@@ -1824,6 +1824,13 @@ unsourced = [
     "guild_quest.statues.shown",
     "guild_quest.statues.part_passed",
     "guild_quest.statues.failed",
+    "guild_quest.vassals.not_leader",
+    "guild_quest.vassals.cleared",
+    "guild_quest.vassals.intro",
+    "guild_quest.vassals.no_offering",
+    "guild_quest.vassals.right",
+    "guild_quest.vassals.hint",
+    "guild_quest.vassals.failed",
     "guild_quest.gate.closed",
     "guild_quest.gate.blocked",
 ]

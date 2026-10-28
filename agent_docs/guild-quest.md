@@ -6,13 +6,14 @@ registration with Shuang, each channel's line of guilds, the waiting room
 and its gathering, the quest's clock, the ends for too few members or a
 missing registrant, the Returning Path and Nuris, and the client's
 waitlist line, the outskirts' brief and earrings, the guide out on every
-stage, the quest's items taken on leaving, the statue keeper's test, and
-the knights' hall's spears and gates. Not yet: the stages beyond the
-knights' hall, their rewards and the rest of the guild points the quest
-earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
+stage, the quest's items taken on leaving, the statue keeper's test, the
+knights' hall's spears and gates, and the vassals' offering at the
+fountain. Not yet: the stages beyond the fountain, their rewards and the
+rest of the guild points the quest earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
 event machinery's anchors in `reports/b253-gq-event-infra.md`, the first
-stages in `reports/b254-gq-stages-1-3.md` and the knights' hall in
-`reports/b255-gq-stage-400.md`.
+stages in `reports/b254-gq-stages-1-3.md`, the knights' hall in
+`reports/b255-gq-stage-400.md` and the fountain in
+`reports/b256-gq-stage-500.md`.
 
 All dialogue is placeholder text (`guild_quest.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -165,6 +166,37 @@ hurting a player without the earring.
   `metalgate_open`, needs a piece of metal (4001037, from 430's big
   reactor) set in its door (9208005), and leads on to 431.
 
+## The fountain
+
+The Fountain of the Wiseman (990000500, `guild_quest::FOUNTAIN`) is stage
+6. The dining hall and the cellar off it (501, 502) are rooms of the
+event, with no stage of their own.
+
+- **The wish.** The first time the registrant talks to the vassals'
+  keeper (9040006, `VASSAL_KEEPER`), each of the four vassals wishes for
+  one of the four kinds of offering (4001027 to 4001030, `OFFERINGS`),
+  repeats allowed (`guild_quest::Vassals`, kept by the event). Anyone else
+  hears that only the registrant is heard.
+- **The offering.** On each later talk the client actor lists the items
+  on the floor (`FieldMessage::FloorItems`, where each came to rest) and
+  makes them an offering (`guild_quest::offering`): exactly four of the
+  kinds, one in each of the map's first four areas, in NX order. Anything
+  else is no offering and uses no try.
+- **Right.** The water gate (reactor "watergate", `WATER_GATE`) goes to
+  state 1, the stage clears, the four items go
+  (`FieldMessage::TakeItems`) and the guild gains 25 points
+  (`VASSAL_POINTS`, in the keeper's script).
+- **Wrong.** The keeper counts the vassals pleased, those given a kind
+  another of them wished for, and those given a kind no one left wished
+  for, with the try's number. The map sees the wrong-answer effect, and a
+  knight of each kind (9300036, 9300037, `KNIGHTS`) comes out. The seventh
+  wrong try (`OFFERING_TRIES`) brings out six of each along the floor
+  instead, and the vassals wish anew on the next talk.
+- **The gate.** `next00` is `watergate_open`: shut until the water gate
+  is open, then on to 990000600's portal 1.
+
+The harness's `RUSTMS_GQ_VASSALS` (four digits 0-3) pins the wish.
+
 ## The quest's items
 
 `events::GUILD_QUEST.items` (`guild_quest::ITEMS`) are Cosmic's exclusive
@@ -230,6 +262,13 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
   and `net/src/guild_quest.rs`
   (`the_knights_hall_plays_its_stage_and_the_maps_off_it_are_rooms`).
 - `net/src/guild_quest.rs` (`statues_*`): the test's parts and judging.
+- `integration-harness/tests/guild_quest_vassals.rs`: the keeper's
+  refusal of a member, the shut gate, the intro, no offering, a wrong one
+  with its hint and knights, the right one with the clear, the points, the
+  offering taken and the gate. `net/src/guild_quest.rs` (`the_vassals_*`,
+  `an_offering_*`) has the hints, the tries and the offering's rules, and
+  `net/src/scripts.rs` (`the_fountain_s_water_gate_opens_on_the_vassals_offering`)
+  the gate.
 - `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)
   and `net/src/scripts.rs` (`shuang_briefs_whoever_reaches_sharenians_outskirts`).
 - `HeavenClient/tests/guild.cpp`: the waitlist lines.

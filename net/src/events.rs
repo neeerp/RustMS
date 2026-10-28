@@ -3597,7 +3597,10 @@ pub fn head_count(split: [u8; 3], areas: &[Area], positions: &[(i32, i32)]) -> H
 
 /// The digits of the environment variable `var`, if it holds `N` of them,
 /// each in `range`: a test's pin on a draw.
-fn pinned_digits<const N: usize>(var: &str, range: RangeInclusive<u8>) -> Option<[u8; N]> {
+pub(crate) fn pinned_digits<const N: usize>(
+    var: &str,
+    range: RangeInclusive<u8>,
+) -> Option<[u8; N]> {
     let pin = std::env::var(var).ok()?;
     let digits: Vec<u8> = pin.bytes().map(|b| b.wrapping_sub(b'0')).collect();
     let digits: [u8; N] = digits.try_into().ok()?;

@@ -7,9 +7,11 @@
 //! Sharenian opens (`events::GUILD_QUEST`). Pure rules; the directory
 //! keeps each channel's line.
 
+use game_data::Area;
 use rand::seq::index::sample;
 use rand::Rng;
 use std::collections::VecDeque;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 /// Victoria Road: Excavation Site <Camp>, where Shuang registers guilds and
@@ -94,6 +96,31 @@ pub const SPEAR_POINTS: i32 = 20;
 /// opened by a piece of metal (4001037).
 pub const STONE_GATE: &str = "stonegate";
 pub const METAL_GATE: &str = "metalgate";
+
+/// The Fountain of the Wiseman, past the knights' hall, where the vassal
+/// keeper (`VASSAL_KEEPER`) judges the offerings the guild sets out before
+/// its four vassals. Two of the kinds come from its knights, and two from
+/// the dining hall and the cellar off it (990000501 and 990000502).
+pub const FOUNTAIN: i32 = 990_000_500;
+pub const VASSAL_KEEPER: i32 = 9_040_006;
+/// The fountain's gate, which the right offerings open (state 1), and the
+/// way on behind it.
+pub const WATER_GATE: &str = "watergate";
+/// The offerings, one kind for each digit of the vassals' wish, from 0:
+/// the knights' two items, the spoiled food and the drink.
+pub const OFFERINGS: std::ops::RangeInclusive<i32> = 4_001_027..=4_001_030;
+/// The vassals, one for each of the fountain's areas, from 0.
+pub const VASSALS: usize = 4;
+/// How many offerings the guild may make before the wish changes.
+pub const OFFERING_TRIES: u8 = 7;
+/// Guild points for the right offerings (Cosmic `9040006`'s `gainGP`).
+pub const VASSAL_POINTS: i32 = 25;
+/// The knights a wrong offering brings out, one of each where it says, and
+/// how many of each the last wrong one brings out anywhere along
+/// `KNIGHTS_X`.
+pub const KNIGHTS: [(i32, (i16, i16)); 2] = [(9_300_036, (-350, 150)), (9_300_037, (400, 150))];
+pub const KNIGHTS_ON_FAILING: usize = 6;
+pub const KNIGHTS_X: std::ops::Range<i16> = -350..400;
 
 /// How many guilds may wait on a channel, besides the one playing.
 pub const QUEUE_MAX: usize = 10;
@@ -319,6 +346,123 @@ impl Statues {
     }
 }
 
+/// What the vassal keeper tells a member (Cosmic `9040006`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VassalTalk {
+    NotLeader,
+    Cleared,
+    /// The vassals have a new wish; the registrant hears the test.
+    Intro,
+    /// Not one offering of the kinds in each area, and four in all.
+    NoOffering,
+    Right,
+    Wrong(Hint),
+    /// The last try was wrong: the wish is forgotten until the next talk.
+    Failed,
+}
+
+/// How a wrong offering went down (Cosmic `9040006`): `pleased` vassals got
+/// what they wished for; of the rest, `unknown` offerings are kinds beyond
+/// what any vassal wished for, and `wrong` ones are wished for elsewhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hint {
+    pub pleased: u8,
+    pub wrong: u8,
+    pub unknown: u8,
+    /// Which try this was, from 1.
+    pub attempt: u8,
+}
+
+/// The vassals' wish, drawn when the registrant first asks, and the tries
+/// made at it.
+#[derive(Clone, Debug, Default)]
+pub struct Vassals {
+    wish: Option<[u8; VASSALS]>,
+    attempt: u8,
+}
+
+impl Vassals {
+    /// The registrant talks to the keeper with `offering` set out (see
+    /// `offering`).
+    pub fn talk(&mut self, offering: Option<[u8; VASSALS]>, rng: &mut impl Rng) -> VassalTalk {
+        let Some(wish) = self.wish else {
+            self.wish = Some(draw_wish(rng));
+            self.attempt = 1;
+            return VassalTalk::Intro;
+        };
+        let Some(offering) = offering else {
+            return VassalTalk::NoOffering;
+        };
+        if offering == wish {
+            return VassalTalk::Right;
+        }
+        if self.attempt >= OFFERING_TRIES {
+            self.wish = None;
+            return VassalTalk::Failed;
+        }
+        let hint = hint(wish, offering, self.attempt);
+        self.attempt += 1;
+        VassalTalk::Wrong(hint)
+    }
+}
+
+/// A new wish: each vassal wishes for any of the four kinds. For testing,
+/// `RUSTMS_GQ_VASSALS` (four digits 0-3) pins it.
+fn draw_wish(rng: &mut impl Rng) -> [u8; VASSALS] {
+    static PIN: OnceLock<Option<[u8; VASSALS]>> = OnceLock::new();
+    if let Some(pin) = PIN.get_or_init(|| crate::events::pinned_digits("RUSTMS_GQ_VASSALS", 0..=3))
+    {
+        return *pin;
+    }
+    std::array::from_fn(|_| rng.gen_range(0, 4))
+}
+
+fn hint(wish: [u8; VASSALS], offering: [u8; VASSALS], attempt: u8) -> Hint {
+    let (mut wished, mut offered) = ([0u8; VASSALS], [0u8; VASSALS]);
+    let mut pleased = 0;
+    for (&w, &o) in wish.iter().zip(&offering) {
+        if w == o {
+            pleased += 1;
+        } else {
+            wished[usize::from(w)] += 1;
+            offered[usize::from(o)] += 1;
+        }
+    }
+    let unknown = (offered.iter().zip(&wished))
+        .map(|(o, w)| o.saturating_sub(*w))
+        .sum::<u8>();
+    Hint {
+        pleased,
+        wrong: VASSALS as u8 - pleased - unknown,
+        unknown,
+        attempt,
+    }
+}
+
+/// The offering the items on the fountain's floor make, each `(item id,
+/// where it lies)`: exactly four of the kinds, one in each of the first
+/// four `areas`; None otherwise. Items of other kinds don't count.
+pub fn offering(items: &[(i32, (i32, i32))], areas: &[Area]) -> Option<[u8; VASSALS]> {
+    let offered: Vec<_> = (items.iter())
+        .filter(|(id, _)| OFFERINGS.contains(id))
+        .collect();
+    if offered.len() != VASSALS {
+        return None;
+    }
+    let mut set = [None; VASSALS];
+    for &&(id, (x, y)) in &offered {
+        let area = (areas.iter().take(VASSALS)).position(|area| area.contains(x, y));
+        if let Some(area) = area {
+            set[area] = Some((id - OFFERINGS.start()) as u8);
+        }
+    }
+    let mut offering = [0; VASSALS];
+    for (kind, set) in offering.iter_mut().zip(set) {
+        *kind = set?;
+    }
+    Some(offering)
+}
+
 /// How long after the statues start moving the `n`th (from 0) of a combo
 /// is shown; `RUSTMS_EVENT_SCALE` shortens it.
 pub fn shown_after(n: usize) -> Duration {
@@ -385,6 +529,75 @@ mod tests {
         assert_eq!(line.next(|_| true), (Some(guild(3)), vec![]));
         line.done(3);
         assert_eq!(line.next(|_| true), (None, vec![]));
+    }
+
+    fn area(x1: i32, x2: i32) -> Area {
+        Area {
+            x1,
+            x2,
+            y1: 100,
+            y2: 200,
+        }
+    }
+
+    #[test]
+    fn the_vassals_hint_counts_pleased_wrong_and_unknown_offerings() {
+        let hint = |wish, offering| {
+            let h = super::hint(wish, offering, 1);
+            (h.pleased, h.wrong, h.unknown)
+        };
+        assert_eq!(hint([0, 1, 2, 3], [0, 1, 3, 2]), (2, 2, 0));
+        // Two of kind 3 offered where only one is wished for: one unknown.
+        assert_eq!(hint([0, 1, 2, 3], [3, 1, 2, 3]), (3, 0, 1));
+        assert_eq!(hint([0, 0, 0, 0], [1, 2, 3, 1]), (0, 0, 4));
+        assert_eq!(hint([0, 1, 2, 3], [1, 2, 3, 0]), (0, 4, 0));
+    }
+
+    #[test]
+    fn the_vassals_take_seven_tries_then_wish_anew() {
+        let mut rng = rand::rngs::mock::StepRng::new(0, 0);
+        let mut vassals = Vassals::default();
+        assert_eq!(vassals.talk(Some([0; 4]), &mut rng), VassalTalk::Intro);
+        let wish = vassals.wish.unwrap();
+        let wrong = wish.map(|kind| (kind + 1) % 4);
+        assert_eq!(vassals.talk(None, &mut rng), VassalTalk::NoOffering);
+        for attempt in 1..OFFERING_TRIES {
+            let VassalTalk::Wrong(hint) = vassals.talk(Some(wrong), &mut rng) else {
+                panic!("try {attempt}");
+            };
+            assert_eq!(hint.attempt, attempt);
+        }
+        assert_eq!(vassals.talk(Some(wrong), &mut rng), VassalTalk::Failed);
+        assert_eq!(vassals.talk(Some(wrong), &mut rng), VassalTalk::Intro);
+        let wish = vassals.wish.unwrap();
+        assert_eq!(vassals.talk(Some(wish), &mut rng), VassalTalk::Right);
+    }
+
+    #[test]
+    fn an_offering_is_four_kinds_one_in_each_area() {
+        let areas = [area(0, 10), area(10, 20), area(20, 30), area(30, 40)];
+        let at = |x| (x, 150);
+        let four = [
+            (4_001_030, at(5)),
+            (4_001_027, at(15)),
+            (4_001_028, at(25)),
+            (4_001_029, at(35)),
+        ];
+        assert_eq!(offering(&four, &areas), Some([3, 0, 1, 2]));
+        // Other items don't count.
+        let mut more = four.to_vec();
+        more.push((4_001_025, at(5)));
+        assert_eq!(offering(&more, &areas), Some([3, 0, 1, 2]));
+        assert_eq!(offering(&four[..3], &areas), None);
+        more.push((4_001_027, at(5)));
+        assert_eq!(offering(&more, &areas), None);
+        // Two in one area leave another empty; one outside every area.
+        let mut doubled = four;
+        doubled[1].1 = at(6);
+        assert_eq!(offering(&doubled, &areas), None);
+        let mut outside = four;
+        outside[3].1 = (35, 250);
+        assert_eq!(offering(&outside, &areas), None);
     }
 
     #[test]

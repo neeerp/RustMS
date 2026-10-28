@@ -2288,6 +2288,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
         },
+        // The fountain's way on, open once the vassals take the guild's
+        // offering (Cosmic `watergate_open`).
+        "watergate_open" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireReactorsSet(&[crate::guild_quest::WATER_GATE]),
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::guild_quest::FOUNTAIN + 100, 1),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
+        },
         // The decks' ways on, once their crews are all gone, as the first
         // stage's (Cosmic `davy_next2`, `davy_next3`).
         "davy_next2" | "davy_next3" => ScriptOutcome {
@@ -4600,6 +4611,30 @@ mod tests {
         assert_eq!(unscripted_map_enter(&player), [Effect::OpenNpc(SHUANG)]);
         player.stats.map_id = WAITING_ROOM;
         assert!(unscripted_map_enter(&player).is_empty());
+    }
+
+    #[test]
+    fn the_fountain_s_water_gate_opens_on_the_vassals_offering() {
+        use crate::guild_quest::{FOUNTAIN, WATER_GATE};
+        let data = crate::get_game_data().unwrap();
+        let field = data.field(FOUNTAIN).unwrap();
+        let next = field.portal_by_name("next00").unwrap();
+        assert_eq!(next.script.as_deref(), Some("watergate_open"));
+        assert!(field.reactors.iter().any(|r| r.name == WATER_GATE));
+        let outcome = portal("watergate_open", &player_with(&[])).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::RequireReactorsSet(&[WATER_GATE]),
+                Effect::PortalSound,
+                Effect::WarpToPortal(FOUNTAIN + 100, 1)
+            ]
+        );
+        assert!(data
+            .field(FOUNTAIN + 100)
+            .unwrap()
+            .portal_by_id(1)
+            .is_some());
     }
 
     #[test]

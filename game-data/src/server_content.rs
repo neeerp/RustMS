@@ -2164,6 +2164,13 @@ pub mod keys {
     pub const GUILD_QUEST_STATUES_SHOWN: &str = "guild_quest.statues.shown";
     pub const GUILD_QUEST_STATUES_PART_PASSED: &str = "guild_quest.statues.part_passed";
     pub const GUILD_QUEST_STATUES_FAILED: &str = "guild_quest.statues.failed";
+    pub const GUILD_QUEST_VASSALS_NOT_LEADER: &str = "guild_quest.vassals.not_leader";
+    pub const GUILD_QUEST_VASSALS_CLEARED: &str = "guild_quest.vassals.cleared";
+    pub const GUILD_QUEST_VASSALS_INTRO: &str = "guild_quest.vassals.intro";
+    pub const GUILD_QUEST_VASSALS_NO_OFFERING: &str = "guild_quest.vassals.no_offering";
+    pub const GUILD_QUEST_VASSALS_RIGHT: &str = "guild_quest.vassals.right";
+    pub const GUILD_QUEST_VASSALS_HINT: &str = "guild_quest.vassals.hint";
+    pub const GUILD_QUEST_VASSALS_FAILED: &str = "guild_quest.vassals.failed";
     pub const GUILD_QUEST_GATE_CLOSED: &str = "guild_quest.gate.closed";
     pub const GUILD_QUEST_GATE_BLOCKED: &str = "guild_quest.gate.blocked";
     pub const LINE3_EXIT_STAY: &str = "line3.exit.stay";

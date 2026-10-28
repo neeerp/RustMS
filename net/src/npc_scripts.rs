@@ -1511,6 +1511,35 @@ impl NpcScript {
         Self::new(guild_quest::STATUE_KEEPER, pages)
     }
 
+    /// The vassals' keeper (9040006) at the fountain, as the guild's
+    /// offering went (Cosmic `9040006`): the registrant hears of the four
+    /// vassals' wishes, and a right offering gains the guild its points.
+    pub fn vassal_keeper(talk: guild_quest::VassalTalk) -> Self {
+        use guild_quest::VassalTalk;
+        let say = |key| vec![Page::Say(text(key))];
+        let pages = match talk {
+            VassalTalk::NotLeader => say(keys::GUILD_QUEST_VASSALS_NOT_LEADER),
+            VassalTalk::Cleared => say(keys::GUILD_QUEST_VASSALS_CLEARED),
+            VassalTalk::Intro => say(keys::GUILD_QUEST_VASSALS_INTRO),
+            VassalTalk::NoOffering => say(keys::GUILD_QUEST_VASSALS_NO_OFFERING),
+            VassalTalk::Right => vec![Page::Act {
+                text: text(keys::GUILD_QUEST_VASSALS_RIGHT),
+                effects: vec![Effect::GainGuildPoints(guild_quest::VASSAL_POINTS)],
+            }],
+            VassalTalk::Wrong(hint) => vec![Page::Say(content::text().get(
+                keys::GUILD_QUEST_VASSALS_HINT,
+                &[
+                    ("attempt", &hint.attempt.to_string()),
+                    ("pleased", &hint.pleased.to_string()),
+                    ("wrong", &hint.wrong.to_string()),
+                    ("unknown", &hint.unknown.to_string()),
+                ],
+            ))],
+            VassalTalk::Failed => say(keys::GUILD_QUEST_VASSALS_FAILED),
+        };
+        Self::new(guild_quest::VASSAL_KEEPER, pages)
+    }
+
     /// Shuang (9040000) at the Excavation Site's camp, to a member of rank
     /// `rank` in their guild (none without one) who finds the channel's
     /// Guild Quest line as `view` (Cosmic `9040000`): the master or a Jr.
