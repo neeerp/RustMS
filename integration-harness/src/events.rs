@@ -317,8 +317,8 @@ pub async fn enter_amoria(team: &mut [WorldSession]) -> Vec<Trace> {
 }
 
 /// `pairs` married couples of new characters at `level`, a man and then
-/// his wife (with a Moonstone ring box), each holding `items` as
-/// `waiting_in` does, logged in and waiting on `lobby`.
+/// his wife (with a Moonstone ring box), each armed and holding `items` as
+/// `waiting_with` does, logged in and waiting on `lobby`.
 pub async fn couples_in(
     lobby: i32,
     level: i16,
@@ -333,6 +333,9 @@ pub async fn couples_in(
         tokio::time::sleep(Duration::from_millis(500)).await;
         set_job(id, 0, level, 50).await.unwrap();
         set_gender(id, (n % 2) as i16).await.unwrap();
+        replace_item(id, -1, -11, 1302000).await.unwrap();
+        set_weapon_attack(id, 500).await.unwrap();
+        set_str(id, 999).await.unwrap();
         for (slot, &(item_id, quantity)) in (1..).zip(items) {
             grant_stack(id, 4, slot, item_id, quantity).await.unwrap();
         }

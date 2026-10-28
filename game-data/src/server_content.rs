@@ -2201,6 +2201,17 @@ pub mod keys {
     pub const AMORIA_PQ_LOBBY_NOT_ELIGIBLE: &str = "amoria_pq.lobby.not_eligible";
     pub const AMORIA_PQ_LOBBY_BUSY: &str = "amoria_pq.lobby.busy";
     pub const AMORIA_PQ_EXIT_ASK: &str = "amoria_pq.exit.ask";
+    pub const AMORIA_PQ_AMOS_CLEARED: &str = "amoria_pq.amos.cleared";
+    pub const AMORIA_PQ_AMOS_NOT_LEADER: &str = "amoria_pq.amos.not_leader";
+    pub const AMORIA_PQ_STAGE1_INTRO: &str = "amoria_pq.stage1.intro";
+    pub const AMORIA_PQ_STAGE1_SEE_GLIMMER: &str = "amoria_pq.stage1.see_glimmer";
+    pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";
+    pub const AMORIA_PQ_GLIMMER_MEMBER_TASK: &str = "amoria_pq.glimmer.member_task";
+    pub const AMORIA_PQ_GLIMMER_FIERRY_OUT: &str = "amoria_pq.glimmer.fierry_out";
+    pub const AMORIA_PQ_GLIMMER_BEAT_FIERRY: &str = "amoria_pq.glimmer.beat_fierry";
+    pub const AMORIA_PQ_GLIMMER_SHARD_TAKEN: &str = "amoria_pq.glimmer.shard_taken";
+    pub const AMORIA_PQ_GENDER_WOMEN_ONLY: &str = "amoria_pq.gender.women_only";
+    pub const AMORIA_PQ_GENDER_MEN_ONLY: &str = "amoria_pq.gender.men_only";
     pub const LINE3_EXIT_STAY: &str = "line3.exit.stay";
     pub const MAKER_PICK: &str = "maker.pick";
     pub const MAKER_ASK: &str = "maker.ask";

@@ -157,6 +157,14 @@ pub struct Cleared {
     /// The Guild Quest's King's Corridor's door took the earring
     /// (`EventCommand::KingGateOpened`).
     king_gate: AtomicBool,
+    /// The Amorian Challenge's fierry came out (`EventCommand::FierryOut`).
+    fierry: AtomicBool,
+    /// The Amorian Challenge's leader handed in the Magik Mirror Shard
+    /// (`EventCommand::ShardIn`).
+    shard: AtomicBool,
+    /// Which of the Amorian Challenge's stage 1 ways its clear opened,
+    /// counted from 1; 0 before.
+    way: AtomicU8,
 }
 
 impl Cleared {
@@ -191,6 +199,19 @@ impl Cleared {
 
     pub fn king_gate(&self) -> bool {
         self.king_gate.load(Ordering::Acquire)
+    }
+
+    pub fn fierry(&self) -> bool {
+        self.fierry.load(Ordering::Acquire)
+    }
+
+    pub fn shard(&self) -> bool {
+        self.shard.load(Ordering::Acquire)
+    }
+
+    /// The Amorian Challenge's open way from stage 1 (`net::events::AMORIA_WAYS`).
+    pub fn way(&self) -> Option<u8> {
+        self.way.load(Ordering::Acquire).checked_sub(1)
     }
 
     /// Take rope room `room`; returns whether no one had.
@@ -295,6 +316,31 @@ impl EventTicket {
     /// Whether Romeo or Juliet has read the other's letter.
     pub fn shocked(&self) -> bool {
         self.cleared.shocked()
+    }
+
+    /// Whether the Glimmer Man brought out the Amorian Challenge's fierry.
+    pub fn fierry(&self) -> bool {
+        self.cleared.fierry()
+    }
+
+    /// Whether the leader handed the Glimmer Man the Magik Mirror Shard.
+    pub fn shard(&self) -> bool {
+        self.cleared.shard()
+    }
+
+    /// Which of the Amorian Challenge's stage 1 ways is open, if any.
+    pub fn way(&self) -> Option<u8> {
+        self.cleared.way()
+    }
+
+    /// The object on `stage`'s map that shows its way on open once it is
+    /// cleared: the stage maps' `gate` (`Event::gates`), or on the Amorian
+    /// Challenge's first the gate of the way drawn, `gate0` to `gate2`.
+    pub fn gate_object(&self, stage: u8) -> Option<String> {
+        if self.kind == EventKind::Amoria && stage == 1 {
+            return self.way().map(|way| format!("gate{way}"));
+        }
+        self.kind.event().gates.then(|| "gate".to_string())
     }
 
     /// Where the member, dead on one of the event's maps, revives instead
@@ -1251,6 +1297,19 @@ impl EventActor {
                     self.send_room_key(stage);
                 }
             }
+            // Once the shard is in, opening one of the three ways at
+            // random (Cosmic `9201044`'s `clearStage`).
+            EventCommand::ClearStage(1) if self.kind == EventKind::Amoria => {
+                if leader && self.cleared.shard() && !self.cleared.has(1) {
+                    let ways = net::events::AMORIA_WAYS.len();
+                    let way = rand::Rng::gen_range(&mut rand::thread_rng(), 0, ways);
+                    let way = u8::try_from(way).unwrap_or(0);
+                    self.cleared.way.store(way + 1, Ordering::Release);
+                    self.clear(1);
+                } else {
+                    debug!(client_id, "Clear not taken");
+                }
+            }
             EventCommand::ClearStage(1) if leader => {
                 if self.stage1.clear() {
                     self.clear(1);
@@ -1423,6 +1482,29 @@ impl EventActor {
                 });
             }
             EventCommand::PastTheDoors => debug!(client_id, "Lord Pirate already out"),
+            // Once a run (Cosmic `9201047`'s `statusStg1`).
+            EventCommand::FierryOut
+                if self.kind == EventKind::Amoria && !won && !self.cleared.fierry() =>
+            {
+                self.cleared.fierry.store(true, Ordering::Release);
+                let field = self.fields.field(FieldKey {
+                    channel_id: self.channel_id,
+                    map_id: event.stage_map(1),
+                    instance_id: self.id,
+                });
+                let message = FieldMessage::BringOut {
+                    mob_id: net::events::FIERRY,
+                    at: net::events::FIERRY_AT,
+                };
+                tokio::spawn(async move {
+                    let _ = field.tx.send(message).await;
+                });
+            }
+            EventCommand::FierryOut => debug!(client_id, "Fierry already out"),
+            EventCommand::ShardIn if leader && self.kind == EventKind::Amoria => {
+                self.cleared.shard.store(true, Ordering::Release);
+            }
+            EventCommand::ShardIn => debug!(client_id, "Shard not taken"),
             // A Magatia hub's side door opened the way back out of the
             // party's copy of the room behind it.
             EventCommand::OpenReactor { map_id, name } if event.holds(map_id) && !won => {

@@ -1861,6 +1861,17 @@ unsourced = [
     "amoria_pq.lobby.not_eligible",
     "amoria_pq.lobby.busy",
     "amoria_pq.exit.ask",
+    "amoria_pq.amos.cleared",
+    "amoria_pq.amos.not_leader",
+    "amoria_pq.stage1.intro",
+    "amoria_pq.stage1.see_glimmer",
+    "amoria_pq.glimmer.task",
+    "amoria_pq.glimmer.member_task",
+    "amoria_pq.glimmer.fierry_out",
+    "amoria_pq.glimmer.beat_fierry",
+    "amoria_pq.glimmer.shard_taken",
+    "amoria_pq.gender.women_only",
+    "amoria_pq.gender.men_only",
 ]
 
 [text."glTutoMsg0.message"]

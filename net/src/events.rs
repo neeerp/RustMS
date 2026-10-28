@@ -1928,6 +1928,31 @@ pub const AMORIA_KEYS_PER_TICKET: i16 = 10;
 /// Code Pieces, of use only in the challenge (Cosmic AmoriaPQ's
 /// `setEventExclusives`).
 pub const AMORIA_ITEMS: [i32; 4] = [4_031_594, 4_031_595, 4_031_596, 4_031_597];
+/// The Magik Mirror Shard the leader hands the Glimmer Man on stage 1, and
+/// the fierry he brings out once its map is bare, below this point, whose
+/// Wing Hammer breaks the mirror (Cosmic `9201047`).
+pub const MAGIK_MIRROR_SHARD: i32 = 4_031_595;
+pub const FIERRY: i32 = 9_400_518;
+pub const FIERRY_AT: (i16, i16) = (-245, 810);
+/// Stage 1's ways up to stage 2, each to its own copy of the stage's map;
+/// the clear opens one, drawn at random (Cosmic `9201044`'s `clearStage`).
+pub const AMORIA_WAYS: [&str; 3] = ["go00", "go01", "go02"];
+pub const AMORIA_STAGE2: [i32; 3] = [670_010_300, 670_010_301, 670_010_302];
+
+/// Where `portal` on `map_id` leads a player in the Amorian Challenge
+/// whose stage 1 opened the way numbered `open`, if any: the open one of
+/// stage 1's ways to its copy of stage 2, and the others nowhere (`Some(None)`).
+/// `None` for any other portal.
+pub fn amoria_way(map_id: i32, portal: &str, open: Option<u8>) -> Option<Option<i32>> {
+    if map_id != AMORIA_ENTRY {
+        return None;
+    }
+    let way = AMORIA_WAYS.iter().position(|&way| way == portal)?;
+    Some(
+        open.filter(|&open| usize::from(open) == way)
+            .map(|_| AMORIA_STAGE2[way]),
+    )
+}
 
 /// The Amorian Challenge (Cosmic `AmoriaPQ`): six of a party, all married,
 /// men and women among them, of level 40 or more, on the Entrance with
@@ -3471,6 +3496,12 @@ pub enum EventCommand {
     KingRoomFell { here: usize, mobs: usize },
     /// A member who died has revived.
     Revived,
+    /// The Glimmer Man brought out the Amorian Challenge's fierry, once a
+    /// run, stage 1 being bare.
+    FierryOut,
+    /// The leader handed the Glimmer Man the Magik Mirror Shard, which lets
+    /// Amos clear stage 1.
+    ShardIn,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -4052,6 +4083,17 @@ mod tests {
                     )
                     .is_some()
         );
+    }
+
+    #[test]
+    fn amoria_s_first_stage_opens_only_the_way_drawn() {
+        let way = |portal, open| amoria_way(AMORIA_ENTRY, portal, open);
+        assert_eq!(way("go00", None), Some(None));
+        assert_eq!(way("go02", Some(1)), Some(None));
+        assert_eq!(way("go01", Some(1)), Some(Some(670010301)));
+        assert_eq!(way("go02", Some(2)), Some(Some(670010302)));
+        assert_eq!(way("male00", Some(0)), None);
+        assert_eq!(amoria_way(AMORIA_STAGE2[0], "go00", Some(0)), None);
     }
 
     #[test]
