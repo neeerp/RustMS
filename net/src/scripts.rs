@@ -3019,6 +3019,28 @@ pub fn rand_ola(map_id: i32, portal: &str, seed: u64) -> Option<Vec<Effect>> {
     ])
 }
 
+/// The portals on the Amorian Challenge's first stage to its side rooms,
+/// the men's on the right and the women's on the left.
+pub const GENDER_GO: &str = "gendergo";
+
+/// Where `portal`, one of the `gendergo` portals on `map_id`, takes a
+/// player of `gender` (0 a man): `male00` takes a man and `female00` a
+/// woman to their room on the same map, and tells anyone else in pink
+/// that it is the other's (Cosmic `gendergo`).
+pub fn gender_go(map_id: i32, portal: &str, gender: u8) -> Vec<Effect> {
+    let (wanted, to, refused) = match portal {
+        "female00" => (1, "female01", keys::AMORIA_PQ_GENDER_WOMEN_ONLY),
+        _ => (0, "male01", keys::AMORIA_PQ_GENDER_MEN_ONLY),
+    };
+    if gender != wanted {
+        return vec![Effect::Pink(content::text().get(refused, &[]))];
+    }
+    vec![
+        Effect::PortalSound,
+        Effect::WarpToPortal(map_id, named(map_id, to)),
+    ]
+}
+
 /// The id of `map_id`'s portal called `name`, else 0.
 pub fn named(map_id: i32, name: &str) -> u8 {
     portal_id(map_id, |portal| portal.name == name)

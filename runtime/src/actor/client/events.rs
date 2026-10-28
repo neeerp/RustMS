@@ -422,6 +422,38 @@ impl ClientActor {
         Ok(Some(NpcScript::guon_aboard(player, leader, marks, bare)))
     }
 
+    /// What Amos or the Glimmer Man, `npc_id`, says to the player on the
+    /// Amorian Challenge's first stage, if there.
+    pub(super) async fn amoria_stage1(
+        &mut self,
+        npc_id: i32,
+    ) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| {
+            ticket.kind == EventKind::Amoria
+                && map_id == events::AMORIA_ENTRY
+                && ticket.holds(map_id)
+        }) else {
+            return Ok(None);
+        };
+        let (leader, fierry, shard) = (ticket.leader(), ticket.fierry(), ticket.shard());
+        if npc_id == net::npc_scripts::AMOS_STAGE {
+            let cleared = ticket.cleared(1);
+            return Ok(Some(NpcScript::amos_stage1(leader, fierry, shard, cleared)));
+        }
+        let bare = if leader && !fierry && !shard {
+            let (reply, mobs) = oneshot::channel();
+            self.send_to_field(FieldMessage::MobCount { reply }).await?;
+            mobs.await.unwrap_or(1) == 0
+        } else {
+            false
+        };
+        let player = &self.in_game()?.player;
+        Ok(Some(NpcScript::glimmer_man(
+            player, leader, fierry, shard, bare,
+        )))
+    }
+
     /// What the hub's Romeo or Juliet, `npc_id`, says to the player in
     /// the hub of their side's party quest, if anything: whether the hub's
     /// stage is cleared and its way on shut decide it.
@@ -1547,6 +1579,26 @@ impl ClientActor {
             .is_some_and(|stage| !ticket.cleared(stage))
     }
 
+    /// Where `packet`, a walk through a portal, leads the player in the
+    /// Amorian Challenge, if it is one of stage 1's ways on: the open one
+    /// to its copy of stage 2, the others nowhere (`Some(None)`).
+    pub(super) fn amoria_way(&self, packet: &Packet) -> Option<Option<i32>> {
+        let (Some(ticket), Some(game)) = (&self.event, &self.game) else {
+            return None;
+        };
+        let map_id = game.player.stats.map_id;
+        if self.in_cash_shop || ticket.kind != EventKind::Amoria || !ticket.holds(map_id) {
+            return None;
+        }
+        events::amoria_way(map_id, &portal_name(packet)?, ticket.way())
+    }
+
+    /// The player went through the Amorian Challenge's open way on from
+    /// stage 1, onto `to` (Cosmic `apq00`-`apq02`).
+    pub(super) async fn take_amoria_way(&mut self, to: i32) -> Result<(), RuntimeError> {
+        self.warp_within_event_to(to, 0).await
+    }
+
     /// Where the player, if dead on one of their event's maps, revives
     /// (`EventTicket::revive_to`): read as they answer the death dialog, as
     /// the event may have let them stay since they died. Returns whether
@@ -1635,6 +1687,7 @@ impl ClientActor {
             return Ok(());
         }
         let (ticket_kind, entered) = (ticket.kind, ticket.entered);
+        let gate = ticket.gate_object(stage);
         let event = ticket.kind.event();
         let dojo = matches!(
             ticket.kind,
@@ -1685,8 +1738,8 @@ impl ClientActor {
         } else if here && !quiet {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
-            if event.gates {
-                packets.push(build_field_object("gate")?);
+            if let Some(gate) = gate {
+                packets.push(build_field_object(&gate)?);
             }
         }
         // A stage worth no EXP shows no "+0" line.
@@ -1786,17 +1839,13 @@ impl ClientActor {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
             return Ok(());
         };
-        let event = ticket.kind.event();
-        if !event.gates {
-            return Ok(());
+        let gate = (ticket.kind.event().stage_on(map_id))
+            .filter(|&stage| ticket.cleared(stage))
+            .and_then(|stage| ticket.gate_object(stage));
+        match gate {
+            Some(gate) => self.send(&mut build_field_object(&gate)?).await,
+            None => Ok(()),
         }
-        let cleared = event
-            .stage_on(map_id)
-            .is_some_and(|stage| ticket.cleared(stage));
-        if !cleared {
-            return Ok(());
-        }
-        self.send(&mut build_field_object("gate")?).await
     }
 
     /// On a Dojo boss floor, the challenger hears the gong, sees the

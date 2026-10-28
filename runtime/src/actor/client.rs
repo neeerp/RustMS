@@ -431,6 +431,17 @@ impl ClientActor {
             return self.refuse_chat().await;
         }
         // Checked before the handler moves the player.
+        if opcode == RecvOpcode::ChangeMap as i16 {
+            match self.amoria_way(&packet) {
+                Some(Some(to)) => return self.take_amoria_way(to).await,
+                Some(None) => {
+                    return self
+                        .send(&mut build_blocked_map(BlockedMap::PortalClosed)?)
+                        .await
+                }
+                None => {}
+            }
+        }
         if opcode == RecvOpcode::ChangeMap as i16
             && (self.gate_closed(&packet) || self.gm_gate_closed(&packet).await?)
         {

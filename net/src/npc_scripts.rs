@@ -977,10 +977,12 @@ pub const GUON_ABOARD: i32 = 2094002;
 /// Amos the Strong on his training ground, who lets a ticket holder into
 /// the Amorian Challenge's Entrance and trades keys for tickets; Amos on
 /// the Entrance, who sends a party of married couples in; and the Glimmer
-/// Man on its way out.
+/// Man on its way out; and Amos on the stages up to the fifth, and the
+/// Glimmer Man on the first.
 pub const AMOS_HALL: i32 = 9201043;
 pub const AMOS_LOBBY: i32 = 9201048;
 pub const GLIMMER_MAN: i32 = 9201047;
+pub const AMOS_STAGE: i32 = 9201044;
 /// So Gong, who takes a challenger into the Mu Lung Dojo from its hall and
 /// stands on each of its floors, and the notice board in Mu Lung that
 /// leads to the Dojo.
@@ -1688,6 +1690,26 @@ impl NpcScript {
     /// may or may not take it on.
     pub fn amos_lobby(entry: Entry) -> Self {
         amos_lobby(entry)
+    }
+
+    /// Amos on the Amorian Challenge's first stage, to the team's `leader`
+    /// or another, once its fierry is out or not and the leader handed in
+    /// the shard or not, and once the stage is `cleared`.
+    pub fn amos_stage1(leader: bool, fierry: bool, shard: bool, cleared: bool) -> Self {
+        amos_stage1(leader, fierry, shard, cleared)
+    }
+
+    /// The Glimmer Man on the Amorian Challenge's first stage, to
+    /// `player`, who may lead the team, once its fierry is out or not, the
+    /// shard handed in or not, and the stage `bare` of mobs or not.
+    pub fn glimmer_man(
+        player: &Player,
+        leader: bool,
+        fierry: bool,
+        shard: bool,
+        bare: bool,
+    ) -> Self {
+        glimmer_man(player, leader, fierry, shard, bare)
     }
 
     /// So Gong in the Dojo's hall, for `player`, who may or may not go in.
@@ -11829,6 +11851,51 @@ fn amos_lobby(entry: Entry) -> NpcScript {
     // Someone left or moved since Amos checked, or another party went in.
     script.refused = Some(not_eligible());
     script
+}
+
+/// Amos on the Amorian Challenge's first stage (Cosmic `9201044`): the
+/// leader hears what the stage asks, and once the shard is in, the stage
+/// clears without a word; the others are sent to the leader. Cosmic
+/// clears it on the fierry coming out; here the shard must be in
+/// (`v83ref/lanes/QUESTIONS.md` b260).
+fn amos_stage1(leader: bool, fierry: bool, shard: bool, cleared: bool) -> NpcScript {
+    let page = match () {
+        _ if cleared => Page::Say(text(keys::AMORIA_PQ_AMOS_CLEARED)),
+        _ if !leader => Page::Say(text(keys::AMORIA_PQ_AMOS_NOT_LEADER)),
+        _ if shard => Page::Done(vec![Effect::EventCommand(EventCommand::ClearStage(1))]),
+        _ if fierry => Page::Say(text(keys::AMORIA_PQ_STAGE1_SEE_GLIMMER)),
+        _ => Page::Say(text(keys::AMORIA_PQ_STAGE1_INTRO)),
+    };
+    NpcScript::new(AMOS_STAGE, vec![page])
+}
+
+/// The Glimmer Man on the Amorian Challenge's first stage (Cosmic
+/// `9201047`): the leader hands in the Magik Mirror Shard, or with the map
+/// bare brings out the fierry, once, whose Wing Hammer breaks the mirror;
+/// the others hear the task.
+fn glimmer_man(player: &Player, leader: bool, fierry: bool, shard: bool, bare: bool) -> NpcScript {
+    let held = player.inventory.count(events::MAGIK_MIRROR_SHARD) > 0;
+    let page = match () {
+        _ if !leader => Page::Say(text(keys::AMORIA_PQ_GLIMMER_MEMBER_TASK)),
+        _ if shard => Page::Say(text(keys::AMORIA_PQ_GLIMMER_SHARD_TAKEN)),
+        _ if held => Page::Act {
+            text: text(keys::AMORIA_PQ_GLIMMER_SHARD_TAKEN),
+            effects: vec![
+                Effect::TakeItem {
+                    item_id: events::MAGIK_MIRROR_SHARD,
+                    quantity: 1,
+                },
+                Effect::EventCommand(EventCommand::ShardIn),
+            ],
+        },
+        _ if fierry => Page::Say(text(keys::AMORIA_PQ_GLIMMER_BEAT_FIERRY)),
+        _ if bare => Page::Act {
+            text: text(keys::AMORIA_PQ_GLIMMER_FIERRY_OUT),
+            effects: vec![Effect::EventCommand(EventCommand::FierryOut)],
+        },
+        _ => Page::Say(text(keys::AMORIA_PQ_GLIMMER_TASK)),
+    };
+    NpcScript::new(GLIMMER_MAN, vec![page])
 }
 
 /// Duarte (Cosmic `2103013`'s commented-out script) in Nett's Pyramid's

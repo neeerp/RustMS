@@ -62,6 +62,10 @@ impl ClientActor {
             (Some(script), Some(_)) if script == scripts::RAND_OLA => {
                 scripts::rand_ola(map_id, portal, self.ola_seed)
             }
+            (Some(script), Some(_)) if script == scripts::GENDER_GO => {
+                let gender = self.in_game()?.player.stats.gender;
+                Some(scripts::gender_go(map_id, portal, gender))
+            }
             (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
                 match scripts::time_leap(&self.in_game()?.player) {
                     Some(effects) => Some(effects),

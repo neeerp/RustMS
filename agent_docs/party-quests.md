@@ -42,8 +42,9 @@ is taken alone ([Jr. Balrog's room](#jr-balrogs-room)), and so are King
 Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
 room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 ([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
-married couples, has its entry, its way out and its end rules; its stages
-come in later slices ([the Amorian Challenge](#the-amorian-challenge)).
+married couples, has its entry, its way out, its end rules and its first
+stage; its later stages come in later slices ([the Amorian
+Challenge](#the-amorian-challenge)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1427,6 +1428,31 @@ them back to the training ground's `st00`. The event's items (4031594-7)
 are taken from whoever leaves. Its lines are placeholders (`amoria_pq.*`).
 Mr. Sandman's (9201042) shop of "AmoriaPQ Extras" is Cosmic's own and is
 left out.
+
+The first stage (670010200) has two side rooms behind script portals
+`male00` and `female00` (script `gendergo`, `scripts::gender_go`): each
+lets in only men or only women, and turns the others back with a pink
+line. Its mobs come back once per spawn point every five minutes, so the
+stage can be cleared bare. Amos (9201044, `AMOS_STAGE`) tells the leader
+the task and the others to fetch the leader; the Glimmer Man (9201047)
+tells the members the task too. Once no mob is left, the Glimmer Man
+brings out the fierry (9400518) for the leader at (-245, 810), once per
+run (`EventCommand::FierryOut`). Its Wing Hammer (4031596), thrown on the
+Magik Mirror (reactor 6702000), breaks it into the Magik Mirror Shard
+(4031595), both by their drops in `rewards.json`. The leader hands the
+shard to the Glimmer Man (`EventCommand::ShardIn`), and Amos then clears
+the stage without a word. Cosmic clears it as soon as the fierry is out;
+here the shard is needed (QUESTIONS b260). Cosmic also turns item drops
+off on the stage maps at setup; the stage's mobs have no content drops,
+so that is left out.
+
+Clearing draws one of the stage's three ways up, `go00` to `go02`, at
+random (`Cleared::way`). These are same-map portals (type 5) in Map.nx,
+so the client sends CHANGE_MAP for them; `amoria_way` sends the drawn
+one's taker to its own copy of stage 2 (670010300-670010302) and turns
+the rest back as closed. The clear shows the map object `gate0` to
+`gate2` of the way drawn instead of the usual `gate`
+(`EventTicket::gate_object`), and so does entering the stage after.
 
 ## Jr. Balrog's room
 
