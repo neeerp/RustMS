@@ -134,6 +134,10 @@ async fn the_white_essence_brings_out_latanica_whose_death_wins_the_fight() {
     party_of_one(&mut next).await;
     turned_away(&mut team[1], keys::LATANICA_PORTAL_NOT_LEADER, &[]).await;
 
+    // Finding Bob reads the Map.nx, which takes the harness longer than
+    // the fight's clock the first time, so before it starts.
+    let ask_bob = talk(ENGINE_ROOM, BOB);
+
     // The leader takes the party in, and at once drops the essence on the
     // reactor, which takes it a few seconds later and calls out the captain.
     send(&mut team[0].connection, enter()).await;
@@ -151,7 +155,7 @@ async fn the_white_essence_brings_out_latanica_whose_death_wins_the_fight() {
 
     // Meanwhile the next party is turned away, and Bob asks first.
     turned_away(&mut next, keys::LATANICA_PORTAL_BUSY, &[]).await;
-    let t = told(member, talk(ENGINE_ROOM, BOB)).await;
+    let t = told(member, ask_bob).await;
     assert!(said(&t, keys::LATANICA_BOB_LEAVE_ASK), "{t:?}");
     told(member, answer(1, 0, None)).await;
 
