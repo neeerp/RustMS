@@ -109,6 +109,9 @@ pub enum EventKind {
     /// Crimsonwood Keep's recruiter (9201113) at its Inner Sanctum's
     /// entrance (`crate::squads`).
     Cwk,
+    /// The battle with The Boss in Showa's gang hideout, an expedition
+    /// gathered by Konpei (9120201) in its Armory (`crate::squads`).
+    Showa,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -2326,6 +2329,109 @@ pub const CWK: Event = Event {
     runs: 1,
 };
 
+/// The battle with The Boss in Showa (Cosmic `ShowaBattle`): an
+/// expedition of 3 to 30 of level 100 or more, gathered by Konpei in the
+/// hideout's Armory by a leader with the Lady Boss's Comb, goes into its
+/// own copy of the arena for an hour. The comb dropped at the arena's
+/// statue brings out The Boss's bodyguards, and The Boss after them; The
+/// Boss's death wins it (its one stage, cleared by any member there), and
+/// Konpei hands each member a prize and takes them on to the clear map.
+/// It lasts until its last member leaves, like Zakum's. The defaults are
+/// in `v83ref/lanes/QUESTIONS.md` b273.
+pub const SHOWA: Event = Event {
+    lobby: SHOWA_ARMORY,
+    entrances: &[],
+    maps: SHOWA_ARENA..=SHOWA_CLEAR,
+    entry: SHOWA_ARENA,
+    entries: 1,
+    exit: SHOWA_ARMORY,
+    levels: 100..=u8::MAX,
+    spread: None,
+    team: 3..=30,
+    married: false,
+    minutes: 60,
+    exp_per_stage: &[0],
+    meso_per_stage: &[],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: true,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+};
+
+/// Showa Town, and the hideout's first map, Near the Hideout, which
+/// Konpei in town takes players to (its portal `in00`).
+pub const SHOWA_TOWN: i32 = 801_000_000;
+pub const SHOWA_HIDEOUT: i32 = 801_040_000;
+/// The hideout's Armory, where expeditions gather and come back to.
+pub const SHOWA_ARMORY: i32 = 801_040_004;
+/// The arena, The Nightmarish Last Days, and the clear map past it.
+pub const SHOWA_ARENA: i32 = 801_040_100;
+pub const SHOWA_CLEAR: i32 = 801_040_101;
+/// What a leader needs to gather an expedition, and what the arena's
+/// statue takes: the Female Boss's drop.
+pub const LADY_BOSS_COMB: i32 = 4_000_138;
+/// The arena's statue (`shouwaBoss`), and the first bodyguard it brings
+/// out, where. Bodyguard A revives as Bodyguard B, and that as The Boss
+/// (`Mob.nx`'s `revive`).
+pub const SHOWA_STATUE: i32 = 8_001_000;
+pub const SHOWA_BODYGUARD: i32 = 9_400_112;
+pub const SHOWA_BODYGUARD_AT: (i16, i16) = (420, 160);
+pub const THE_BOSS: i32 = 9_400_300;
+/// What comes out on the clear map, where, once The Boss falls with no
+/// member having died (Cosmic `clearPQ`'s `playerDied`).
+pub const SLOT_MACHINE: i32 = 9_400_114;
+pub const SLOT_MACHINE_AT: (i16, i16) = (500, -50);
+/// What Konpei hands each member once The Boss falls: one of these, at
+/// random (Cosmic `ShowaBattle`'s `setEventRewards`, its 2022306 twice).
+pub const SHOWA_REWARDS: [(i32, i16); 29] = [
+    (1_102_145, 1),
+    (1_102_084, 1),
+    (1_102_085, 1),
+    (1_102_086, 1),
+    (1_102_087, 1),
+    (1_052_165, 1),
+    (1_052_166, 1),
+    (1_052_167, 1),
+    (1_402_013, 1),
+    (1_332_030, 1),
+    (1_032_030, 1),
+    (1_032_070, 1),
+    (4_003_000, 40),
+    (4_000_030, 40),
+    (4_006_000, 100),
+    (4_006_001, 100),
+    (4_005_000, 2),
+    (4_005_001, 2),
+    (4_005_002, 2),
+    (4_005_003, 2),
+    (4_005_004, 1),
+    (2_022_016, 100),
+    (2_022_263, 100),
+    (2_022_264, 100),
+    (2_022_015, 40),
+    (2_022_306, 40),
+    (2_022_307, 40),
+    (2_022_306, 40),
+    (2_022_113, 40),
+];
+
 /// Crimsonwood Keep's Inner Sanctum's entrance, where its expeditions
 /// gather and come back to, and the Keep's first stage.
 pub const CWK_LOBBY: i32 = 610_030_020;
@@ -3636,7 +3742,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 47] = [
+    pub const ALL: [EventKind; 48] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -3684,6 +3790,7 @@ impl EventKind {
         EventKind::GuildQuest,
         EventKind::Amoria,
         EventKind::Cwk,
+        EventKind::Showa,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -3738,6 +3845,7 @@ impl EventKind {
             EventKind::GuildQuest => &GUILD_QUEST,
             EventKind::Amoria => &AMORIA,
             EventKind::Cwk => &CWK,
+            EventKind::Showa => &SHOWA,
         }
     }
 
@@ -4268,6 +4376,9 @@ pub enum EventCommand {
     KingRoomFell { here: usize, mobs: usize },
     /// A member who died has revived.
     Revived,
+    /// A member died on one of Showa's maps: no Slot Machine comes out
+    /// with the win (Cosmic `ShowaBattle.playerDead`).
+    ShowaFell,
     /// The Glimmer Man brought out the Amorian Challenge's fierry, once a
     /// run, stage 1 being bare.
     FierryOut,
@@ -4869,6 +4980,19 @@ mod tests {
                     )
                     .is_some()
         );
+    }
+
+    #[test]
+    fn showa_s_expedition_is_won_by_the_boss_and_lasts_till_its_last_leaves() {
+        assert_eq!(EventKind::Showa.event().lobby, SHOWA_ARMORY);
+        assert!(SHOWA.squad && SHOWA.lasts_until_empty());
+        assert_eq!((SHOWA.team.clone(), *SHOWA.levels.start()), (3..=30, 100));
+        assert_eq!((SHOWA.minutes, SHOWA.last_stage()), (60, 1));
+        assert!(SHOWA.holds(SHOWA_ARENA) && SHOWA.holds(SHOWA_CLEAR));
+        assert!(!SHOWA.holds(SHOWA_ARMORY) && event_map(SHOWA_CLEAR));
+        assert_eq!((SHOWA.entry, SHOWA.exit), (SHOWA_ARENA, SHOWA_ARMORY));
+        assert_eq!(SHOWA.clear_map, None);
+        assert_eq!(SHOWA_REWARDS.iter().filter(|r| r.0 == 2_022_306).count(), 2);
     }
 
     #[test]

@@ -65,12 +65,12 @@ pub enum Action {
     /// `notice`) first.
     WarpMap { warp: Warp, notice: &'static str },
     /// Bring out one `mob_id` on the ground below `at`, a fixed point on
-    /// its map, with a pink line (the text key `notice`) to everyone there,
-    /// and `music`, if any, playing.
+    /// its map, with a pink line (the text key `notice`), if any, to
+    /// everyone there, and `music`, if any, playing.
     SpawnAt {
         mob_id: i32,
         at: (i16, i16),
-        notice: &'static str,
+        notice: Option<&'static str>,
         music: Option<&'static str>,
     },
     /// Bring out an NPC on the ground below it, with a pink line (the text
@@ -416,13 +416,13 @@ pub fn action(reactor_id: i32) -> Action {
         2201002 => Action::SpawnAt {
             mob_id: LPQ_ROMBAD,
             at: (1, -211),
-            notice: keys::LPQ_NOTICE_ROMBAD,
+            notice: Some(keys::LPQ_NOTICE_ROMBAD),
             music: None,
         },
         2201003 => Action::SpawnAt {
             mob_id: LPQ_ALISHAR,
             at: (941, 184),
-            notice: keys::LPQ_NOTICE_ALISHAR,
+            notice: Some(keys::LPQ_NOTICE_ALISHAR),
             music: None,
         },
         // The cracked dimension on the Origin of Clocktower (`boss`, Cosmic
@@ -430,7 +430,7 @@ pub fn action(reactor_id: i32) -> Action {
         PAPULATUS_CRACK => Action::SpawnAt {
             mob_id: crate::mobs::TIME_SPHERE,
             at: (-410, -400),
-            notice: keys::PAPULATUS_SUMMONED,
+            notice: Some(keys::PAPULATUS_SUMMONED),
             music: Some("Bgm09/TimeAttack"),
         },
         // The boxes on Ludibrium's bonus stage (`ludiquest4`:
@@ -512,10 +512,19 @@ pub fn action(reactor_id: i32) -> Action {
         // empty ones (3002002) drop nothing.
         2002003 | ELLIN_SPINE | ELLIN_STONE_BOX => Action::DropsAndClears,
         // The sixth stage's altar (Cosmic `3001000`), which takes the stone.
+        // The statue in Showa's arena (`shouwaBoss`) takes the Lady Boss's
+        // Comb and the first of The Boss's bodyguards comes out (Cosmic
+        // `8001000`), unannounced.
+        crate::events::SHOWA_STATUE => Action::SpawnAt {
+            mob_id: crate::events::SHOWA_BODYGUARD,
+            at: crate::events::SHOWA_BODYGUARD_AT,
+            notice: None,
+            music: None,
+        },
         ELLIN_ALTAR => Action::SpawnAt {
             mob_id: crate::events::ELLIN_GOLEM,
             at: crate::events::ELLIN_ALTAR_AT,
-            notice: keys::ELLIN_ALTAR_GOLEM,
+            notice: Some(keys::ELLIN_ALTAR_GOLEM),
             music: None,
         },
         ELLIN_FOUNTAIN => Action::ExpToAll(crate::events::ELLIN_FOUNTAIN_EXP),
@@ -829,6 +838,16 @@ mod tests {
         assert_eq!(
             (mob_id, at, music),
             (8500000, (-410, -400), Some("Bgm09/TimeAttack"))
+        );
+        // Showa's statue, unannounced.
+        assert_eq!(
+            action(crate::events::SHOWA_STATUE),
+            Action::SpawnAt {
+                mob_id: 9_400_112,
+                at: (420, 160),
+                notice: None,
+                music: None
+            }
         );
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);

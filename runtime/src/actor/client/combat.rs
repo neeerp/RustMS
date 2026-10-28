@@ -67,6 +67,12 @@ impl ClientActor {
                 .await;
             return Ok(());
         }
+        let in_showa = self.event.as_ref().is_some_and(|ticket| {
+            ticket.kind == net::events::EventKind::Showa && ticket.holds(map_id)
+        });
+        if in_showa {
+            self.tell_event(net::events::EventCommand::ShowaFell).await;
+        }
         self.cancel_buffs().await?;
         self.remember_spawn_point();
         let player = &mut self.in_game_mut()?.player;
