@@ -68,12 +68,24 @@ const CWK: SquadText = SquadText {
     notice_started: keys::CWK_SQUAD_NOTICE_STARTED,
 };
 
+const SHOWA: SquadText = SquadText {
+    level: keys::SHOWA_SQUAD_LEVEL,
+    ask: keys::SHOWA_SQUAD_ASK,
+    start_choice: keys::SHOWA_SQUAD_START_CHOICE,
+    join_ask: keys::SHOWA_SQUAD_JOIN_ASK,
+    rejoin_ask: keys::SHOWA_SQUAD_REJOIN_ASK,
+    taken: keys::SHOWA_SQUAD_TAKEN,
+    notice_opened: keys::SHOWA_SQUAD_NOTICE_OPENED,
+    notice_started: keys::SHOWA_SQUAD_NOTICE_STARTED,
+};
+
 /// What `kind`'s squad says, if its event is gathered by one.
 pub fn text(kind: EventKind) -> Option<&'static SquadText> {
     match kind {
         EventKind::Zakum => Some(&ZAKUM),
         EventKind::Horntail => Some(&HORNTAIL),
         EventKind::Cwk => Some(&CWK),
+        EventKind::Showa => Some(&SHOWA),
         _ => None,
     }
 }

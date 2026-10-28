@@ -822,6 +822,7 @@ pub fn spawn(
         stage_started: Instant::now(),
         began: Instant::now(),
         fallen: HashSet::new(),
+        showa_fell: false,
         gauge: None,
         gauge_out: None,
         pyramid_end: None,
@@ -968,6 +969,9 @@ struct EventActor {
     /// The members dead in the Guild Quest's last room who haven't
     /// revived (`EventCommand::KingRoomFell`).
     fallen: HashSet<ClientId>,
+    /// A member died in Showa's battle before it was won
+    /// (`EventCommand::ShowaFell`).
+    showa_fell: bool,
     /// The stage's gauge rules (`mobMassacre/gauge`).
     gauge: Option<game_data::Massacre>,
     /// When the stage's gauge runs out, as the tally stands.
@@ -1705,6 +1709,10 @@ impl EventActor {
             EventCommand::Revived => {
                 self.fallen.remove(&client_id);
             }
+            EventCommand::ShowaFell if self.kind == EventKind::Showa && !won => {
+                self.showa_fell = true;
+            }
+            EventCommand::ShowaFell => {}
             EventCommand::KingGateOpened if self.kind == EventKind::GuildQuest => {
                 if !self.cleared.king_gate.swap(true, Ordering::AcqRel) {
                     info!(id = self.id, client_id, "King's Corridor opened");
@@ -2887,6 +2895,28 @@ impl EventActor {
         if event.bonus.as_ref().is_some_and(|bonus| bonus.on_win) {
             self.start_bonus();
         }
+        if self.kind == EventKind::Showa && !self.showa_fell {
+            self.slot_machine();
+        }
+    }
+
+    /// Showa's battle was won with no member dying: the Slot Machine comes
+    /// out on the copy's clear map, and Konpei tells the team (Cosmic
+    /// `ShowaBattle.clearPQ`).
+    fn slot_machine(&self) {
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::events::SHOWA_CLEAR,
+            instance_id: self.id,
+        });
+        let message = FieldMessage::BringOut {
+            mob_id: net::events::SLOT_MACHINE,
+            at: net::events::SLOT_MACHINE_AT,
+        };
+        tokio::spawn(async move {
+            let _ = field.tx.send(message).await;
+        });
+        self.tell_team(keys::SHOWA_NO_CASUALTIES);
     }
 
     /// A Trial Grounds room's seal took its key: the same key falls on the

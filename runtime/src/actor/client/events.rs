@@ -94,9 +94,11 @@ impl ClientActor {
             // A squad's, above; Papulatus's has a portal, not an NPC; So
             // Gong starts his trial and the party run from the Dojo's own
             // talk.
-            EventKind::Zakum | EventKind::Horntail | EventKind::Cwk | EventKind::Papulatus => {
-                return Ok(())
-            }
+            EventKind::Zakum
+            | EventKind::Horntail
+            | EventKind::Cwk
+            | EventKind::Showa
+            | EventKind::Papulatus => return Ok(()),
             EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
             // Duarte asks after every run at once (`talk_to_duarte`).
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),

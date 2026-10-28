@@ -22,6 +22,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/ox-quiz.md`: the OX Quiz: its field and rooms, the questions, a GM's `/ox` and `/start`, the judging, the end, and the packets
 - `agent_docs/timed-events.md`: GM events run on a clock, starting with the Physical Fitness Test: its maps, the lobby's gate, the clock and notices, and the time up
 - `agent_docs/horntail.md`: the way to Horntail in Leafre's Cave of Life: the Dragon Squad's quests, the doors at Keroben and the slate, the ways out, the expedition, its trials, the fight, and the win
+- `agent_docs/showa.md`: The Boss in Showa's gang hideout: the way in, Konpei's expedition and the comb, the statue and the bodyguards, the win, the prizes, and the Slot Machine
 - `agent_docs/ships.md`: the Ellinia–Orbis ship's timetable, boarding NPCs, CONTI packets, and the station wall clock
 - `agent_docs/combat.md`: mob spawning and control, melee attacks, EXP and level-ups, spending AP and SP, drops and pickup, touch damage and death
 - `agent_docs/parties.md`: party state and flows, EXP sharing, party chat, and the client's party window and HP displays

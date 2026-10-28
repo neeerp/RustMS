@@ -1952,7 +1952,7 @@ impl NpcScript {
     /// its `leader`, and whose party may have `won` it: Growlie's, Tommy's
     /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
     /// Ludibrium, Minerva's in the Tower of Goddess, Rolly's in the
-    /// Ludibrium Maze's clear room.
+    /// Ludibrium Maze's clear room, Konpei's in Showa's arena.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
@@ -1977,6 +1977,9 @@ impl NpcScript {
             }
             WU_YANG if won && player.stats.map_id == events::PIRATE_CLEAR => {
                 Some(wu_yang_clear(player))
+            }
+            KONPEI_ARENA if player.stats.map_id == events::SHOWA_ARENA => {
+                Some(konpei_arena(player, won, &mut rand::thread_rng()))
             }
             _ => None,
         }
@@ -2336,6 +2339,9 @@ impl NpcScript {
             }
             SITE_EXIT => return Some(site_exit()),
             CWK_GATE => return Some(cwk_gate(player)),
+            KONPEI_TOWN => return Some(konpei_town()),
+            KONPEI_HIDEOUT => return Some(konpei_hideout()),
+            KONPEI_CLEAR => return Some(konpei_clear()),
             SERRYL => {
                 return Some(item_maker(
                     SERRYL,
@@ -10521,6 +10527,9 @@ pub const HORNTAIL_RECRUITER: i32 = 2083004;
 /// Keep.
 pub const CWK_RECRUITER: i32 = 9201113;
 
+/// Konpei (9120201) in the Armory of Showa's gang hideout.
+pub const SHOWA_RECRUITER: i32 = 9120201;
+
 /// The NPC who gathers a kind of expedition.
 #[derive(Clone, Copy, Debug)]
 pub struct Recruiter {
@@ -10545,13 +10554,18 @@ pub fn recruiter(kind: EventKind) -> Option<Recruiter> {
             npc: CWK_RECRUITER,
             needs: None,
         }),
+        EventKind::Showa => Some(Recruiter {
+            npc: SHOWA_RECRUITER,
+            needs: Some((events::LADY_BOSS_COMB, keys::SHOWA_SQUAD_NO_COMB)),
+        }),
         _ => None,
     }
 }
 
 /// The NPC who gathers the channel's expedition of `kind`
-/// (`crate::squads`; Cosmic `2030013`, `2083004`, `9201113`): one of the levels, with
-/// the item it needs if any (Zakum's Eye of Fire), opens it, others of the
+/// (`crate::squads`; Cosmic `2030013`, `2083004`, `9201113`, `9120201`):
+/// one of the levels, with the item it needs if any (Zakum's Eye of Fire,
+/// Showa's Lady Boss's Comb), opens it, others of the
 /// levels join, and its leader turns members out, takes it in, or calls it
 /// off. While it runs, those on its roster may go back in.
 fn squad(kind: EventKind, view: SquadView, player: &Player) -> Option<NpcScript> {
@@ -13149,6 +13163,98 @@ fn maze_present(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
     let mut script = NpcScript::new(ROLLY_PRESENT, vec![ask, last]);
     script.inventory_full = Some(text(keys::LUDIMAZE_PRESENT_FULL));
     Some(script)
+}
+
+/// Konpei in Showa Town (Cosmic `9120015`): what the hideout is, or a
+/// walk there, to Near the Hideout's portal on.
+const KONPEI_TOWN: i32 = 9120015;
+/// Near the Hideout's portal `in00`.
+const HIDEOUT_IN: u8 = 4;
+
+fn konpei_town() -> NpcScript {
+    NpcScript::new(
+        KONPEI_TOWN,
+        vec![Page::Menu {
+            text: text(keys::SHOWA_KONPEI_TOWN_MENU),
+            choices: vec![
+                (
+                    text(keys::SHOWA_KONPEI_TOWN_ABOUT_CHOICE),
+                    vec![Page::Say(text(keys::SHOWA_KONPEI_TOWN_ABOUT))],
+                ),
+                (
+                    text(keys::SHOWA_KONPEI_TOWN_GO_CHOICE),
+                    vec![Page::Done(vec![Effect::WarpToPortal(
+                        events::SHOWA_HIDEOUT,
+                        HIDEOUT_IN,
+                    )])],
+                ),
+            ],
+        }],
+    )
+}
+
+/// Konpei Near the Hideout (Cosmic `9120200`): back to Showa Town?
+const KONPEI_HIDEOUT: i32 = 9120200;
+
+fn konpei_hideout() -> NpcScript {
+    NpcScript::new(
+        KONPEI_HIDEOUT,
+        vec![Page::Ask {
+            text: text(keys::SHOWA_KONPEI_HIDEOUT_ASK),
+            on_yes: vec![Effect::Warp(events::SHOWA_TOWN)],
+            on_no: None,
+        }],
+    )
+}
+
+/// Konpei in Showa's arena (Cosmic `9120202`), to a member of the
+/// expedition: before the win, out to the Armory's portal 1, with no way
+/// back; once The Boss falls, a prize from `SHOWA_REWARDS` and on to the
+/// copy's clear map, if they have room for any.
+const KONPEI_ARENA: i32 = 9120202;
+const ARMORY_BACK: u8 = 1;
+
+fn konpei_arena(player: &Player, won: bool, rng: &mut impl Rng) -> NpcScript {
+    if !won {
+        return NpcScript::new(
+            KONPEI_ARENA,
+            vec![Page::Ask {
+                text: text(keys::SHOWA_KONPEI_ARENA_LEAVE_ASK),
+                on_yes: vec![Effect::WarpToPortal(events::SHOWA_ARMORY, ARMORY_BACK)],
+                on_no: None,
+            }],
+        );
+    }
+    let prize = (has_reward_slot(&player.inventory))
+        .then(|| events::SHOWA_REWARDS.choose(rng))
+        .flatten();
+    let last = match prize {
+        Some(&(item_id, quantity)) => Page::Done(vec![
+            Effect::GiveItem { item_id, quantity },
+            Effect::Warp(events::SHOWA_CLEAR),
+        ]),
+        None => Page::Say(text(keys::SHOWA_KONPEI_ARENA_FULL)),
+    };
+    let mut script = NpcScript::new(
+        KONPEI_ARENA,
+        vec![Page::Say(text(keys::SHOWA_KONPEI_ARENA_WON)), last],
+    );
+    script.inventory_full = Some(text(keys::SHOWA_KONPEI_ARENA_FULL));
+    script
+}
+
+/// Konpei on the clear map past the arena (Cosmic `9120203`): back to
+/// Showa Town.
+const KONPEI_CLEAR: i32 = 9120203;
+
+fn konpei_clear() -> NpcScript {
+    NpcScript::new(
+        KONPEI_CLEAR,
+        vec![
+            Page::Say(text(keys::SHOWA_KONPEI_CLEAR)),
+            Page::Done(vec![Effect::Warp(events::SHOWA_TOWN)]),
+        ],
+    )
 }
 
 /// Papulatus in the past sends a visitor back to their own time. A
@@ -20334,6 +20440,31 @@ mod tests {
         let low = gather(EventKind::Cwk, 89);
         let level = event_terms(&events::CWK, keys::CWK_SQUAD_LEVEL);
         assert_eq!(page_text(&low.begin()), level);
+        // Showa's Konpei wants the Lady Boss's Comb, and keeps none.
+        let low = gather(EventKind::Showa, 99);
+        assert_eq!(low.npc_id, SHOWA_RECRUITER);
+        let level = event_terms(&events::SHOWA, keys::SHOWA_SQUAD_LEVEL);
+        assert_eq!(page_text(&low.begin()), level);
+        assert_eq!(
+            page_text(&gather(EventKind::Showa, 100).begin()),
+            text(keys::SHOWA_SQUAD_NO_COMB)
+        );
+        let mut combed = at(100);
+        combed.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(events::LADY_BOSS_COMB, 1),
+        );
+        let mut open = NpcScript::squad(EventKind::Showa, SquadView::None, &combed).unwrap();
+        let ask = event_terms(&events::SHOWA, keys::SHOWA_SQUAD_ASK);
+        assert_eq!(question(&open.begin()), ask);
+        assert_eq!(
+            open.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Squad {
+                kind: EventKind::Showa,
+                command: SquadCommand::Open
+            }]
+        );
         let taken = NpcScript::squad(EventKind::Horntail, SquadView::Taken, &at(100));
         assert_eq!(
             page_text(&taken.unwrap().begin()),
@@ -24006,5 +24137,64 @@ mod tests {
         let full = script.respond(ScriptInput::Yes).unwrap();
         assert!(full.effects.is_empty());
         assert_eq!(page_text(&full), text(keys::LUDIMAZE_PRESENT_FULL));
+    }
+
+    #[test]
+    fn konpei_leads_to_the_hideout_and_hands_out_the_boss_s_prizes() {
+        let town = rider(100, 0, events::SHOWA_TOWN);
+        let mut konpei = NpcScript::for_npc(KONPEI_TOWN, &town).unwrap();
+        konpei.begin();
+        assert_eq!(
+            konpei.respond(ScriptInput::Select(1)).unwrap().effects,
+            [Effect::WarpToPortal(events::SHOWA_HIDEOUT, HIDEOUT_IN)]
+        );
+        let mut konpei = NpcScript::for_npc(KONPEI_HIDEOUT, &town).unwrap();
+        konpei.begin();
+        assert_eq!(
+            konpei.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(events::SHOWA_TOWN)]
+        );
+        let clear = rider(100, 0, events::SHOWA_CLEAR);
+        let mut konpei = NpcScript::for_npc(KONPEI_CLEAR, &clear).unwrap();
+        assert_eq!(page_text(&konpei.begin()), text(keys::SHOWA_KONPEI_CLEAR));
+        assert_eq!(
+            konpei.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Warp(events::SHOWA_TOWN)]
+        );
+
+        // In the arena before the win: out to the Armory, for good.
+        let mut player = rider(100, 0, events::SHOWA_ARENA);
+        let mut leave = NpcScript::in_event(KONPEI_ARENA, &player, false, false).unwrap();
+        let ask = text(keys::SHOWA_KONPEI_ARENA_LEAVE_ASK);
+        assert_eq!(question(&leave.begin()), ask);
+        assert_eq!(
+            leave.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(events::SHOWA_ARMORY, ARMORY_BACK)]
+        );
+        // After it: one prize each, then on to the clear map.
+        let mut prize = NpcScript::in_event(KONPEI_ARENA, &player, false, true).unwrap();
+        assert_eq!(
+            page_text(&prize.begin()),
+            text(keys::SHOWA_KONPEI_ARENA_WON)
+        );
+        let effects = prize.respond(ScriptInput::Next).unwrap().effects;
+        let [Effect::GiveItem { item_id, quantity }, Effect::Warp(on)] = effects[..] else {
+            panic!("{effects:?}");
+        };
+        assert!(events::SHOWA_REWARDS.contains(&(item_id, quantity)));
+        assert_eq!(on, events::SHOWA_CLEAR);
+        let refused = prize.inventory_full().unwrap();
+        assert!(page_text(&refused).contains(&text(keys::SHOWA_KONPEI_ARENA_FULL)));
+        assert!(NpcScript::in_event(KONPEI_ARENA, &clear, false, true).is_none());
+
+        // A full tab: nothing yet.
+        let inventory = &mut player.inventory;
+        inventory.set_slot_limit(InventoryType::Use, 1);
+        inventory.insert(InventoryType::Use, 1, game::Item::stack(2000000, 1));
+        let mut full = NpcScript::in_event(KONPEI_ARENA, &player, false, true).unwrap();
+        full.begin();
+        let full = full.respond(ScriptInput::Next).unwrap();
+        assert!(full.effects.is_empty());
+        assert_eq!(page_text(&full), text(keys::SHOWA_KONPEI_ARENA_FULL));
     }
 }

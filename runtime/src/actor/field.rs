@@ -2142,6 +2142,12 @@ impl FieldActor {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
             (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
+            // Every mob in the arena goes with The Boss (Cosmic
+            // `ShowaBattle.clearPQ`).
+            (net::events::THE_BOSS, net::events::SHOWA_ARENA) if self.key.instance_id != 0 => {
+                self.boss_falls();
+                self.clear_mobs();
+            }
             (mob_id, _) if net::events::is_frankenroid(mob_id) => self.frankenroid_falls(),
             (mob_id, map_id)
                 if net::events::is_lord_pirate(mob_id)
@@ -4300,8 +4306,8 @@ impl FieldActor {
                 notice,
                 music,
             } => {
-                let notice = net::content::text().get(notice, &[]);
-                if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                let notice = notice.map(|notice| net::content::text().get(notice, &[]));
+                if let Some(Ok(packet)) = notice.map(|n| build_broadcast(Broadcast::Pink, &n)) {
                     self.broadcast(None, packet);
                 }
                 if let Some(Ok(packet)) = music.map(build_field_music) {
