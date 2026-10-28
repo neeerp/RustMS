@@ -648,7 +648,7 @@ replace = [
 ]
 
 [mobs.9420511]
-# Selkie Jr..
+# Selkie Jr.
 replace = [
     { money = 380, prob = 0.4 },
     { item = 4000382, prob = 0.3 },

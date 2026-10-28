@@ -4759,6 +4759,7 @@ mod tests {
         let table = RewardTable::load(None).unwrap();
         for (mob, essence) in [
             (9420509, 4000380),
+            (9420510, 4000379),
             (9420511, 4000382),
             (9420512, 4000383),
             (9420513, 4000384),

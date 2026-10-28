@@ -52,14 +52,17 @@ line and takes them up.
 
 The content pack has no drops for the Ghost Ship's mobs or the captain
 (9420509 to 9420513). Theirs come from `game-data/reward_overrides.toml`:
-Cosmic's tables, with each mob's mesos as one pile. Each of these drops its
-essence 3 times in 10:
+Cosmic's tables, with each mob's mesos as one pile. Each drops its essence
+3 times in 10:
 
+- Slimy (9420510): 4000379;
 - Pac Pinky (9420509): 4000380;
 - Selkie Jr. (9420511): the Blue Essence 4000382;
 - Mr. Anchor (9420512): the Red Essence 4000383, which Ralph's 4522 asks for;
 - the captain (9420513): the Black Essence 4000384, which Fight for the
   future (4513) asks for, and a Soul Lantern (4000385).
+
+No quest here asks for the others.
 
 The captain's kill in the copy counts for 4513, like any kill.
 
