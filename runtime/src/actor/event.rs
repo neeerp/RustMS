@@ -36,7 +36,7 @@ use game_data::server_content::keys;
 use game_data::skills::CarnivalSkill;
 use net::events::{
     draw_combo, draw_question, htpq_room_key, Balloon, ClockOn, Cloto, Event, EventCommand,
-    EventKind, Puzzles, Ropes, RopesTalk, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT,
+    EventKind, GatherTalk, Puzzles, Ropes, RopesTalk, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT,
     MAZE_COUPONS_WANTED, MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
 };
 use net::loot::Loot;
@@ -88,6 +88,15 @@ pub enum EventMessage {
         mobs: bool,
         heads: Vec<u8>,
         reply: oneshot::Sender<Option<RopesTalk>>,
+    },
+    /// `client_id` talks to Amos on the Amorian Challenge's gate stage,
+    /// the team all `together` at him or not and every gate `open` or not;
+    /// None for anyone not in the event.
+    Gather {
+        client_id: ClientId,
+        together: bool,
+        open: bool,
+        reply: oneshot::Sender<Option<GatherTalk>>,
     },
     /// `client_id` talks to the Guild Quest's statue keeper; None for
     /// anyone not in the event.
@@ -412,6 +421,24 @@ impl EventTicket {
                 stage,
                 mobs,
                 heads,
+                reply,
+            })
+            .await
+            .ok()?;
+        talk.await.ok().flatten()
+    }
+
+    /// What Amos makes of the member's talk on the Amorian Challenge's
+    /// gate stage, the team all `together` at him or not and every gate
+    /// `open` or not. `None` if the event is over.
+    pub async fn gather(&self, together: bool, open: bool) -> Option<GatherTalk> {
+        let (reply, talk) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Gather {
+                client_id: self.member,
+                together,
+                open,
                 reply,
             })
             .await
@@ -898,6 +925,9 @@ impl EventActor {
                     Some(EventMessage::Ropes { client_id, stage, mobs, heads, reply }) => {
                         let _ = reply.send(self.ropes(client_id, stage, mobs, &heads));
                     }
+                    Some(EventMessage::Gather { client_id, together, open, reply }) => {
+                        let _ = reply.send(self.gather(client_id, together, open));
+                    }
                     Some(EventMessage::Statues { client_id, reply }) => {
                         let _ = reply.send(self.statues(client_id));
                     }
@@ -1331,6 +1361,43 @@ impl EventActor {
         };
         if talk == RopesTalk::Right {
             self.clear(stage);
+        }
+        Some(talk)
+    }
+
+    /// The leader first hears what the gate stage asks; then, with the
+    /// whole team gathered at Amos and every gate open, clears it. Once
+    /// cleared, any member's talk takes the team on to stage 6, once
+    /// (Cosmic `9201045`).
+    fn gather(&mut self, client_id: ClientId, together: bool, open: bool) -> Option<GatherTalk> {
+        use net::events::{AMORIA_GATES_STAGE, AMORIA_STAGE6};
+        let stage = AMORIA_GATES_STAGE;
+        if !self.team.has(client_id) || self.kind != EventKind::Amoria {
+            return None;
+        }
+        let talk = if self.cleared.has(stage) {
+            GatherTalk::Cleared
+        } else if client_id != self.team.leader() {
+            GatherTalk::NotLeader
+        } else if self.heard.insert(stage) {
+            GatherTalk::Intro
+        } else if !together {
+            GatherTalk::Apart
+        } else if !open {
+            GatherTalk::Shut
+        } else {
+            GatherTalk::Right
+        };
+        match talk {
+            GatherTalk::Right => {
+                self.amoria_clock(stage);
+                self.clear(stage);
+            }
+            GatherTalk::Cleared if !self.moved_to.contains(&AMORIA_STAGE6) => {
+                self.moved_to.push(AMORIA_STAGE6);
+                self.move_team(None, AMORIA_STAGE6, self.ends);
+            }
+            _ => {}
         }
         Some(talk)
     }
@@ -2060,7 +2127,8 @@ impl EventActor {
 
     /// The Amorian Challenge's clock on clearing `stage` (Cosmic
     /// `9201045`): stage 4 cuts it short, if there is time enough to, and
-    /// tells the team in pink; stage 5 gives back what was cut.
+    /// tells the team in pink; stage 5 gives back what was cut, and tells
+    /// them only the boss is left.
     fn amoria_clock(&mut self, stage: u8) {
         use net::events::{AMORIA_CODES_STAGE, AMORIA_RUSH_FROM, AMORIA_RUSH_MINUTES};
         if stage == AMORIA_CODES_STAGE {
@@ -2077,6 +2145,7 @@ impl EventActor {
                 info!(kind = ?self.kind, id = self.id, "Clock given back");
                 self.tell_clock();
             }
+            self.tell_team(keys::AMORIA_PQ_STAGE5_NOTICE);
         }
     }
 

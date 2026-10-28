@@ -372,6 +372,9 @@ pub fn action(reactor_id: i32) -> Action {
         // (their `9208005`, `9208006`, `9208010`-`9208012` scripts do
         // nothing), its spears, and the gargoyles' altar (`9201000`).
         9208005 | 9208006 | 9208010..=9208012 => Action::Hold,
+        // The Amorian Challenge's stage-5 gates, which stay open once hit
+        // to their last state (`amoriaItem1` does nothing).
+        crate::events::AMORIA_GATE => Action::Hold,
         crate::guild_quest::SPEAR => Action::Spear,
         crate::guild_quest::KING_GATE_REACTOR => Action::KingGate,
         // The grave's altar, once dressed (Cosmic `9201001`).
@@ -882,6 +885,8 @@ mod tests {
     fn the_guild_quest_s_gates_and_spears_stay_set() {
         use crate::guild_quest::SPEAR;
         assert_eq!(action(9208005), Action::Hold);
+        assert_eq!(action(crate::events::AMORIA_GATE), Action::Hold);
+        assert!(stays(crate::events::AMORIA_GATE));
         assert_eq!(action(9208006), Action::Hold);
         assert_eq!(action(SPEAR), Action::Spear);
         assert_eq!(action(9208004), Action::Drops);

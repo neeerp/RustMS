@@ -1998,6 +1998,20 @@ pub const CUPID_CODE_PIECE: i32 = 4_031_597;
 pub const AMORIA_CODES: i16 = 50;
 pub const AMORIA_RUSH_FROM: u64 = 5;
 pub const AMORIA_RUSH_MINUTES: u64 = 4;
+/// Stage 5: the team hits each of its seven gates (reactor
+/// `AMORIA_GATE`) open, its last state, whose doors (`doorgo` portals)
+/// then let them through; the whole team then gathers in its last area,
+/// at Amos (Cosmic `9201045`), whose talk with the leader clears the stage
+/// and on the next talk takes the team on to stage 6.
+pub const AMORIA_STAGE5: i32 = 670_010_600;
+pub const AMORIA_GATES_STAGE: u8 = 5;
+pub const AMORIA_GATE: i32 = 6_702_001;
+pub const AMORIA_GATES: [&str; 7] = [
+    "gate00", "gate01", "gate02", "gate03", "gate04", "gate05", "gate06",
+];
+pub const AMORIA_GATE_OPEN: u8 = 4;
+pub const AMORIA_GATHER_AREA: usize = 2;
+pub const AMORIA_STAGE6: i32 = 670_010_700;
 /// The stage maps whose way on stays shut until their stage is cleared.
 pub const AMORIA_GATED: [i32; 5] = [
     AMORIA_STAGE2[0],
@@ -2050,6 +2064,30 @@ pub enum RopesTalk {
     Reset,
     /// The right try, which clears the stage.
     Right,
+}
+
+/// What Amos makes of a talk on stage 5 (Cosmic `9201045`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GatherTalk {
+    /// The stage is cleared: the team is taken on to stage 6.
+    Cleared,
+    NotLeader,
+    /// The leader's first talk: what the stage asks.
+    Intro,
+    /// Not all the team is on the map, at Amos.
+    Apart,
+    /// The team is gathered, but not every gate is open.
+    Shut,
+    /// The team is gathered with every gate open, which clears the stage.
+    Right,
+}
+
+/// Whether all `team` of the members are on the map and in `AMORIA_STAGE5`'s
+/// last area, by `positions`, everyone's on the map.
+pub fn gathered(areas: &[Area], positions: &[(i32, i32)], team: usize) -> bool {
+    let at_amos = areas.get(AMORIA_GATHER_AREA);
+    positions.len() == team
+        && at_amos.is_some_and(|area| positions.iter().all(|&(x, y)| area.contains(x, y)))
 }
 
 /// The ropes Amos wants on stage 2 and the team's wrong tries since they
@@ -4288,6 +4326,20 @@ mod tests {
         assert_eq!(way("go02", Some(2)), Some(Some(670010302)));
         assert_eq!(way("male00", Some(0)), None);
         assert_eq!(amoria_way(AMORIA_STAGE2[0], "go00", Some(0)), None);
+    }
+
+    #[test]
+    fn amoria_s_gate_stage_gathers_the_whole_team_at_amos() {
+        assert_eq!(AMORIA.stage_on(AMORIA_STAGE5), Some(AMORIA_GATES_STAGE));
+        assert_eq!(AMORIA.stage_on(AMORIA_STAGE6), Some(AMORIA_GATES_STAGE + 1));
+        assert!(AMORIA.maps.contains(&AMORIA_STAGE6));
+        assert_eq!(AMORIA.hand_in_on(AMORIA_STAGE5, 9_201_045), None);
+        let area = |x1, x2, y1, y2| Area { x1, x2, y1, y2 };
+        let areas = [area(0, 10, 0, 10), area(0, 10, 0, 10), area(50, 60, 0, 10)];
+        assert!(gathered(&areas, &[(55, 5), (51, 1)], 2));
+        assert!(!gathered(&areas, &[(55, 5)], 2));
+        assert!(!gathered(&areas, &[(55, 5), (5, 5)], 2));
+        assert!(!gathered(&areas[..2], &[(5, 5)], 1));
     }
 
     #[test]

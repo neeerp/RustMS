@@ -2220,6 +2220,12 @@ pub mod keys {
     pub const AMORIA_PQ_STAGE4_SHORT: &str = "amoria_pq.stage4.short";
     pub const AMORIA_PQ_STAGE4_DONE: &str = "amoria_pq.stage4.done";
     pub const AMORIA_PQ_STAGE4_NOTICE: &str = "amoria_pq.stage4.notice";
+    pub const AMORIA_PQ_STAGE5_INTRO: &str = "amoria_pq.stage5.intro";
+    pub const AMORIA_PQ_STAGE5_APART: &str = "amoria_pq.stage5.apart";
+    pub const AMORIA_PQ_STAGE5_TELEPORTED: &str = "amoria_pq.stage5.teleported";
+    pub const AMORIA_PQ_STAGE5_DONE: &str = "amoria_pq.stage5.done";
+    pub const AMORIA_PQ_STAGE5_NOTICE: &str = "amoria_pq.stage5.notice";
+    pub const AMORIA_PQ_STAGE5_GATE_SHUT: &str = "amoria_pq.stage5.gate_shut";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";
     pub const AMORIA_PQ_GLIMMER_MEMBER_TASK: &str = "amoria_pq.glimmer.member_task";
     pub const AMORIA_PQ_GLIMMER_FIERRY_OUT: &str = "amoria_pq.glimmer.fierry_out";
