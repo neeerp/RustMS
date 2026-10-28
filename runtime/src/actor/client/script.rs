@@ -66,6 +66,18 @@ impl ClientActor {
                 let gender = self.in_game()?.player.stats.gender;
                 Some(scripts::gender_go(map_id, portal, gender))
             }
+            // The Amorian Challenge's gate stage: a door lets through once
+            // its gate is open.
+            (Some(script), Some(_))
+                if script == scripts::AMORIA_DOOR && map_id == net::events::AMORIA_STAGE5 =>
+            {
+                let state = match scripts::amoria_door_gate(portal) {
+                    Some(gate) => self.reactor_states(&[gate]).await?.pop().flatten(),
+                    None => None,
+                };
+                let open = state == Some(net::events::AMORIA_GATE_OPEN);
+                Some(scripts::amoria_door(map_id, portal, open))
+            }
             (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
                 match scripts::time_leap(&self.in_game()?.player) {
                     Some(effects) => Some(effects),

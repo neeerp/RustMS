@@ -9,8 +9,8 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
-    self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, Find, HandIn, HeadCount,
-    LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing, Statue,
+    self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, Find, GatherTalk, HandIn,
+    HeadCount, LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::guild_quest;
@@ -1709,6 +1709,11 @@ impl NpcScript {
     /// Amos on the Amorian Challenge's platform stage, after `talk`.
     pub fn amos_platforms(talk: RopesTalk) -> Self {
         amos_platforms(talk)
+    }
+
+    /// Amos on the Amorian Challenge's gate stage, after `talk`.
+    pub fn amos_gather(talk: GatherTalk) -> Self {
+        amos_gather(talk)
     }
 
     /// The Glimmer Man on the Amorian Challenge's first stage, to
@@ -11957,6 +11962,20 @@ fn amos_platforms(talk: RopesTalk) -> NpcScript {
         RopesTalk::Wrong { .. } | RopesTalk::Reset | RopesTalk::Right => Page::Done(Vec::new()),
     };
     NpcScript::new(AMOS_STAGE, vec![page])
+}
+
+/// Amos on the Amorian Challenge's gate stage (Cosmic `9201045`); once
+/// it is cleared, the talk takes the team on without a word.
+fn amos_gather(talk: GatherTalk) -> NpcScript {
+    let page = match talk {
+        GatherTalk::Cleared => Page::Done(Vec::new()),
+        GatherTalk::NotLeader => Page::Say(text(keys::AMORIA_PQ_AMOS_NOT_LEADER)),
+        GatherTalk::Intro => Page::Say(text(keys::AMORIA_PQ_STAGE5_INTRO)),
+        GatherTalk::Apart => Page::Say(text(keys::AMORIA_PQ_STAGE5_APART)),
+        GatherTalk::Shut => Page::Say(text(keys::AMORIA_PQ_STAGE5_TELEPORTED)),
+        GatherTalk::Right => Page::Say(text(keys::AMORIA_PQ_STAGE5_DONE)),
+    };
+    NpcScript::new(AMOS_TRIALS, vec![page])
 }
 
 /// The Glimmer Man on the Amorian Challenge's first stage (Cosmic

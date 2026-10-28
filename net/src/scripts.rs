@@ -3041,6 +3041,31 @@ pub fn gender_go(map_id: i32, portal: &str, gender: u8) -> Vec<Effect> {
     ]
 }
 
+/// The doors on the Amorian Challenge's fifth stage, `gtNNPCS`, one by
+/// each of its gates, `gateNN`.
+pub const AMORIA_DOOR: &str = "doorgo";
+
+/// The gate `portal`, one of the `doorgo` portals, is by, if any.
+pub fn amoria_door_gate(portal: &str) -> Option<&'static str> {
+    let nn = portal.strip_prefix("gt")?.get(..2)?;
+    (crate::events::AMORIA_GATES.iter())
+        .find(|gate| gate.ends_with(nn))
+        .copied()
+}
+
+/// Where `portal`, a `doorgo` portal on `map_id`, takes a player: past its
+/// gate, to `gtNNPIB`, if the gate is `open`; else they are told in pink
+/// that it is shut (Cosmic `doorgo`).
+pub fn amoria_door(map_id: i32, portal: &str, open: bool) -> Vec<Effect> {
+    let to = (portal.get(2..4)).map(|nn| named(map_id, &format!("gt{nn}PIB")));
+    match to {
+        Some(to) if open => vec![Effect::PortalSound, Effect::WarpToPortal(map_id, to)],
+        _ => vec![Effect::Pink(
+            content::text().get(keys::AMORIA_PQ_STAGE5_GATE_SHUT, &[]),
+        )],
+    }
+}
+
 /// The id of `map_id`'s portal called `name`, else 0.
 pub fn named(map_id: i32, name: &str) -> u8 {
     portal_id(map_id, |portal| portal.name == name)
@@ -3060,6 +3085,16 @@ mod tests {
     use super::*;
     use game::{QuestRecord, QuestStatus};
     use std::time::SystemTime;
+
+    #[test]
+    fn each_amoria_door_is_by_its_gate() {
+        assert_eq!(amoria_door_gate("gt00PCS"), Some("gate00"));
+        assert_eq!(amoria_door_gate("gt06PCS"), Some("gate06"));
+        assert_eq!(amoria_door_gate("gt07PCS"), None);
+        assert_eq!(amoria_door_gate("gm00"), None);
+        let shut = amoria_door(crate::events::AMORIA_STAGE5, "gt03PCS", false);
+        assert!(matches!(shut[..], [Effect::Pink(_)]), "{shut:?}");
+    }
 
     fn player_with(quests: &[(i16, QuestState)]) -> Player {
         let mut player = crate::codec::stats::sample_player();

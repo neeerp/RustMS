@@ -511,6 +511,39 @@ impl ClientActor {
         Ok(Some(NpcScript::amos_ropes(talk)))
     }
 
+    /// What Amos says to the player on the Amorian Challenge's gate stage,
+    /// if there: whether the whole team stands at him, and every gate is
+    /// open (Cosmic `9201045`).
+    pub(super) async fn amoria_gather(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let in_amoria =
+            |ticket: &&EventTicket| ticket.kind == EventKind::Amoria && ticket.holds(map_id);
+        if map_id != events::AMORIA_STAGE5 || self.event.as_ref().filter(in_amoria).is_none() {
+            return Ok(None);
+        }
+        let gates = self.reactor_states(&events::AMORIA_GATES).await?;
+        let open = (gates.iter()).all(|&state| state == Some(events::AMORIA_GATE_OPEN));
+        let Some(team) = self.event.as_ref() else {
+            return Ok(None);
+        };
+        let Some(team) = team.team_size().await else {
+            return Ok(None);
+        };
+        let together = self
+            .standing_on(map_id, |areas, positions| {
+                events::gathered(areas, positions, team)
+            })
+            .await?
+            .unwrap_or(false);
+        let Some(ticket) = self.event.as_ref() else {
+            return Ok(None);
+        };
+        let Some(talk) = ticket.gather(together, open).await else {
+            return Ok(None);
+        };
+        Ok(Some(NpcScript::amos_gather(talk)))
+    }
+
     /// Bring out `count` slimes on the Amorian Challenge's platform stage,
     /// each a random one at a random point.
     async fn bring_out_slimes(&mut self, count: usize) -> Result<(), RuntimeError> {

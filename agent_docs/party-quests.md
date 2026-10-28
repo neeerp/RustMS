@@ -43,7 +43,7 @@ Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
 room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 ([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
 married couples, has its entry, its way out, its end rules and its first
-four stages; its later stages come in later slices ([the Amorian
+five stages; its later stages come in later slices ([the Amorian
 Challenge](#the-amorian-challenge)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
@@ -1493,6 +1493,21 @@ left, the clock is cut to four (`EventActor::amoria_clock`), and the time
 it would have run to is kept for stage 5 to give back. Either way the team
 hears in pink that time is short (`amoria_pq.stage4.notice`). With the
 harness's 60-fold clock, the cut clock shows 4 seconds.
+
+Stage 5 (670010600, `AMORIA_STAGE5`) has seven gates, reactor 6702001
+named `gate00` to `gate06`, each hit open through four states; the last
+stays (`Action::Hold`). By each gate is a door, the `doorgo` portal
+`gtNNPCS`, which takes a player past it to `gtNNPIB` once its gate is
+open, and otherwise says in pink that it is shut
+(`scripts::amoria_door`). Amos (`AMOS_TRIALS`) waits at the far end
+(`amoria_gather`): after the leader has heard the task, the whole team
+must be on the map and in its last area (`events::gathered`; the map's
+`gm00` portal is a shortcut there). With a gate still shut he says so;
+with every gate open (`EventActor::gather`) the stage clears for 9000 EXP
+each, the clock cut on stage 4 is given back, and the team hears in pink
+that only the boss is left (`amoria_pq.stage5.notice`). Once it is
+cleared, any member's talk takes the whole team to stage 6 (670010700),
+once. Unlike Cosmic, a dead member still on the map counts as apart.
 
 ## Jr. Balrog's room
 
