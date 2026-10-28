@@ -91,15 +91,16 @@ impl ClientActor {
                 };
                 NpcScript::so_gong(entry, party, &self.in_game()?.player)
             }
-            // A squad's, above; Papulatus's has a portal, not an NPC; So
-            // Gong starts his trial and the party run from the Dojo's own
-            // talk.
+            // A squad's, above; Papulatus's and Latanica's have a portal,
+            // not an NPC; So Gong starts his trial and the party run from
+            // the Dojo's own talk.
             EventKind::Zakum
             | EventKind::Horntail
             | EventKind::Cwk
             | EventKind::Showa
             | EventKind::Balrog
-            | EventKind::Papulatus => return Ok(()),
+            | EventKind::Papulatus
+            | EventKind::Latanica => return Ok(()),
             EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
             // Duarte asks after every run at once (`talk_to_duarte`).
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
@@ -1305,6 +1306,19 @@ impl ClientActor {
         Ok(entry
             .await
             .map(scripts::papulatus_portal)
+            .unwrap_or_default())
+    }
+
+    /// The way to Capt. Latanica: a player holding a White Essence is let
+    /// in if the directory says their party may go.
+    pub(super) async fn latanica_portal(&mut self) -> Result<Vec<Effect>, RuntimeError> {
+        let player = &self.in_game()?.player;
+        if player.inventory.count(net::events::WHITE_ESSENCE) == 0 {
+            return Ok(scripts::latanica_portal(None));
+        }
+        let entry = self.event_entry(EventKind::Latanica).await?;
+        Ok(entry
+            .map(|entry| scripts::latanica_portal(Some(entry)))
             .unwrap_or_default())
     }
 

@@ -115,6 +115,10 @@ pub enum EventKind {
     /// The battle with the Balrog in its tomb under Sleepywood, an
     /// expedition gathered by Mu Young (1061014) (`crate::squads`).
     Balrog,
+    /// The fight with Capt. Latanica in the ghost ship's Engine Room,
+    /// which a party's leader holding a White Essence starts by its portal
+    /// on the ship's last deck.
+    Latanica,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -2507,6 +2511,63 @@ pub const SEALED_BALROG_AFTER: Duration = Duration::from_secs(10);
 /// What the clear map's way out (`balog_end`) gives each winner.
 pub const BALROG_LEATHER: i32 = 4_001_261;
 
+/// The fight with Capt. Latanica (Cosmic `LatanicaBattle`): one to six of
+/// a party, all on the ghost ship's last deck with their leader, who holds
+/// a White Essence, go to their own copy of its Engine Room for ten
+/// minutes. The essence dropped on the room's reactor calls out the
+/// captain, whose death wins it. Bob there takes them up to the Peaceful
+/// Ship, where a time-up sends them too. It lasts until its last member
+/// leaves. The defaults are in `v83ref/lanes/QUESTIONS.md` b279.
+pub const LATANICA: Event = Event {
+    lobby: GHOST_SHIP_DECK,
+    entrances: &[],
+    maps: ENGINE_ROOM..=ENGINE_ROOM,
+    entry: ENGINE_ROOM,
+    entries: 1,
+    exit: PEACEFUL_SHIP,
+    levels: 1..=u8::MAX,
+    spread: None,
+    team: 1..=6,
+    married: false,
+    minutes: 10,
+    exp_per_stage: &[0],
+    meso_per_stage: &[],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: true,
+    survive: None,
+    runs: 1,
+};
+
+/// The ghost ship's last deck ("Ghost ship 7"), whose `in00` leads to the
+/// fight; the Engine Room, where it is fought; and the Peaceful Ship, its
+/// way out, whose `west00` leads back to Boat Quay Town.
+pub const GHOST_SHIP_DECK: i32 = 541_010_060;
+pub const ENGINE_ROOM: i32 = 541_010_100;
+pub const PEACEFUL_SHIP: i32 = 541_010_110;
+/// What the Engine Room's reactor takes to call out the captain, and the
+/// portal checks for: quest 4512's reward.
+pub const WHITE_ESSENCE: i32 = 4_000_381;
+/// The point above the ground below which the captain comes out (Cosmic
+/// `5411000`).
+pub const LATANICA_AT: (i16, i16) = (-146, 225);
+
 /// Crimsonwood Keep's Inner Sanctum's entrance, where its expeditions
 /// gather and come back to, and the Keep's first stage.
 pub const CWK_LOBBY: i32 = 610_030_020;
@@ -3817,7 +3878,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 49] = [
+    pub const ALL: [EventKind; 50] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -3867,6 +3928,7 @@ impl EventKind {
         EventKind::Cwk,
         EventKind::Showa,
         EventKind::Balrog,
+        EventKind::Latanica,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -3923,6 +3985,7 @@ impl EventKind {
             EventKind::Cwk => &CWK,
             EventKind::Showa => &SHOWA,
             EventKind::Balrog => &BALROG,
+            EventKind::Latanica => &LATANICA,
         }
     }
 
@@ -6056,6 +6119,26 @@ mod tests {
         assert!(PAPULATUS.holds(ORIGIN_OF_CLOCKTOWER));
         assert!(!PAPULATUS.holds(CLOCKTOWER_DEPTHS));
         assert_eq!(PAPULATUS.gate.len(), 3);
+    }
+
+    #[test]
+    fn latanica_takes_one_to_six_of_a_party_on_the_last_deck() {
+        let on_deck = |n: ClientId| -> Vec<Candidate> {
+            (1..=n).map(|id| at(id, 1, GHOST_SHIP_DECK)).collect()
+        };
+        assert_eq!(LATANICA.team(1, &on_deck(1)).map(|t| t.len()), Some(1));
+        assert_eq!(LATANICA.team(1, &on_deck(6)).map(|t| t.len()), Some(6));
+        assert_eq!(LATANICA.team(1, &on_deck(7)), None);
+        // Only those on the deck come, and the leader must be one.
+        let mut split = on_deck(3);
+        split[2].map_id = PEACEFUL_SHIP;
+        assert_eq!(LATANICA.team(1, &split).map(|t| t.len()), Some(2));
+        assert_eq!(LATANICA.team(3, &split), None);
+        assert!(LATANICA.holds(ENGINE_ROOM));
+        assert!(!LATANICA.holds(GHOST_SHIP_DECK));
+        assert!(!LATANICA.holds(PEACEFUL_SHIP));
+        assert!(LATANICA.until_empty);
+        assert_eq!(LATANICA.minutes, 10);
     }
 
     #[test]
