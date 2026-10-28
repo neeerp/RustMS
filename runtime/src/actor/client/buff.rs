@@ -98,6 +98,7 @@ impl ClientActor {
             return Ok(());
         }
         let at = game.position;
+        let dead = game.player.stats.hp <= 0;
         let result = party_skill_reached(
             &mut game.player,
             &used,
@@ -106,8 +107,14 @@ impl ClientActor {
             std::time::Instant::now(),
         )
         .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        let raised = dead && game.player.stats.hp > 0;
         for action in result.actions {
             self.apply(action).await?;
+        }
+        // Raised where they fell (Resurrection), they no longer count as
+        // fallen in their event.
+        if raised {
+            self.tell_event(net::events::EventCommand::Revived).await;
         }
         Ok(())
     }

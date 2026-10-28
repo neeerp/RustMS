@@ -2005,3 +2005,5 @@
 "guild_quest.gate.blocked" = "[placeholder] The door is blocked."
 "guild_quest.gate.too_high" = "[placeholder] Only those of level 30 or lower may go this way."
 "guild_quest.gate.crack" = "[placeholder] The door beside the crack keeps it shut."
+"guild_quest.rubian.not_leader" = "[placeholder] Bring Ergoth's Rubian here, and let the one who registered your guild hand it to me."
+"guild_quest.rubian.missing" = "[placeholder] Bring Ergoth's Rubian here and hand it to me."

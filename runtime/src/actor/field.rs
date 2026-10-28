@@ -4208,6 +4208,21 @@ impl FieldActor {
                 }
                 self.board(mob_id, 1, at);
             }
+            // Cosmic `changeMusic(..)`, `spawnMonster(..)`, then
+            // `spawnMonster(.., x, y)` for each guard.
+            reactors::Action::Summon {
+                mob_id,
+                guards,
+                music,
+            } => {
+                if let Ok(packet) = build_field_music(music) {
+                    self.broadcast(None, packet);
+                }
+                self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)));
+                for &(guard, at) in guards {
+                    self.board(guard, 1, at);
+                }
+            }
             // Cosmic `mapMessage(5, ..)` then `spawnNpc(..)`.
             reactors::Action::Appear { npc_id, notice } => {
                 let notice = net::content::text().get(notice, &[]);

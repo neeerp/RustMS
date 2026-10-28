@@ -1556,6 +1556,30 @@ impl NpcScript {
         Self::new(guild_quest::SHAREN_SOUL, pages)
     }
 
+    /// The Rubian's keeper (9040010) in Ergoth's room, to a member of the
+    /// quest who finds it as `talk` holding `count` Rubians, or to anyone
+    /// else, who is sent on its way out (Cosmic `9040010`). The handed-in
+    /// Rubians go, and the guild earns its points, with no word said.
+    pub fn rubian_keeper(talk: Option<guild_quest::RubianTalk>, count: i16) -> Self {
+        use guild_quest::RubianTalk;
+        let pages = match talk {
+            Some(RubianTalk::NotLeader) => {
+                vec![Page::Say(text(keys::GUILD_QUEST_RUBIAN_NOT_LEADER))]
+            }
+            Some(RubianTalk::Missing) => vec![Page::Say(text(keys::GUILD_QUEST_RUBIAN_MISSING))],
+            Some(RubianTalk::HandedIn(points)) => {
+                let mut effects = vec![Effect::TakeItem {
+                    item_id: guild_quest::RUBIAN,
+                    quantity: count,
+                }];
+                effects.extend(points.map(Effect::GainGuildPoints));
+                vec![Page::Done(effects)]
+            }
+            None => vec![Page::Done(vec![Effect::Warp(guild_quest::RETURNING_PATH)])],
+        };
+        Self::new(guild_quest::RUBIAN_KEEPER, pages)
+    }
+
     /// Shuang (9040000) at the Excavation Site's camp, to a member of rank
     /// `rank` in their guild (none without one) who finds the channel's
     /// Guild Quest line as `view` (Cosmic `9040000`): the master or a Jr.

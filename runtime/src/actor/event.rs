@@ -99,6 +99,13 @@ pub enum EventMessage {
         client_id: ClientId,
         reply: oneshot::Sender<Option<net::guild_quest::SoulTalk>>,
     },
+    /// `client_id`, holding the Rubian or not, talks to its keeper in
+    /// Ergoth's room; None for anyone not in the event.
+    Rubian {
+        client_id: ClientId,
+        has_rubian: bool,
+        reply: oneshot::Sender<Option<net::guild_quest::RubianTalk>>,
+    },
     /// `client_id`'s script did something the event keeps track of.
     Command {
         client_id: ClientId,
@@ -401,6 +408,22 @@ impl EventTicket {
         talk.await.ok().flatten()
     }
 
+    /// What the Rubian's keeper tells the member, who holds it or not, or
+    /// `None` if the event is over.
+    pub async fn rubian(&self, has_rubian: bool) -> Option<net::guild_quest::RubianTalk> {
+        let (reply, talk) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Rubian {
+                client_id: self.member,
+                has_rubian,
+                reply,
+            })
+            .await
+            .ok()?;
+        talk.await.ok().flatten()
+    }
+
     /// How many are in the team now, or `None` if the event is over.
     pub async fn team_size(&self) -> Option<usize> {
         let (reply, size) = oneshot::channel();
@@ -584,6 +607,8 @@ pub fn spawn(
         pyramid_stage: 1,
         tally: net::pyramid::Tally::default(),
         stage_started: Instant::now(),
+        began: Instant::now(),
+        fallen: HashSet::new(),
         gauge: None,
         gauge_out: None,
         pyramid_end: None,
@@ -715,6 +740,11 @@ struct EventActor {
     /// stage's gauge (`EventCommand::Massacre`).
     tally: net::pyramid::Tally,
     stage_started: Instant,
+    /// When the event was set up, its gathering and all.
+    began: Instant,
+    /// The members dead in the Guild Quest's last room who haven't
+    /// revived (`EventCommand::KingRoomFell`).
+    fallen: HashSet<ClientId>,
     /// The stage's gauge rules (`mobMassacre/gauge`).
     gauge: Option<game_data::Massacre>,
     /// When the stage's gauge runs out, as the tally stands.
@@ -789,6 +819,9 @@ impl EventActor {
                     }
                     Some(EventMessage::Soul { client_id, reply }) => {
                         let _ = reply.send(self.soul(client_id));
+                    }
+                    Some(EventMessage::Rubian { client_id, has_rubian, reply }) => {
+                        let _ = reply.send(self.rubian(client_id, has_rubian));
                     }
                     Some(EventMessage::Command { client_id, command }) => {
                         self.command(client_id, command);
@@ -1329,6 +1362,13 @@ impl EventActor {
                 self.spears_set(client_id, set)
             }
             EventCommand::SpearsSet(_) => {}
+            EventCommand::KingRoomFell { here, mobs } if self.kind == EventKind::GuildQuest => {
+                self.king_room_fell(client_id, here, mobs);
+            }
+            EventCommand::KingRoomFell { .. } => {}
+            EventCommand::Revived => {
+                self.fallen.remove(&client_id);
+            }
             EventCommand::KingGateOpened if self.kind == EventKind::GuildQuest => {
                 if !self.cleared.king_gate.swap(true, Ordering::AcqRel) {
                     info!(id = self.id, client_id, "King's Corridor opened");
@@ -2031,6 +2071,48 @@ impl EventActor {
             let _ = grave.tx.send(open).await;
         });
         Some(SoulTalk::Opened)
+    }
+
+    /// What the Rubian's keeper tells `client_id` (Cosmic `9040010`): the
+    /// registrant's Rubian wins the quest, earning the guild its points the
+    /// first time by how long the quest has gone on.
+    fn rubian(
+        &mut self,
+        client_id: ClientId,
+        has_rubian: bool,
+    ) -> Option<net::guild_quest::RubianTalk> {
+        use net::guild_quest::RubianTalk;
+        if self.kind != EventKind::GuildQuest || !self.team.has(client_id) {
+            return None;
+        }
+        if client_id != self.team.leader() {
+            return Some(RubianTalk::NotLeader);
+        }
+        if !has_rubian {
+            return Some(RubianTalk::Missing);
+        }
+        let first = !self.cleared.has(self.kind.event().last_stage());
+        let points = first.then(|| net::guild_quest::rubian_points(self.began.elapsed()));
+        self.win();
+        Some(RubianTalk::HandedIn(points))
+    }
+
+    /// `client_id` died in the Guild Quest's last room, where `here` stand
+    /// with `mobs` alive: with everyone there dead and a mob left, the
+    /// quest ends (Cosmic GuildQuest's `playerDead`).
+    fn king_room_fell(&mut self, client_id: ClientId, here: usize, mobs: usize) {
+        if !self.team.has(client_id) {
+            return;
+        }
+        self.fallen.insert(client_id);
+        let won = self.cleared.has(self.kind.event().last_stage());
+        let fallen = (self.fallen.iter())
+            .filter(|member| self.team.has(**member))
+            .count();
+        if !won && mobs > 0 && here <= fallen {
+            info!(kind = ?self.kind, id = self.id, "Everyone in Ergoth's room fell");
+            self.failed = true;
+        }
     }
 
     /// `set` spears are set in the room of the spears, the last by

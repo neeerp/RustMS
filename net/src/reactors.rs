@@ -73,6 +73,13 @@ pub enum Action {
     /// Bring out an NPC on the ground below it, with a pink line (the text
     /// key `notice`) to everyone on its map.
     Appear { npc_id: i32, notice: &'static str },
+    /// `music` plays, and one `mob_id` comes out on the ground below it and
+    /// each of `guards` on the ground below its fixed point.
+    Summon {
+        mob_id: i32,
+        guards: &'static [(i32, (i16, i16))],
+        music: &'static str,
+    },
     /// A moonflower on Henesys's Primrose Hill, which blooms on its seed:
     /// it stays in bloom, the map's full moon (`FULL_MOON`) waxes a phase,
     /// and once every moonflower there blooms the Moon Bunny comes out below
@@ -371,6 +378,17 @@ pub fn action(reactor_id: i32) -> Action {
         crate::guild_quest::CLOTHES_ALTAR => Action::Appear {
             npc_id: crate::guild_quest::SHAREN_SOUL,
             notice: keys::GUILD_QUEST_SOUL_APPEARS,
+        },
+        // Ergoth's altar (Cosmic `9201002`) and the treasure room's boxes
+        // (`9202012`).
+        crate::guild_quest::ERGOTH_ALTAR => Action::Summon {
+            mob_id: crate::guild_quest::ERGOTH,
+            guards: &crate::guild_quest::ERGOTH_GUARDS,
+            music: crate::guild_quest::ERGOTH_MUSIC,
+        },
+        crate::guild_quest::TREASURE_BOX => Action::Spray {
+            at_least: 10,
+            mesos: (30, 60),
         },
         crate::guild_quest::GARGOYLE_ALTAR => Action::BringOutAt {
             mob_id: crate::guild_quest::JR_GARGOYLE,
@@ -909,6 +927,28 @@ mod tests {
                 assert!(altar.item_dropped(state, other, 1, (0, 0)).is_none());
             }
             assert!(altar.is_last(4));
+        }
+        // Ergoth's altar brings Ergoth and the guards out on its fifth hit,
+        // and the treasure room's boxes spray theirs.
+        use crate::guild_quest::{ERGOTH, ERGOTH_ALTAR, ERGOTH_GUARDS, TREASURE_BOX};
+        assert_eq!(
+            action(ERGOTH_ALTAR),
+            Action::Summon {
+                mob_id: ERGOTH,
+                guards: &ERGOTH_GUARDS,
+                music: "Bgm10/Eregos"
+            }
+        );
+        let spray = Action::Spray {
+            at_least: 10,
+            mesos: (30, 60),
+        };
+        assert_eq!(action(TREASURE_BOX), spray);
+        for reactor in [ERGOTH_ALTAR, TREASURE_BOX] {
+            assert!(!stays(reactor) && !acts_staying(reactor));
+            if let Some(template) = template(reactor) {
+                assert!(template.is_last(5) && !template.is_last(4));
+            }
         }
         // The King's Corridor's door takes the earring and stays open.
         use crate::guild_quest::{KING_GATE_ITEM, KING_GATE_REACTOR};

@@ -388,13 +388,13 @@ pub enum Balloon {
     Answer { combo: u32 },
 }
 
-/// A won event's bonus: the team plays `map` for `minutes`, then whoever is
+/// A won event's bonus: the team plays `map` for `seconds`, then whoever is
 /// still there goes on to `exit`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Bonus {
     pub map: i32,
     pub exit: i32,
-    pub minutes: u64,
+    pub seconds: u64,
     /// Whether the win itself takes the team there, rather than the leader
     /// later.
     pub on_win: bool,
@@ -403,7 +403,7 @@ pub struct Bonus {
 impl Bonus {
     /// How long the bonus lasts, shortened like the event's time.
     pub fn duration(&self) -> Duration {
-        scaled(Duration::from_secs(self.minutes * 60))
+        scaled(Duration::from_secs(self.seconds))
     }
 }
 
@@ -547,7 +547,7 @@ pub const HPQ: Event = Event {
     bonus: Some(Bonus {
         map: 910_010_200,
         exit: 910_010_400,
-        minutes: 5,
+        seconds: 5 * 60,
         on_win: false,
     }),
     blessings: &[],
@@ -612,7 +612,7 @@ pub const LPQ: Event = Event {
     bonus: Some(Bonus {
         map: 922_011_000,
         exit: 922_011_100,
-        minutes: 1,
+        seconds: 60,
         on_win: true,
     }),
     blessings: &[],
@@ -1113,7 +1113,9 @@ pub const ZAKUM: Event = Event {
 /// `join00` opens once its three minutes are up; Sharenian's stages follow
 /// a hundred map ids apart, up to the boss's 990000900. Its members come in
 /// one by one through Shuang while it gathers, and once it is under way it
-/// ends when fewer than six remain or its registrant leaves.
+/// ends when fewer than six remain or its registrant leaves. The Rubian
+/// handed in wins it and takes the guild to Sharenian's treasure room for
+/// half a minute (Cosmic `clearPQ`'s `bonusTime`), then out.
 pub const GUILD_QUEST: Event = Event {
     lobby: crate::guild_quest::CAMP,
     entrances: &[],
@@ -1139,7 +1141,12 @@ pub const GUILD_QUEST: Event = Event {
     hand_ins: &[],
     gates: false,
     clear_map: None,
-    bonus: None,
+    bonus: Some(Bonus {
+        map: crate::guild_quest::BONUS_MAP,
+        exit: crate::guild_quest::RETURNING_PATH,
+        seconds: 30,
+        on_win: true,
+    }),
     blessings: &[],
     squad: false,
     gate: &[],
@@ -3367,6 +3374,11 @@ pub enum EventCommand {
     SpearsSet(u8),
     /// The Guild Quest's King's Corridor's door took the earring.
     KingGateOpened,
+    /// A member died in the Guild Quest's last room, where `here` stand
+    /// (they too) with `mobs` alive.
+    KingRoomFell { here: usize, mobs: usize },
+    /// A member who died has revived.
+    Revived,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

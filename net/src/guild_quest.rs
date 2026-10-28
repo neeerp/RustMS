@@ -178,6 +178,47 @@ pub const KING_GATE_REACTOR: i32 = 9_208_009;
 pub const KING_GATE_ITEM: i32 = 1_032_033;
 pub const KING_ROOM: i32 = 990_000_900;
 pub const KING_WAYS: [(&str, u8); 2] = [("kinggate_open", 1), ("kinggate2_open", 2)];
+/// The altar in Ergoth's room (9201002), which on its fifth hit brings out
+/// Ergoth below it and its four guards at their points, to its music
+/// (Cosmic `9201002`).
+pub const ERGOTH_ALTAR: i32 = 9_201_002;
+pub const ERGOTH: i32 = 9_300_028;
+pub const ERGOTH_GUARDS: [(i32, (i16, i16)); 4] = [
+    (9_300_031, (130, 90)),
+    (9_300_032, (540, 90)),
+    (9_300_029, (130, 150)),
+    (9_300_030, (540, 150)),
+];
+pub const ERGOTH_MUSIC: &str = "Bgm10/Eregos";
+/// Ergoth's Rubian, which the registrant hands in to the NPC beside the
+/// altar (Cosmic `9040010`) to win the quest.
+pub const RUBIAN: i32 = 4_001_024;
+pub const RUBIAN_KEEPER: i32 = 9_040_010;
+/// Sharenian's treasure room (990001000), the won guild's bonus, whose
+/// boxes (9202012) give up their loot topped up with piles of 30 to 60
+/// mesos (Cosmic `9202012`'s `sprayItems(true, 1, 30, 60, 10)`).
+pub const BONUS_MAP: i32 = 990_001_000;
+pub const TREASURE_BOX: i32 = 9_202_012;
+
+/// The guild's points for the Rubian, handed in `elapsed` after the quest
+/// was set up for it (its gathering too): 1000 less one for every six
+/// seconds, but never under 100 (Cosmic `9040010`).
+pub fn rubian_points(elapsed: Duration) -> i32 {
+    let lost = i32::try_from(elapsed.as_millis() / 6000).unwrap_or(i32::MAX);
+    1000_i32.saturating_sub(lost).max(100)
+}
+
+/// What the Rubian's keeper tells a member of the quest.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RubianTalk {
+    /// Only the registrant hands it in.
+    NotLeader,
+    /// The registrant hasn't it.
+    Missing,
+    /// The registrant handed it in, earning the guild these points the
+    /// first time.
+    HandedIn(Option<i32>),
+}
 
 /// Where the grid's way `script` leads a member who last came from `room`,
 /// and the room it records: `None` for any other portal.
@@ -759,6 +800,35 @@ mod tests {
             assert!(event.holds(*map_id), "{map_id}");
         }
         assert_eq!(event.stage_on(STATUE_HALL), Some(KNIGHT_STAGE - 1));
+    }
+
+    #[test]
+    fn the_rubian_earns_a_point_less_every_six_seconds_down_to_a_hundred() {
+        let after = |ms| rubian_points(Duration::from_millis(ms));
+        assert_eq!((after(0), after(5_999), after(6_000)), (1000, 1000, 999));
+        assert_eq!(after(60 * 60 * 1000), 400);
+        assert_eq!((after(5_400_000), after(u64::MAX)), (100, 100));
+    }
+
+    #[test]
+    fn ergoth_s_room_holds_the_altar_and_the_rubian_s_keeper_and_the_win_its_treasure() {
+        let data = crate::get_game_data().unwrap();
+        let room = data.field(KING_ROOM).unwrap();
+        assert!(room.map_npcs.iter().any(|npc| npc.npc_id == RUBIAN_KEEPER));
+        assert!(room.reactors.iter().any(|r| r.reactor_id == ERGOTH_ALTAR));
+        let treasure = data.field(BONUS_MAP).unwrap();
+        assert!(treasure
+            .reactors
+            .iter()
+            .any(|r| r.reactor_id == TREASURE_BOX));
+        let event = crate::events::GUILD_QUEST;
+        let bonus = event.bonus.as_ref().unwrap();
+        assert_eq!(
+            (bonus.map, bonus.exit, bonus.seconds),
+            (BONUS_MAP, RETURNING_PATH, 30)
+        );
+        assert!(bonus.on_win && event.holds(BONUS_MAP) && !event.holds(RETURNING_PATH));
+        assert_eq!(event.stage_on(KING_ROOM), Some(event.last_stage()));
     }
 
     #[test]
