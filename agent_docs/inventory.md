@@ -144,16 +144,17 @@ places either kind where it last saw the player, and anyone may pick it up
 at once (ownership 2). Dead players can't drop.
 
 A map whose `fieldLimit` has bit 0x400000 keeps items and mesos off the
-ground. An `info/everlast` map keeps thrown items off it: v83 silently does
-nothing when an item is dragged out of the inventory there (FUN_004f31a5),
-HeavenClient does the same, and the server refuses the drop. Mesos are not
-stopped (the client's meso path wasn't traced). As in v83, HeavenClient asks its usual questions first and then says
+ground. As in v83, HeavenClient asks its usual questions first and then says
 "You cannot drop the item here." in the skill chat colour instead of sending
 the drop. It also refuses an item drop while the player is alert from a hit
 or an attack ("You can't do it right now. Catch your breath and then try
 again.") or dead ("You can't do it once you're dead."). The server refuses
 item and meso drops on such a map too (`FieldTemplate::may_drop`) with an
 enable-actions stat update.
+
+An `info/everlast` map takes thrown items like any other and keeps
+them: v83's drop check (FUN_004f31a5) reads the map's everlast flag only when
+its first argument is set, and its one caller, the inventory drag, passes 0.
 
 GATHER_ITEMS (`0x45`) and SORT_ITEMS (`0x46`) (tick, type) are the item
 window's Gather and Sort buttons. The rearrangement goes out as one

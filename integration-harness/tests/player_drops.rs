@@ -90,8 +90,9 @@ async fn a_dropped_weapon_is_anyones_and_gone_from_the_dropper() {
     assert_eq!(finder.items.get(&weapon), Some(&1));
 }
 
+/// As in v83, whose drop check skips the map's everlast flag.
 #[tokio::test]
-async fn nothing_may_be_thrown_down_in_an_everlast_map() {
+async fn items_may_be_thrown_down_in_an_everlast_map() {
     let config = load_harness_config_or_fail().await;
     let mut session = login_to_world_session(&config).await.unwrap();
     let weapon = session.equipped[&WEAPON.abs()];
@@ -103,12 +104,11 @@ async fn nothing_may_be_thrown_down_in_an_everlast_map() {
     send(c, item_move(EQUIPPED, WEAPON, 1, 1)).await;
     read_for(c, &mut t, 300).await;
     send(c, item_move(EQUIP, 1, 0, 1)).await;
-    read_for(c, &mut t, 500).await;
-    assert!(t.field.item_drop(weapon).is_none());
+    until(c, &mut t, |t| t.field.item_drop(weapon).is_some()).await;
     drop(session);
 
     let session = relogin(&config).await;
-    assert_eq!(session.items.get(&weapon), Some(&1));
+    assert!(!session.items.contains_key(&weapon));
 }
 
 #[tokio::test]

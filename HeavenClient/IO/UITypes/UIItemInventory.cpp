@@ -2291,10 +2291,6 @@ namespace ms
 		if (item_drop::kept(item_id))
 			return;
 
-		// v83 FUN_004f31a5 drops nothing on an everlast map, silently.
-		if (Stage::get().get_mapinfo().is_everlast())
-			return;
-
 		// A token breaks the couple off instead (0x4f33ee); the server takes
 		// it.
 		if (marriage::is_token(item_id))

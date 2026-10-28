@@ -105,7 +105,7 @@ fn drop_item(
     let field = crate::get_game_data()
         .ok()
         .and_then(|data| data.field(player.stats.map_id));
-    if !field.is_none_or(|field| field.may_drop_items()) {
+    if !field.is_none_or(|field| field.may_drop()) {
         return Err("the map forbids drops");
     }
     let kind = InventoryType::from_i16(i16::from(kind))
