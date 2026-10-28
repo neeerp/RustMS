@@ -2330,6 +2330,9 @@ pub const CWK: Event = Event {
 /// gather and come back to, and the Keep's first stage.
 pub const CWK_LOBBY: i32 = 610_030_020;
 pub const CWK_ENTRY: i32 = 610_030_100;
+/// The Keep's treasure room, after its rest room, the one map whose clock
+/// still starts once the Keep is won.
+pub const CWK_TREASURE: i32 = CWK_ENTRY + 700;
 
 /// Where the Keep's first stage hides its way on, behind the pillar by the
 /// Lion Shield: Cosmic's `next01` (`glpqPortalDummy`), which our Map.nx
@@ -2357,7 +2360,7 @@ pub const CWK_CLOCKS: [(i32, u64); 6] = [
     (CWK_ENTRY + 300, 10),
     (CWK_ENTRY + 400, 20),
     (CWK_ENTRY + 500, 60),
-    (CWK_ENTRY + 700, 1),
+    (CWK_TREASURE, 1),
 ];
 
 /// The Keep's sigils, lit by a job's skills, on its second and third
@@ -2575,6 +2578,94 @@ pub fn cwk_keeper(keeper: i32) -> Option<(u8, &'static CwkRoom)> {
     let job = CWK_ROOMS.iter().position(|room| room.keeper == keeper)?;
     Some((job as u8, &CWK_ROOMS[job]))
 }
+
+/// The Keep's sixth stage, the Twisted Masters' own. Nothing lives there
+/// but what its host (`CWK_HOST`) brings out.
+pub const CWK_BOSS: i32 = CWK_ENTRY + 500;
+/// The host of the sixth stage (Cosmic `9201115`), who brings out an escort
+/// of guardians, then the Twisted Masters, as the leader talks to it.
+pub const CWK_HOST: i32 = 9_201_115;
+/// The escort the host brings out first: ten Master Guardians and twenty
+/// Crimson Guardians, each at its own x along the stage's floor
+/// (`CWK_ESCORT_X`, at `CWK_ESCORT_Y`).
+pub const CWK_ESCORT: [(i32, usize); 2] = [(CWK_MASTER_GUARDIAN, 10), (9_400_582, 20)];
+pub const CWK_ESCORT_X: std::ops::Range<i16> = -1337..0;
+pub const CWK_ESCORT_Y: i16 = 276;
+/// The Twisted Masters, brought out once the escort is gone: Margana on
+/// the upper platform, then Red Nirg, Hsalf and Rellik below.
+pub const CWK_MASTERS: [(i32, (i16, i16)); 4] = [
+    (9_400_590, (-22, 1)),
+    (9_400_591, (-22, 276)),
+    (9_400_593, (496, 276)),
+    (9_400_592, (-496, 276)),
+];
+
+/// What the sixth stage's host does for a member who talks to it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CwkHost {
+    /// The Twisted Masters are beaten: the way on is open.
+    WellPlayed,
+    /// Only the leader hears the rest.
+    Leader,
+    /// Welcomes the party and brings out the escort.
+    Welcome,
+    /// What it brought out is still about: the escort, or the Twisted
+    /// Masters (true).
+    Escorting(bool),
+    /// The escort is gone: it brings out the Twisted Masters.
+    Masters,
+    /// The Twisted Masters and all they brought are gone: the Keep is won.
+    Beaten,
+}
+
+/// What the host does, `phase` being how many times it has brought mobs
+/// out, with `mobs` alive on the stage, summons and all (Cosmic `9201115`'s
+/// `glpq6` and `countMonsters`). The Keep is won only once the leader
+/// talks to it after the last falls.
+pub fn cwk_host(won: bool, leader: bool, phase: u8, mobs: usize) -> CwkHost {
+    match phase {
+        _ if won => CwkHost::WellPlayed,
+        _ if !leader => CwkHost::Leader,
+        0 => CwkHost::Welcome,
+        _ if mobs > 0 => CwkHost::Escorting(phase > 1),
+        1 => CwkHost::Masters,
+        _ => CwkHost::Beaten,
+    }
+}
+
+/// Jack (Cosmic `9201112`), who goes along with the expedition and tells
+/// of each stage, and of the way to the Twisted Masters' armory.
+pub const CWK_JACK: i32 = 9_201_112;
+
+/// What Jack tells on `map_id`, page by page, during the Keep's party
+/// quest; nothing on any other map.
+pub fn cwk_jack(map_id: i32) -> &'static [&'static str] {
+    use game_data::server_content::keys;
+    match map_id - CWK_ENTRY {
+        0 => &[
+            keys::CWK_JACK_STAGE1_1,
+            keys::CWK_JACK_STAGE1_2,
+            keys::CWK_JACK_STAGE1_3,
+        ],
+        100 => &[keys::CWK_JACK_STAGE2_1, keys::CWK_JACK_STAGE2_2],
+        200 => &[keys::CWK_JACK_STAGE3_1, keys::CWK_JACK_STAGE3_2],
+        300 => &[keys::CWK_JACK_STAGE4_1, keys::CWK_JACK_STAGE4_2],
+        400 => &[
+            keys::CWK_JACK_STAGE5_1,
+            keys::CWK_JACK_STAGE5_2,
+            keys::CWK_JACK_STAGE5_3,
+            keys::CWK_JACK_STAGE5_4,
+        ],
+        600 => &[keys::CWK_JACK_REST],
+        _ => &[],
+    }
+}
+
+/// The first stage's Master Guardians, who come at one place a minute
+/// after the Keep's copy opens, if anyone is still on the stage (Cosmic
+/// CWKPQ's `spawnGuardians`). They come once.
+pub const CWK_GUARDIANS_AFTER: Duration = Duration::from_secs(60);
+pub const CWK_GUARDIANS: (i32, (i16, i16), usize) = (CWK_MASTER_GUARDIAN, (1000, 336), 20);
 
 /// Magatia's lobbies for Romeo and Juliet's party quest: Romeo's room on
 /// the Zenumist side, Juliet's on the Alcadno side.
@@ -4115,6 +4206,10 @@ pub enum EventCommand {
     /// A member took Crimsonwood Keep's third stage's way up
     /// (`glpqPortal2`).
     CwkStep,
+    /// The leader heard the Keep's sixth stage's host out after it had
+    /// brought mobs out this many times (`cwk_host`): it brings out the
+    /// escort, then the Twisted Masters, then owns their defeat.
+    CwkHost(u8),
     /// The Guild Quest's room of the spears has this many spears set.
     SpearsSet(u8),
     /// The Guild Quest's King's Corridor's door took the earring.
@@ -4815,6 +4910,32 @@ mod tests {
         let mesos: Vec<_> = (1..=7).map(|stage| CWK.stage_meso(stage)).collect();
         assert_eq!(mesos, [500, 1000, 2000, 5000, 8000, 20000, 0]);
         assert_eq!(ZAKUM.stage_meso(1), 0);
+    }
+
+    #[test]
+    fn crimsonwood_keep_s_host_brings_out_its_masters_for_the_leader() {
+        use CwkHost::*;
+        // Only the leader moves it on, until the Keep is won.
+        assert_eq!(cwk_host(false, false, 0, 0), Leader);
+        assert_eq!(cwk_host(true, false, 2, 0), WellPlayed);
+        assert_eq!(cwk_host(true, true, 3, 0), WellPlayed);
+        assert_eq!(cwk_host(false, true, 0, 0), Welcome);
+        // Each time, once all it brought out are gone.
+        assert_eq!(cwk_host(false, true, 1, 30), Escorting(false));
+        assert_eq!(cwk_host(false, true, 1, 0), Masters);
+        assert_eq!(cwk_host(false, true, 2, 1), Escorting(true));
+        assert_eq!(cwk_host(false, true, 2, 0), Beaten);
+        assert_eq!(CWK.last_stage(), 6);
+        assert_eq!(CWK.stage_on(CWK_BOSS), Some(6));
+        let escort: usize = CWK_ESCORT.iter().map(|&(_, count)| count).sum();
+        assert_eq!(escort, 30);
+        assert!(CWK_ESCORT_X.contains(&-1337) && !CWK_ESCORT_X.contains(&0));
+        // Jack tells of each stage he stands on, and of the rest room.
+        assert_eq!(cwk_jack(CWK_ENTRY).len(), 3);
+        assert_eq!(cwk_jack(CWK_HUB).len(), 4);
+        assert_eq!(cwk_jack(CWK_ENTRY + 600).len(), 1);
+        assert!(cwk_jack(CWK_BOSS).is_empty() && cwk_jack(CWK_ENTRY + 700).is_empty());
+        assert!(cwk_jack(CWK_LOBBY).is_empty());
     }
 
     #[test]

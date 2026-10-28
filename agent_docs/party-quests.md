@@ -1591,7 +1591,12 @@ within reach of `CWK_HIDDEN_WAY` (`events::cwk_hidden_way`, checked by
 (`member_clears`). That member goes back to the stage's start, and
 everyone hears it in pink (`cwk.stage1.found`). The stage's reactor
 `mob0` (6109010, fed in the original data by item 4000488, which nothing
-drops) is left alone. The picks are in QUESTIONS b264.
+drops) is left alone. The picks are in QUESTIONS b264. A minute after the
+event starts (`CWK_GUARDIANS_AFTER`, `EventActor::cwk_guardians`), if anyone is
+still on the first stage, everyone there hears in pink that they've been
+found (`cwk.guardians.detected`) and 20 Master Guardians (9400594) come out
+at its east end (`CWK_GUARDIANS`, as Cosmic's `spawnGuardians`). A copy
+already closed is left closed (`FieldRegistry::running`).
 
 The second stage (610030200) has five sigils, one for each job's
 (`events::cwk_sigil`, `CWK_SIGILS`, 6109000 to 6109004: warrior, bowman,
@@ -1653,8 +1658,45 @@ The hub's five altars (6109005 to 6109009) each take one weapon dropped
 in their area, and count as the sigils do (`Cleared::light_sigil` for
 stage 5). Everyone hears each one restored (`cwk.weapon.restored`); with
 the fifth, everyone hears that the way on is open (`cwk.weapons.done`) and
-the stage clears. The boss and the treasure room come in later slices.
-The picks are in QUESTIONS b267.
+the stage clears. The picks are in QUESTIONS b267.
+
+The sixth stage (`CWK_BOSS`, 610030600) has the host (`CWK_HOST`,
+9201115, `cwk_host` in the client's dialogue chain), who talks business
+only with the leader; anyone else hears to fetch the leader
+(`cwk.host.leader`). The event keeps a phase (`Cleared::host`), and the
+host's lines follow it and the stage's live mobs (`events::cwk_host`,
+`FieldMessage::MobCount`, so anything the mobs summon counts too):
+
+- **Welcome (phase 0):** three pages, the last bringing out the escort
+  (`EventCommand::CwkHost(0)`): 10 Master Guardians (9400594) and 20 of
+  9400582 at random across the floor (`CWK_ESCORT`), with a chat-log line
+  for everyone there (`cwk.escort.out`). While they live, the host says so
+  (`cwk.host.escorting`).
+- **Masters (phase 1):** with the escort gone, two pages, the last
+  bringing out the four Twisted Masters (9400590 to 9400593,
+  `CWK_MASTERS`, at their Cosmic spots) and a line (`cwk.masters.out`).
+  While any mob lives, the host says so (`cwk.host.masters_escorting`).
+- **Beaten (phase 2):** with them gone, one page that wins the Keep
+  (`EventActor::win`): the stage clears for all with its EXP and mesos,
+  everyone on the stage hears in pink that the way on is open
+  (`cwk.boss.open`), and the host only says well played from then on.
+
+Each phase moves on once, however many talk at once
+(`Cleared::host_heard`). There's no win without the last talk, as in
+Cosmic. The stage's other reactor, 6109011, is left alone.
+
+Once won, the stage's way on (`glpqPortal6`) leads to the rest room
+(610030700), and its way on (`glpqPortal7`) to the treasure room
+(`CWK_TREASURE`, 610030800), whose clock of a minute, the one that still
+starts after the win, sends everyone back to the entrance.
+Its boxes (6102002 to 6102005) spray at least 15 drops of 90 to 360 mesos
+when broken (`Action::Spray`; the content pack has no item rows for them).
+
+Jack (`CWK_JACK`, 9201112) stands on every stage and in the rest room.
+Within the event, its advice follows the map (`events::cwk_jack`,
+`cwk.jack.stageN.*`, `cwk.jack.rest`); anywhere else, or on a map with no
+advice, it gives one idle line (`cwk.jack.idle`). The picks are in
+QUESTIONS b268.
 
 ## Jr. Balrog's room
 

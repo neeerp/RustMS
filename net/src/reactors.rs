@@ -483,6 +483,12 @@ pub fn action(reactor_id: i32) -> Action {
             at_least: 15,
             mesos: (30, 60),
         },
+        // Crimsonwood Keep's treasure room's boxes (`6102002` to `6102005`:
+        // `sprayItems(true, 1, 90, 360, 15)`).
+        6102002..=6102005 => Action::Spray {
+            at_least: 15,
+            mesos: (90, 360),
+        },
         OPQ_LEVER => Action::Lever,
         // The jails' boxes (`2002017`, `2002018`: `sprayItems(true, 1, 100,
         // 400, 15)`).
@@ -799,6 +805,17 @@ mod tests {
                 mesos: (100, 400)
             }
         ));
+        // Crimsonwood Keep's treasure room's boxes.
+        for reactor_id in 6102002..=6102005 {
+            assert_eq!(
+                action(reactor_id),
+                Action::Spray {
+                    at_least: 15,
+                    mesos: (90, 360)
+                }
+            );
+        }
+        assert_ne!(action(6102001), action(6102002));
         let Action::SpawnAt { mob_id, at, .. } = action(2201003) else {
             panic!("{:?}", action(2201003));
         };
