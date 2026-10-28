@@ -61,6 +61,10 @@ namespace ms
 		// Where a swing hits it, or an empty box if it takes none now.
 		reactor_rules::Box get_swing_box() const;
 
+		// Where the user stands on it, if it is set off by touch, else an
+		// empty box.
+		reactor_rules::Box get_touch_box() const;
+
 		// The local player, at `user`, used `skill`: if an event of its
 		// state takes that there, it plays it in 800 ms and returns its
 		// index, else -1 (FUN_00735ab7).
@@ -85,6 +89,9 @@ namespace ms
 
 		int32_t rid;
 		nl::node src;
+		// Set off by touch (`info/activateByTouch`): the user tells as they
+		// step onto it and off it.
+		bool touch;
 
 		int8_t state;
 		int8_t previous;

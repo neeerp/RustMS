@@ -1,5 +1,6 @@
 #include "../Gameplay/MapleMap/ReactorRules.h"
 #include <iostream>
+#include <set>
 #include <stdexcept>
 
 void require(bool condition, const char* message)
@@ -76,6 +77,22 @@ int main()
 		require(pick_skill_event({ SkillEvent{ SKILL_USED, { 1211002 }, Box{ 200, 0, 300, 50 } }, sigil }, 1211002, 0, 0)
 					== 1, "the first whose area holds the user");
 		require(!swingable({ SKILL_USED }), "and it takes no swing");
+
+		// A flame 149x45 with its origin (74, 22), drawn 22 up from (0, 0).
+		Box flame{ -74, -44, 75, 1 };
+		require(contains(flame, -74, -44) && contains(flame, 74, 0), "a point in the box");
+		require(!contains(flame, 75, 0) && !contains(flame, 0, 1), "but not on its right or bottom edge");
+
+		using Changes = std::vector<TouchChange>;
+		std::set<int32_t> touched;
+		std::vector<Touchable> reactors{ { 7, flame }, { 9, Box{ 200, -44, 349, 1 } }, { 11, Box{} } };
+		require(touch_changes(reactors, 0, 0, touched) == Changes{ { 7, true } }, "stepping onto one is told");
+		require(touch_changes(reactors, 10, -5, touched).empty(), "once");
+		require(touch_changes(reactors, 300, 0, touched) == Changes{ { 7, false }, { 9, true } },
+				"stepping off it as onto another");
+		require(touch_changes({ { 7, flame } }, 0, 0, touched) == Changes{ { 7, true } }, "one gone is not stepped off");
+		require(touched == std::set<int32_t>{ 7, 9 }, "and stays in until the field changes");
+		require(touch_changes({ { 7, Box{} } }, 500, 0, touched).empty(), "one with an empty box is passed over");
 
 		std::cout << "Reactor rules passed\n";
 		return 0;

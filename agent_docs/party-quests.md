@@ -45,8 +45,8 @@ room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 married couples, has its entry, its way out, its end rules, its six
 stages and its bonus ([the Amorian Challenge](#the-amorian-challenge)).
 Crimsonwood Keep's party quest is an expedition's, which ends like a
-party's; it has its gate, its squad, its clocks and its end rules, and its
-stages come in later slices ([Crimsonwood Keep](#crimsonwood-keep)).
+party's; it has its gate, its squad, its clocks, its end rules, its
+stages, its win and its rooms after ([Crimsonwood Keep](#crimsonwood-keep)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1633,8 +1633,22 @@ the stage's field starts, it wakes one at each place (`events::cwk_wake`,
 sigil of each job is among them (the last place has only fakes), and
 deals the eight places out among them afresh
 (`ReactorSet::shuffle_named`). Its woken sigils count as the second
-stage's do. Its fakes break on a swing. The fourth stage's flames come in
-a later slice.
+stage's do. Its fakes break on a swing.
+
+The fourth stage's floor has fires, `a1` to `i7` (flametorch objects:
+state 1 lit, which burns, 2 out). The field starts with all of them lit
+but those of letters b, d, e, g and i numbered 2, 4, 5 or 7 (`events::cwk_fires`,
+as Cosmic's CWKPQ sets them), sent to those who come
+(FIELD_OBSTACLE_ONOFF_STATUS). Eight flames (6109014, 6109021 to 6109027,
+`i_a` to `3_5`) and two stirges (6109013) go off by touch
+([combat](./combat.md)). A flame lit by its first player on, and again
+when its last steps off, flips its fires, as Cosmic's reactor scripts do:
+a lit fire goes out and any other is lit (`cwk_flame`, `cwk_flip`,
+FIELD_OBSTACLE_ONOFF). The stage's 48 Blood Stirges (9400595) take no
+damage. With five standing on the two stirges at once
+(`CWK_STIRGE_STANDING`, one count for both, as in Cosmic), everyone there
+hears so (`cwk.stirges.gone`, an item line) and every mob there goes for
+good, once a field. The picks are in QUESTIONS b270.
 
 The fifth stage is a hub (610030500) with a way into a room for each job
 (`CWK_ROOMS`): `in01` to `in05` (`glpqPortal00` to `glpqPortal04`,

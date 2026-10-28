@@ -25,6 +25,7 @@
 #include "../Spawn.h"
 
 #include <queue>
+#include <set>
 
 namespace ms
 {
@@ -47,6 +48,10 @@ namespace ms
 		// Break a reactor, now in its last `state`.
 		void remove(int32_t oid, int8_t state);
 
+		// The reactors set off by touch that the user at `user` stepped onto
+		// or off since the last poll (FUN_00735d90).
+		std::vector<reactor_rules::TouchChange> touch(Point<int16_t> user);
+
 		// Remove all reactors.
 		void clear();
 
@@ -56,5 +61,9 @@ namespace ms
 		MapObjects reactors;
 
 		std::queue<ReactorSpawn> spawns;
+
+		// Those the user stands on, as far as the server was told; kept
+		// until the field changes.
+		std::set<int32_t> touched;
 	};
 }

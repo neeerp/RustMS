@@ -159,6 +159,16 @@ pub fn hit_reactor(object_id: i32) -> Packet {
     p
 }
 
+/// TOUCH_REACTOR: the player stepped onto (`inside`) or off a reactor set
+/// off by touch.
+pub fn touch_reactor(object_id: i32, inside: bool) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::TouchReactor as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_byte(u8::from(inside)).unwrap();
+    p
+}
+
 /// DAMAGE_REACTOR: skill `skill_id` used by a reactor, facing right on a
 /// foothold, landing after 800 ms as the client's do.
 pub fn skill_at_reactor(object_id: i32, skill_id: i32) -> Packet {

@@ -1402,6 +1402,19 @@ namespace ms
 		};
 	};
 
+	// The user stepped onto a reactor set off by touch, or off it (v83
+	// FUN_00735d90).
+	// Opcode: TOUCH_REACTOR(206)
+	class TouchReactorPacket : public OutPacket
+	{
+	public:
+		TouchReactorPacket(int32_t oid, bool inside) : OutPacket(OutPacket::Opcode::TOUCH_REACTOR)
+		{
+			write_int(oid);
+			write_byte(inside);
+		};
+	};
+
 	// Opcode: PLAYER_MAP_TRANSFER(207)
 	class PlayerMapTransferPacket : public OutPacket
 	{

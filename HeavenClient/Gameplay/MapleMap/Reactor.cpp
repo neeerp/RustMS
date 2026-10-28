@@ -30,6 +30,7 @@ namespace ms
 	{
 		std::string strid = string_format::extend_id(rid, 7);
 		src = nl::nx::reactor[strid + ".img"];
+		touch = src["info"]["activateByTouch"].get_integer() != 0;
 
 		// Some reactors take their states from another.
 		nl::node link = src["info"]["link"];
@@ -237,6 +238,17 @@ namespace ms
 	reactor_rules::Box Reactor::get_swing_box() const
 	{
 		if (!active || phase != Phase::IDLE || cooldown > 0 || !reactor_rules::swingable(event_types(state)))
+			return {};
+
+		Point<int16_t> corner = get_position() - Point<int16_t>(0, shift) - animation.get_origin();
+		Point<int16_t> size = animation.get_dimensions();
+
+		return { corner.x(), corner.y(), corner.x() + size.x(), corner.y() + size.y() };
+	}
+
+	reactor_rules::Box Reactor::get_touch_box() const
+	{
+		if (!active || !touch)
 			return {};
 
 		Point<int16_t> corner = get_position() - Point<int16_t>(0, shift) - animation.get_origin();

@@ -2309,6 +2309,7 @@ pub mod keys {
     pub const CWK_JACK_STAGE5_3: &str = "cwk.jack.stage5.3";
     pub const CWK_JACK_STAGE5_4: &str = "cwk.jack.stage5.4";
     pub const CWK_JACK_REST: &str = "cwk.jack.rest";
+    pub const CWK_STIRGES_GONE: &str = "cwk.stirges.gone";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";

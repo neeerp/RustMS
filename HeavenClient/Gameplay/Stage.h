@@ -455,6 +455,7 @@ namespace ms
 		MapTilesObjs tilesobjs;
 		// The ms since the quest-bound tags were last looked at, and the quest log they were looked at for.
 		int32_t since_quest_tags = 0;
+		int32_t since_reactor_touch = 0;
 		uint64_t quest_tags_revision = 0;
 		QuestAlert quest_alert;
 		MapBackgrounds backgrounds;

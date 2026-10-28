@@ -2459,6 +2459,55 @@ pub fn cwk_wake(rng: &mut impl rand::Rng) -> [&'static str; 8] {
     }
 }
 
+/// The fourth stage's fires, `a1` to `i7`: nine letters of seven, each
+/// in a state as the stage sets them (Cosmic CWKPQ's setup). All are lit
+/// (1) but those of letters b, d, e, g and i numbered 2, 4, 5 or 7, which
+/// are left as the map has them.
+pub fn cwk_fires() -> Vec<(String, i32)> {
+    let mut fires = Vec::new();
+    for (letter, x) in ('a'..='i').zip(0..) {
+        for n in 1..=7 {
+            let sparse = matches!(x, 1 | 3 | 4 | 6 | 8);
+            if !sparse || !matches!(n, 2 | 4 | 5 | 7) {
+                fires.push((format!("{letter}{n}"), 1));
+            }
+        }
+    }
+    fires
+}
+
+/// The fires of the fourth stage that a flame (set off by touch) puts
+/// out or lights again (Cosmic `6109014` and `6109021` to `6109027`):
+/// a block of them in each corner and side of the stage.
+pub fn cwk_flame(reactor_id: i32) -> Option<&'static [&'static str]> {
+    Some(match reactor_id {
+        6_109_014 => &["a1", "a2", "b1", "b2", "c1", "c2"],
+        6_109_021 => &["a3", "a4", "a5", "b3", "b4", "b5", "c3", "c4", "c5"],
+        6_109_022 => &["a6", "a7", "b6", "b7", "c6", "c7"],
+        6_109_023 => &["d1", "d2", "e1", "e2", "f1", "f2"],
+        6_109_024 => &["d6", "d7", "e6", "e7", "f6", "f7"],
+        6_109_025 => &["g1", "g2", "h1", "h2", "i1", "i2"],
+        6_109_026 => &["g3", "g4", "g5", "h3", "h4", "h5", "i3", "i4", "i5"],
+        6_109_027 => &["g6", "g7", "h6", "h7", "i6", "i7"],
+        _ => return None,
+    })
+}
+
+/// A fire's next state as a flame flips it (Cosmic `toggleEnvironment`):
+/// lit (1) goes to 2, and anything else to lit.
+pub fn cwk_flip(state: Option<i32>) -> i32 {
+    match state {
+        Some(1) => 2,
+        _ => 1,
+    }
+}
+
+/// The fourth stage's stirge reactors (set off by touch): with
+/// `CWK_STIRGE_STANDING` on them at once, every mob there is gone
+/// (Cosmic `6109013`).
+pub const CWK_STIRGE: i32 = 6_109_013;
+pub const CWK_STIRGE_STANDING: usize = 5;
+
 /// The Keep's items of use only in it, taken from whoever leaves.
 pub const CWK_ITEMS: [i32; 5] = [4_001_256, 4_001_257, 4_001_258, 4_001_259, 4_001_260];
 
@@ -4905,6 +4954,24 @@ mod tests {
             jobs.dedup();
             assert_eq!(jobs, [None, Some(0), Some(1), Some(2), Some(3), Some(4)]);
         }
+        // Its fires: 63 less the 20 left as the map has them.
+        let fires = cwk_fires();
+        assert_eq!(fires.len(), 43);
+        assert!(fires.iter().all(|(_, state)| *state == 1));
+        let lit = |name: &str| fires.iter().any(|(fire, _)| fire == name);
+        assert!(lit("a2") && lit("b1") && lit("b3") && lit("i6") && lit("c7"));
+        assert!(!lit("b2") && !lit("e5") && !lit("i7") && !lit("a8"));
+        // Its eight flames each flip a block of them, none twice.
+        let mut flipped: Vec<_> = (6_109_013..=6_109_027)
+            .filter_map(cwk_flame)
+            .flatten()
+            .collect();
+        assert_eq!(flipped.len(), 54);
+        flipped.sort();
+        flipped.dedup();
+        assert_eq!(flipped.len(), 54);
+        assert!(cwk_flame(CWK_STIRGE).is_none());
+        assert_eq!([None, Some(1), Some(2)].map(cwk_flip), [1, 2, 1]);
         // Any member's find clears it.
         assert!(CWK.member_clears.contains(&1));
         let mesos: Vec<_> = (1..=7).map(|stage| CWK.stage_meso(stage)).collect();

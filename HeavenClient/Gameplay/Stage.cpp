@@ -66,6 +66,8 @@ namespace ms
 
 		// How often v83 looks at the quest-bound tags again (FUN_00531b8d).
 		constexpr int32_t QUEST_TAG_INTERVAL = 5000;
+		// How often the user's stepping onto reactors is checked (0x94df67).
+		constexpr int32_t REACTOR_TOUCH_INTERVAL = 1000;
 
 		// What a mob's attack shows on the player it hits: Mob.nx
 		// <id>.img/attack<n>/info/hit, whether it stays on them (hit/attach),
@@ -515,6 +517,19 @@ namespace ms
 		quest_alert.update();
 
 		reactors.update(physics);
+
+		// Once a second, the reactors set off by touch the user stepped onto
+		// or off (0x94df67).
+		since_reactor_touch += Constants::TIMESTEP;
+
+		if (since_reactor_touch >= REACTOR_TOUCH_INTERVAL)
+		{
+			since_reactor_touch = 0;
+
+			for (const reactor_rules::TouchChange &change : reactors.touch(player.get_position()))
+				TouchReactorPacket(change.oid, change.inside).dispatch();
+		}
+
 		mists.update();
 		kites.update();
 		merchants.update(physics);

@@ -41,3 +41,23 @@ impl WorldHandler for DamageReactorHandler {
         )
     }
 }
+
+/// `TOUCH_REACTOR`: the reactor's object id and whether the player stepped
+/// onto it (1) or off it (0). The client tells of each, at most once a
+/// second, only for reactors set off by touch (0x735d90).
+pub struct TouchReactorHandler;
+
+impl WorldHandler for TouchReactorHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let object_id = r.read_int()?;
+        let touching = r.read_byte()? != 0;
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::TouchReactor {
+                object_id,
+                touching,
+            })),
+        )
+    }
+}
