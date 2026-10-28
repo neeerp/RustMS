@@ -408,6 +408,10 @@ pub struct Bonus {
     /// Whether the win itself takes the team there, rather than the leader
     /// later.
     pub on_win: bool,
+    /// A map a team of couples (each member's partner on it) plays first,
+    /// and for how many seconds; the leader takes it on to `map` from
+    /// there, and once its time is up everyone goes on to `exit`.
+    pub couples: Option<(i32, u64)>,
 }
 
 impl Bonus {
@@ -563,6 +567,7 @@ pub const HPQ: Event = Event {
         exit: 910_010_400,
         seconds: 5 * 60,
         on_win: false,
+        couples: None,
     }),
     blessings: &[],
     squad: false,
@@ -630,6 +635,7 @@ pub const LPQ: Event = Event {
         exit: 922_011_100,
         seconds: 60,
         on_win: true,
+        couples: None,
     }),
     blessings: &[],
     squad: false,
@@ -1170,6 +1176,7 @@ pub const GUILD_QUEST: Event = Event {
         exit: crate::guild_quest::RETURNING_PATH,
         seconds: 30,
         on_win: true,
+        couples: None,
     }),
     blessings: &[],
     squad: false,
@@ -2028,6 +2035,16 @@ pub const GEIST_BALROG_AT: (i16, i16) = (942, 478);
 pub const GEIST_FANG: i32 = 4_031_594;
 pub const AMORIA_LIFT_AREA: usize = 0;
 pub const AMORIA_LIFT_TO: &str = "st01";
+/// The bonus after the win (Cosmic `9201045`): a team of three married
+/// couples first plays the couples' bonus for two minutes, whose boxes
+/// bring out monsters, and every team the crates' bonus for one.
+pub const AMORIA_COUPLES_BONUS: i32 = 670_010_750;
+pub const AMORIA_BONUS: i32 = 670_010_800;
+/// The couples' bonus's boxes, each bringing out seven of its monsters,
+/// each one at random (Cosmic `6701000` to `6701002`).
+pub const AMORIA_BOXES: [i32; 3] = [6_701_000, 6_701_001, 6_701_002];
+pub const AMORIA_BOX_MOBS: [i32; 3] = [9_400_523, 9_400_524, 9_400_525];
+pub const AMORIA_BOX_MOB_COUNT: usize = 7;
 /// The stage maps whose way on stays shut until their stage is cleared.
 pub const AMORIA_GATED: [i32; 5] = [
     AMORIA_STAGE2[0],
@@ -2213,7 +2230,13 @@ pub const AMORIA: Event = Event {
     }],
     gates: false,
     clear_map: None,
-    bonus: None,
+    bonus: Some(Bonus {
+        map: AMORIA_BONUS,
+        exit: AMORIA_EXIT,
+        seconds: 60,
+        on_win: false,
+        couples: Some((AMORIA_COUPLES_BONUS, 2 * 60)),
+    }),
     blessings: &[],
     squad: false,
     gate: &[],
@@ -4355,6 +4378,15 @@ mod tests {
             [(GEIST_BALROG, GEIST_BALROG_AT, 1)]
         );
         assert!(AMORIA.items.contains(&GEIST_FANG));
+        // Its bonus: the couples' first, for those who are all couples.
+        let bonus = AMORIA.bonus.as_ref().unwrap();
+        assert_eq!(
+            (bonus.map, bonus.exit, bonus.on_win),
+            (AMORIA_BONUS, AMORIA_EXIT, false)
+        );
+        assert_eq!(bonus.couples, Some((AMORIA_COUPLES_BONUS, 120)));
+        assert!(AMORIA.holds(AMORIA_COUPLES_BONUS) && AMORIA.holds(AMORIA_BONUS));
+        assert!(!AMORIA.gated.contains(&AMORIA_BONUS));
         assert_eq!(AMORIA.hand_in_on(AMORIA_STAGE5, 9_201_045), None);
         let area = |x1, x2, y1, y2| Area { x1, x2, y1, y2 };
         let areas = [area(0, 10, 0, 10), area(0, 10, 0, 10), area(50, 60, 0, 10)];

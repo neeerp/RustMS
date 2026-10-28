@@ -216,6 +216,7 @@ impl WorldDirectory {
             blessing: None,
             queue,
             roster,
+            couples: false,
         }))
     }
 

@@ -1,7 +1,8 @@
 //! The Amorian Challenge's last stage: the Geist Balrog waits there from
 //! the start, and comes back twice as it dies; only its last form drops
 //! the Geist Fang. Amos takes anyone below up to it, sends the others to
-//! the leader, and the leader's Fang wins the challenge.
+//! the leader, and the leader's Fang wins the challenge; the others then
+//! wait on the leader (`amoria_bonus`).
 
 use game_data::server_content::keys;
 use integration_harness::events::{cleared, couples_in, enter_amoria, party, talk, told};
@@ -108,6 +109,5 @@ async fn the_geist_balrog_s_fang_wins_the_amorian_challenge() {
         cleared(t) && t.gains.last() == Some(&exp)
     })
     .await;
-    hears(&mut team[0], keys::AMORIA_PQ_STAGE6_WON).await;
     hears(&mut team[1], keys::AMORIA_PQ_STAGE6_WAIT).await;
 }

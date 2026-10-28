@@ -545,24 +545,25 @@ impl ClientActor {
     }
 
     /// What Amos says to the player on the Amorian Challenge's last stage,
-    /// if there, by whether they stand below, in its first area (Cosmic
-    /// `9201045`).
+    /// if there, by whether they stand below, in its first area, or on its
+    /// couples' bonus (Cosmic `9201045`).
     pub(super) fn amoria_geist(&self) -> Result<Option<NpcScript>, RuntimeError> {
         let game = self.in_game()?;
         let map_id = game.player.stats.map_id;
         let Some(ticket) = self.event.as_ref().filter(|ticket| {
             ticket.kind == EventKind::Amoria
-                && map_id == events::AMORIA_STAGE6
+                && [events::AMORIA_STAGE6, events::AMORIA_COUPLES_BONUS].contains(&map_id)
                 && ticket.holds(map_id)
         }) else {
             return Ok(None);
         };
         let (x, y) = (i32::from(game.position.0), i32::from(game.position.1));
-        let below = net::get_game_data()
-            .ok()
-            .and_then(|data| data.field(map_id))
-            .and_then(|field| field.areas.get(events::AMORIA_LIFT_AREA).copied())
-            .is_some_and(|area| area.contains(x, y));
+        let below = map_id == events::AMORIA_STAGE6
+            && net::get_game_data()
+                .ok()
+                .and_then(|data| data.field(map_id))
+                .and_then(|field| field.areas.get(events::AMORIA_LIFT_AREA).copied())
+                .is_some_and(|area| area.contains(x, y));
         let won = ticket.cleared(events::AMORIA_GEIST_STAGE);
         Ok(Some(NpcScript::amos_geist(
             &game.player,

@@ -1888,7 +1888,7 @@ unsourced = [
     "amoria_pq.stage5.gate_shut",
     "amoria_pq.stage6.fang",
     "amoria_pq.stage6.done",
-    "amoria_pq.stage6.won",
+    "amoria_pq.bonus.hurry",
     "amoria_pq.stage6.wait",
     "amoria_pq.stage6.dead",
     "amoria_pq.glimmer.task",
