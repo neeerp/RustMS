@@ -4792,6 +4792,25 @@ mod tests {
         assert_eq!((potions.min, potions.max), (Some(1), Some(4)));
     }
 
+    #[test]
+    fn pink_bean_drops_without_the_pack_and_its_statue_and_guardians_drop_nothing() {
+        let table = RewardTable::load(None).unwrap();
+        let pink_bean = table.drops(8820001);
+        assert_eq!(pink_bean.len(), 98);
+        assert_eq!((pink_bean[0].money, pink_bean[0].prob), (Some(45000), 0.4));
+        // The Timeless Pendant, and one Pink Bean Hat, not a stack.
+        let pendant = pink_bean.iter().find(|d| d.item == Some(1122012)).unwrap();
+        assert_eq!(pendant.prob, 0.04);
+        let hat = pink_bean.iter().find(|d| d.item == Some(1002971)).unwrap();
+        assert_eq!((hat.prob, hat.min, hat.max), (0.08, None, None));
+        assert!(!pink_bean.iter().any(|d| d.item == Some(2388043)));
+        for mob in 8820000..=8820006 {
+            if mob != 8820001 {
+                assert!(table.drops(mob).is_empty(), "{mob}");
+            }
+        }
+    }
+
     fn quest_item(item: i32, quest: i16) -> RewardEntry {
         RewardEntry {
             item: Some(item),
