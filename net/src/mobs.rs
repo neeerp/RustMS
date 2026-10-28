@@ -63,11 +63,33 @@ pub const DEAD_HORNTAIL_PARTS: RangeInclusive<i32> = 8810010..=8810017;
 /// The ground below which Horntail and its parts come out.
 pub const HORNTAIL_AT: (i16, i16) = (71, 260);
 
-/// The mobs that keep `mob_id` from harm while any of them is out: Zakum's
-/// arms its body (Cosmic `MapleMap.damageMonster`). Until then it has no
-/// controller either; the last arm to die makes it real.
-pub fn shielded_by(mob_id: i32) -> Option<RangeInclusive<i32>> {
-    (mob_id == ZAKUM_BODY).then_some(ZAKUM_ARMS)
+/// The Balrog in its tomb (`crate::events::BALROG`): its body, which comes
+/// out shielded, its arms, and the left claw that gives way to the left
+/// arm a minute in (Mob.nx `revive`). The arms die into corpses, 8830004
+/// and 8830005, which shield nothing. Its body's death brings out the
+/// sealed Balrog.
+pub const BALROG_BODY: i32 = 8830000;
+pub const BALROG_LEFT_ARM: i32 = 8830001;
+pub const BALROG_RIGHT_ARM: i32 = 8830002;
+pub const SEALED_BALROG: i32 = 8830003;
+pub const BALROG_CLAW: i32 = 8830006;
+
+/// Whether a `guard` out keeps a `mob_id` from harm: Zakum's arms its body
+/// (Cosmic `MapleMap.damageMonster`), and the Balrog's arms and claw its
+/// own (Cosmic's `BalrogBattle` makes the body real after the arms'
+/// deaths). Until then it has no controller either; the last guard to die
+/// makes it real.
+pub fn shields(guard: i32, mob_id: i32) -> bool {
+    match mob_id {
+        ZAKUM_BODY => ZAKUM_ARMS.contains(&guard),
+        BALROG_BODY => [BALROG_LEFT_ARM, BALROG_RIGHT_ARM, BALROG_CLAW].contains(&guard),
+        _ => false,
+    }
+}
+
+/// Whether any mob may keep a `mob_id` from harm (see `shields`).
+pub fn shieldable(mob_id: i32) -> bool {
+    [ZAKUM_BODY, BALROG_BODY].contains(&mob_id)
 }
 
 /// A boss that keeps coming back to its spot on one map: an area boss.
@@ -176,9 +198,20 @@ mod tests {
 
     #[test]
     fn zakums_arms_shield_only_its_first_body() {
-        assert_eq!(shielded_by(ZAKUM_BODY), Some(8800003..=8800010));
-        assert_eq!(shielded_by(8800001), None);
-        assert_eq!(shielded_by(8800003), None);
+        assert!(shields(8800003, ZAKUM_BODY) && shields(8800010, ZAKUM_BODY));
+        assert!(!shields(8800011, ZAKUM_BODY) && !shields(8800003, 8800001));
+        assert!(shieldable(ZAKUM_BODY) && !shieldable(8800003));
+    }
+
+    #[test]
+    fn the_balrog_s_arms_and_claw_shield_its_body_and_its_corpses_do_not() {
+        for guard in [BALROG_LEFT_ARM, BALROG_RIGHT_ARM, BALROG_CLAW] {
+            assert!(shields(guard, BALROG_BODY));
+            assert!(!shields(guard, SEALED_BALROG));
+        }
+        assert!(!shields(8830004, BALROG_BODY) && !shields(8830005, BALROG_BODY));
+        assert!(!shields(8800003, BALROG_BODY) && !shields(BALROG_CLAW, ZAKUM_BODY));
+        assert!(shieldable(BALROG_BODY) && !shieldable(SEALED_BALROG));
     }
 
     #[test]

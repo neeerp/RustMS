@@ -848,6 +848,13 @@ pub enum FieldMessage {
         mob_id: i32,
         at: (i16, i16),
     },
+    /// Kill every live `mob_id` here outright, as one that dies: the
+    /// Balrog's claw a minute into the battle, which gives way to its left
+    /// arm (Cosmic `BalrogBattle.releaseLeftClaw`; the tomb sends it to
+    /// itself).
+    Slay {
+        mob_id: i32,
+    },
     /// `summoner` spent CP on `index` of the Monster Carnival window's tab
     /// `tab`, which everyone on the field hears of.
     CarnivalAnnounce {

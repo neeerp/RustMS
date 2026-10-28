@@ -841,13 +841,15 @@ impl MobSet {
     }
 
     /// Whether `mob` takes no harm, and has no controller, while another
-    /// mob is out: Zakum's body while any of its arms is.
+    /// mob is out or about to come back (`net::mobs::shields`): Zakum's
+    /// body while any of its arms is, the Balrog's while its claw is or
+    /// the left arm it gives way to.
     fn shields(&self, mob: &LiveMob) -> bool {
-        net::mobs::shielded_by(mob.info.mob_id).is_some_and(|guards| {
-            self.live
-                .values()
-                .any(|other| guards.contains(&other.info.mob_id))
-        })
+        let mob_id = mob.info.mob_id;
+        net::mobs::shieldable(mob_id)
+            && (self.live.values().map(|other| other.info.mob_id))
+                .chain(self.revivals.iter().flat_map(|r| r.mob_ids.iter().copied()))
+                .any(|guard| net::mobs::shields(guard, mob_id))
     }
 
     /// Whether the mob `object_id` takes no harm yet (see `shields`).
@@ -862,11 +864,7 @@ impl MobSet {
     pub fn unshielded_by(&self, mob_id: i32) -> Vec<i32> {
         self.live
             .values()
-            .filter(|mob| {
-                net::mobs::shielded_by(mob.info.mob_id)
-                    .is_some_and(|guards| guards.contains(&mob_id))
-                    && !self.shields(mob)
-            })
+            .filter(|mob| net::mobs::shields(mob_id, mob.info.mob_id) && !self.shields(mob))
             .map(|mob| mob.object_id)
             .collect()
     }
@@ -2465,6 +2463,42 @@ mod tests {
         assert!(!mobs.shielded(body));
         assert_eq!(mobs.assign_uncontrolled(2), [body]);
         assert_eq!(mobs.damage(2, body, 60, now), Some(Ok(40)));
+    }
+
+    #[test]
+    fn the_balrog_s_body_stays_shielded_while_its_claw_gives_way_to_its_arm() {
+        use net::mobs::{BALROG_BODY, BALROG_CLAW, BALROG_LEFT_ARM, BALROG_RIGHT_ARM};
+        let now = Instant::now();
+        let mut mobs = MobSet::default();
+        let mob = |mob_id, revive: &[i32]| MobInfo {
+            mob_id,
+            max_hp: 100,
+            revive: revive.to_vec(),
+            dying_ms: 500,
+            ..MobInfo::default()
+        };
+        let body = mobs.place(mob(BALROG_BODY, &[]), (0, 0), 5, None, now);
+        let right = mobs.place(mob(BALROG_RIGHT_ARM, &[8830005]), (0, 0), 5, None, now);
+        let claw = mobs.place(mob(BALROG_CLAW, &[BALROG_LEFT_ARM]), (0, 0), 5, None, now);
+        assert!(mobs.damage(1, right, 100, now).unwrap().is_err());
+        assert!(mobs.unshielded_by(BALROG_RIGHT_ARM).is_empty());
+        // Between the claw's death and the left arm's coming out, the body
+        // is still shielded.
+        assert_eq!(mobs.slay(claw, now).unwrap().mob_id, BALROG_CLAW);
+        assert!(mobs.unshielded_by(BALROG_CLAW).is_empty());
+        assert!(mobs.shielded(body));
+        let info = |mob_id| Some(mob(mob_id, &[8830004]));
+        let later = now + Duration::from_secs(1);
+        let out = mobs.revive(later, info);
+        let left = *out
+            .iter()
+            .find(|&&o| mobs.get(o).unwrap().info.mob_id == BALROG_LEFT_ARM)
+            .unwrap();
+        assert!(mobs.shielded(body));
+        // The left arm's corpse shields nothing.
+        assert!(mobs.damage(1, left, 100, later).unwrap().is_err());
+        assert_eq!(mobs.unshielded_by(BALROG_LEFT_ARM), [body]);
+        assert!(!mobs.shielded(body));
     }
 
     #[test]
