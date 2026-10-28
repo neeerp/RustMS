@@ -84,6 +84,39 @@ namespace ms
 			int32_t bottom = 0;
 		};
 
+		// The event type a skill used by a reactor sets off.
+		constexpr int32_t SKILL_USED = 5;
+
+		// A reactor's event, as a skill used by it sees it: its type, the
+		// skills it takes, and where the user must stand, from the reactor.
+		struct SkillEvent
+		{
+			int32_t type = 0;
+			std::vector<int32_t> skills;
+			Box area;
+		};
+
+		// The event `skill`, used by a user `x` across and `y` down from the
+		// reactor, sets off: the first of type 5 that lists the skill and
+		// whose area holds the user, or -1 (FUN_00735ab7).
+		inline int32_t pick_skill_event(const std::vector<SkillEvent> &events, int32_t skill, int32_t x, int32_t y)
+		{
+			for (size_t i = 0; i < events.size(); i++)
+			{
+				const SkillEvent &event = events[i];
+				const Box &area = event.area;
+
+				if (event.type != SKILL_USED
+					|| std::find(event.skills.begin(), event.skills.end(), skill) == event.skills.end())
+					continue;
+
+				if (x >= area.left && x < area.right && y >= area.top && y < area.bottom)
+					return static_cast<int32_t>(i);
+			}
+
+			return -1;
+		}
+
 		inline bool empty(const Box &box)
 		{
 			return box.right <= box.left || box.bottom <= box.top;

@@ -1591,9 +1591,22 @@ within reach of `CWK_HIDDEN_WAY` (`events::cwk_hidden_way`, checked by
 (`member_clears`). That member goes back to the stage's start, and
 everyone hears it in pink (`cwk.stage1.found`). The stage's reactor
 `mob0` (6109010, fed in the original data by item 4000488, which nothing
-drops) is left alone. The picks are in QUESTIONS b264. The sigils of
-stages 2 to 4, the job rooms of stage 5, its boss and the treasure room
-come in later slices.
+drops) is left alone. The picks are in QUESTIONS b264.
+
+The second stage (610030200) has five sigils, one for each job's
+(`events::cwk_sigil`, `CWK_SIGILS`, 6109000 to 6109004: warrior, bowman,
+magician, thief, pirate). Each lights, for good, when a member uses a
+skill of its job by it (a skill-used reactor event; see
+[combat](./combat.md)), and stays lit (`reactors::Action::Sigil`, in
+`stays`). The field tells the member's event (`ServerMessage::SigilLit`,
+`EventCommand::SigilLit`), which counts each sigil once a stage
+(`Cleared::light_sigil`). Everyone hears in the chat log that it lit
+(`CWK_SIGIL_LINES`, `cwk.sigil.*`), and with the fifth that the way on is
+open (`cwk.sigils.done`), and the stage clears (Cosmic `6109000`'s `act`).
+The fourth stage's sigils (6109016 to 6109020) count the same way, once
+the stage wakes them. The picks are in QUESTIONS b265. The third stage's
+sigils and menhirs, the fourth's waking, the job rooms of stage 5, its
+boss and the treasure room come in later slices.
 
 ## Jr. Balrog's room
 

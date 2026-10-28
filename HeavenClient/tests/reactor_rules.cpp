@@ -59,6 +59,24 @@ int main()
 		require(pick_target({ Box{ -3, -40, 0, -6 }, Box{ 0, -40, 10, -6 } }, Box{ -10, -60, 10, 0 }, -1, false) == 0,
 				"halving rounds towards 0");
 
+		// Crimsonwood Keep's warriors' sigil (6109000): a skill of theirs
+		// lights it from below and a little above it.
+		Box sigil_area{ -125, -19, 123, 122 };
+		SkillEvent sigil{ SKILL_USED, { 1211002, 1311003 }, sigil_area };
+		SkillEvent swing{ 0, {}, Box{} };
+
+		require(pick_skill_event({ sigil }, 1211002, 0, 0) == 0, "a skill it lists, by it");
+		require(pick_skill_event({ sigil }, 1311003, -125, 121) == 0, "anywhere in its area");
+		require(pick_skill_event({ sigil }, 3211006, 0, 0) == -1, "not one it doesn't list");
+		require(pick_skill_event({ sigil }, 1211002, 123, 0) == -1, "nor from its right edge on");
+		require(pick_skill_event({ sigil }, 1211002, 0, -20) == -1, "nor from above it");
+		require(pick_skill_event({ swing, sigil }, 1211002, 0, 0) == 1, "only type 5 takes skills");
+		require(pick_skill_event({ SkillEvent{ 0, { 1211002 }, sigil_area } }, 1211002, 0, 0) == -1,
+				"whatever it lists");
+		require(pick_skill_event({ SkillEvent{ SKILL_USED, { 1211002 }, Box{ 200, 0, 300, 50 } }, sigil }, 1211002, 0, 0)
+					== 1, "the first whose area holds the user");
+		require(!swingable({ SKILL_USED }), "and it takes no swing");
+
 		std::cout << "Reactor rules passed\n";
 		return 0;
 	}

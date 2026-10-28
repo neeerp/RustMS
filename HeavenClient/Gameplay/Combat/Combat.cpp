@@ -321,9 +321,13 @@ namespace ms
 
 			end_dash();
 
-			// Held skills ready the pet's MP potion too (0x9692d1).
+			// Held skills ready the pet's MP potion too, and set off
+			// reactors (0x9692d1).
 			if (start_prepare(skill))
+			{
 				player.arm_auto_mp();
+				use_skill_at_reactors(move_id);
+			}
 
 			return true;
 		}
@@ -356,11 +360,14 @@ namespace ms
 		else
 			used = apply_move(move);
 
-		// A skill used readies the pet's MP potion and a refused one doesn't
-		// (0x967b85, 0x9693a8). Teleport and Flash Jump take their own way
-		// and never ready it, as in v83.
+		// A skill used readies the pet's MP potion and sets off reactors,
+		// and a refused one doesn't (0x967b85, 0x9693a8). Teleport and
+		// Flash Jump take their own way and do neither, as in v83.
 		if (used && move_id != 0)
+		{
 			player.arm_auto_mp();
+			use_skill_at_reactors(move_id);
+		}
 
 		return true;
 	}
@@ -1720,6 +1727,25 @@ namespace ms
 		AttackResult result = attack;
 		result.attacker = player.get_oid();
 		AttackPacket(result, player.get_position()).dispatch();
+	}
+
+	void Combat::use_skill_at_reactors(int32_t skill)
+	{
+		// Any number of reactors at once, in the order they entered the
+		// map, each telling the server.
+		int32_t flags = reactor_rules::flags(!player.getflip(), player.get_phobj().onground);
+		MapObjects *objs = reactors.get_reactors();
+		std::vector<std::pair<uint32_t, Reactor *>> order;
+
+		for (auto &mmo : *objs)
+			if (mmo.second)
+				order.emplace_back(objs->entry_order(mmo.first), static_cast<Reactor *>(mmo.second.get()));
+
+		std::sort(order.begin(), order.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+
+		for (auto &entry : order)
+			if (entry.second->use_skill(skill, player.get_position()) >= 0)
+				DamageReactorPacket(entry.second->get_oid(), 1, flags, Reactor::SKILL_DELAY, skill).dispatch();
 	}
 
 	bool Combat::swing_at_reactor()
