@@ -2273,6 +2273,7 @@ impl NpcScript {
                 ))
             }
             SITE_EXIT => return Some(site_exit()),
+            CWK_GATE => return Some(cwk_gate(player)),
             SERRYL => {
                 return Some(item_maker(
                     SERRYL,
@@ -4219,6 +4220,23 @@ fn jack_sees_the_keystone(player: &Player) -> NpcScript {
         keys::JACK_HURRY
     };
     NpcScript::new(JACK, vec![Page::Say(text(words))])
+}
+
+/// The Inner Sanctum's gate (9201114), in Crimsonwood Keep, and the
+/// portal past it on the Sanctum's entrance, `out00`.
+pub const CWK_GATE: i32 = 9201114;
+const PAST_CWK_GATE: u8 = 3;
+
+/// The gate lets one with the Crimsonwood Keystone through to the Inner
+/// Sanctum's entrance, where its expeditions gather; it won't move for
+/// anyone else, who hears so in pink (Cosmic `9201114.js`).
+fn cwk_gate(player: &Player) -> NpcScript {
+    let effects = if player.inventory.count(CRIMSONWOOD_KEYSTONE) > 0 {
+        vec![Effect::WarpToPortal(events::CWK_LOBBY, PAST_CWK_GATE)]
+    } else {
+        vec![Effect::Pink(text(keys::CWK_GATE_NO_KEY))]
+    };
+    NpcScript::new(CWK_GATE, vec![Page::Done(effects)])
 }
 
 /// The Adventurer titles (29900 to 29903): quest, title and medal. Each
@@ -10437,6 +10455,10 @@ pub const ZAKUM_RECRUITER: i32 = 2030013;
 /// The Mark of the Squad (2083004), at the Entrance to Horntail's Cave.
 pub const HORNTAIL_RECRUITER: i32 = 2083004;
 
+/// The recruiter (9201113) at the Inner Sanctum's entrance in Crimsonwood
+/// Keep.
+pub const CWK_RECRUITER: i32 = 9201113;
+
 /// The NPC who gathers a kind of expedition.
 #[derive(Clone, Copy, Debug)]
 pub struct Recruiter {
@@ -10457,12 +10479,16 @@ pub fn recruiter(kind: EventKind) -> Option<Recruiter> {
             npc: HORNTAIL_RECRUITER,
             needs: None,
         }),
+        EventKind::Cwk => Some(Recruiter {
+            npc: CWK_RECRUITER,
+            needs: None,
+        }),
         _ => None,
     }
 }
 
 /// The NPC who gathers the channel's expedition of `kind`
-/// (`crate::squads`; Cosmic `2030013`, `2083004`): one of the levels, with
+/// (`crate::squads`; Cosmic `2030013`, `2083004`, `9201113`): one of the levels, with
 /// the item it needs if any (Zakum's Eye of Fire), opens it, others of the
 /// levels join, and its leader turns members out, takes it in, or calls it
 /// off. While it runs, those on its roster may go back in.
@@ -16040,6 +16066,27 @@ mod tests {
     }
 
     #[test]
+    fn the_inner_sanctum_s_gate_opens_for_the_keystone() {
+        let mut keystone = player(90);
+        let key = game::Item::stack(CRIMSONWOOD_KEYSTONE, 1);
+        keystone
+            .inventory
+            .insert(game::InventoryType::Setup, 1, key);
+        // Without a word.
+        let gate = |player| {
+            let step = NpcScript::for_npc(CWK_GATE, player).unwrap().begin();
+            assert_eq!(step.prompt, None);
+            step.effects
+        };
+        assert_eq!(
+            gate(&keystone),
+            [Effect::WarpToPortal(events::CWK_LOBBY, PAST_CWK_GATE)]
+        );
+        let shut = [Effect::Pink(text(keys::CWK_GATE_NO_KEY))];
+        assert_eq!(gate(&player(90)), shut);
+    }
+
+    #[test]
     fn adventurer_titles_start_silently_and_dalair_gives_the_medals() {
         for (quest, title, medal) in ADVENTURER_TITLES {
             let mut start = NpcScript::for_quest(&format!("q{quest}s"), &player(30)).unwrap();
@@ -20217,6 +20264,14 @@ mod tests {
             page_text(&gather(EventKind::Zakum, 100).begin()),
             text(keys::ZAKUM_SQUAD_NO_EYE)
         );
+        // Crimsonwood Keep's recruiter asks for none either.
+        let mut keep = gather(EventKind::Cwk, 90);
+        assert_eq!(keep.npc_id, CWK_RECRUITER);
+        let ask = event_terms(&events::CWK, keys::CWK_SQUAD_ASK);
+        assert_eq!(question(&keep.begin()), ask);
+        let low = gather(EventKind::Cwk, 89);
+        let level = event_terms(&events::CWK, keys::CWK_SQUAD_LEVEL);
+        assert_eq!(page_text(&low.begin()), level);
         let taken = NpcScript::squad(EventKind::Horntail, SquadView::Taken, &at(100));
         assert_eq!(
             page_text(&taken.unwrap().begin()),

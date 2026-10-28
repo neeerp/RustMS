@@ -2229,6 +2229,15 @@ pub mod keys {
     pub const AMORIA_PQ_STAGE6_FANG: &str = "amoria_pq.stage6.fang";
     pub const AMORIA_PQ_STAGE6_DONE: &str = "amoria_pq.stage6.done";
     pub const AMORIA_PQ_BONUS_HURRY: &str = "amoria_pq.bonus.hurry";
+    pub const CWK_SQUAD_LEVEL: &str = "cwk.squad.level";
+    pub const CWK_SQUAD_ASK: &str = "cwk.squad.ask";
+    pub const CWK_SQUAD_START_CHOICE: &str = "cwk.squad.start_choice";
+    pub const CWK_SQUAD_JOIN_ASK: &str = "cwk.squad.join_ask";
+    pub const CWK_SQUAD_REJOIN_ASK: &str = "cwk.squad.rejoin_ask";
+    pub const CWK_SQUAD_TAKEN: &str = "cwk.squad.taken";
+    pub const CWK_SQUAD_NOTICE_OPENED: &str = "cwk.squad.notice.opened";
+    pub const CWK_SQUAD_NOTICE_STARTED: &str = "cwk.squad.notice.started";
+    pub const CWK_GATE_NO_KEY: &str = "cwk.gate.no_key";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";

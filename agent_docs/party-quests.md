@@ -44,6 +44,9 @@ room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 ([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
 married couples, has its entry, its way out, its end rules, its six
 stages and its bonus ([the Amorian Challenge](#the-amorian-challenge)).
+Crimsonwood Keep's party quest is an expedition's, which ends like a
+party's; it has its gate, its squad, its clocks and its end rules, and its
+stages come in later slices ([Crimsonwood Keep](#crimsonwood-keep)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1539,6 +1542,39 @@ drop from their `rewards.json` entries, one roll each, and the other Amos
 the exit, 670011000. Both maps shuffle their reactors on reset. Cosmic's
 9201046 also trades 35 pieces for a cape, but only on 670010750, where
 Map.nx never puts it, so that trade is left out.
+
+## Crimsonwood Keep
+
+Crimsonwood Keep's party quest (`EventKind::Cwk`, `events::CWK`;
+`v83ref/reports/b259-cwk-pq.md`; picks in `v83ref/lanes/QUESTIONS.md`
+b263). The Inner Sanctum's gate (`CWK_GATE`, 9201114) stands in the Keep's
+hall (610030010). It lets a player who holds the Crimsonwood Keystone
+(3992041, from quest 8223) through to the Sanctum's entrance, 610030020
+(`CWK_LOBBY`, portal `out00`). Anyone else hears in pink that it won't
+move (`cwk.gate.no_key`). Map.nx has no `glpqEnter` portal on the hall,
+so the NPC is the only way through.
+
+The team is an expedition squad (`Event::squad`, `net/src/squads.rs`).
+Anyone of level 90 or more gathers one at the recruiter (`CWK_RECRUITER`,
+9201113) on the entrance, with no item needed. Then 6 to 30 members set
+out to their own copy of the Keep, from 610030100 (`CWK_ENTRY`) up to the
+treasure room, 610030800. Unlike Zakum's and Horntail's, it ends like a
+party's (Cosmic CWKPQ asks `isEventTeamLackingNow`): when its leader
+leaves, or when too few remain (`Event::lasts_until_empty` is false for
+it). Once won, it ends only when the last member leaves. The team's
+minimum is the squad's (`Event::least`), so the harness's
+`RUSTMS_EXPEDITION_MIN` lowers it. Members on its roster may still come
+back in while it runs.
+
+Its clock is two minutes. It starts over the first time the team reaches
+each later stage (`CWK_CLOCKS` in `clock_on`): 10 minutes for stages 2 to
+4 (610030200 to 610030400), 20 for stage 5's hall (610030500), 60 for
+stage 6 (610030600) and 1 for the treasure room. When time is up, the team
+goes back to the entrance. The six stages give Cosmic's EXP. The five job
+weapons (4001256 to 4001260) are taken from whoever leaves
+(`CWK_ITEMS`). The stages themselves, their meso, and the treasure room
+come in later slices. Until then `next00`'s `glpqPortal0` stays shut, so a
+team stays on the first stage until its clock runs out.
 
 ## Jr. Balrog's room
 
