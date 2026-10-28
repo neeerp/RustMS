@@ -8,9 +8,9 @@ missing registrant, the Returning Path and Nuris, and the client's
 waitlist line, the outskirts' brief and earrings, the guide out on every
 stage, the quest's items taken on leaving, the statue keeper's test, the
 knights' hall's spears and gates, the vassals' offering at the
-fountain, the waterway's doors and gargoyles, and Sharen III's clothes
-and soul at the grave. Not yet: the stages beyond the grave, their rewards
-and the rest of the guild points the quest earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
+fountain, the waterway's doors and gargoyles, Sharen III's clothes and
+soul at the grave, the King's Corridor and its door, and Ergoth's room,
+the Rubian's win and the treasure room. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
 event machinery's anchors in `reports/b253-gq-event-infra.md`, the first
 stages in `reports/b254-gq-stages-1-3.md`, the knights' hall in
 `reports/b255-gq-stage-400.md`, the fountain in
@@ -334,8 +334,9 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
 
 - Cosmic's chat callouts of the guild's place and its strategy phase are
   server text. RustMS sends the client's own 0x4C instead.
-- Cosmic gives a random blessing (2023000 to 2023003) to a team with every
-  job; not yet.
+- Cosmic gives a team with every job one of four blessings (items 2023000
+  to 2023003) once it is under way. v83's Item.nx has none of the four, so
+  there is nothing to give, and RustMS gives none.
 - Cosmic turns away a non-member in the waiting room. Here only members of
   the guild come in through Shuang, and the copy is the guild's own.
 - The earring doesn't expire after 120 minutes; it can't leave the quest.
