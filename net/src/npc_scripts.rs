@@ -977,12 +977,13 @@ pub const GUON_ABOARD: i32 = 2094002;
 /// Amos the Strong on his training ground, who lets a ticket holder into
 /// the Amorian Challenge's Entrance and trades keys for tickets; Amos on
 /// the Entrance, who sends a party of married couples in; and the Glimmer
-/// Man on its way out; and Amos on the stages up to the fifth, and the
-/// Glimmer Man on the first.
+/// Man on its way out; Amos on the first three stages, and the Glimmer
+/// Man on the first; and Amos on the last three.
 pub const AMOS_HALL: i32 = 9201043;
 pub const AMOS_LOBBY: i32 = 9201048;
 pub const GLIMMER_MAN: i32 = 9201047;
 pub const AMOS_STAGE: i32 = 9201044;
+pub const AMOS_TRIALS: i32 = 9201045;
 /// So Gong, who takes a challenger into the Mu Lung Dojo from its hall and
 /// stands on each of its floors, and the notice board in Mu Lung that
 /// leads to the Dojo.
@@ -8210,6 +8211,9 @@ fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
     if hand_in.npc == EAK {
         return eak_hand_in(hand_in, view, player);
     }
+    if hand_in.npc == AMOS_TRIALS {
+        return amos_hand_in(hand_in, view, player);
+    }
     let item = hand_in.item.to_string();
     let n = hand_in.count.to_string();
     let get = |key| content::text().get(key, &[("item", &item), ("n", &n)]);
@@ -8278,6 +8282,37 @@ fn eak_hand_in(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
     let mut script = NpcScript::new(EAK, vec![page]);
     script.refused = Some(short);
     script.inventory_full = Some(text(keys::OPQ_EAK_FULL));
+    script
+}
+
+/// Amos on the Amorian Challenge's fourth stage (Cosmic `9201045`): the
+/// leader first hears what the stage asks, then hands in the Cupid Code
+/// Pieces, which clears it; the event tells the map time is short.
+fn amos_hand_in(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
+    let item = hand_in.item.to_string();
+    let n = hand_in.count.to_string();
+    let get = |key| content::text().get(key, &[("item", &item), ("n", &n)]);
+    let short = get(keys::AMORIA_PQ_STAGE4_SHORT);
+    let page = match view {
+        Balloon::Cleared => Page::Say(text(keys::AMORIA_PQ_AMOS_CLEARED)),
+        Balloon::NotLeader => Page::Say(text(keys::AMORIA_PQ_AMOS_NOT_LEADER)),
+        Balloon::Intro => Page::Say(get(keys::AMORIA_PQ_STAGE4_INTRO)),
+        Balloon::Ready if player.inventory.count(hand_in.item) >= i32::from(hand_in.count) => {
+            Page::Act {
+                text: text(keys::AMORIA_PQ_STAGE4_DONE),
+                effects: vec![
+                    Effect::TakeItem {
+                        item_id: hand_in.item,
+                        quantity: hand_in.count,
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(hand_in.stage)),
+                ],
+            }
+        }
+        Balloon::Ready | Balloon::Answer { .. } => Page::Say(short.clone()),
+    };
+    let mut script = NpcScript::new(AMOS_TRIALS, vec![page]);
+    script.refused = Some(short);
     script
 }
 
