@@ -1527,6 +1527,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::MAGIC_LIBRARY_MUSHROOMS_LEFT, &[])),
         },
+        // The way out of the Balrog's clear map: a Piece of Balrog
+        // Leather each, and back to Mu Young (Cosmic `balog_end`).
+        "balog_end" => {
+            let leather = crate::events::BALROG_LEATHER;
+            if !crate::items::fits_until(&player.inventory, leather, 1, None) {
+                return Some(refused(keys::BALROG_END_FULL));
+            }
+            let warp = Effect::WarpToPortal(crate::events::MU_YOUNG_MAP, 0);
+            let mut out = through(warp);
+            out.effects.insert(
+                0,
+                Effect::GiveItem {
+                    item_id: leather,
+                    quantity: 1,
+                },
+            );
+            out
+        }
         "balogTemple" => through(Effect::WarpToPortal(
             UNDERGROUND_TEMPLE_STAIRS,
             named(UNDERGROUND_TEMPLE_STAIRS, "top00"),
@@ -4106,6 +4124,25 @@ mod tests {
             go("balogTemple", &fresh),
             Some((UNDERGROUND_TEMPLE_STAIRS, 2))
         );
+        let leather = Effect::GiveItem {
+            item_id: crate::events::BALROG_LEATHER,
+            quantity: 1,
+        };
+        assert_eq!(
+            portal("balog_end", &fresh).unwrap().effects,
+            [
+                leather,
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::MU_YOUNG_MAP, 0)
+            ]
+        );
+        let mut full = player_with(&[]);
+        full.inventory.set_slot_limit(InventoryType::Etc, 1);
+        full.inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4000000, 1));
+        let refused = portal("balog_end", &full).unwrap().effects;
+        let room = content::text().get(keys::BALROG_END_FULL, &[]);
+        assert_eq!(refused, [Effect::Pink(room)]);
         assert_eq!(
             go("enterNepenthes", &fresh),
             Some((NEGLECTED_STROLLING_PATH, 2))

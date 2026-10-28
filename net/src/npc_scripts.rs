@@ -1952,7 +1952,8 @@ impl NpcScript {
     /// its `leader`, and whose party may have `won` it: Growlie's, Tommy's
     /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
     /// Ludibrium, Minerva's in the Tower of Goddess, Rolly's in the
-    /// Ludibrium Maze's clear room, Konpei's in Showa's arena.
+    /// Ludibrium Maze's clear room, Konpei's in Showa's arena, Mu Young's
+    /// in the Balrog's tomb.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
@@ -1981,6 +1982,7 @@ impl NpcScript {
             KONPEI_ARENA if player.stats.map_id == events::SHOWA_ARENA => {
                 Some(konpei_arena(player, won, &mut rand::thread_rng()))
             }
+            BALROG_KEEPER if player.stats.map_id == events::BALROG_TOMB => Some(balrog_keeper(won)),
             _ => None,
         }
     }
@@ -10558,12 +10560,17 @@ pub fn recruiter(kind: EventKind) -> Option<Recruiter> {
             npc: SHOWA_RECRUITER,
             needs: Some((events::LADY_BOSS_COMB, keys::SHOWA_SQUAD_NO_COMB)),
         }),
+        EventKind::Balrog => Some(Recruiter {
+            npc: MU_YOUNG,
+            needs: None,
+        }),
         _ => None,
     }
 }
 
 /// The NPC who gathers the channel's expedition of `kind`
-/// (`crate::squads`; Cosmic `2030013`, `2083004`, `9201113`, `9120201`):
+/// (`crate::squads`; Cosmic `2030013`, `2083004`, `9201113`, `9120201`,
+/// `1061014`):
 /// one of the levels, with the item it needs if any (Zakum's Eye of Fire,
 /// Showa's Lady Boss's Comb), opens it, others of the
 /// levels join, and its leader turns members out, takes it in, or calls it
@@ -13241,6 +13248,26 @@ fn konpei_arena(player: &Player, won: bool, rng: &mut impl Rng) -> NpcScript {
     );
     script.inventory_full = Some(text(keys::SHOWA_KONPEI_ARENA_FULL));
     script
+}
+
+/// Mu Young in the Balrog's tomb (Cosmic `1061018`): before the win, the
+/// way back out to the temple's entrance; after it, on to the clear map.
+const BALROG_KEEPER: i32 = 1061018;
+
+fn balrog_keeper(won: bool) -> NpcScript {
+    let pages = if won {
+        vec![
+            Page::Say(text(keys::BALROG_KEEPER_WON)),
+            Page::Done(vec![Effect::Warp(events::BALROG_CLEAR)]),
+        ]
+    } else {
+        vec![Page::Ask {
+            text: text(keys::BALROG_KEEPER_LEAVE_ASK),
+            on_yes: vec![Effect::Warp(events::MU_YOUNG_MAP)],
+            on_no: None,
+        }]
+    };
+    NpcScript::new(BALROG_KEEPER, pages)
 }
 
 /// Konpei on the clear map past the arena (Cosmic `9120203`): back to
@@ -20465,6 +20492,13 @@ mod tests {
                 command: SquadCommand::Open
             }]
         );
+        // Mu Young gathers the Balrog's from level 50, wanting nothing.
+        let low = gather(EventKind::Balrog, 49);
+        assert_eq!(low.npc_id, MU_YOUNG);
+        let level = event_terms(&events::BALROG, keys::BALROG_SQUAD_LEVEL);
+        assert_eq!(page_text(&low.begin()), level);
+        let ask = event_terms(&events::BALROG, keys::BALROG_SQUAD_ASK);
+        assert_eq!(question(&gather(EventKind::Balrog, 50).begin()), ask);
         let taken = NpcScript::squad(EventKind::Horntail, SquadView::Taken, &at(100));
         assert_eq!(
             page_text(&taken.unwrap().begin()),
@@ -24137,6 +24171,26 @@ mod tests {
         let full = script.respond(ScriptInput::Yes).unwrap();
         assert!(full.effects.is_empty());
         assert_eq!(page_text(&full), text(keys::LUDIMAZE_PRESENT_FULL));
+    }
+
+    #[test]
+    fn mu_young_in_the_tomb_lets_out_before_the_win_and_on_after_it() {
+        let tomb = rider(50, 0, events::BALROG_TOMB);
+        let mut leave = NpcScript::in_event(BALROG_KEEPER, &tomb, false, false).unwrap();
+        let ask = text(keys::BALROG_KEEPER_LEAVE_ASK);
+        assert_eq!(question(&leave.begin()), ask);
+        assert_eq!(
+            leave.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(events::MU_YOUNG_MAP)]
+        );
+        let mut on = NpcScript::in_event(BALROG_KEEPER, &tomb, false, true).unwrap();
+        assert_eq!(page_text(&on.begin()), text(keys::BALROG_KEEPER_WON));
+        assert_eq!(
+            on.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Warp(events::BALROG_CLEAR)]
+        );
+        let clear = rider(50, 0, events::BALROG_CLEAR);
+        assert!(NpcScript::in_event(BALROG_KEEPER, &clear, false, true).is_none());
     }
 
     #[test]

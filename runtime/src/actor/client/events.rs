@@ -98,6 +98,7 @@ impl ClientActor {
             | EventKind::Horntail
             | EventKind::Cwk
             | EventKind::Showa
+            | EventKind::Balrog
             | EventKind::Papulatus => return Ok(()),
             EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
             // Duarte asks after every run at once (`talk_to_duarte`).

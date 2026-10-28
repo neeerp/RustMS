@@ -112,6 +112,9 @@ pub enum EventKind {
     /// The battle with The Boss in Showa's gang hideout, an expedition
     /// gathered by Konpei (9120201) in its Armory (`crate::squads`).
     Showa,
+    /// The battle with the Balrog in its tomb under Sleepywood, an
+    /// expedition gathered by Mu Young (1061014) (`crate::squads`).
+    Balrog,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -1915,6 +1918,15 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     if map_id == AMORIA_STAGE6 {
         return &GEIST;
     }
+    // The Balrog's arms first, so the body comes out shielded.
+    const BALROG_PARTS: [(i32, (i16, i16), usize); 3] = [
+        (crate::mobs::BALROG_RIGHT_ARM, BALROG_AT, 1),
+        (crate::mobs::BALROG_CLAW, BALROG_AT, 1),
+        (crate::mobs::BALROG_BODY, BALROG_AT, 1),
+    ];
+    if map_id == BALROG_TOMB {
+        return &BALROG_PARTS;
+    }
     const MASTER_GUARDIANS: [(i32, (i16, i16), usize); 5] = [
         (CWK_MASTER_GUARDIAN, (944, -204), 1),
         (CWK_MASTER_GUARDIAN, (401, -384), 1),
@@ -2431,6 +2443,69 @@ pub const SHOWA_REWARDS: [(i32, i16); 29] = [
     (2_022_306, 40),
     (2_022_113, 40),
 ];
+
+/// The battle with the Balrog (Cosmic `BalrogBattle`): an expedition of
+/// 6 to 30 of level 50 or more, gathered by Mu Young in the Sleepywood
+/// dungeon, goes into its own copy of the Balrog's tomb for an hour. The
+/// Balrog's right arm and its left claw wait there with its body, which
+/// takes no harm while an arm is out; a minute in, the claw gives way to
+/// the left arm. The body's death wins it (its one stage, cleared by any
+/// member there), and ten seconds later the sealed Balrog comes out. Mu
+/// Young in the tomb takes the winners on to the clear map, whose way out
+/// gives each a Piece of Balrog Leather. It lasts until its last member
+/// leaves, like Zakum's. The defaults are in `v83ref/lanes/QUESTIONS.md`
+/// b275.
+pub const BALROG: Event = Event {
+    lobby: MU_YOUNG_MAP,
+    entrances: &[],
+    maps: BALROG_TOMB..=BALROG_CLEAR,
+    entry: BALROG_TOMB,
+    entries: 1,
+    exit: MU_YOUNG_MAP,
+    levels: 50..=u8::MAX,
+    spread: None,
+    team: 6..=30,
+    married: false,
+    minutes: 60,
+    exp_per_stage: &[0],
+    meso_per_stage: &[],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: true,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+};
+
+/// The Balrog's tomb, and the clear map past it.
+pub const BALROG_TOMB: i32 = 105_100_300;
+pub const BALROG_CLEAR: i32 = 105_100_301;
+/// The point above the ground below which the Balrog's body, its right
+/// arm and its left claw come out as the tomb's copy opens, and the
+/// sealed Balrog after the win (Cosmic `spawnBalrog`).
+pub const BALROG_AT: (i16, i16) = (412, 258);
+/// How long after the expedition sets out the claw gives way to the left
+/// arm (Cosmic `releaseLeftClaw`), and after the win the sealed Balrog
+/// comes out (`spawnSealedBalrog`).
+pub const BALROG_CLAW_AFTER: Duration = Duration::from_secs(60);
+pub const SEALED_BALROG_AFTER: Duration = Duration::from_secs(10);
+/// What the clear map's way out (`balog_end`) gives each winner.
+pub const BALROG_LEATHER: i32 = 4_001_261;
 
 /// Crimsonwood Keep's Inner Sanctum's entrance, where its expeditions
 /// gather and come back to, and the Keep's first stage.
@@ -3742,7 +3817,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 48] = [
+    pub const ALL: [EventKind; 49] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -3791,6 +3866,7 @@ impl EventKind {
         EventKind::Amoria,
         EventKind::Cwk,
         EventKind::Showa,
+        EventKind::Balrog,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -3846,6 +3922,7 @@ impl EventKind {
             EventKind::Amoria => &AMORIA,
             EventKind::Cwk => &CWK,
             EventKind::Showa => &SHOWA,
+            EventKind::Balrog => &BALROG,
         }
     }
 
@@ -4993,6 +5070,21 @@ mod tests {
         assert_eq!((SHOWA.entry, SHOWA.exit), (SHOWA_ARENA, SHOWA_ARMORY));
         assert_eq!(SHOWA.clear_map, None);
         assert_eq!(SHOWA_REWARDS.iter().filter(|r| r.0 == 2_022_306).count(), 2);
+    }
+
+    #[test]
+    fn the_balrog_s_expedition_opens_on_its_parts_and_lasts_till_its_last_leaves() {
+        assert_eq!(EventKind::Balrog.event().lobby, MU_YOUNG_MAP);
+        assert!(BALROG.squad && BALROG.lasts_until_empty());
+        assert_eq!((BALROG.team.clone(), *BALROG.levels.start()), (6..=30, 50));
+        assert_eq!((BALROG.minutes, BALROG.last_stage()), (60, 1));
+        assert!(BALROG.holds(BALROG_TOMB) && BALROG.holds(BALROG_CLEAR));
+        assert!(!BALROG.holds(MU_YOUNG_MAP));
+        assert_eq!((BALROG.entry, BALROG.exit), (BALROG_TOMB, MU_YOUNG_MAP));
+        // The arms come out before the body, which they shield.
+        let parts: Vec<i32> = opening_mobs(BALROG_TOMB).iter().map(|m| m.0).collect();
+        assert_eq!(parts, [8830002, 8830006, 8830000]);
+        assert!(opening_mobs(BALROG_CLEAR).is_empty());
     }
 
     #[test]

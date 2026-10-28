@@ -317,6 +317,10 @@ pub struct FieldActor {
     race: Option<Race>,
     /// Crimsonwood Keep's fourth stage's stirges are gone, for good.
     stirges_gone: bool,
+    /// What this field does to itself later, once due: the Balrog's tomb
+    /// lets its claw go a minute in, and brings out the sealed Balrog after
+    /// the win.
+    later: Vec<(Instant, FieldMessage)>,
     tick: Duration,
 }
 
@@ -425,6 +429,7 @@ impl FieldActor {
                 }),
             race: None,
             stirges_gone: false,
+            later: Vec::new(),
             tick,
         };
         // A wedding's copy of the hunting ground opens with its one Giant
@@ -449,6 +454,14 @@ impl FieldActor {
             for &(mob_id, at, count) in net::events::opening_mobs(key.map_id) {
                 field.board(mob_id, count, at);
             }
+        }
+        // The Balrog's claw gives way to its left arm a minute in (Cosmic
+        // `BalrogBattle.releaseLeftClaw`).
+        if key.map_id == net::events::BALROG_TOMB && key.instance_id != 0 {
+            let claw = FieldMessage::Slay {
+                mob_id: net::mobs::BALROG_CLAW,
+            };
+            field.after(net::events::BALROG_CLAW_AFTER, claw);
         }
         // Crimsonwood Keep's fourth stage opens with its fires lit.
         if key.map_id == net::events::CWK_ENTRY + 300 {
@@ -478,6 +491,13 @@ impl FieldActor {
     /// Advance time-driven field state: drop expiry, mobs leaving or coming
     /// out of dead ones, and mob and reactor respawns.
     fn on_tick(&mut self, now: Instant) {
+        let (due, later) = std::mem::take(&mut self.later)
+            .into_iter()
+            .partition(|(at, _)| *at <= now);
+        self.later = later;
+        for (_, message) in due {
+            self.handle_message(message);
+        }
         self.run_trips();
         self.tick_merchants(now);
         self.tick_yulete(now);
@@ -723,6 +743,14 @@ impl FieldActor {
             FieldMessage::SwapMobs { only } => self.swap_mobs(only),
             FieldMessage::BringOut { mob_id, at } => {
                 self.board(mob_id, 1, at);
+            }
+            FieldMessage::Slay { mob_id } => {
+                let now = Instant::now();
+                for object_id in self.out(mob_id) {
+                    if let Some(kill) = self.mobs.slay(object_id, now) {
+                        self.killed(&kill);
+                    }
+                }
             }
             FieldMessage::CarnivalSummon {
                 summoner,
@@ -2142,6 +2170,17 @@ impl FieldActor {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
             (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
+            // The sealed Balrog comes out a little later (Cosmic
+            // `BalrogBattle.spawnSealedBalrog`).
+            (net::mobs::BALROG_BODY, net::events::BALROG_TOMB) if self.key.instance_id != 0 => {
+                self.boss_falls();
+                self.announce(keys::BALROG_VICTORY);
+                let sealed = FieldMessage::BringOut {
+                    mob_id: net::mobs::SEALED_BALROG,
+                    at: net::events::BALROG_AT,
+                };
+                self.after(net::events::SEALED_BALROG_AFTER, sealed);
+            }
             // Every mob in the arena goes with The Boss (Cosmic
             // `ShowaBattle.clearPQ`).
             (net::events::THE_BOSS, net::events::SHOWA_ARENA) if self.key.instance_id != 0 => {
@@ -2377,11 +2416,22 @@ impl FieldActor {
     /// `broadcastZakumVictory`).
     fn zakum_falls(&mut self) {
         self.boss_falls();
-        let line = net::content::text().get(keys::ZAKUM_VICTORY, &[]);
+        self.announce(keys::ZAKUM_VICTORY);
+    }
+
+    /// Handle `message` `after` (scaled, `net::events::scaled`) from now.
+    fn after(&mut self, after: Duration, message: FieldMessage) {
+        let at = Instant::now() + net::events::scaled(after);
+        self.later.push((at, message));
+    }
+
+    /// The world reads the line `key` (an item line), through the first
+    /// client here that takes it.
+    fn announce(&self, key: &str) {
+        let line = net::content::text().get(key, &[]);
         let Ok(packet) = build_item_line(&line, 0) else {
             return;
         };
-        // Through the first client that takes it.
         self.occupants.values().any(|occupant| {
             occupant
                 .handle
@@ -2400,16 +2450,7 @@ impl FieldActor {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
             }
         }
-        let line = net::content::text().get(keys::HORNTAIL_VICTORY, &[]);
-        let Ok(packet) = build_item_line(&line, 0) else {
-            return;
-        };
-        // Through the first client that takes it.
-        self.occupants.values().any(|occupant| {
-            occupant
-                .handle
-                .send(ServerMessage::Announce(packet.clone()))
-        });
+        self.announce(keys::HORNTAIL_VICTORY);
     }
 
     /// The object ids of the live `mob_id`s here.

@@ -79,6 +79,17 @@ const SHOWA: SquadText = SquadText {
     notice_started: keys::SHOWA_SQUAD_NOTICE_STARTED,
 };
 
+const BALROG: SquadText = SquadText {
+    level: keys::BALROG_SQUAD_LEVEL,
+    ask: keys::BALROG_SQUAD_ASK,
+    start_choice: keys::BALROG_SQUAD_START_CHOICE,
+    join_ask: keys::BALROG_SQUAD_JOIN_ASK,
+    rejoin_ask: keys::BALROG_SQUAD_REJOIN_ASK,
+    taken: keys::BALROG_SQUAD_TAKEN,
+    notice_opened: keys::BALROG_SQUAD_NOTICE_OPENED,
+    notice_started: keys::BALROG_SQUAD_NOTICE_STARTED,
+};
+
 /// What `kind`'s squad says, if its event is gathered by one.
 pub fn text(kind: EventKind) -> Option<&'static SquadText> {
     match kind {
@@ -86,6 +97,7 @@ pub fn text(kind: EventKind) -> Option<&'static SquadText> {
         EventKind::Horntail => Some(&HORNTAIL),
         EventKind::Cwk => Some(&CWK),
         EventKind::Showa => Some(&SHOWA),
+        EventKind::Balrog => Some(&BALROG),
         _ => None,
     }
 }
