@@ -5,7 +5,8 @@
 //! the fifth wave is down, the item that calls the lightning falls on the
 //! statue's reactor, which takes it a few seconds later: the statue dies,
 //! and Pink Bean comes out where it stood. Its fall wins the fight: every
-//! mob there goes, and the world hears which channel's expedition won.
+//! mob there goes, the world hears which channel's expedition won, and
+//! what it leaves is its own.
 //! The harness world runs events
 //! 60 times as fast, and lets two set out (`RUSTMS_EXPEDITION_MIN`).
 
@@ -180,6 +181,7 @@ async fn the_guardians_wake_in_waves_and_their_fall_lets_the_lightning_strike_th
 
     // Pink Bean's fall wins: both see the clear, every mob goes, the world
     // hears the first channel's expedition won, and the keeper knows it.
+    let before = lt.field.drops.len();
     beat(c, &name, &mut lt, pink_bean).await;
     let cleared = |t: &Trace| {
         t.field_effects
@@ -200,6 +202,19 @@ async fn the_guardians_wake_in_waves_and_their_fall_lets_the_lightning_strike_th
         .filter(|(oid, _)| !lt.field.killed.contains(oid))
         .collect();
     assert!(left.is_empty(), "{left:?}");
+    // What it leaves comes from its own table (or is the harness's card),
+    // as its statue and guardians leave nothing.
+    let table = game_data::server_content::RewardTable::load(None).unwrap();
+    let ours = table.drops(PINK_BEAN);
+    for drop in &lt.field.drops[before..] {
+        // Its pile of about 45,000 mesos, which ours vary a fifth around.
+        let known = if drop.meso {
+            (36_000..=54_000).contains(&drop.value)
+        } else {
+            drop.value / 10_000 == 238 || ours.iter().any(|d| d.item == Some(drop.value))
+        };
+        assert!(known, "{drop:?}");
+    }
     let t = told(&mut leader, talk(PINK_BEAN_ARENA, KEEPER)).await;
     assert!(said(&t, keys::PINK_BEAN_KEEPER_WON), "{t:?}");
 }

@@ -8,9 +8,9 @@ The battle with Pink Bean in the Temple of Time, after Cosmic's
 All dialogue is placeholder text (`pink_bean.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
 
-So far the way in and out (slice 1) and the statue's guardians (slice 2)
-are done. Pink Bean's own fight, the win, the deaths count and the drops
-are still to come.
+The way in and out, the statue's guardians, Pink Bean's skills, the win,
+the deaths count and the drops are done. The quests that follow the win
+(3522 and 3538) are still to come.
 
 ## The expedition
 
@@ -90,6 +90,16 @@ an item line naming the channel whose expedition won (`pink_bean.victory`,
 Cosmic `broadcastPinkBeanVictory`). The keeper then offers the way out
 (`pink_bean.keeper.won`).
 
+## The drops
+
+The content pack has no drops for Pink Bean, its statue or its guardians,
+so `game-data/reward_overrides.toml` gives Pink Bean (8820001) Cosmic's
+(`152-drop-data`): a pile of about 45,000 mesos, potions, mastery books,
+the Rock of Time, the Timeless gear, earrings and pendants, and the Pink
+Bean Hat and Suit, one each. The statue and the guardians drop nothing, as in Cosmic, where
+the statue's are turned off and the guardians have none. The picks are
+b288 in v83ref's QUESTIONS.
+
 ## Their skills
 
 The skills are Mob.nx's, cast through the usual mob skill path (see
@@ -123,7 +133,10 @@ only once Pink Bean is hurt.
 - Harness `pink_bean_waves`: the five waves wake in order out of their
   statues, the warded statue takes no hit, and after the fifth the item
   falls on the reactor, the statue dies and Pink Bean comes out. Its fall
-  shows the clear, takes every mob, and tells the world the channel.
+  shows the clear, takes every mob, and tells the world the channel, and
+  what it leaves comes from its table.
+- `game-data`: Pink Bean's table, and none for its statue or guardians
+  (`server_content.rs`).
 - Harness `pink_bean_entry` also counts the dead: deaths in the revival
   room count, the third and fourth warn, and the fifth sends everyone out.
 - `net`: which deaths warn and which ends it (`events.rs`).
