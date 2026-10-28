@@ -840,6 +840,25 @@ impl FieldActor {
             FieldMessage::DropCount { reply } => {
                 let _ = reply.send(self.drops.all().count());
             }
+            FieldMessage::FloorItems { reply } => {
+                let items = (self.drops.all())
+                    .filter_map(|drop| Some((reactor_item(&drop.loot)?.0, self.landing(drop))));
+                let _ = reply.send(items.collect());
+            }
+            FieldMessage::TakeItems { ids } => {
+                let taken: Vec<i32> = (self.drops.all())
+                    .filter(|drop| {
+                        reactor_item(&drop.loot).is_some_and(|(id, _)| ids.contains(&id))
+                    })
+                    .map(|drop| drop.object_id)
+                    .collect();
+                for object_id in taken {
+                    self.drops.remove(object_id);
+                    if let Ok(packet) = build_remove_drop(object_id, None) {
+                        self.send_drop_packet(packet);
+                    }
+                }
+            }
             FieldMessage::ReactorStates { names, reply } => {
                 let states = names
                     .iter()

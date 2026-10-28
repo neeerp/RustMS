@@ -1043,6 +1043,45 @@ impl ClientActor {
         Ok(Some(NpcScript::statue_keeper(talk)))
     }
 
+    /// The vassals' keeper's script for a member of the Guild Quest at the
+    /// fountain, judging the offering on its floor, a wrong one shown to
+    /// the map; None elsewhere.
+    pub(super) async fn vassal_keeper(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        use net::guild_quest::{VassalTalk, FOUNTAIN};
+        let map_id = self.in_game()?.player.stats.map_id;
+        if map_id != FOUNTAIN {
+            return Ok(None);
+        }
+        let in_gq =
+            |ticket: &&EventTicket| ticket.kind == EventKind::GuildQuest && ticket.holds(map_id);
+        if self.event.as_ref().filter(in_gq).is_none() {
+            return Ok(None);
+        }
+        let Some(field) = net::get_game_data()
+            .ok()
+            .and_then(|data| data.field(map_id))
+        else {
+            return Ok(None);
+        };
+        let (reply, items) = oneshot::channel();
+        self.send_to_field(FieldMessage::FloorItems { reply })
+            .await?;
+        let items: Vec<_> = (items.await.unwrap_or_default().into_iter())
+            .map(|(id, (x, y))| (id, (i32::from(x), i32::from(y))))
+            .collect();
+        let offering = net::guild_quest::offering(&items, &field.areas);
+        let Some(ticket) = self.event.as_ref() else {
+            return Ok(None);
+        };
+        let Some(talk) = ticket.vassals(offering).await else {
+            return Ok(None);
+        };
+        if matches!(talk, VassalTalk::Wrong(_) | VassalTalk::Failed) {
+            self.show_wrong_answer().await?;
+        }
+        Ok(Some(NpcScript::vassal_keeper(talk)))
+    }
+
     /// A wrong answer to a puzzle: everyone on the map sees and hears it.
     async fn show_wrong_answer(&mut self) -> Result<(), RuntimeError> {
         self.show_to_field(&["quest/party/wrong_kor"], &["Party1/Failed"])

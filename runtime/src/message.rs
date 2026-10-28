@@ -750,6 +750,16 @@ pub enum FieldMessage {
     DropCount {
         reply: tokio::sync::oneshot::Sender<usize>,
     },
+    /// The items lying on the map, each `(item id, where it came to rest)`;
+    /// no mesos, nor quest drops.
+    FloorItems {
+        reply: tokio::sync::oneshot::Sender<Vec<(i32, (i16, i16))>>,
+    },
+    /// The items lying on the map whose ids are in `ids` go, as the Guild
+    /// Quest's vassals take their offering.
+    TakeItems {
+        ids: std::ops::RangeInclusive<i32>,
+    },
     /// The states of the live reactors named `names` here, in turn, with
     /// `None` for a name none has.
     ReactorStates {

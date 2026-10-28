@@ -87,6 +87,9 @@ services:
       RUSTMS_MAGATIA_ROPES: "0123012301"
       # Its first jail opens to levers 1, 3 and 5 (see tests/opq_jails.rs).
       RUSTMS_OPQ_JAIL1: "135"
+      # The Guild Quest's four vassals wish for the four offerings in turn
+      # (see tests/guild_quest_vassals.rs).
+      RUSTMS_GQ_VASSALS: "0123"
       # Every Gachapon roll is the same uncommon prize, which the world hears
       # of (see tests/gachapon.rs).
       RUSTMS_GACHAPON_SEED: "10"

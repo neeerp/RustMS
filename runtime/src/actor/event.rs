@@ -85,6 +85,14 @@ pub enum EventMessage {
         client_id: ClientId,
         reply: oneshot::Sender<Option<net::guild_quest::StatueTalk>>,
     },
+    /// `client_id` talks to the Guild Quest's vassals' keeper with
+    /// `offering` on the fountain's floor; None for anyone not in the
+    /// event.
+    Vassals {
+        client_id: ClientId,
+        offering: Option<[u8; net::guild_quest::VASSALS]>,
+        reply: oneshot::Sender<Option<net::guild_quest::VassalTalk>>,
+    },
     /// `client_id`'s script did something the event keeps track of.
     Command {
         client_id: ClientId,
@@ -334,6 +342,25 @@ impl EventTicket {
         talk.await.ok().flatten()
     }
 
+    /// What the Guild Quest's vassals' keeper tells the member, who finds
+    /// `offering` on the fountain's floor, or `None` if the event is over.
+    pub async fn vassals(
+        &self,
+        offering: Option<[u8; net::guild_quest::VASSALS]>,
+    ) -> Option<net::guild_quest::VassalTalk> {
+        let (reply, talk) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Vassals {
+                client_id: self.member,
+                offering,
+                reply,
+            })
+            .await
+            .ok()?;
+        talk.await.ok().flatten()
+    }
+
     /// How many are in the team now, or `None` if the event is over.
     pub async fn team_size(&self) -> Option<usize> {
         let (reply, size) = oneshot::channel();
@@ -500,6 +527,7 @@ pub fn spawn(
         stage1: Stage1::default(),
         puzzles: Puzzles::default(),
         statues: Default::default(),
+        vassals: Default::default(),
         heard: HashSet::new(),
         cleared,
         leader: Arc::new(AtomicI32::new(start.leader)),
@@ -613,6 +641,8 @@ struct EventActor {
     puzzles: Puzzles,
     /// The Guild Quest's statue keeper's test.
     statues: net::guild_quest::Statues,
+    /// The Guild Quest's vassals' wish and the guild's tries at it.
+    vassals: net::guild_quest::Vassals,
     /// The hand-in stages whose NPC the leader has heard out.
     heard: HashSet<u8>,
     cleared: Arc<Cleared>,
@@ -713,6 +743,9 @@ impl EventActor {
                     }
                     Some(EventMessage::Statues { client_id, reply }) => {
                         let _ = reply.send(self.statues(client_id));
+                    }
+                    Some(EventMessage::Vassals { client_id, offering, reply }) => {
+                        let _ = reply.send(self.vassals(client_id, offering));
                     }
                     Some(EventMessage::Command { client_id, command }) => {
                         self.command(client_id, command);
@@ -1853,6 +1886,70 @@ impl EventActor {
             _ => return Some(talk),
         };
         self.tell_hall(vec![notice], Duration::ZERO);
+        Some(talk)
+    }
+
+    /// What the vassals' keeper tells `client_id`, who finds `offering` on
+    /// the fountain's floor (Cosmic `9040006`): the right one opens the
+    /// water gate, clears the stage and is taken; a wrong one brings out a
+    /// knight of each kind, and the last wrong one six of each.
+    fn vassals(
+        &mut self,
+        client_id: ClientId,
+        offering: Option<[u8; net::guild_quest::VASSALS]>,
+    ) -> Option<net::guild_quest::VassalTalk> {
+        use net::guild_quest::{
+            VassalTalk, FOUNTAIN, KNIGHTS, KNIGHTS_ON_FAILING, KNIGHTS_X, OFFERINGS, WATER_GATE,
+        };
+        use rand::Rng;
+        if self.kind != EventKind::GuildQuest || !self.team.has(client_id) {
+            return None;
+        }
+        let stage = self.kind.event().stage_on(FOUNTAIN)?;
+        if self.cleared.has(stage) {
+            return Some(VassalTalk::Cleared);
+        }
+        if client_id != self.team.leader() {
+            return Some(VassalTalk::NotLeader);
+        }
+        let mut rng = rand::thread_rng();
+        let talk = self.vassals.talk(offering, &mut rng);
+        info!(id = self.id, ?talk, "Vassals judged");
+        let mut sent = Vec::new();
+        match talk {
+            VassalTalk::Right => {
+                self.clear(stage);
+                sent.push(FieldMessage::SetReactor {
+                    name: WATER_GATE,
+                    state: 1,
+                });
+                sent.push(FieldMessage::TakeItems { ids: OFFERINGS });
+            }
+            VassalTalk::Wrong(_) => {
+                for (mob_id, at) in KNIGHTS {
+                    sent.push(FieldMessage::BringOut { mob_id, at });
+                }
+            }
+            VassalTalk::Failed => {
+                for (mob_id, (_, y)) in KNIGHTS {
+                    for _ in 0..KNIGHTS_ON_FAILING {
+                        let at = (rng.gen_range(KNIGHTS_X.start, KNIGHTS_X.end), y);
+                        sent.push(FieldMessage::BringOut { mob_id, at });
+                    }
+                }
+            }
+            _ => {}
+        }
+        let fountain = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: FOUNTAIN,
+            instance_id: self.id,
+        });
+        tokio::spawn(async move {
+            for message in sent {
+                let _ = fountain.tx.send(message).await;
+            }
+        });
         Some(talk)
     }
 
