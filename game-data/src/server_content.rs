@@ -2238,6 +2238,10 @@ pub mod keys {
     pub const CWK_SQUAD_NOTICE_OPENED: &str = "cwk.squad.notice.opened";
     pub const CWK_SQUAD_NOTICE_STARTED: &str = "cwk.squad.notice.started";
     pub const CWK_GATE_NO_KEY: &str = "cwk.gate.no_key";
+    pub const CWK_WAY_BLOCKED: &str = "cwk.way.blocked";
+    pub const CWK_WAY_NOT_ACTIVATED: &str = "cwk.way.not_activated";
+    pub const CWK_WAY_SHUT: &str = "cwk.way.shut";
+    pub const CWK_STAGE1_FOUND: &str = "cwk.stage1.found";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";

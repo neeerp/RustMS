@@ -353,11 +353,15 @@ impl EventTicket {
     }
 
     /// The object on `stage`'s map that shows its way on open once it is
-    /// cleared: the stage maps' `gate` (`Event::gates`), or on the Amorian
-    /// Challenge's first the gate of the way drawn, `gate0` to `gate2`.
+    /// cleared: the stage maps' `gate` (`Event::gates`), on the Amorian
+    /// Challenge's first the gate of the way drawn, `gate0` to `gate2`, or
+    /// on Crimsonwood Keep's second to fifth their portals, `2pt` to `5pt`.
     pub fn gate_object(&self, stage: u8) -> Option<String> {
         if self.kind == EventKind::Amoria && stage == 1 {
             return self.way().map(|way| format!("gate{way}"));
+        }
+        if self.kind == EventKind::Cwk {
+            return (2..=5).contains(&stage).then(|| format!("{stage}pt"));
         }
         self.kind.event().gates.then(|| "gate".to_string())
     }

@@ -300,6 +300,9 @@ pub struct Event {
     /// The EXP every member gets for clearing each stage, in order. Stage n
     /// is played on `entry + (n - 1) * stride`, unless `stage_maps` says.
     pub exp_per_stage: &'static [i32],
+    /// The mesos every member gets for clearing each stage, in order; none
+    /// past its end.
+    pub meso_per_stage: &'static [i32],
     /// How far apart the stage maps' ids are; the maps between them are
     /// rooms off the stages.
     pub stride: i32,
@@ -456,6 +459,7 @@ pub const KPQ: Event = Event {
     married: false,
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
@@ -551,6 +555,7 @@ pub const HPQ: Event = Event {
     married: false,
     minutes: 10,
     exp_per_stage: &[1600],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
@@ -605,6 +610,7 @@ pub const LPQ: Event = Event {
     married: false,
     minutes: 45,
     exp_per_stage: &[210, 2520, 2940, 3360, 3770, 0, 4620, 5040, 5950],
+    meso_per_stage: &[],
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
@@ -800,6 +806,7 @@ pub const OPQ: Event = Event {
     married: false,
     minutes: 60,
     exp_per_stage: &[3500, 3500, 3500, 3500, 3500, 3500, 3500, 0, 3500],
+    meso_per_stage: &[],
     stride: 100,
     stage_maps: &[
         920_010_000,
@@ -1051,6 +1058,7 @@ pub const ZPQ: Event = Event {
     married: false,
     minutes: 30,
     exp_per_stage: &[12_000],
+    meso_per_stage: &[],
     stride: 10,
     stage_maps: &[],
     talk_clears: &[],
@@ -1118,6 +1126,7 @@ pub const ZAKUM: Event = Event {
     married: false,
     minutes: 120,
     exp_per_stage: &[0],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
@@ -1162,6 +1171,7 @@ pub const GUILD_QUEST: Event = Event {
     married: false,
     minutes: 90,
     exp_per_stage: &[0; 10],
+    meso_per_stage: &[],
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
@@ -1215,6 +1225,7 @@ pub const PAPULATUS: Event = Event {
     married: false,
     minutes: 45,
     exp_per_stage: &[0],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
@@ -1265,6 +1276,7 @@ pub const HORNTAIL: Event = Event {
     married: false,
     minutes: 120,
     exp_per_stage: &[0, 0, 0],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II, HORNTAILS_CAVE],
     talk_clears: &[],
@@ -1353,6 +1365,7 @@ pub const HTPQ: Event = Event {
     married: false,
     minutes: 25,
     exp_per_stage: &[0; 6],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[
         HTPQ_ENTRY + 1,
@@ -1446,6 +1459,7 @@ pub const DELLI: Event = Event {
     married: false,
     minutes: 6,
     exp_per_stage: &[0],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
@@ -1558,6 +1572,7 @@ pub const LUDIMAZE: Event = Event {
     married: false,
     minutes: 15,
     exp_per_stage: &[0],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[MAZE_GOAL],
     talk_clears: &[],
@@ -1617,6 +1632,7 @@ pub const TYLUS: Event = Event {
     married: false,
     minutes: 10,
     exp_per_stage: &[0],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
@@ -1702,6 +1718,7 @@ pub const ELLIN: Event = Event {
     married: false,
     minutes: 30,
     exp_per_stage: &[0; 6],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &ELLIN_STAGES,
     talk_clears: &[],
@@ -1922,6 +1939,7 @@ pub const PIRATE: Event = Event {
     married: false,
     minutes: 4,
     exp_per_stage: &[0; 6],
+    meso_per_stage: &[],
     stride: 1,
     stage_maps: &PIRATE_STAGES,
     talk_clears: &[],
@@ -2214,6 +2232,7 @@ pub const AMORIA: Event = Event {
     married: true,
     minutes: 75,
     exp_per_stage: &[2000, 4000, 6000, 8000, 9000, 11000],
+    meso_per_stage: &[],
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
@@ -2255,8 +2274,9 @@ pub const AMORIA: Event = Event {
 /// Sanctum's entrance, goes into its own copy of the Keep's stages for
 /// two minutes, the clock starting over on each later stage
 /// (`CWK_CLOCKS`). It ends when its leader leaves or too few remain, like
-/// a party's. Stage EXP is Cosmic's. The defaults are in
-/// `v83ref/lanes/QUESTIONS.md` b263.
+/// a party's. Stage EXP and mesos are Cosmic's. Any member finding the
+/// first stage's hidden way (`cwk_hidden_way`) clears it. The defaults are
+/// in `v83ref/lanes/QUESTIONS.md` b263 and b264.
 pub const CWK: Event = Event {
     lobby: CWK_LOBBY,
     entrances: &[],
@@ -2270,10 +2290,11 @@ pub const CWK: Event = Event {
     married: false,
     minutes: 2,
     exp_per_stage: &[2500, 8000, 18000, 25000, 30000, 40000],
+    meso_per_stage: &[500, 1000, 2000, 5000, 8000, 20000],
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
-    member_clears: &[],
+    member_clears: &[1],
     clear_portals: &[],
     stage_copies: &[],
     gated: &[],
@@ -2297,6 +2318,23 @@ pub const CWK: Event = Event {
 /// gather and come back to, and the Keep's first stage.
 pub const CWK_LOBBY: i32 = 610_030_020;
 pub const CWK_ENTRY: i32 = 610_030_100;
+
+/// Where the Keep's first stage hides its way on, behind the pillar by the
+/// Lion Shield: Cosmic's `next01` (`glpqPortalDummy`), which our Map.nx
+/// lacks, so the server watches for a member standing there.
+pub const CWK_HIDDEN_WAY: (i16, i16) = (1547, 336);
+/// How near the hidden way, across and up or down, a member must stand.
+const CWK_HIDDEN_REACH: (i16, i16) = (40, 50);
+
+/// Whether one standing at `at` on `map_id` has found the Keep's first
+/// stage's hidden way.
+pub fn cwk_hidden_way(map_id: i32, at: (i16, i16)) -> bool {
+    let (x, y) = CWK_HIDDEN_WAY;
+    let (across, up) = CWK_HIDDEN_REACH;
+    map_id == CWK_ENTRY
+        && (i32::from(at.0) - i32::from(x)).abs() <= i32::from(across)
+        && (i32::from(at.1) - i32::from(y)).abs() <= i32::from(up)
+}
 
 /// The Keep's stages after the first, and the minutes the clock starts over
 /// with the first time the team reaches each, the last of them the
@@ -2365,6 +2403,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         married: false,
         minutes: 45,
         exp_per_stage: &[0, 10_000, 20_000, 0, 20_000, 20_000, 0],
+        meso_per_stage: &[],
         stride: 1,
         stage_maps: stages,
         talk_clears: &[MAGATIA_FILES_STAGE],
@@ -2680,6 +2719,7 @@ pub const DOJO: Event = Event {
     married: false,
     minutes: 5,
     exp_per_stage: &[0; DOJO_FLOORS as usize],
+    meso_per_stage: &[],
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
@@ -2728,6 +2768,7 @@ const fn carnival(room: u8) -> Event {
         team: if room <= 4 { 2..=4 } else { 3..=6 },
         minutes: 0,
         exp_per_stage: &[0],
+        meso_per_stage: &[],
         member_clears: &[],
         runs: 1,
         ..DOJO
@@ -2757,6 +2798,7 @@ pub const DOJO_TRIAL: Event = Event {
     married: false,
     minutes: 0,
     exp_per_stage: &[0],
+    meso_per_stage: &[],
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
@@ -2839,6 +2881,7 @@ const fn pyramid(party: bool, mode: PyramidMode) -> Event {
         team: if party { 2..=6 } else { 1..=1 },
         minutes: 2,
         exp_per_stage: &[0; PYRAMID_STAGES as usize],
+        meso_per_stage: &[],
         member_clears: &[],
         runs: if party { 10 } else { 5 },
         ..DOJO
@@ -2888,6 +2931,7 @@ const fn pyramid_tomb(mode: PyramidMode, shades: &'static [i32]) -> Event {
         team: 1..=1,
         minutes: 0,
         exp_per_stage: &[],
+        meso_per_stage: &[],
         member_clears: &[],
         runs: 20,
         ..DOJO
@@ -2930,6 +2974,7 @@ pub const TRISTAN: Event = Event {
     team: 1..=1,
     minutes: 10,
     exp_per_stage: &[],
+    meso_per_stage: &[],
     member_clears: &[],
     runs: 1,
     ..DOJO
@@ -2966,6 +3011,7 @@ pub const DOLLHOUSE: Event = Event {
     team: 1..=1,
     minutes: 10,
     exp_per_stage: &[],
+    meso_per_stage: &[],
     member_clears: &[],
     items: &[DOLLHOUSE_PENDULUM],
     runs: 1,
@@ -3007,6 +3053,7 @@ pub const MECHANICAL_PARTS: Event = Event {
     team: 1..=1,
     minutes: 20,
     exp_per_stage: &[],
+    meso_per_stage: &[],
     member_clears: &[],
     items: &[MACHINE_PART],
     runs: 1,
@@ -3044,6 +3091,7 @@ pub const KING_PEPE: Event = Event {
     team: 1..=1,
     minutes: 20,
     exp_per_stage: &[],
+    meso_per_stage: &[],
     member_clears: &[],
     runs: 1,
     ..DOJO
@@ -3079,6 +3127,7 @@ pub const WEDDING_HALL_EVENT: Event = Event {
     team: 1..=1,
     minutes: 10,
     exp_per_stage: &[],
+    meso_per_stage: &[],
     member_clears: &[],
     runs: 1,
     ..DOJO
@@ -3115,6 +3164,7 @@ pub const ROCK_SPIRIT: Event = Event {
     team: 1..=1,
     minutes: 60,
     exp_per_stage: &[],
+    meso_per_stage: &[],
     member_clears: &[],
     runs: 8,
     ..DOJO
@@ -3542,6 +3592,15 @@ impl Event {
         usize::from(stage)
             .checked_sub(1)
             .and_then(|index| self.exp_per_stage.get(index))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// The mesos for clearing `stage`, 0 if none.
+    pub fn stage_meso(&self, stage: u8) -> i32 {
+        usize::from(stage)
+            .checked_sub(1)
+            .and_then(|index| self.meso_per_stage.get(index))
             .copied()
             .unwrap_or(0)
     }
@@ -4478,6 +4537,23 @@ mod tests {
         ];
         assert_eq!(clocks, expected);
         assert_eq!(clock_on(CWK_ENTRY + 410), None);
+    }
+
+    #[test]
+    fn crimsonwood_keep_s_first_stage_hides_its_way_and_each_stage_pays() {
+        let (x, y) = CWK_HIDDEN_WAY;
+        assert!(cwk_hidden_way(CWK_ENTRY, (x, y)));
+        assert!(cwk_hidden_way(CWK_ENTRY, (x - 40, y + 50)));
+        assert!(!cwk_hidden_way(CWK_ENTRY, (x + 41, y)));
+        assert!(!cwk_hidden_way(CWK_ENTRY, (x, y - 51)));
+        // Not the stage's way on, `next00`, nor elsewhere.
+        assert!(!cwk_hidden_way(CWK_ENTRY, (824, 328)));
+        assert!(!cwk_hidden_way(CWK_ENTRY + 100, (x, y)));
+        // Any member's find clears it.
+        assert!(CWK.member_clears.contains(&1));
+        let mesos: Vec<_> = (1..=7).map(|stage| CWK.stage_meso(stage)).collect();
+        assert_eq!(mesos, [500, 1000, 2000, 5000, 8000, 20000, 0]);
+        assert_eq!(ZAKUM.stage_meso(1), 0);
     }
 
     #[test]

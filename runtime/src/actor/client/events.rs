@@ -2,7 +2,7 @@
 //! that puts them in the event's own copy of its maps, the event's clock,
 //! its stages' gates, and getting out when it ends or they leave.
 
-use super::quest::gain_exp;
+use super::quest::{gain_exp, pay_mesos};
 use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
@@ -1050,6 +1050,36 @@ impl ClientActor {
         }
     }
 
+    /// What Crimsonwood Keep's ways on do for a member there
+    /// (`scripts::cwk_way_on`). `None` for any other portal.
+    pub(super) fn cwk_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let ticket = (self.event.as_ref())
+            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Cwk);
+        Ok(ticket.and_then(|ticket| scripts::cwk_way_on(script, |stage| ticket.cleared(stage))))
+    }
+
+    /// The player, having moved, stands where the Keep's first stage
+    /// hides its way on (`events::cwk_hidden_way`): before anyone has
+    /// found it, it clears the stage and takes them back to the stage's
+    /// start (Cosmic `glpqPortalDummy`). Found, it does nothing more.
+    pub(super) async fn cwk_hidden_way(&mut self) -> Result<(), RuntimeError> {
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
+        };
+        let map_id = game.player.stats.map_id;
+        let found = self.event.as_ref().is_some_and(|ticket| {
+            ticket.kind == EventKind::Cwk && ticket.holds(map_id) && !ticket.cleared(1)
+        });
+        if self.in_cash_shop || !found || !events::cwk_hidden_way(map_id, game.position) {
+            return Ok(());
+        }
+        self.tell_event(EventCommand::ClearStage(1)).await;
+        let effects = [Effect::PortalSound, Effect::WarpToPortal(map_id, 0)];
+        self.apply_effects(&effects).await?;
+        Ok(())
+    }
+
     /// What the Dojo's two portals do for a challenger on a floor. Its
     /// `dojang_up`, by the door, takes them up to the upper tier once the
     /// floor's boss is beaten (the client moves them, on 0xCF) and opens
@@ -1896,6 +1926,12 @@ impl ClientActor {
         // A stage worth no EXP shows no "+0" line.
         if !no_exp && exp != 0 {
             gain_exp(&mut next, exp, &mut packets)?;
+        }
+        pay_mesos(&mut next, event.stage_meso(stage), &mut packets)?;
+        // The Keep's hidden way, found by one, is news to all.
+        if ticket_kind == EventKind::Cwk && stage == 1 {
+            let found = net::content::text().get(keys::CWK_STAGE1_FOUND, &[]);
+            packets.push(build_broadcast(Broadcast::Pink, &found)?);
         }
         self.commit_player(next, None, &mut packets).await?;
         // The EXP comes before the clock stops, as in Cosmic's `clearPQ`;
