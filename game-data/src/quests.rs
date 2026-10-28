@@ -184,6 +184,8 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
     (21742, 21763),
     (21610, 21619),
     (21613, 21620),
+    (3522, 7402),
+    (3538, 7402),
 ];
 /// Quests that start only once a record that is no quest reads a value
 /// (`Check/0 infoNumber` names it, `infoex` the value), which a script sets

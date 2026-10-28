@@ -9,8 +9,7 @@ All dialogue is placeholder text (`pink_bean.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
 
 The way in and out, the statue's guardians, Pink Bean's skills, the win,
-the deaths count and the drops are done. The quests that follow the win
-(3522 and 3538) are still to come.
+the deaths count, the drops and the quests that follow the win are done.
 
 ## The expedition
 
@@ -100,6 +99,18 @@ Bean Hat and Suit, one each. The statue and the guardians drop nothing, as in Co
 the statue's are turned off and the guardians have none. The picks are
 b288 in v83ref's QUESTIONS.
 
+## The quests
+
+"Beyond the Ruins" (3522) and its Cygnus Knights' twin (3538) are
+completed at Kirston (2140000) on the Three-Way Road Split (270000000)
+once record 7402 reads "1". Their data names no mob, and no script sets
+that record, so Pink Bean's kill does (`KILL_RECORDS` in
+`net/src/quests.rs`): every player its EXP goes to who has either quest
+started, which is everyone who hit it and their party on the map. The
+client's data gives no reward for either; Cosmic's Act data gives 3522
+a Giant Pink Bean Cushion and 2,000,000 EXP. The picks are b289 in v83ref's
+QUESTIONS.
+
 ## Their skills
 
 The skills are Mob.nx's, cast through the usual mob skill path (see
@@ -134,9 +145,12 @@ only once Pink Bean is hurt.
   statues, the warded statue takes no hit, and after the fifth the item
   falls on the reactor, the statue dies and Pink Bean comes out. Its fall
   shows the clear, takes every mob, and tells the world the channel, and
-  what it leaves comes from its table.
+  what it leaves comes from its table. The leader, on "Beyond the Ruins",
+  gets its record and completes it at Kirston.
 - `game-data`: Pink Bean's table, and none for its statue or guardians
   (`server_content.rs`).
+- `net`: Pink Bean's kill sets 7402 for 3522 and 3538, once, and only
+  while one is started (`quests.rs`).
 - Harness `pink_bean_entry` also counts the dead: deaths in the revival
   room count, the third and fourth warn, and the fifth sends everyone out.
 - `net`: which deaths warn and which ends it (`events.rs`).

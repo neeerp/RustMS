@@ -6,17 +6,19 @@
 //! statue's reactor, which takes it a few seconds later: the statue dies,
 //! and Pink Bean comes out where it stood. Its fall wins the fight: every
 //! mob there goes, the world hears which channel's expedition won, and
-//! what it leaves is its own.
+//! what it leaves is its own. Its fall also lets "Beyond the Ruins" (3522)
+//! be completed.
 //! The harness world runs events
 //! 60 times as fast, and lets two set out (`RUSTMS_EXPEDITION_MIN`).
 
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::{replace_item, set_job, set_str, set_weapon_attack};
+use integration_harness::database::{replace_item, set_job, set_quest, set_str, set_weapon_attack};
+use integration_harness::events::maps;
 use integration_harness::events::{said, talk, told};
-use integration_harness::hunting::attack;
+use integration_harness::hunting::{attack, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::quests::answer;
+use integration_harness::quests::{answer, build_quest_completion};
 use integration_harness::trace::{barrier, read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{PINK_BEAN_ARENA, PINK_BEAN_GATE, PINK_BEAN_GUARDIANS, PINK_BEAN_LIGHTNING_ITEM};
@@ -26,12 +28,18 @@ use tokio::time::Duration;
 const RECRUITER: i32 = 2141001;
 const KEEPER: i32 = 2141002;
 const PINK: u8 = 5;
+/// "Beyond the Ruins", completed at the Temple of Time's Three-Way Road
+/// Split once Pink Bean's fall has set its record.
+const BEYOND_THE_RUINS: i16 = 3522;
+const RUINS_RECORD: i16 = 7402;
+const THREE_WAY_SPLIT: i32 = 270000000;
+const KIRSTON_NPC: i32 = 2140000;
 /// Under the most a level-120 character with 32000 STR and a 1999-attack
 /// sword may hit for.
 const HIT: i32 = 5_000_000;
 
-/// A new character of level 120 hitting very hard, logged in at the
-/// temple's last gate.
+/// A new character of level 120 hitting very hard and on "Beyond the
+/// Ruins", logged in at the temple's last gate.
 async fn hunter() -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
@@ -41,6 +49,7 @@ async fn hunter() -> WorldSession {
     replace_item(id, -1, -11, 1302000).await.unwrap();
     set_weapon_attack(id, 1_999).await.unwrap();
     set_str(id, 32_000).await.unwrap();
+    set_quest(id, BEYOND_THE_RUINS, 1, "").await.unwrap();
     let mut session = relogin(&config).await;
     let mut seen = Trace::default();
     let c = &mut session.connection;
@@ -215,6 +224,20 @@ async fn the_guardians_wake_in_waves_and_their_fall_lets_the_lightning_strike_th
         };
         assert!(known, "{drop:?}");
     }
+    // The one who felled it may complete "Beyond the Ruins".
+    assert_eq!(lt.kills.get(&RUINS_RECORD).map(String::as_str), Some("1"));
     let t = told(&mut leader, talk(PINK_BEAN_ARENA, KEEPER)).await;
     assert!(said(&t, keys::PINK_BEAN_KEEPER_WON), "{t:?}");
+    let c = &mut leader.connection;
+    assert_eq!(warp(c, THREE_WAY_SPLIT, "", &mut lt).await, THREE_WAY_SPLIT);
+    let field = maps().field(THREE_WAY_SPLIT).unwrap();
+    let npc = field.map_npcs.iter().find(|n| n.npc_id == KIRSTON_NPC);
+    let npc = npc.unwrap();
+    told(&mut leader, walk_to(npc.x, npc.y)).await;
+    let done = build_quest_completion(BEYOND_THE_RUINS, KIRSTON_NPC, -1);
+    let mut t = told(&mut leader, done).await;
+    until(&mut leader.connection, &mut t, |t| {
+        t.states.get(&BEYOND_THE_RUINS) == Some(&2)
+    })
+    .await;
 }

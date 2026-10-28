@@ -407,8 +407,15 @@ pub fn check_complete(
 /// Kills that set a record (`game::quest::RECORDS`) for a started quest
 /// that has no mob to hunt: `(quest, mob, record, value)`. The Puppeteer's
 /// fall in Lith Harbor's Info Shop (9300345) for "Gathering Some Strange
-/// Information" (21733), whose completion reads 21762 at "2".
-const KILL_RECORDS: [(i16, i32, i16, &str); 1] = [(21733, 9300345, 21762, "2")];
+/// Information" (21733), whose completion reads 21762 at "2", and Pink
+/// Bean's (8820001) for "Beyond the Ruins" (3522) and its Cygnus Knights'
+/// twin (3538), whose completions read 7402 at "1". The client's data names
+/// no mob for those two, and no script sets 7402, so its kill does.
+const KILL_RECORDS: [(i16, i32, i16, &str); 3] = [
+    (21733, 9300345, 21762, "2"),
+    (3522, crate::mobs::PINK_BEAN, 7402, "1"),
+    (3538, crate::mobs::PINK_BEAN, 7402, "1"),
+];
 
 /// Set the records a kill of `mob_id` sets for `player`'s started quests.
 /// Returns the records changed, with their new values.
@@ -1130,6 +1137,23 @@ mod tests {
         assert!(p.quests.set_record(6401, "q3"));
         assert!(!p.quests.set_record(6401, "q3"));
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn pink_beans_fall_completes_beyond_the_ruins_and_its_cygnus_twin() {
+        let catalog = catalog().unwrap();
+        for quest_id in [3522, 3538] {
+            let quest = catalog.quest(quest_id).unwrap();
+            assert_eq!(quest.end_info_record, Some(7402));
+            let mut p = player(140, 0);
+            assert!(kill_records(&mut p, crate::mobs::PINK_BEAN).is_empty());
+            set(&mut p, quest_id, QuestState::Started);
+            let npc = quest.end_npc;
+            assert_eq!(check_complete(quest, npc, &p), Err(QuestRejection::Info));
+            assert_eq!(kill_records(&mut p, crate::mobs::PINK_BEAN), [(7402, "1")]);
+            assert!(kill_records(&mut p, crate::mobs::PINK_BEAN).is_empty());
+            assert_eq!(check_complete(quest, npc, &p), Ok(()));
+        }
     }
 
     #[test]

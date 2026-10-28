@@ -31,6 +31,8 @@ pub const INFO_QUESTS: &[i16] = &[
 /// and an Aran's search of the Puppeteer's door (21761, for "The
 /// Puppeteer's Cave", 21728) and the Puppeteer's fall in Lith Harbor's
 /// Info Shop (21762, for "Gathering Some Strange Information", 21733),
+/// and Pink Bean's fall (7402, for "Beyond the Ruins", 3522, and its
+/// Cygnus Knights' twin, 3538),
 /// and the growth of the Timer's Egg a player raises (7067, for "A Cute
 /// Baby Bird", 3250) and the writing coming back on Mr. Do's Hanging
 /// Scroll (21763, for "The Black Scroll", 21742), which feeding them in
@@ -50,7 +52,7 @@ pub const INFO_QUESTS: &[i16] = &[
 /// (`crate::quest_ex`).
 pub const RECORDS: &[i16] = &[
     1200, 1201, 1202, 1203, 1204, 1205, 1206, 1301, 2311, 6331, 6364, 6371, 6401, 6411, 7067, 7072,
-    7081, 7760, 20731, 20732, 21619, 21620, 21760, 21761, 21762, 21763, 21764, 21765,
+    7081, 7402, 7760, 20731, 20732, 21619, 21620, 21760, 21761, 21762, 21763, 21764, 21765,
 ];
 
 /// The timed titles (`QuestInfo` `timeLimit2`): Celebrity, Diligent
