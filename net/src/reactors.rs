@@ -520,10 +520,6 @@ pub fn action(reactor_id: i32) -> Action {
         // holds the Purple Stone of Magic (Cosmic `3002001`); its eight
         // empty ones (3002002) drop nothing.
         2002003 | ELLIN_SPINE | ELLIN_STONE_BOX => Action::DropsAndClears,
-        // The sixth stage's altar (Cosmic `3001000`), which takes the stone.
-        // The statue in Showa's arena (`shouwaBoss`) takes the Lady Boss's
-        // Comb and the first of The Boss's bodyguards comes out (Cosmic
-        // `8001000`), unannounced.
         // The Engine Room's `boss` (Cosmic `5411000`), which takes a White
         // Essence and calls out Capt. Latanica.
         LATANICA_BOSS => Action::SpawnAt {
@@ -532,12 +528,16 @@ pub fn action(reactor_id: i32) -> Action {
             notice: Some(keys::LATANICA_SUMMONED),
             music: Some("Bgm09/TimeAttack"),
         },
+        // The statue in Showa's arena (`shouwaBoss`) takes the Lady Boss's
+        // Comb and the first of The Boss's bodyguards comes out (Cosmic
+        // `8001000`), unannounced.
         crate::events::SHOWA_STATUE => Action::SpawnAt {
             mob_id: crate::events::SHOWA_BODYGUARD,
             at: crate::events::SHOWA_BODYGUARD_AT,
             notice: None,
             music: None,
         },
+        // The sixth stage's altar (Cosmic `3001000`), which takes the stone.
         ELLIN_ALTAR => Action::SpawnAt {
             mob_id: crate::events::ELLIN_GOLEM,
             at: crate::events::ELLIN_ALTAR_AT,
