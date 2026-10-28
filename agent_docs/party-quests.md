@@ -1762,9 +1762,12 @@ player leaves by `left00` or the time runs out, back to the door.
   ends it through `q2332e` for the 4,400 EXP of its `rewardSummary`.
 - `q2333s` has her ask for help and name the Prime Minister (3300008), who
   comes out at (292, 143) (`Effect::BringOutMob`). Entering with 2333 taken
-  and him not yet beaten brings him out too. His kill counts for 2333, and
-  `q2333e` ends it for 15,000 EXP. He drops the Royal Seal (4001318) for
-  those on "The Seal of the Empire" (2331; `reward_overrides.toml`).
+  and the Prime Minister not yet beaten brings it out too. Its kill counts
+  for 2333, and `q2333e` ends it for 15,000 EXP. It drops the Royal Seal
+  (4001318) for those on "The Seal of the Empire" (2331), and otherwise
+  Cosmic's table: about 930 mesos, ores, potions, arrows, weapons and
+  scrolls, less its Monster Book card (`reward_overrides.toml`; QUESTIONS
+  b291).
 - Once 2333 is done, the door leads straight into the hall itself, where
   `q2334s` (Violetta's face, Cosmic's 1,000 EXP) and `q2342s` (the seal, for
   one still on 2331 who left it behind) complete their quests as they start

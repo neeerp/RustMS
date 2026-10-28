@@ -386,11 +386,80 @@ replace = [{ item = 2022613, prob = 1.0 }]
 replace = [{ item = 2022618, prob = 1.0 }]
 
 [mobs.3300008]
-# The Prime Minister (Mushroom Castle Wedding Hall): The Seal of the Empire
-# (2331) asks for the Royal Seal 4001318 (Quest.nx Check.img/2331/1/item),
-# and The Recovered Royal Seal (2342) has Violetta keep the one he dropped
-# for whoever left it behind. The pack has no drops for him.
-add = [{ item = 4001318, prob = 1.0, quest = 2331 }]
+# The Prime Minister (Mushroom Castle Wedding Hall, and its refight's copy):
+# The Seal of the Empire (2331) asks for the Royal Seal 4001318 (Quest.nx
+# Check.img/2331/1/item), and The Recovered Royal Seal (2342) has Violetta
+# keep the one it dropped for whoever left it behind. The pack has no drops
+# for it; the rest are Cosmic's (152-drop-data, 3300008), less its Monster
+# Book card, which the pack has for no mob, and its Royal Seal for anyone at
+# 60 in 100, as ours is only for those on 2331 (v83ref/lanes/QUESTIONS.md
+# b291). Every item is in our String.nx. Cosmic's 315 to 1,550 mesos at 40 in
+# 100 are one pile that ours vary around.
+replace = [
+    { money = 930, prob = 0.4 },
+    { item = 4001318, prob = 1.0, quest = 2331 },
+    { item = 4010005, prob = 0.09 },
+    { item = 4020005, prob = 0.09 },
+    { item = 2000002, prob = 0.2 },
+    { item = 2000003, prob = 0.2 },
+    { item = 2002002, prob = 0.2 },
+    { item = 2002003, prob = 0.2 },
+    { item = 2040301, prob = 0.003 },
+    { item = 2040504, prob = 0.003 },
+    { item = 2040707, prob = 0.003 },
+    { item = 2040801, prob = 0.003 },
+    { item = 2040901, prob = 0.003 },
+    { item = 2041016, prob = 0.003 },
+    { item = 2043801, prob = 0.003 },
+    { item = 2044101, prob = 0.003 },
+    { item = 2044601, prob = 0.003 },
+    { item = 2044701, prob = 0.003 },
+    { item = 2040514, prob = 0.003 },
+    { item = 2041002, prob = 0.003 },
+    { item = 2041017, prob = 0.003 },
+    { item = 2043702, prob = 0.003 },
+    { item = 2044302, prob = 0.003 },
+    { item = 2060000, prob = 0.3, min = 69, max = 87 },
+    { item = 2061000, prob = 0.3, min = 69, max = 87 },
+    { item = 1302010, prob = 0.007 },
+    { item = 1312008, prob = 0.007 },
+    { item = 1322017, prob = 0.007 },
+    { item = 1332003, prob = 0.005 },
+    { item = 1372007, prob = 0.007 },
+    { item = 1382006, prob = 0.007 },
+    { item = 1402003, prob = 0.007 },
+    { item = 1412003, prob = 0.007 },
+    { item = 1422005, prob = 0.007 },
+    { item = 1432004, prob = 0.005 },
+    { item = 1442005, prob = 0.007 },
+    { item = 1452008, prob = 0.005 },
+    { item = 1462007, prob = 0.005 },
+    { item = 1472021, prob = 0.005 },
+    { item = 1482007, prob = 0.005 },
+    { item = 1492007, prob = 0.005 },
+    { item = 2044802, prob = 0.003 },
+    { item = 2044901, prob = 0.003 },
+    { item = 2040931, prob = 0.003 },
+    { item = 2040928, prob = 0.003 },
+    { item = 2043216, prob = 0.003 },
+    { item = 2043311, prob = 0.003 },
+    { item = 2044024, prob = 0.003 },
+    { item = 2044116, prob = 0.003 },
+    { item = 2044216, prob = 0.003 },
+    { item = 2044316, prob = 0.003 },
+    { item = 2044416, prob = 0.003 },
+    { item = 2043711, prob = 0.003 },
+    { item = 2043811, prob = 0.003 },
+    { item = 2044511, prob = 0.003 },
+    { item = 2044611, prob = 0.003 },
+    { item = 2044711, prob = 0.003 },
+    { item = 2044816, prob = 0.003 },
+    { item = 2041044, prob = 0.01, min = 1, max = 4 },
+    { item = 2044804, prob = 0.01, min = 1, max = 4 },
+    { item = 2044902, prob = 0.01, min = 1, max = 4 },
+    { item = 2040932, prob = 0.01, min = 1, max = 4 },
+    { item = 2040930, prob = 0.01, min = 1, max = 4 },
+]
 
 [mobs.2230101]
 # Zombie Mushroom: Zombie Mushroom Signal 3 (2251) asks for 20 Recording
