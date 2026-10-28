@@ -454,16 +454,19 @@ impl ClientActor {
         )))
     }
 
-    /// What Amos says to the player on the Amorian Challenge's rope stage,
-    /// if there: how the leader's try weighs, by where the team hangs on
-    /// the ropes. A wrong try shows to the map as a wrong answer, with a
-    /// pink line (Cosmic `9201044`'s `mapMessage`).
+    /// What Amos says to the player on the Amorian Challenge's rope or
+    /// platform stage, if there: how the leader's try weighs, by where the
+    /// team stands on the stage's areas. A wrong try shows to the map as a
+    /// wrong answer: on the ropes with a pink line (Cosmic `9201044`'s
+    /// `mapMessage`), on the platforms with a slime for each platform
+    /// right (`spawnMobs`).
     pub(super) async fn amoria_ropes(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let event = EventKind::Amoria.event();
-        if event.stage_on(map_id) != Some(events::AMORIA_ROPES_STAGE) {
+        let on = [events::AMORIA_ROPES_STAGE, events::AMORIA_PLATFORMS_STAGE];
+        let Some(stage) = event.stage_on(map_id).filter(|stage| on.contains(stage)) else {
             return Ok(None);
-        }
+        };
         let in_amoria =
             |ticket: &&EventTicket| ticket.kind == EventKind::Amoria && ticket.holds(map_id);
         if self.event.as_ref().filter(in_amoria).is_none() {
@@ -478,9 +481,16 @@ impl ClientActor {
         let Some(ticket) = self.event.as_ref() else {
             return Ok(None);
         };
-        let Some(talk) = ticket.ropes(mobs, heads).await else {
+        let Some(talk) = ticket.ropes(stage, mobs, heads).await else {
             return Ok(None);
         };
+        if stage == events::AMORIA_PLATFORMS_STAGE {
+            if let RopesTalk::Wrong { right } = talk {
+                self.bring_out_slimes(right).await?;
+                self.show_wrong_answer().await?;
+            }
+            return Ok(Some(NpcScript::amos_platforms(talk)));
+        }
         let notice = match talk {
             RopesTalk::Wrong { right: 0 } => Some(keys::AMORIA_PQ_STAGE2_ALL_DIFFER_NOTICE),
             RopesTalk::Wrong { .. } => Some(keys::AMORIA_PQ_STAGE2_ONE_SAME_NOTICE),
@@ -499,6 +509,34 @@ impl ClientActor {
             self.show_wrong_answer().await?;
         }
         Ok(Some(NpcScript::amos_ropes(talk)))
+    }
+
+    /// Bring out `count` slimes on the Amorian Challenge's platform stage,
+    /// each a random one at a random point.
+    async fn bring_out_slimes(&mut self, count: usize) -> Result<(), RuntimeError> {
+        let slimes: Vec<(i32, (i16, i16))> = {
+            let mut rng = rand::thread_rng();
+            (0..count)
+                .map(|_| {
+                    let slime =
+                        events::AMORIA_SLIMES[rng.gen_range(0, events::AMORIA_SLIMES.len())];
+                    let at =
+                        events::AMORIA_SLIMES_AT[rng.gen_range(0, events::AMORIA_SLIMES_AT.len())];
+                    (slime, at)
+                })
+                .collect()
+        };
+        for (mob_id, at) in slimes {
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::BringOutMobs {
+                    mob_id,
+                    at: vec![at],
+                },
+            })
+            .await?;
+        }
+        Ok(())
     }
 
     /// What the hub's Romeo or Juliet, `npc_id`, says to the player in

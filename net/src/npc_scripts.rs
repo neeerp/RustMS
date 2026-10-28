@@ -1705,6 +1705,11 @@ impl NpcScript {
         amos_ropes(talk)
     }
 
+    /// Amos on the Amorian Challenge's platform stage, after `talk`.
+    pub fn amos_platforms(talk: RopesTalk) -> Self {
+        amos_platforms(talk)
+    }
+
     /// The Glimmer Man on the Amorian Challenge's first stage, to
     /// `player`, who may lead the team, once its fierry is out or not, the
     /// shard handed in or not, and the stage `bare` of mobs or not.
@@ -11900,6 +11905,21 @@ fn amos_ropes(talk: RopesTalk) -> NpcScript {
                 .collect(),
         },
         RopesTalk::Right => Page::Done(Vec::new()),
+    };
+    NpcScript::new(AMOS_STAGE, vec![page])
+}
+
+/// Amos on the Amorian Challenge's platform stage (Cosmic `9201044`): as
+/// on the ropes, but a wrong try draws no word, only its slimes, and the
+/// platforms are never drawn anew.
+fn amos_platforms(talk: RopesTalk) -> NpcScript {
+    let page = match talk {
+        RopesTalk::Cleared => Page::Say(text(keys::AMORIA_PQ_AMOS_CLEARED)),
+        RopesTalk::NotLeader => Page::Say(text(keys::AMORIA_PQ_AMOS_NOT_LEADER)),
+        RopesTalk::Intro => Page::Say(text(keys::AMORIA_PQ_STAGE3_INTRO)),
+        RopesTalk::Mobs => Page::Say(text(keys::AMORIA_PQ_STAGE2_MOBS)),
+        RopesTalk::Few => Page::Say(text(keys::AMORIA_PQ_STAGE3_FEW)),
+        RopesTalk::Wrong { .. } | RopesTalk::Reset | RopesTalk::Right => Page::Done(Vec::new()),
     };
     NpcScript::new(AMOS_STAGE, vec![page])
 }

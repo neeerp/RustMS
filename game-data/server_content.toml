@@ -1874,6 +1874,8 @@ unsourced = [
     "amoria_pq.stage2.one_same_notice",
     "amoria_pq.stage2.reset",
     "amoria_pq.stage2.reset_notice",
+    "amoria_pq.stage3.intro",
+    "amoria_pq.stage3.few",
     "amoria_pq.glimmer.task",
     "amoria_pq.glimmer.member_task",
     "amoria_pq.glimmer.fierry_out",
