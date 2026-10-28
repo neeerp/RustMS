@@ -517,7 +517,8 @@ impl ClientActor {
                     start,
                     movement_bytes,
                 })
-                .await?
+                .await?;
+                self.cwk_hidden_way().await?
             }
             WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
                 self.conversation = None;

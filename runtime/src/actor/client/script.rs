@@ -90,6 +90,7 @@ impl ClientActor {
                     .or(self.delli_portal(script)?)
                     .or(self.tylus_portal(script)?)
                     .or(self.ellin_portal(script)?)
+                    .or(self.cwk_portal(script)?)
                 {
                     None => match self.htpq_portal(script).await? {
                         None => match self.dojo_portal(script).await? {

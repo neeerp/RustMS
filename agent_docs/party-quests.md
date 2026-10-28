@@ -1564,17 +1564,36 @@ leaves, or when too few remain (`Event::lasts_until_empty` is false for
 it). Once won, it ends only when the last member leaves. The team's
 minimum is the squad's (`Event::least`), so the harness's
 `RUSTMS_EXPEDITION_MIN` lowers it. Members on its roster may still come
-back in while it runs.
+back in while it runs. Leaving one's party doesn't take one out, since the
+roster, not the party, is the team.
 
 Its clock is two minutes. It starts over the first time the team reaches
 each later stage (`CWK_CLOCKS` in `clock_on`): 10 minutes for stages 2 to
 4 (610030200 to 610030400), 20 for stage 5's hall (610030500), 60 for
 stage 6 (610030600) and 1 for the treasure room. When time is up, the team
-goes back to the entrance. The six stages give Cosmic's EXP. The five job
-weapons (4001256 to 4001260) are taken from whoever leaves
-(`CWK_ITEMS`). The stages themselves, their meso, and the treasure room
-come in later slices. Until then `next00`'s `glpqPortal0` stays shut, so a
-team stays on the first stage until its clock runs out.
+goes back to the entrance. The six stages give Cosmic's EXP and mesos
+(`Event::meso_per_stage`, shown in the chat log). The five job weapons
+(4001256 to 4001260) are taken from whoever leaves (`CWK_ITEMS`).
+
+The stages' ways on are script portals, `glpqPortal0` to `glpqPortal7`
+(`scripts::cwk_way_on`, reached through `cwk_portal` in the client's
+portal chain). Each stays shut with a pink line until its stage clears,
+then leads to the next stage's map; `glpqPortal7`, to the treasure room,
+is always open. `glpqPortal2`, stage 3's climb that sends members back
+down, comes with the sigils. Stages 2 to 5 show their portal objects,
+`2pt` to `5pt`, when they clear (`EventTicket::gate_object`).
+
+The first stage hides its way on behind the pillar by the Lion Shield.
+Cosmic has a hidden portal there (`next01`, `glpqPortalDummy`), but our
+Map.nx doesn't, so the server watches movement instead: a member standing
+within reach of `CWK_HIDDEN_WAY` (`events::cwk_hidden_way`, checked by
+`cwk_hidden_way` on every `FieldMove`) clears the stage for all
+(`member_clears`). That member goes back to the stage's start, and
+everyone hears it in pink (`cwk.stage1.found`). The stage's reactor
+`mob0` (6109010, fed in the original data by item 4000488, which nothing
+drops) is left alone. The picks are in QUESTIONS b264. The sigils of
+stages 2 to 4, the job rooms of stage 5, its boss and the treasure room
+come in later slices.
 
 ## Jr. Balrog's room
 

@@ -2828,6 +2828,35 @@ pub fn ellin_maze_way(script: &str, lucky: bool) -> Option<Vec<Effect>> {
     Some(vec![Effect::PortalSound, Effect::WarpToPortal(maze, to)])
 }
 
+/// The Keep's ways on, in order (Cosmic `glpqPortal0` to `glpqPortal7`):
+/// the stage each needs cleared first, if any, and the line it stays shut
+/// with until then. The third, `glpqPortal2`, leads back down instead.
+const CWK_WAYS: [(&str, Option<(u8, &str)>); 7] = [
+    ("glpqPortal0", Some((1, keys::CWK_WAY_BLOCKED))),
+    ("glpqPortal1", Some((2, keys::CWK_WAY_NOT_ACTIVATED))),
+    ("glpqPortal3", Some((3, keys::CWK_WAY_SHUT))),
+    ("glpqPortal4", Some((4, keys::CWK_WAY_SHUT))),
+    ("glpqPortal5", Some((5, keys::CWK_WAY_SHUT))),
+    ("glpqPortal6", Some((6, keys::CWK_WAY_SHUT))),
+    ("glpqPortal7", None),
+];
+
+/// What the Keep's way on `script` does for a member: once the stage it
+/// needs is `cleared`, it takes them to the next stage's map, the n-th
+/// way to the (n+1)-th stage's; until then it stays shut, with a pink
+/// line. `None` for any other portal.
+pub fn cwk_way_on(script: &str, cleared: impl Fn(u8) -> bool) -> Option<Vec<Effect>> {
+    use crate::events::CWK;
+    let n = CWK_WAYS.iter().position(|&(way, _)| way == script)?;
+    let to = CWK.entry + 100 * i32::try_from(n + 1).ok()?;
+    Some(match CWK_WAYS[n].1 {
+        Some((stage, shut)) if !cleared(stage) => {
+            vec![Effect::Pink(content::text().get(shut, &[]))]
+        }
+        _ => vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)],
+    })
+}
+
 /// The way out of the forest's last stage (Cosmic `party6_out`).
 pub const ELLIN_OUT: &str = "party6_out";
 /// The prize map's way home (Cosmic `party6_stage800`).
@@ -4528,6 +4557,38 @@ mod tests {
             assert_eq!(ellin_maze_way(script, false), None, "{script}");
         }
         assert_eq!(ellin_maze_way(ELLIN_STAGE, true), None);
+    }
+
+    #[test]
+    fn the_keep_s_ways_on_open_as_their_stages_clear() {
+        use crate::events::CWK_ENTRY;
+        let on = |to| Some(vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)]);
+        let shut = |key| Some(vec![Effect::Pink(content::text().get(key, &[]))]);
+        let none = |_| false;
+        assert_eq!(cwk_way_on("glpqPortal0", none), shut(keys::CWK_WAY_BLOCKED));
+        assert_eq!(cwk_way_on("glpqPortal0", |s| s == 1), on(CWK_ENTRY + 100));
+        assert_eq!(
+            cwk_way_on("glpqPortal1", |s| s == 1),
+            shut(keys::CWK_WAY_NOT_ACTIVATED)
+        );
+        assert_eq!(cwk_way_on("glpqPortal1", |s| s == 2), on(CWK_ENTRY + 200));
+        for (n, script) in ["glpqPortal3", "glpqPortal4", "glpqPortal5", "glpqPortal6"]
+            .into_iter()
+            .enumerate()
+        {
+            let stage = u8::try_from(n + 3).unwrap();
+            assert_eq!(
+                cwk_way_on(script, none),
+                shut(keys::CWK_WAY_SHUT),
+                "{script}"
+            );
+            let to = CWK_ENTRY + 100 * i32::from(stage);
+            assert_eq!(cwk_way_on(script, |s| s == stage), on(to), "{script}");
+        }
+        // To the treasure room, always open; the climb back down is not
+        // one of them.
+        assert_eq!(cwk_way_on("glpqPortal7", none), on(CWK_ENTRY + 700));
+        assert_eq!(cwk_way_on("glpqPortal2", |_| true), None);
     }
 
     #[test]
