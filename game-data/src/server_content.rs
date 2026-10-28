@@ -4823,6 +4823,27 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_prime_minister_drops_cosmics_table_and_the_seal_only_for_its_quest() {
+        let table = RewardTable::load(None).unwrap();
+        let minister = table.drops(3300008);
+        assert_eq!(minister.len(), 63);
+        assert_eq!((minister[0].money, minister[0].prob), (Some(930), 0.4));
+        let seals: Vec<_> = (minister.iter())
+            .filter(|d| d.item == Some(4001318))
+            .collect();
+        assert_eq!(seals.len(), 1);
+        assert_eq!((seals[0].prob, seals[0].quest), (1.0, Some(2331)));
+        let arrows = minister.iter().find(|d| d.item == Some(2060000)).unwrap();
+        assert_eq!(
+            (arrows.prob, arrows.min, arrows.max),
+            (0.3, Some(69), Some(87))
+        );
+        let katar = minister.iter().find(|d| d.item == Some(1302010)).unwrap();
+        assert_eq!((katar.prob, katar.min, katar.max), (0.007, None, None));
+        assert!(!minister.iter().any(|d| d.item == Some(2388070)));
+    }
+
     fn quest_item(item: i32, quest: i16) -> RewardEntry {
         RewardEntry {
             item: Some(item),

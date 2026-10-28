@@ -29,6 +29,7 @@ use std::time::Duration;
 const DOOR: &str = "right00";
 const DOOR_AT: (i16, i16) = (255, 140);
 const MENU: u8 = 4;
+const ROYAL_SEAL: i32 = 4_001_318;
 /// The hall's way back to the door.
 const LEFT_AT: (i16, i16) = (-641, 142);
 /// Under the most a level-35 character with 32000 STR and a 1999-attack
@@ -135,8 +136,22 @@ async fn the_blocked_entrance_takes_a_party_or_one_alone_to_the_prime_minister()
 
     // Its death wins it.
     let c = &mut team[0].connection;
+    let before = lt.field.drops.len();
     beat(c, &mut lt, prime_minister).await;
     until(c, &mut lt, cleared).await;
+    // What it leaves comes from its own table (or is the harness's card),
+    // and the Royal Seal only for those still on its quest.
+    let table = game_data::server_content::RewardTable::load(None).unwrap();
+    let ours = table.drops(PRIME_MINISTER);
+    for drop in &lt.field.drops[before..] {
+        // Its pile of about 930 mesos, which ours vary a fifth around.
+        let known = if drop.meso {
+            (744..=1_116).contains(&drop.value)
+        } else {
+            drop.value / 10_000 == 238 || ours.iter().any(|d| d.item == Some(drop.value))
+        };
+        assert!(known && drop.value != ROYAL_SEAL, "{drop:?}");
+    }
 
     // They walk back out to the door; then one with no party goes in
     // alone.
