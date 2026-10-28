@@ -105,6 +105,10 @@ pub enum EventKind {
     /// The Amorian Challenge, Amoria's party quest for married couples,
     /// started at Amos (9201048) on its Entrance.
     Amoria,
+    /// Crimsonwood Keep's party quest, an expedition gathered by the
+    /// Crimsonwood Keep's recruiter (9201113) at its Inner Sanctum's
+    /// entrance (`crate::squads`).
+    Cwk,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -345,8 +349,9 @@ pub struct Event {
     pub blessings: &'static [i32],
     /// Whether its team is a squad gathered at its NPC from anyone, not a
     /// party (`crate::squads`): it ends only when the last member leaves,
-    /// whoever leads, and members on its roster may come back in while it
-    /// runs (Cosmic `isExpeditionTeamLackingNow`).
+    /// whoever leads (Cosmic `isExpeditionTeamLackingNow`), but for
+    /// Crimsonwood Keep's (`lasts_until_empty`), and members on its roster
+    /// may come back in while it runs.
     pub squad: bool,
     /// The reactors, by their map and name, that the event shuts (state
     /// 1) while it runs and opens (0) once it is won or over (Cosmic
@@ -2245,6 +2250,69 @@ pub const AMORIA: Event = Event {
     runs: 1,
 };
 
+/// Crimsonwood Keep's party quest (Cosmic `CWKPQ`): an expedition of 6 to
+/// 30 of level 90 or more, gathered at the recruiter on the Inner
+/// Sanctum's entrance, goes into its own copy of the Keep's stages for
+/// two minutes, the clock starting over on each later stage
+/// (`CWK_CLOCKS`). It ends when its leader leaves or too few remain, like
+/// a party's. Stage EXP is Cosmic's. The defaults are in
+/// `v83ref/lanes/QUESTIONS.md` b263.
+pub const CWK: Event = Event {
+    lobby: CWK_LOBBY,
+    entrances: &[],
+    maps: CWK_ENTRY..=CWK_ENTRY + 700,
+    entry: CWK_ENTRY,
+    entries: 1,
+    exit: CWK_LOBBY,
+    levels: 90..=u8::MAX,
+    spread: None,
+    team: 6..=30,
+    married: false,
+    minutes: 2,
+    exp_per_stage: &[2500, 8000, 18000, 25000, 30000, 40000],
+    stride: 100,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &CWK_ITEMS,
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: true,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+};
+
+/// Crimsonwood Keep's Inner Sanctum's entrance, where its expeditions
+/// gather and come back to, and the Keep's first stage.
+pub const CWK_LOBBY: i32 = 610_030_020;
+pub const CWK_ENTRY: i32 = 610_030_100;
+
+/// The Keep's stages after the first, and the minutes the clock starts over
+/// with the first time the team reaches each, the last of them the
+/// treasure room's.
+pub const CWK_CLOCKS: [(i32, u64); 6] = [
+    (CWK_ENTRY + 100, 10),
+    (CWK_ENTRY + 200, 10),
+    (CWK_ENTRY + 300, 10),
+    (CWK_ENTRY + 400, 20),
+    (CWK_ENTRY + 500, 60),
+    (CWK_ENTRY + 700, 1),
+];
+
+/// The Keep's items of use only in it, taken from whoever leaves.
+pub const CWK_ITEMS: [i32; 5] = [4_001_256, 4_001_257, 4_001_258, 4_001_259, 4_001_260];
+
 /// Magatia's lobbies for Romeo and Juliet's party quest: Romeo's room on
 /// the Zenumist side, Juliet's on the Alcadno side.
 pub const ZENUMIST_LOBBY: i32 = 261_000_011;
@@ -3118,8 +3186,13 @@ pub enum ClockOn {
 ///   with `(floor > 36 ? 15 : floor / 6 + 5)` minutes, and a rest floor
 ///   stops the clock (Cosmic `Channel.startDojoSchedule`, which a rest
 ///   floor's `dojang_1st` dismisses). Its first section's 5 are the
-///   event's own `minutes`.
+///   event's own `minutes`;
+/// - Crimsonwood Keep's stages after the first give their `CWK_CLOCKS`
+///   (Cosmic CWKPQ's `changedMapInside`).
 pub fn clock_on(map_id: i32) -> Option<ClockOn> {
+    if let Some(&(_, minutes)) = CWK_CLOCKS.iter().find(|&&(map, _)| map == map_id) {
+        return Some(ClockOn::Restart(minutes));
+    }
     if let Some(floor) = dojo_floor(map_id) {
         return match floor {
             _ if rest_floor(floor) => Some(ClockOn::Stop),
@@ -3148,7 +3221,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 46] = [
+    pub const ALL: [EventKind; 47] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -3195,6 +3268,7 @@ impl EventKind {
         EventKind::RockSpiritVip,
         EventKind::GuildQuest,
         EventKind::Amoria,
+        EventKind::Cwk,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -3248,6 +3322,7 @@ impl EventKind {
             EventKind::RockSpiritVip => &ROCK_SPIRIT_VIP,
             EventKind::GuildQuest => &GUILD_QUEST,
             EventKind::Amoria => &AMORIA,
+            EventKind::Cwk => &CWK,
         }
     }
 
@@ -3319,10 +3394,11 @@ impl Event {
             .unwrap_or(*self.team.start())
     }
 
-    /// Whether only the last member's leaving ends it: a squad's, or one
-    /// that says so (`until_empty`).
+    /// Whether only the last member's leaving ends it: a squad's, but for
+    /// Crimsonwood Keep's, which ends like a party's (Cosmic CWKPQ asks
+    /// `isEventTeamLackingNow`), or one that says so (`until_empty`).
     pub fn lasts_until_empty(&self) -> bool {
-        self.squad || self.until_empty
+        (self.squad && self.lobby != CWK_LOBBY) || self.until_empty
     }
 
     /// Whether it is taken alone, without a party: a team of one.
@@ -3550,9 +3626,9 @@ fn scale() -> u32 {
 
 /// Who is still playing. The event ends when its leader leaves or too few
 /// remain, and once won, when the last of them leaves (Cosmic
-/// `isEventTeamLackingNow`). A squad's, and one that lasts until empty,
-/// ends only when the last leaves (`isExpeditionTeamLackingNow`), and a
-/// squad's members may come back.
+/// `isEventTeamLackingNow`). A squad's but Crimsonwood Keep's, and one
+/// that lasts until empty, ends only when the last leaves
+/// (`isExpeditionTeamLackingNow`), and a squad's members may come back.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Team {
     leader: ClientId,
@@ -3571,7 +3647,12 @@ impl Team {
             leader,
             roster: event.squad.then(|| members.iter().copied().collect()),
             members,
-            least: *event.team.start(),
+            // A squad's minimum may be lowered for testing.
+            least: if event.squad {
+                event.least()
+            } else {
+                *event.team.start()
+            },
             won: false,
             until_empty: event.lasts_until_empty(),
         }
@@ -4354,6 +4435,49 @@ mod tests {
                     )
                     .is_some()
         );
+    }
+
+    #[test]
+    fn crimsonwood_keep_s_expedition_ends_like_a_party_s() {
+        assert_eq!(EventKind::Cwk.event().lobby, CWK_LOBBY);
+        assert!(CWK.squad && !CWK.lasts_until_empty());
+        assert!(HORNTAIL.lasts_until_empty() && ZAKUM.lasts_until_empty());
+        assert_eq!((CWK.team.clone(), *CWK.levels.start()), (6..=30, 90));
+        assert_eq!(CWK.last_stage(), 6);
+        assert_eq!(CWK.stage_on(CWK_ENTRY + 500), Some(6));
+        assert!(CWK.holds(CWK_ENTRY + 700) && !CWK.holds(CWK_LOBBY));
+        assert_eq!(CWK.exit, CWK_LOBBY);
+        // Cosmic `isEventTeamLackingNow`: the leader's leaving ends it, and
+        // so does one more leaving once only six are left.
+        let mut team = Team::new(&CWK, 1, (1..=7).collect());
+        assert!(!team.leave(7));
+        assert!(team.leave(6));
+        let mut team = Team::new(&CWK, 1, (1..=7).collect());
+        assert!(team.leave(1));
+        // Once won, only the last one's leaving.
+        let mut team = Team::new(&CWK, 1, (1..=6).collect());
+        team.win();
+        assert!(!team.leave(1) && !team.leave(2));
+        // Its clock starts over on each later stage, and on the treasure
+        // room (Cosmic CWKPQ's `changedMapInside`), not on the first nor the
+        // rest stop before the treasure room.
+        let minutes = |map| match clock_on(map) {
+            Some(ClockOn::Restart(minutes)) => Some(minutes),
+            _ => None,
+        };
+        let clocks: Vec<_> = (0..8).map(|n| minutes(CWK_ENTRY + n * 100)).collect();
+        let expected = [
+            None,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(20),
+            Some(60),
+            None,
+            Some(1),
+        ];
+        assert_eq!(clocks, expected);
+        assert_eq!(clock_on(CWK_ENTRY + 410), None);
     }
 
     #[test]

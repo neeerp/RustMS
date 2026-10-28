@@ -9,7 +9,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/npc-dialogue.md`: asset-backed conversations, runtime ownership, and future quest integration
 - `agent_docs/quests.md`: the v83 client-driven quest flow, supported requirements/actions, persistence, and rewards
 - `agent_docs/map-travel.md`: asset portal links, active beginner route, legacy map variants, and map/portal scripts
-- `agent_docs/party-quests.md`: instanced party events (the party quests of Kerning City, Henesys, Ludibrium, Orbis and Horntail's Trial Grounds, Delli's rescue, the Ludibrium Maze, Protecting Tylus, the Forest of Poison Haze, the Pirate Ship, Romeo and Juliet, and Amoria's Amorian Challenge): entry, tickets, copies of maps, leaving and ending
+- `agent_docs/party-quests.md`: instanced party events (the party quests of Kerning City, Henesys, Ludibrium, Orbis and Horntail's Trial Grounds, Delli's rescue, the Ludibrium Maze, Protecting Tylus, the Forest of Poison Haze, the Pirate Ship, Romeo and Juliet, Amoria's Amorian Challenge, and Crimsonwood Keep's): entry, tickets, copies of maps, leaving and ending
 - `agent_docs/guild-quest.md`: the Guild Quest to Sharenian: Shuang's registration, each channel's line of guilds, the waiting room and its gathering, the ends, and the waitlist packet
 - `agent_docs/zakum.md`: the way to Zakum: the chiefs' approval, Adobis's trials, the Breath of Lava, and the gate
 - `agent_docs/papulatus.md`: the fight with Papulatus in Ludibrium's Clocktower: the party's portal, the gates, the way out, the summon, and the win

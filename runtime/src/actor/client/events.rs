@@ -93,7 +93,9 @@ impl ClientActor {
             // A squad's, above; Papulatus's has a portal, not an NPC; So
             // Gong starts his trial and the party run from the Dojo's own
             // talk.
-            EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
+            EventKind::Zakum | EventKind::Horntail | EventKind::Cwk | EventKind::Papulatus => {
+                return Ok(())
+            }
             EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
             // Duarte asks after every run at once (`talk_to_duarte`).
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
@@ -1582,13 +1584,14 @@ impl ClientActor {
     }
 
     /// Without a party there is no event: the player leaves it, unless it
-    /// is already won (Cosmic `playerLeft`), a squad's, or one that lasts
-    /// until empty (Papulatus's `leftParty` does nothing).
+    /// is already won (Cosmic `playerLeft`), a squad's, whose roster is not
+    /// the party (CWKPQ's `leftParty` does nothing either), or one that
+    /// lasts until empty (Papulatus's `leftParty` does nothing).
     pub(super) async fn left_party_in_event(&mut self) -> Result<(), RuntimeError> {
-        let playing = self
-            .event
-            .as_ref()
-            .is_some_and(|ticket| !ticket.won() && !ticket.kind.event().lasts_until_empty());
+        let playing = self.event.as_ref().is_some_and(|ticket| {
+            let event = ticket.kind.event();
+            !ticket.won() && !event.squad && !event.lasts_until_empty()
+        });
         if self.party_id.is_none() && playing {
             self.leave_event().await?;
         }
