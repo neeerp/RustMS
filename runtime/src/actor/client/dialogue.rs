@@ -153,6 +153,11 @@ impl ClientActor {
                 return self.start_script(script).await;
             }
         }
+        if npc_id == net::guild_quest::SHAREN_SOUL {
+            if let Some(script) = self.sharen_soul().await? {
+                return self.start_script(script).await;
+            }
+        }
         if npc_id == net::guild_quest::VASSAL_KEEPER {
             if let Some(script) = self.vassal_keeper().await? {
                 return self.start_script(script).await;

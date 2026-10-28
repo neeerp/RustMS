@@ -56,6 +56,9 @@ impl ClientActor {
                 let used = fountain.is_some_and(|state| state > 0);
                 Some(scripts::ellin_home(&self.in_game()?.player, used))
             }
+            (Some(script), Some(_)) if script.starts_with("guild1F") => {
+                self.guild_quest_grid(script)?
+            }
             (Some(script), Some(_)) if script == scripts::RAND_OLA => {
                 scripts::rand_ola(map_id, portal, self.ola_seed)
             }

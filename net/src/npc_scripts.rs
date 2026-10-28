@@ -1540,6 +1540,22 @@ impl NpcScript {
         Self::new(guild_quest::VASSAL_KEEPER, pages)
     }
 
+    /// Sharen III's soul (9040003) on the grave, to a member who finds it
+    /// as `talk` (Cosmic `9040003`): the registrant's talk gains the guild
+    /// its points.
+    pub fn sharen_soul(talk: guild_quest::SoulTalk) -> Self {
+        use guild_quest::SoulTalk;
+        let pages = match talk {
+            SoulTalk::NotLeader => vec![Page::Say(text(keys::GUILD_QUEST_SOUL_NOT_LEADER))],
+            SoulTalk::Cleared => vec![Page::Say(text(keys::GUILD_QUEST_SOUL_CLEARED))],
+            SoulTalk::Opened => vec![Page::Act {
+                text: text(keys::GUILD_QUEST_SOUL_OPENED),
+                effects: vec![Effect::GainGuildPoints(guild_quest::SOUL_POINTS)],
+            }],
+        };
+        Self::new(guild_quest::SHAREN_SOUL, pages)
+    }
+
     /// Shuang (9040000) at the Excavation Site's camp, to a member of rank
     /// `rank` in their guild (none without one) who finds the channel's
     /// Guild Quest line as `view` (Cosmic `9040000`): the master or a Jr.

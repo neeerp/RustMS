@@ -147,6 +147,36 @@ pub const JR_GARGOYLES_AT: (i16, i16) = (-100, 50);
 /// guild has dressed Sharen III's soul) leads on to the King's Corridor.
 pub const GRAVE: i32 = 990_000_700;
 pub const GHOST_GATE: &str = "ghostgate";
+/// The altar on the grave (9201001), which takes Sharen III's shoes,
+/// pants, top and crown (4001032, 4001031, 4001033, 4001034) in turn and
+/// brings out Sharen III's soul (`SHAREN_SOUL`).
+pub const CLOTHES_ALTAR: i32 = 9_201_001;
+pub const SHAREN_SOUL: i32 = 9_040_003;
+/// Guild points for opening the grave's gate (Cosmic `9040003`'s `gainGP`).
+pub const SOUL_POINTS: i32 = 30;
+/// The end rooms' ways to the grave, each recording the room it was taken
+/// from (Cosmic `guild1F01` to `4`'s `gridInsert`), and the grave's way
+/// back, to the waterway's portal beside the room last recorded
+/// (`guild1F00`'s `backPortals`).
+pub const GRID_WAYS: [&str; 4] = ["guild1F01", "guild1F02", "guild1F04", "guild1F03"];
+pub const GRID_BACK: &str = "guild1F00";
+pub const BACK_PORTALS: [u8; 4] = [6, 8, 9, 11];
+/// The grave's `st00`, where the end rooms' ways come out.
+pub const GRAVE_ARRIVAL: u8 = 1;
+/// The waterway's `st00`, the way back for one who never came through a
+/// room (Cosmic has no such case).
+pub const WATERWAY_ARRIVAL: u8 = 1;
+
+/// Where the grid's way `script` leads a member who last came from `room`,
+/// and the room it records: `None` for any other portal.
+pub fn grid_way(script: &str, room: Option<u8>) -> Option<((i32, u8), Option<u8>)> {
+    if script == GRID_BACK {
+        let back = room.and_then(|room| BACK_PORTALS.get(usize::from(room)));
+        return Some(((WATERWAY, *back.unwrap_or(&WATERWAY_ARRIVAL)), room));
+    }
+    let way = GRID_WAYS.iter().position(|way| *way == script)?;
+    Some(((GRAVE, GRAVE_ARRIVAL), u8::try_from(way).ok()))
+}
 
 /// How many guilds may wait on a channel, besides the one playing.
 pub const QUEUE_MAX: usize = 10;
@@ -370,6 +400,16 @@ impl Statues {
             self.guess.push(statue);
         }
     }
+}
+
+/// What Sharen III's soul tells a member (Cosmic `9040003`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SoulTalk {
+    NotLeader,
+    Cleared,
+    /// The registrant hears the soul out: the stage clears and the gate
+    /// opens.
+    Opened,
 }
 
 /// What the vassal keeper tells a member (Cosmic `9040006`).
@@ -707,6 +747,48 @@ mod tests {
             assert!(event.holds(*map_id), "{map_id}");
         }
         assert_eq!(event.stage_on(STATUE_HALL), Some(KNIGHT_STAGE - 1));
+    }
+
+    #[test]
+    fn the_grid_takes_each_end_room_to_the_grave_and_back_beside_it() {
+        let data = crate::get_game_data().unwrap();
+        // Each end room's way and the room it records, in Cosmic's order.
+        for (end, room) in [(611, 0), (620, 1), (641, 2), (631, 3)] {
+            let field = data.field(990_000_000 + end).unwrap();
+            let way = field
+                .portals()
+                .find_map(|p| p.script.as_deref().filter(|s| s.starts_with("guild1F")))
+                .unwrap();
+            assert_eq!(
+                grid_way(way, None),
+                Some(((GRAVE, GRAVE_ARRIVAL), Some(room))),
+                "{end}"
+            );
+            let back = BACK_PORTALS[usize::from(room)];
+            assert_eq!(
+                grid_way(GRID_BACK, Some(room)),
+                Some(((WATERWAY, back), Some(room)))
+            );
+            assert!(data
+                .field(WATERWAY)
+                .unwrap()
+                .portal_by_id(back.into())
+                .is_some());
+        }
+        let grave = data.field(GRAVE).unwrap();
+        assert_eq!(
+            grave.portal_by_name("out00").unwrap().script.as_deref(),
+            Some(GRID_BACK)
+        );
+        assert!(grave.portal_by_id(GRAVE_ARRIVAL.into()).is_some());
+        assert_eq!(
+            grid_way(GRID_BACK, None),
+            Some(((WATERWAY, WATERWAY_ARRIVAL), None))
+        );
+        assert_eq!(grid_way("guild1F05", Some(1)), None);
+        let event = &crate::events::GUILD_QUEST;
+        assert_eq!(event.stage_on(WATERWAY), Some(7));
+        assert_eq!(event.stage_on(GRAVE), Some(8));
     }
 
     #[test]

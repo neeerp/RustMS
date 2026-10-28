@@ -2171,6 +2171,10 @@ pub mod keys {
     pub const GUILD_QUEST_VASSALS_RIGHT: &str = "guild_quest.vassals.right";
     pub const GUILD_QUEST_VASSALS_HINT: &str = "guild_quest.vassals.hint";
     pub const GUILD_QUEST_VASSALS_FAILED: &str = "guild_quest.vassals.failed";
+    pub const GUILD_QUEST_SOUL_APPEARS: &str = "guild_quest.soul.appears";
+    pub const GUILD_QUEST_SOUL_NOT_LEADER: &str = "guild_quest.soul.not_leader";
+    pub const GUILD_QUEST_SOUL_OPENED: &str = "guild_quest.soul.opened";
+    pub const GUILD_QUEST_SOUL_CLEARED: &str = "guild_quest.soul.cleared";
     pub const GUILD_QUEST_GATE_CLOSED: &str = "guild_quest.gate.closed";
     pub const GUILD_QUEST_GATE_BLOCKED: &str = "guild_quest.gate.blocked";
     pub const GUILD_QUEST_GATE_TOO_HIGH: &str = "guild_quest.gate.too_high";
