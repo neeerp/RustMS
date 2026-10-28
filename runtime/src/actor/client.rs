@@ -1771,6 +1771,11 @@ impl ClientActor {
                 self.tell_event(net::events::EventCommand::StatueStruck(statue))
                     .await
             }
+            ServerMessage::SpearsSet(set) => {
+                self.tell_event(net::events::EventCommand::SpearsSet(set))
+                    .await
+            }
+            ServerMessage::GainGuildPoints(amount) => self.gain_guild_points(amount).await?,
             ServerMessage::YuleteLeft(caught) => {
                 self.tell_event(net::events::EventCommand::YuleteLeft(caught))
                     .await

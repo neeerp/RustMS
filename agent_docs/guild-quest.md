@@ -6,12 +6,13 @@ registration with Shuang, each channel's line of guilds, the waiting room
 and its gathering, the quest's clock, the ends for too few members or a
 missing registrant, the Returning Path and Nuris, and the client's
 waitlist line, the outskirts' brief and earrings, the guide out on every
-stage, the quest's items taken on leaving, and the statue keeper's test.
-Not yet: the stages beyond the hall of statues, their rewards and the rest
-of the guild points the quest earns. The plan is in v83ref's
-`reports/b252-guild-quest.md`, with the event machinery's anchors in
-`reports/b253-gq-event-infra.md` and the first stages in
-`reports/b254-gq-stages-1-3.md`.
+stage, the quest's items taken on leaving, the statue keeper's test, and
+the knights' hall's spears and gates. Not yet: the stages beyond the
+knights' hall, their rewards and the rest of the guild points the quest
+earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
+event machinery's anchors in `reports/b253-gq-event-infra.md`, the first
+stages in `reports/b254-gq-stages-1-3.md` and the knights' hall in
+`reports/b255-gq-stage-400.md`.
 
 All dialogue is placeholder text (`guild_quest.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -139,6 +140,31 @@ keeps the test; the event holds it (`EventMessage::Statues`,
 - **The gate.** `next00` is the `statuegate_open` script: shut until the
   gate is set, then on to 990000301.
 
+## The knights' hall
+
+The knights' hall (990000400, `guild_quest::KNIGHT_HALL`) is stage 5
+(`KNIGHT_STAGE`). Its portals lead to rooms off it (410, 420, 440, and
+430 past a door, with 431 past that), all in the event's copy and all
+hurting a player without the earring.
+
+- **The spears.** Thrown on one of the four spears in the room of the
+  spears (440; reactor 9208007, `reactors::Action::Spear`), a spear
+  (4001025, from the reactors in 410) sets it, and it stays. The field
+  tells the event of whoever threw it, or of someone still there, how
+  many are set (`ServerMessage::SpearsSet`, `EventCommand::SpearsSet`).
+  The event moves the hall's gate (reactor "speargate", `SPEAR_GATE`) to
+  that state. The fourth clears the stage and gains the guild 20 points
+  (`SPEAR_POINTS`, `ServerMessage::GainGuildPoints` to that member).
+- **The clear.** It shows on the hall and every room off it
+  (`KNIGHT_MAPS`), but not on 401 past the gate (the client actor's
+  `stage_cleared`).
+- **The gates.** `next00` is `speargate_open`: shut until the stage is
+  cleared, then on to 990000401. `in02` is `stonegate_open`: a stone
+  (4001026, from 420's boss) set in the door (9208006, which holds it,
+  `Action::Hold`) opens the way to the metal room (430). There `in00`,
+  `metalgate_open`, needs a piece of metal (4001037, from 430's big
+  reactor) set in its door (9208005), and leads on to 431.
+
 ## The quest's items
 
 `events::GUILD_QUEST.items` (`guild_quest::ITEMS`) are Cosmic's exclusive
@@ -178,6 +204,8 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
 - Cosmic turns away a non-member in the waiting room. Here only members of
   the guild come in through Shuang, and the copy is the guild's own.
 - The earring doesn't expire after 120 minutes; it can't leave the quest.
+- Cosmic's `speargate_open` checks the gate's state; here it checks the
+  stage, which clears as the gate reaches its last state.
 
 ## Tests
 
@@ -191,6 +219,16 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
   the earrings taken; then the statue keeper's refusal of a member, the
   shut gate, a wrong guess, three parts passed, the guild's points and the
   gate.
+- `integration-harness/tests/guild_quest_knights.rs`: the knights' hall's
+  shut gate and door, four spears moving the gate, the clear in the hall
+  and the room of the spears, the guild's points, and the stone and the
+  metal opening their doors. Its helpers for the way in are in
+  `integration-harness/src/guild_quest.rs`.
+- `net/src/reactors.rs` (`the_guild_quest_s_gates_and_spears_stay_set`),
+  `net/src/scripts.rs`
+  (`the_knights_hall_s_gates_open_on_the_spears_the_stone_and_the_metal`)
+  and `net/src/guild_quest.rs`
+  (`the_knights_hall_plays_its_stage_and_the_maps_off_it_are_rooms`).
 - `net/src/guild_quest.rs` (`statues_*`): the test's parts and judging.
 - `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)
   and `net/src/scripts.rs` (`shuang_briefs_whoever_reaches_sharenians_outskirts`).

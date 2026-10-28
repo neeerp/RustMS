@@ -1248,6 +1248,10 @@ impl EventActor {
                 self.statues.struck(statue, std::time::Instant::now());
             }
             EventCommand::StatueStruck(_) => {}
+            EventCommand::SpearsSet(set) if self.kind == EventKind::GuildQuest => {
+                self.spears_set(client_id, set)
+            }
+            EventCommand::SpearsSet(_) => {}
             // Kept by the member's own ticket.
             EventCommand::PrizeTaken => {}
             // Each in turn, by the leader (Cosmic `2094002`).
@@ -1850,6 +1854,33 @@ impl EventActor {
         };
         self.tell_hall(vec![notice], Duration::ZERO);
         Some(talk)
+    }
+
+    /// `set` spears are set in the room of the spears, the last by
+    /// `client_id` or with them there: the knights' hall's gate moves on
+    /// to match (never back, as two members' word may cross), and the last
+    /// opens it, clears the stage and gains the guild its points (Cosmic
+    /// `9208007`).
+    fn spears_set(&mut self, client_id: ClientId, set: u8) {
+        use net::guild_quest::{KNIGHT_HALL, SPEARS, SPEAR_GATE, SPEAR_POINTS};
+        let hall = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: KNIGHT_HALL,
+            instance_id: self.id,
+        });
+        tokio::spawn(async move {
+            let moved = FieldMessage::ForwardReactor {
+                name: SPEAR_GATE,
+                state: set.min(SPEARS),
+            };
+            let _ = hall.tx.send(moved).await;
+        });
+        let stage = self.kind.event().stage_on(KNIGHT_HALL);
+        if set >= SPEARS && stage.is_some_and(|stage| self.clear(stage)) {
+            if let Some(handle) = self.members.get(&client_id) {
+                handle.send(ServerMessage::GainGuildPoints(SPEAR_POINTS));
+            }
+        }
     }
 
     /// The event's copy of the hall of statues.

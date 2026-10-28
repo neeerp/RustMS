@@ -77,7 +77,13 @@ pub enum Action {
     Statue,
     /// One of the scars on the Tower of Goddess's hub (`2008000`-`2008005`),
     /// where a piece of Minerva's statue goes: it keeps the piece set in it.
+    /// The Guild Quest's stone and metal gates (`9208006`, `9208005`) keep
+    /// theirs too, and stay open.
     Hold,
+    /// One of the Guild Quest's spears (`9208007`), which takes a spear and
+    /// stays: the knights' hall's gate moves to the number set, and the
+    /// last opens it and clears the stage (`guild_quest::SPEAR_GATE`).
+    Spear,
     /// One of the fourteen spots on the Tower of Goddess's Salion stage
     /// (`2001002`-`2001015`), which breaks on the Cellion's drop: the
     /// field brings the next Cellion out at another spot (`salion_next`),
@@ -343,6 +349,10 @@ pub fn action(reactor_id: i32) -> Action {
         2401002 => Action::BringOut(9300090, 1),
         9108000..=9108005 => Action::Bloom,
         9208000..=9208002 => Action::Statue,
+        // The Guild Quest's metal and stone gates (their `9208005`,
+        // `9208006` scripts do nothing), and its spears.
+        9208005 | 9208006 => Action::Hold,
+        crate::guild_quest::SPEAR => Action::Spear,
         // Ludibrium's stage 3 boxes (`ludiMob1`): three Bloctopuses come out.
         2201001 => Action::BringOut(LPQ_BLOCTOPUS, 3),
         // Stage 7's (`ludiMob2`), which take the other pass, and the
@@ -597,7 +607,10 @@ pub fn first_state(reactor_id: i32) -> u8 {
 /// Whether a reactor stays when it reaches its last state, rather than
 /// going away: a moonflower stays in bloom, a scar keeps its piece.
 pub fn stays(reactor_id: i32) -> bool {
-    matches!(action(reactor_id), Action::Bloom | Action::Hold) || acts_staying(reactor_id)
+    matches!(
+        action(reactor_id),
+        Action::Bloom | Action::Hold | Action::Spear
+    ) || acts_staying(reactor_id)
 }
 
 /// Whether a reactor, reaching its end state (its last, or one whose own
@@ -821,6 +834,30 @@ mod tests {
         assert_eq!(scar.item_dropped(0, 4001044, 1, (0, 0)), Some((0, 1)));
         assert_eq!(scar.item_dropped(0, 4001048, 1, (0, 0)), None);
         assert!(scar.is_last(1));
+    }
+
+    #[test]
+    fn the_guild_quest_s_gates_and_spears_stay_set() {
+        use crate::guild_quest::SPEAR;
+        assert_eq!(action(9208005), Action::Hold);
+        assert_eq!(action(9208006), Action::Hold);
+        assert_eq!(action(SPEAR), Action::Spear);
+        assert_eq!(action(9208004), Action::Drops);
+        assert!(stays(9208005) && stays(9208006) && stays(SPEAR));
+        let (Some(stone), Some(metal), Some(spear)) =
+            (template(9208006), template(9208005), template(SPEAR))
+        else {
+            return;
+        };
+        assert!(stone.item_dropped(0, 4001026, 1, (0, 0)).is_some());
+        assert!(metal.item_dropped(0, 4001037, 1, (0, 0)).is_some());
+        assert!(spear.item_dropped(0, 4001025, 1, (0, 0)).is_some());
+        assert!(spear.item_dropped(0, 4001026, 1, (0, 0)).is_none());
+        assert!(spear.is_last(1) && stone.is_last(1) && metal.is_last(1));
+        // Nothing set goes back on its own.
+        for set in [&spear, &stone, &metal] {
+            assert_eq!(set.time_out(1), None);
+        }
     }
 
     #[test]

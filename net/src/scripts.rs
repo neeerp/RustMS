@@ -2253,6 +2253,41 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
         },
+        // The knights' hall's way on, open once the spears are all set,
+        // which clears the stage (Cosmic `speargate_open`).
+        "speargate_open" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireStage {
+                    stage: crate::guild_quest::KNIGHT_STAGE,
+                    refused: None,
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::guild_quest::KNIGHT_HALL + 1, 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
+        },
+        // Its door to the metal room, open once a stone is set in it, and
+        // the metal room's to the room past it, once a piece of metal is
+        // (Cosmic `stonegate_open`, `metalgate_open`).
+        "stonegate_open" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireReactorsSet(&[crate::guild_quest::STONE_GATE]),
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::guild_quest::KNIGHT_HALL + 30, 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_BLOCKED, &[])),
+        },
+        "metalgate_open" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireReactorsSet(&[crate::guild_quest::METAL_GATE]),
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::guild_quest::KNIGHT_HALL + 31, 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
+        },
         // The decks' ways on, once their crews are all gone, as the first
         // stage's (Cosmic `davy_next2`, `davy_next3`).
         "davy_next2" | "davy_next3" => ScriptOutcome {
@@ -4565,6 +4600,56 @@ mod tests {
         assert_eq!(unscripted_map_enter(&player), [Effect::OpenNpc(SHUANG)]);
         player.stats.map_id = WAITING_ROOM;
         assert!(unscripted_map_enter(&player).is_empty());
+    }
+
+    #[test]
+    fn the_knights_hall_s_gates_open_on_the_spears_the_stone_and_the_metal() {
+        use crate::guild_quest::{KNIGHT_HALL, KNIGHT_STAGE, METAL_GATE, STONE_GATE};
+        let data = crate::get_game_data().unwrap();
+        let script = |map, name: &str| {
+            let field = data.field(map).unwrap();
+            field.portal_by_name(name).unwrap().script.clone()
+        };
+        assert_eq!(
+            script(KNIGHT_HALL, "next00").as_deref(),
+            Some("speargate_open")
+        );
+        assert_eq!(
+            script(KNIGHT_HALL, "in02").as_deref(),
+            Some("stonegate_open")
+        );
+        assert_eq!(
+            script(KNIGHT_HALL + 30, "in00").as_deref(),
+            Some("metalgate_open")
+        );
+        let player = player_with(&[]);
+        let spears = portal("speargate_open", &player).unwrap();
+        assert_eq!(
+            spears.effects[0],
+            Effect::RequireStage {
+                stage: KNIGHT_STAGE,
+                refused: None
+            }
+        );
+        assert_eq!(
+            spears.effects[1..],
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(KNIGHT_HALL + 1, 0)
+            ]
+        );
+        for (name, gate, to) in [
+            ("stonegate_open", &[STONE_GATE], KNIGHT_HALL + 30),
+            ("metalgate_open", &[METAL_GATE], KNIGHT_HALL + 31),
+        ] {
+            let outcome = portal(name, &player).unwrap();
+            assert_eq!(outcome.effects[0], Effect::RequireReactorsSet(gate));
+            assert_eq!(
+                outcome.effects[1..],
+                [Effect::PortalSound, Effect::WarpToPortal(to, 0)]
+            );
+            assert!(outcome.occupied.is_some());
+        }
     }
 
     #[test]

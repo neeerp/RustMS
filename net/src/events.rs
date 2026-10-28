@@ -3363,6 +3363,8 @@ pub enum EventCommand {
     ShowStatues,
     /// A member struck the statue numbered this, from 1.
     StatueStruck(u8),
+    /// The Guild Quest's room of the spears has this many spears set.
+    SpearsSet(u8),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

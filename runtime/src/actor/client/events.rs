@@ -1542,12 +1542,17 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if next.stats.map_id == map_id && dojo {
+        // The knights' hall's clear shows on the maps off it too.
+        let here = next.stats.map_id == map_id
+            || (ticket_kind == EventKind::GuildQuest
+                && map_id == net::guild_quest::KNIGHT_HALL
+                && net::guild_quest::KNIGHT_MAPS.contains(&next.stats.map_id));
+        if here && dojo {
             // A Dojo floor's own (Cosmic `Monster.killBy`, as its clear
             // marker comes out).
             packets.push(build_field_sound("Dojang/clear")?);
             packets.push(build_field_effect("dojang/end/clear")?);
-        } else if next.stats.map_id == map_id && !quiet {
+        } else if here && !quiet {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
             if event.gates {
