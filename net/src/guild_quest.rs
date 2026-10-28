@@ -122,6 +122,32 @@ pub const KNIGHTS: [(i32, (i16, i16)); 2] = [(9_300_036, (-350, 150)), (9_300_03
 pub const KNIGHTS_ON_FAILING: usize = 6;
 pub const KNIGHTS_X: std::ops::Range<i16> = -350..400;
 
+/// The Underground Waterway, past the fountain: a maze of portals to four
+/// rooms, three behind a door (`SECRET_GATES`) that opens on a stack of
+/// Marks of Evil, and one (990000640) only those of `UNDER_30_LEVEL` or
+/// lower may enter. Past each lies a room where a piece of Sharen III's
+/// clothes drops, and the way on to the grave (990000700).
+pub const WATERWAY: i32 = 990_000_600;
+/// Each door's reactor, its room and the room it opens on (whose portal 1
+/// it leads to).
+pub static SECRET_GATES: [(&str, i32, i32); 3] = [
+    ("secretgate1", 990_000_610, 990_000_611),
+    ("secretgate2", 990_000_630, 990_000_631),
+    ("secretgate3", 990_000_640, 990_000_641),
+];
+pub const UNDER_30_LEVEL: u8 = 30;
+/// The altar on the gargoyles' room's ledge (990000630), which takes the
+/// Gargoyle's drop and brings out `JR_GARGOYLES` of `JR_GARGOYLE` on the
+/// ground below `JR_GARGOYLES_AT`, whose Marks open its door.
+pub const GARGOYLE_ALTAR: i32 = 9_201_000;
+pub const JR_GARGOYLE: i32 = 9_300_033;
+pub const JR_GARGOYLES: usize = 8;
+pub const JR_GARGOYLES_AT: (i16, i16) = (-100, 50);
+/// Sharen III's Grave (990000700), whose gate (forced open once the
+/// guild has dressed Sharen III's soul) leads on to the King's Corridor.
+pub const GRAVE: i32 = 990_000_700;
+pub const GHOST_GATE: &str = "ghostgate";
+
 /// How many guilds may wait on a channel, besides the one playing.
 pub const QUEUE_MAX: usize = 10;
 /// How long the guild whose turn it is has to gather (Cosmic

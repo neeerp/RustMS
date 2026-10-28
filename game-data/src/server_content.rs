@@ -2173,6 +2173,7 @@ pub mod keys {
     pub const GUILD_QUEST_VASSALS_FAILED: &str = "guild_quest.vassals.failed";
     pub const GUILD_QUEST_GATE_CLOSED: &str = "guild_quest.gate.closed";
     pub const GUILD_QUEST_GATE_BLOCKED: &str = "guild_quest.gate.blocked";
+    pub const GUILD_QUEST_GATE_TOO_HIGH: &str = "guild_quest.gate.too_high";
     pub const LINE3_EXIT_STAY: &str = "line3.exit.stay";
     pub const MAKER_PICK: &str = "maker.pick";
     pub const MAKER_ASK: &str = "maker.ask";

@@ -7,13 +7,15 @@ and its gathering, the quest's clock, the ends for too few members or a
 missing registrant, the Returning Path and Nuris, and the client's
 waitlist line, the outskirts' brief and earrings, the guide out on every
 stage, the quest's items taken on leaving, the statue keeper's test, the
-knights' hall's spears and gates, and the vassals' offering at the
-fountain. Not yet: the stages beyond the fountain, their rewards and the
-rest of the guild points the quest earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
+knights' hall's spears and gates, the vassals' offering at the
+fountain, and the waterway's doors and gargoyles. Not yet: Sharen III's
+clothes and the stages beyond the waterway, their rewards and the rest of
+the guild points the quest earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
 event machinery's anchors in `reports/b253-gq-event-infra.md`, the first
 stages in `reports/b254-gq-stages-1-3.md`, the knights' hall in
-`reports/b255-gq-stage-400.md` and the fountain in
-`reports/b256-gq-stage-500.md`.
+`reports/b255-gq-stage-400.md`, the fountain in
+`reports/b256-gq-stage-500.md` and the waterway in
+`reports/b257-gq-stage-600.md`.
 
 All dialogue is placeholder text (`guild_quest.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -197,6 +199,31 @@ event, with no stage of their own.
 
 The harness's `RUSTMS_GQ_VASSALS` (four digits 0-3) pins the wish.
 
+## The waterway
+
+The Underground Waterway (990000600, `guild_quest::WATERWAY`) is stage
+7, a maze of portals in front of four rooms (610, 620, 630, 640), each
+with an end room past it (611, 621, 631, 641). They are rooms of the
+event, with no stage of their own.
+
+- **The doors.** The doors of 610, 630 and 640 (reactors "secretgate1"
+  to "secretgate3", 9208010 to 9208012, `SECRET_GATES`) each take a stack
+  of exactly 9, 8 and 20 Marks of the guild (4001035) thrown down on them,
+  and stay open (`reactors::Action::Hold`). Each room's `in00`
+  (`secretgate1_open` to `3`) is blocked until then, and leads on to its
+  end room's portal 1. The Marks are the drops of the room's monsters.
+- **The gargoyles.** In 630 the Gargoyle on the ledge drops onto the
+  altar (reactor 9201000, `GARGOYLE_ALTAR`), which takes it and brings out
+  eight Jr. Gargoyles (9300033, `JR_GARGOYLES`) on the ground below
+  (-100, 50) (`reactors::Action::BringOutAt`). Their Marks open 630's door.
+- **The last room.** 600's `in03` (`under30gate`) leads to 640's portal
+  1 only for those of level 30 or lower (`UNDER_30_LEVEL`); others are
+  told so in pink.
+- **The grave's gate.** Sharen III's Grave (990000700, `GRAVE`) is stage
+  8. Its `next00` (`ghostgate_open`) is shut until the gate (reactor
+  "ghostgate", `GHOST_GATE`) is open, then leads on to 990000800's portal
+  0. Nothing opens the gate yet.
+
 ## The quest's items
 
 `events::GUILD_QUEST.items` (`guild_quest::ITEMS`) are Cosmic's exclusive
@@ -269,6 +296,14 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
   `an_offering_*`) has the hints, the tries and the offering's rules, and
   `net/src/scripts.rs` (`the_fountain_s_water_gate_opens_on_the_vassals_offering`)
   the gate.
+- `integration-harness/tests/guild_quest_waterway.rs`: the first door
+  shut, a stack one short left, the stack of nine opening it and the way
+  through; the altar's Jr. Gargoyles and their shut door; a new
+  character's way to the last room; the grave's shut gate.
+  `net/src/reactors.rs` (`the_guild_quest_s_gates_and_spears_stay_set`)
+  has the doors' and the altar's actions, and `net/src/scripts.rs`
+  (`the_waterway_s_doors_open_on_their_marks_and_its_last_room_on_low_levels`)
+  the portals.
 - `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)
   and `net/src/scripts.rs` (`shuang_briefs_whoever_reaches_sharenians_outskirts`).
 - `HeavenClient/tests/guild.cpp`: the waitlist lines.

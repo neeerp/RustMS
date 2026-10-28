@@ -2299,6 +2299,41 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
         },
+        // The waterway's doors, open once their Marks are set in them, each
+        // to the room past it (Cosmic `secretgate1_open` to `3`).
+        "secretgate1_open" | "secretgate2_open" | "secretgate3_open" => {
+            let n = usize::from(script.as_bytes()[10] - b'1');
+            let (gate, _, past) = &crate::guild_quest::SECRET_GATES[n];
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireReactorsSet(std::slice::from_ref(gate)),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(*past, 1),
+                ],
+                block: false,
+                occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_BLOCKED, &[])),
+            }
+        }
+        // The waterway's last room, only for the low levels (Cosmic
+        // `under30gate`).
+        "under30gate" if player.stats.level > crate::guild_quest::UNDER_30_LEVEL => {
+            refused(keys::GUILD_QUEST_GATE_TOO_HIGH)
+        }
+        "under30gate" => through(Effect::WarpToPortal(
+            crate::guild_quest::SECRET_GATES[2].1,
+            1,
+        )),
+        // The grave's way on to the King's Corridor, open once Sharen
+        // III's soul opens it (Cosmic `ghostgate_open`).
+        "ghostgate_open" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireReactorsSet(&[crate::guild_quest::GHOST_GATE]),
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::guild_quest::GRAVE + 100, 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
+        },
         // The decks' ways on, once their crews are all gone, as the first
         // stage's (Cosmic `davy_next2`, `davy_next3`).
         "davy_next2" | "davy_next3" => ScriptOutcome {
@@ -4635,6 +4670,61 @@ mod tests {
             .unwrap()
             .portal_by_id(1)
             .is_some());
+    }
+
+    #[test]
+    fn the_waterway_s_doors_open_on_their_marks_and_its_last_room_on_low_levels() {
+        use crate::guild_quest::{GHOST_GATE, GRAVE, SECRET_GATES, UNDER_30_LEVEL, WATERWAY};
+        let data = crate::get_game_data().unwrap();
+        let script = |map, name: &str| {
+            let field = data.field(map).unwrap();
+            field.portal_by_name(name).unwrap().script.clone()
+        };
+        let player = player_with(&[]);
+        for (n, &(gate, room, past)) in SECRET_GATES.iter().enumerate() {
+            let name = format!("secretgate{}_open", n + 1);
+            assert_eq!(script(room, "in00"), Some(name.clone()));
+            let field = data.field(room).unwrap();
+            assert!(field.reactors.iter().any(|r| r.name == gate), "{room}");
+            assert!(data.field(past).unwrap().portal_by_id(1).is_some());
+            let outcome = portal(&name, &player).unwrap();
+            assert_eq!(
+                outcome.effects,
+                [
+                    Effect::RequireReactorsSet(std::slice::from_ref(&SECRET_GATES[n].0)),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(past, 1)
+                ]
+            );
+            assert!(outcome.occupied.is_some());
+        }
+        assert_eq!(script(WATERWAY, "in03").as_deref(), Some("under30gate"));
+        let at = |level| {
+            let mut player = player_with(&[]);
+            player.stats.level = level;
+            portal("under30gate", &player).unwrap()
+        };
+        assert_eq!(
+            at(UNDER_30_LEVEL).effects,
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(SECRET_GATES[2].1, 1)
+            ]
+        );
+        assert!(matches!(
+            at(UNDER_30_LEVEL + 1).effects[..],
+            [Effect::Pink(_)]
+        ));
+        assert_eq!(script(GRAVE, "next00").as_deref(), Some("ghostgate_open"));
+        let outcome = portal("ghostgate_open", &player).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::RequireReactorsSet(&[GHOST_GATE]),
+                Effect::PortalSound,
+                Effect::WarpToPortal(GRAVE + 100, 0)
+            ]
+        );
     }
 
     #[test]
