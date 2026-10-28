@@ -4,16 +4,23 @@
 //! altar takes the Gargoyle's drop and brings out the Jr. Gargoyles whose
 //! Marks open the second door; the last room lets only the low levels in,
 //! and the grave's gate stays shut till Sharen III's soul opens it.
+//! Each room's box gives up a piece of Sharen III's clothes, the end
+//! rooms' ways lead to the grave and its way back beside the room last
+//! come from, and the clothes set on the grave's altar in turn bring out
+//! the soul, whose word to the registrant clears the stage, earns the
+//! guild 30 points and opens the gate.
 
 use game_data::server_content::keys;
-use integration_harness::events::{go_to, throw_down, told};
+use integration_harness::events::{cleared, go_to, said, talk_to, throw_down, told};
 use integration_harness::guild_quest::{
     arrived, guild_with, into_the_outskirts, touch_script_portal,
 };
-use integration_harness::hunting::{walk_to, MapReactor};
+use integration_harness::hunting::{hit_reactor, pickup, walk_to, MapReactor};
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::WorldSession;
+use packet::io::read::PktRead;
+use std::io::Cursor;
 
 const WATERWAY: i32 = 990_000_600;
 const FIRST_ROOM: i32 = 990_000_610;
@@ -27,6 +34,15 @@ const MARK: i32 = 4_001_035;
 const GARGOYLE_DROP: i32 = 4_001_036;
 const JR_GARGOYLE: i32 = 9_300_033;
 const PINK: u8 = 5;
+const SHOE_ROOM: i32 = 990_000_620;
+const SHOE_BOX: i32 = 9_202_006;
+const CLOTHES_ALTAR: i32 = 9_201_001;
+const SHAREN_SOUL: i32 = 9_040_003;
+const SHOES: i32 = 4_001_032;
+const PANTS: i32 = 4_001_031;
+const TOP: i32 = 4_001_033;
+const CROWN: i32 = 4_001_034;
+const POINTS_CHANGED: u8 = 0x48;
 
 /// `player` touches `map`'s script portal `name` and hears `key` in pink
 /// instead of going through.
@@ -117,4 +133,128 @@ async fn the_waterway_s_doors_open_on_their_marks() {
     through(low, WATERWAY, "in03", LAST_ROOM).await;
     go_to(low, GRAVE, GHOST_GATE).await;
     shut(low, GRAVE, "next00", keys::GUILD_QUEST_GATE_CLOSED).await;
+}
+
+/// Whether `t` saw `player` arrive on `map` at its portal `portal`.
+fn arrived_at(t: &Trace, map: i32, portal: u8) -> bool {
+    t.arrivals.iter().any(|a| (a.0, a.1) == (map, portal))
+}
+
+#[tokio::test]
+async fn sharen_iii_s_soul_opens_the_grave_s_gate() {
+    let items = [(SHOES, 1), (PANTS, 1), (TOP, 1), (CROWN, 1)];
+    // A line of its own beside the waterway's test.
+    let mut team = guild_with(1, 2, 2, &items).await;
+    let there = into_the_outskirts(&mut team).await;
+    for player in team.iter_mut() {
+        told(player, answer(0, 1, None)).await;
+    }
+    drop(there);
+
+    // The shoes' box gives them up on its fifth hit.
+    let member = &mut team[1];
+    let (mut room, shoe_box) = go_to(member, SHOE_ROOM, SHOE_BOX).await;
+    let c = &mut member.connection;
+    send(c, walk_to(shoe_box.x, shoe_box.y)).await;
+    for state in 1..=4u8 {
+        send(c, hit_reactor(shoe_box.object_id)).await;
+        until(c, &mut room, |t| {
+            t.field.reactor_hits.contains(&(shoe_box.object_id, state))
+        })
+        .await;
+    }
+    send(c, hit_reactor(shoe_box.object_id)).await;
+    until(c, &mut room, |t| t.field.item_drop(SHOES).is_some()).await;
+
+    // The room's way leads to the grave, and the grave's way back beside
+    // the room; one who never came through a room is taken back to the
+    // waterway's start.
+    let to_grave = |t: &Trace| arrived_at(t, GRAVE, 1);
+    touch_script_portal(member, SHOE_ROOM, "guild1F00").await;
+    let mut t = Trace::default();
+    until(&mut member.connection, &mut t, to_grave).await;
+    touch_script_portal(member, GRAVE, "out00").await;
+    until(&mut member.connection, &mut t, |t| {
+        arrived_at(t, WATERWAY, 8)
+    })
+    .await;
+    let master = &mut team[0];
+    let mut seen = Trace::default();
+    assert_eq!(
+        warp(&mut master.connection, GRAVE, "", &mut seen).await,
+        GRAVE
+    );
+    touch_script_portal(master, GRAVE, "out00").await;
+    until(&mut master.connection, &mut seen, |t| {
+        arrived_at(t, WATERWAY, 1)
+    })
+    .await;
+
+    // The altar takes no piece out of turn: the pants first stay put.
+    let (mut grave, altar) = go_to(&mut team[1], GRAVE, CLOTHES_ALTAR).await;
+    let master = &mut team[0];
+    let (mut seen, _) = go_to(master, GRAVE, CLOTHES_ALTAR).await;
+    let set = |slot| (walk_to(altar.x, altar.y), throw_down(slot, 1));
+    for slot in [2, 1] {
+        let (walk, throw) = set(slot);
+        send(&mut master.connection, walk).await;
+        send(&mut master.connection, throw).await;
+    }
+    until(&mut master.connection, &mut seen, |t| {
+        t.field.reactor_hits.contains(&(altar.object_id, 1))
+    })
+    .await;
+    let pants = seen.field.item_drop(PANTS).unwrap();
+    assert!(seen.field.removals(pants.object_id).is_empty(), "{seen:?}");
+
+    // Picked back up (into the first free slot) and set in turn with the
+    // rest, the clothes bring out the soul.
+    let c = &mut master.connection;
+    send(c, pickup(pants.object_id, pants.x, pants.y)).await;
+    until(c, &mut seen, |t| {
+        !t.field.removals(pants.object_id).is_empty()
+    })
+    .await;
+    for slot in [1, 3, 4] {
+        let (walk, throw) = set(slot);
+        send(c, walk).await;
+        send(c, throw).await;
+        let state = if slot == 1 { 2 } else { slot as u8 };
+        until(c, &mut seen, |t| {
+            t.field.reactor_hits.contains(&(altar.object_id, state))
+                || t.field.npc(SHAREN_SOUL).is_some()
+        })
+        .await;
+    }
+    let notice = net::content::text().get(keys::GUILD_QUEST_SOUL_APPEARS, &[]);
+    until(&mut team[1].connection, &mut grave, |t| {
+        t.field.npc(SHAREN_SOUL).is_some() && t.broadcasts.contains(&(PINK, notice.clone()))
+    })
+    .await;
+    let soul = grave.field.npc(SHAREN_SOUL).unwrap();
+
+    // Only the registrant is heard; the gate is shut till then.
+    shut(&mut team[1], GRAVE, "next00", keys::GUILD_QUEST_GATE_CLOSED).await;
+    let t = told(&mut team[1], talk_to(soul)).await;
+    assert!(said(&t, keys::GUILD_QUEST_SOUL_NOT_LEADER), "{t:?}");
+    told(&mut team[1], answer(0, 1, None)).await;
+
+    // The registrant's talk clears the stage, earns the guild its points
+    // and opens the gate.
+    let master = &mut team[0];
+    let mut t = told(master, talk_to(soul)).await;
+    assert!(said(&t, keys::GUILD_QUEST_SOUL_OPENED), "{t:?}");
+    send(&mut master.connection, answer(0, 1, None)).await;
+    until(&mut master.connection, &mut t, |t| {
+        cleared(t) && (t.guild_ops.iter()).any(|op| op[0] == POINTS_CHANGED)
+    })
+    .await;
+    let op = (t.guild_ops.iter()).find(|op| op[0] == POINTS_CHANGED);
+    let mut r = Cursor::new(&op.unwrap()[1..]);
+    let (_guild, total) = (r.read_int().unwrap(), r.read_int().unwrap());
+    assert_eq!(total, 30, "{t:?}");
+    let t = told(master, talk_to(soul)).await;
+    assert!(said(&t, keys::GUILD_QUEST_SOUL_CLEARED), "{t:?}");
+    told(master, answer(0, 1, None)).await;
+    through(&mut team[1], GRAVE, "next00", GRAVE + 100).await;
 }

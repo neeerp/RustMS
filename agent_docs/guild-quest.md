@@ -8,9 +8,9 @@ missing registrant, the Returning Path and Nuris, and the client's
 waitlist line, the outskirts' brief and earrings, the guide out on every
 stage, the quest's items taken on leaving, the statue keeper's test, the
 knights' hall's spears and gates, the vassals' offering at the
-fountain, and the waterway's doors and gargoyles. Not yet: Sharen III's
-clothes and the stages beyond the waterway, their rewards and the rest of
-the guild points the quest earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
+fountain, the waterway's doors and gargoyles, and Sharen III's clothes
+and soul at the grave. Not yet: the stages beyond the grave, their rewards
+and the rest of the guild points the quest earns. The plan is in v83ref's `reports/b252-guild-quest.md`, with the
 event machinery's anchors in `reports/b253-gq-event-infra.md`, the first
 stages in `reports/b254-gq-stages-1-3.md`, the knights' hall in
 `reports/b255-gq-stage-400.md`, the fountain in
@@ -202,9 +202,9 @@ The harness's `RUSTMS_GQ_VASSALS` (four digits 0-3) pins the wish.
 ## The waterway
 
 The Underground Waterway (990000600, `guild_quest::WATERWAY`) is stage
-7, a maze of portals in front of four rooms (610, 620, 630, 640), each
-with an end room past it (611, 621, 631, 641). They are rooms of the
-event, with no stage of their own.
+7, a maze of portals in front of four rooms (610, 620, 630, 640). Past
+the doors of three of them are end rooms (611, 631, 641). They are rooms
+of the event, with no stage of their own.
 
 - **The doors.** The doors of 610, 630 and 640 (reactors "secretgate1"
   to "secretgate3", 9208010 to 9208012, `SECRET_GATES`) each take a stack
@@ -219,10 +219,32 @@ event, with no stage of their own.
 - **The last room.** 600's `in03` (`under30gate`) leads to 640's portal
   1 only for those of level 30 or lower (`UNDER_30_LEVEL`); others are
   told so in pink.
-- **The grave's gate.** Sharen III's Grave (990000700, `GRAVE`) is stage
-  8. Its `next00` (`ghostgate_open`) is shut until the gate (reactor
-  "ghostgate", `GHOST_GATE`) is open, then leads on to 990000800's portal
-  0. Nothing opens the gate yet.
+- **The clothes.** A box in 611, 620, 631 and 641 (9202005 to 9202008)
+  gives up a piece of Sharen III's clothes on its fifth hit and comes back
+  a second later (`Action::Drops`, the loot in the content pack).
+- **The grid.** The way to the grave in 611, 620, 641 and 631 (`guild1F01`
+  to `4`, `GRID_WAYS`) leads to the grave's `st00` and records the room on
+  the member's ticket (`EventTicket::grid`). The grave's `out00`
+  (`guild1F00`) leads back to the waterway's portal beside that room
+  (`BACK_PORTALS`), or to its `st00` for one who never came through a
+  room (Cosmic fails then). `guild_quest::grid_way` has the rule and
+  `ClientActor::guild_quest_grid` keeps the room.
+
+## The grave
+
+Sharen III's Grave (990000700, `GRAVE`) is stage 8.
+
+- **The clothes.** Its altar (9201001, `CLOTHES_ALTAR`) takes the shoes,
+  pants, top and crown (4001032, 4001031, 4001033, 4001034) in that turn;
+  a piece out of turn stays on the floor. The crown brings out Sharen
+  III's soul (9040003, `SHAREN_SOUL`) with a pink notice to the map
+  (`Action::Appear`).
+- **The soul.** Only the registrant is heard. Their talk clears the stage,
+  opens the gate (reactor "ghostgate", `GHOST_GATE`, forced to state 1)
+  and earns the guild 30 points (`SOUL_POINTS`, in the soul's script).
+  Afterwards anyone hears thanks (`EventActor::soul`, `SoulTalk`).
+- **The gate.** `next00` (`ghostgate_open`) is shut until the gate is
+  open, then leads on to 990000800's portal 0.
 
 ## The quest's items
 
@@ -299,9 +321,14 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
 - `integration-harness/tests/guild_quest_waterway.rs`: the first door
   shut, a stack one short left, the stack of nine opening it and the way
   through; the altar's Jr. Gargoyles and their shut door; a new
-  character's way to the last room; the grave's shut gate.
+  character's way to the last room; the grave's shut gate. Then the shoes'
+  box, the grid's ways there and back, the clothes set out of turn and in
+  turn, the soul's notice, its refusal of a member, the clear, the points,
+  its thanks and the open gate. `net/src/guild_quest.rs`
+  (`the_grid_takes_each_end_room_to_the_grave_and_back_beside_it`) has
+  the grid.
   `net/src/reactors.rs` (`the_guild_quest_s_gates_and_spears_stay_set`)
-  has the doors' and the altar's actions, and `net/src/scripts.rs`
+  has the doors' and the altars' actions, and `net/src/scripts.rs`
   (`the_waterway_s_doors_open_on_their_marks_and_its_last_room_on_low_levels`)
   the portals.
 - `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)

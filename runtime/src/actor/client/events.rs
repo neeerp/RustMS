@@ -1082,6 +1082,44 @@ impl ClientActor {
         Ok(Some(NpcScript::vassal_keeper(talk)))
     }
 
+    /// Sharen III's soul on the Guild Quest's grave, to a member there.
+    pub(super) async fn sharen_soul(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        if map_id != net::guild_quest::GRAVE {
+            return Ok(None);
+        }
+        let in_gq =
+            |ticket: &&EventTicket| ticket.kind == EventKind::GuildQuest && ticket.holds(map_id);
+        let Some(ticket) = self.event.as_ref().filter(in_gq) else {
+            return Ok(None);
+        };
+        Ok(ticket.soul().await.map(NpcScript::sharen_soul))
+    }
+
+    /// Where the Guild Quest's ways between the waterway's end rooms and
+    /// the grave take a member there, who is minded of the room they
+    /// came from (`net::guild_quest::grid_way`). `None` for any other
+    /// portal.
+    pub(super) fn guild_quest_grid(
+        &mut self,
+        script: &str,
+    ) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = (self.event.as_mut())
+            .filter(|ticket| ticket.kind == EventKind::GuildQuest && ticket.holds(map_id))
+        else {
+            return Ok(None);
+        };
+        let Some(((to, portal), room)) = net::guild_quest::grid_way(script, ticket.grid) else {
+            return Ok(None);
+        };
+        ticket.grid = room;
+        Ok(Some(vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(to, portal),
+        ]))
+    }
+
     /// A wrong answer to a puzzle: everyone on the map sees and hears it.
     async fn show_wrong_answer(&mut self) -> Result<(), RuntimeError> {
         self.show_to_field(&["quest/party/wrong_kor"], &["Party1/Failed"])

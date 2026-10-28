@@ -93,6 +93,12 @@ pub enum EventMessage {
         offering: Option<[u8; net::guild_quest::VASSALS]>,
         reply: oneshot::Sender<Option<net::guild_quest::VassalTalk>>,
     },
+    /// `client_id` talks to Sharen III's soul on the Guild Quest's grave;
+    /// None for anyone not in the event.
+    Soul {
+        client_id: ClientId,
+        reply: oneshot::Sender<Option<net::guild_quest::SoulTalk>>,
+    },
     /// `client_id`'s script did something the event keeps track of.
     Command {
         client_id: ClientId,
@@ -217,6 +223,9 @@ pub struct EventTicket {
     /// Whether the member heard Ellin out on the forest's fourth stage
     /// (Cosmic `gridInsert`).
     pub hint_heard: bool,
+    /// The Guild Quest's waterway room the member last came to the grave
+    /// from (`net::guild_quest::grid_way`).
+    pub grid: Option<u8>,
     /// The member's side in a Monster Carnival, 0 Maple Red or 1 Maple
     /// Blue, which their look shows others.
     pub side: u8,
@@ -354,6 +363,21 @@ impl EventTicket {
             .send(EventMessage::Vassals {
                 client_id: self.member,
                 offering,
+                reply,
+            })
+            .await
+            .ok()?;
+        talk.await.ok().flatten()
+    }
+
+    /// What Sharen III's soul tells the member, or `None` if the event is
+    /// over.
+    pub async fn soul(&self) -> Option<net::guild_quest::SoulTalk> {
+        let (reply, talk) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Soul {
+                client_id: self.member,
                 reply,
             })
             .await
@@ -747,6 +771,9 @@ impl EventActor {
                     Some(EventMessage::Vassals { client_id, offering, reply }) => {
                         let _ = reply.send(self.vassals(client_id, offering));
                     }
+                    Some(EventMessage::Soul { client_id, reply }) => {
+                        let _ = reply.send(self.soul(client_id));
+                    }
                     Some(EventMessage::Command { client_id, command }) => {
                         self.command(client_id, command);
                         over = self.failed;
@@ -802,6 +829,7 @@ impl EventActor {
             blessing: self.blessing,
             prize_taken: false,
             hint_heard: false,
+            grid: None,
             side: self.carnival.side(member).unwrap_or(0),
             entered: Instant::now(),
         }
@@ -1951,6 +1979,36 @@ impl EventActor {
             }
         });
         Some(talk)
+    }
+
+    /// What Sharen III's soul tells `client_id` (Cosmic `9040003`): the
+    /// registrant's talk clears the stage and opens the grave's gate.
+    fn soul(&mut self, client_id: ClientId) -> Option<net::guild_quest::SoulTalk> {
+        use net::guild_quest::{SoulTalk, GHOST_GATE, GRAVE};
+        if self.kind != EventKind::GuildQuest || !self.team.has(client_id) {
+            return None;
+        }
+        let stage = self.kind.event().stage_on(GRAVE)?;
+        if self.cleared.has(stage) {
+            return Some(SoulTalk::Cleared);
+        }
+        if client_id != self.team.leader() {
+            return Some(SoulTalk::NotLeader);
+        }
+        self.clear(stage);
+        let grave = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: GRAVE,
+            instance_id: self.id,
+        });
+        tokio::spawn(async move {
+            let open = FieldMessage::SetReactor {
+                name: GHOST_GATE,
+                state: 1,
+            };
+            let _ = grave.tx.send(open).await;
+        });
+        Some(SoulTalk::Opened)
     }
 
     /// `set` spears are set in the room of the spears, the last by

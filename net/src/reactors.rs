@@ -362,6 +362,11 @@ pub fn action(reactor_id: i32) -> Action {
         // nothing), its spears, and the gargoyles' altar (`9201000`).
         9208005 | 9208006 | 9208010..=9208012 => Action::Hold,
         crate::guild_quest::SPEAR => Action::Spear,
+        // The grave's altar, once dressed (Cosmic `9201001`).
+        crate::guild_quest::CLOTHES_ALTAR => Action::Appear {
+            npc_id: crate::guild_quest::SHAREN_SOUL,
+            notice: keys::GUILD_QUEST_SOUL_APPEARS,
+        },
         crate::guild_quest::GARGOYLE_ALTAR => Action::BringOutAt {
             mob_id: crate::guild_quest::JR_GARGOYLE,
             count: crate::guild_quest::JR_GARGOYLES,
@@ -878,6 +883,27 @@ mod tests {
         );
         if let Some(altar) = template(GARGOYLE_ALTAR) {
             assert!(altar.item_dropped(0, 4001036, 1, (0, 0)).is_some());
+        }
+        // The grave's altar takes the shoes, pants, top and crown in turn,
+        // and the last brings out the soul.
+        use crate::guild_quest::{CLOTHES_ALTAR, SHAREN_SOUL};
+        let Action::Appear { npc_id, .. } = action(CLOTHES_ALTAR) else {
+            panic!("{:?}", action(CLOTHES_ALTAR));
+        };
+        assert_eq!(npc_id, SHAREN_SOUL);
+        if let Some(altar) = template(CLOTHES_ALTAR) {
+            let clothes = [4001032, 4001031, 4001033, 4001034];
+            for (state, piece) in (0..).zip(clothes) {
+                assert_eq!(
+                    altar
+                        .item_dropped(state, piece, 1, (0, 0))
+                        .map(|(_, next)| next),
+                    Some(state + 1)
+                );
+                let other = clothes[(usize::from(state) + 1) % 4];
+                assert!(altar.item_dropped(state, other, 1, (0, 0)).is_none());
+            }
+            assert!(altar.is_last(4));
         }
         let (Some(stone), Some(metal), Some(spear)) =
             (template(9208006), template(9208005), template(SPEAR))
