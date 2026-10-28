@@ -166,6 +166,15 @@ impl ClientActor {
         if let Some(script) = self.cwk_keeper(npc_id).await? {
             return self.start_script(script).await;
         }
+        if npc_id == net::events::CWK_HOST {
+            if let Some(script) = self.cwk_host().await? {
+                return self.start_script(script).await;
+            }
+        }
+        if npc_id == net::events::CWK_JACK {
+            let script = self.cwk_jack()?;
+            return self.start_script(script).await;
+        }
         if npc_id == net::guild_quest::RUBIAN_KEEPER {
             let script = self.rubian_keeper().await?;
             return self.start_script(script).await;

@@ -9,8 +9,9 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
-    self, Aura, Balloon, Cloto, CwkKeeper, Entry, EventCommand, EventKind, Find, GatherTalk,
-    HandIn, HeadCount, LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing, Statue,
+    self, Aura, Balloon, Cloto, CwkHost, CwkKeeper, Entry, EventCommand, EventKind, Find,
+    GatherTalk, HandIn, HeadCount, LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing,
+    Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::guild_quest;
@@ -1607,6 +1608,50 @@ impl NpcScript {
             },
         };
         Self::new(npc_id, vec![page])
+    }
+
+    /// The host of Crimsonwood Keep's sixth stage, as `talk` (Cosmic
+    /// `9201115`): the leader's last page of each talk tells the event to
+    /// bring out the next mobs, or that the Keep is won.
+    pub fn cwk_host(talk: CwkHost) -> Self {
+        let host = |phase| Effect::EventCommand(EventCommand::CwkHost(phase));
+        let pages = match talk {
+            CwkHost::WellPlayed => vec![Page::Say(text(keys::CWK_HOST_WELL_PLAYED))],
+            CwkHost::Leader => vec![Page::Say(text(keys::CWK_HOST_LEADER))],
+            CwkHost::Welcome => vec![
+                Page::Say(text(keys::CWK_HOST_WELCOME_1)),
+                Page::Say(text(keys::CWK_HOST_WELCOME_2)),
+                Page::Act {
+                    text: text(keys::CWK_HOST_WELCOME_3),
+                    effects: vec![host(0)],
+                },
+            ],
+            CwkHost::Escorting(false) => vec![Page::Say(text(keys::CWK_HOST_ESCORTING))],
+            CwkHost::Escorting(true) => vec![Page::Say(text(keys::CWK_HOST_MASTERS_ESCORTING))],
+            CwkHost::Masters => vec![
+                Page::Say(text(keys::CWK_HOST_ESCORT_BEATEN)),
+                Page::Act {
+                    text: text(keys::CWK_HOST_MASTERS),
+                    effects: vec![host(1)],
+                },
+            ],
+            CwkHost::Beaten => vec![Page::Act {
+                text: text(keys::CWK_HOST_BEATEN),
+                effects: vec![host(2)],
+            }],
+        };
+        Self::new(events::CWK_HOST, pages)
+    }
+
+    /// Jack in Crimsonwood Keep (Cosmic `9201112`), on `map_id` of its
+    /// party quest, or anywhere else (`None`, where nothing is going on).
+    pub fn cwk_jack(map_id: Option<i32>) -> Self {
+        let told = match map_id.map_or(&[][..], events::cwk_jack) {
+            [] => &[keys::CWK_JACK_IDLE][..],
+            told => told,
+        };
+        let pages = told.iter().map(|&key| Page::Say(text(key))).collect();
+        Self::new(events::CWK_JACK, pages)
     }
 
     /// Shuang (9040000) at the Excavation Site's camp, to a member of rank

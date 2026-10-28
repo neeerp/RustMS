@@ -1,31 +1,37 @@
-//! Crimsonwood Keep's first five stages and their ways on. The first's way
-//! on stays shut until a member finds the stage's hidden way, behind the
-//! pillar by the Lion Shield; that takes the finder back to the stage's
-//! start and clears it for all, with its EXP and mesos. The way on then
-//! leads to the second stage, on its own clock, whose way on stays shut
-//! until a skill of each job has lit that job's sigil. The third's way on
-//! waits on its sigils, which set its menhirs going, and on five trips up
-//! its way up; the fourth wakes a sigil of each job, which clear it once
-//! lit. The fifth's hub has a room for each job, whose keeper gives back
-//! its weapon once the room is won, and an altar for each weapon; with all
-//! five restored, it clears. The harness lets two set out
-//! (`RUSTMS_EXPEDITION_MIN`) and runs events 60 times as fast
+//! Crimsonwood Keep's stages and their ways on. The first's way on stays
+//! shut until a member finds the stage's hidden way, behind the pillar by
+//! the Lion Shield; that takes the finder back to the stage's start and
+//! clears it for all, with its EXP and mesos. The way on then leads to the
+//! second stage, on its own clock, whose way on stays shut until a skill of
+//! each job has lit that job's sigil. The third's way on waits on its
+//! sigils, which set its menhirs going, and on five trips up its way up;
+//! the fourth wakes a sigil of each job, which clear it once lit. The
+//! fifth's hub has a room for each job, whose keeper gives back its weapon
+//! once the room is won, and an altar for each weapon; with all five
+//! restored, it clears. The sixth's host, for the leader alone, brings out
+//! an escort and then the four Twisted Masters, and once they are beaten
+//! wins the Keep for all, opening the way to the rest room and on to the
+//! treasure room, whose clock sees the team out. The harness lets two set
+//! out (`RUSTMS_EXPEDITION_MIN`) and runs events 60 times as fast
 //! (`RUSTMS_EVENT_SCALE`), so the first stage's clock lasts 2 seconds, the
-//! next three's 10 and the fifth's 20.
+//! next three's 10, the fifth's 20, the sixth's 60 and the treasure room's
+//! 1. Both are made strong enough to beat the masters in time.
 
 use game_data::server_content::keys;
-use integration_harness::database::{grant_item, grant_skill, set_job};
+use integration_harness::connection::MapleTestConnection;
+use integration_harness::database::{grant_item, grant_skill, set_job, set_str, set_weapon_attack};
 use integration_harness::events::{cleared, said, talk, throw_down, told};
 use integration_harness::guild_quest::touch_script_portal;
-use integration_harness::hunting::{hit_reactor, skill_at_reactor, walk_to, MapReactor};
+use integration_harness::hunting::{attack, hit_reactor, skill_at_reactor, walk_to, MapReactor};
 use integration_harness::packets::build_change_map;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{
-    cwk_menhirs, CWK, CWK_ENTRY, CWK_EYE, CWK_HIDDEN_WAY, CWK_LATER_SIGILS, CWK_LOBBY,
-    CWK_MASTER_GUARDIAN, CWK_MENHIR_LINES, CWK_ROOMS, CWK_SIGILS, CWK_SIGIL_LINES,
+    cwk_menhirs, CWK, CWK_ENTRY, CWK_ESCORT, CWK_EYE, CWK_HIDDEN_WAY, CWK_HOST, CWK_JACK,
+    CWK_LATER_SIGILS, CWK_LOBBY, CWK_MASTERS, CWK_MASTER_GUARDIAN, CWK_MENHIR_LINES, CWK_ROOMS,
+    CWK_SIGILS, CWK_SIGIL_LINES,
 };
 use net::npc_scripts::CWK_RECRUITER;
 use tokio::time::Duration;
@@ -40,6 +46,11 @@ const STAGE3: i32 = CWK_ENTRY + 200;
 const STAGE4: i32 = CWK_ENTRY + 300;
 const HUB: i32 = CWK_ENTRY + 400;
 const STAGE6: i32 = CWK_ENTRY + 500;
+const REST: i32 = CWK_ENTRY + 600;
+const TREASURE: i32 = CWK_ENTRY + 700;
+/// Under the most a character with 32000 STR and a 1999-attack weapon may
+/// hit for.
+const HIT: i32 = 5_000_000;
 const ETC: i16 = 4;
 /// The fifth stage's altars, in job order, and a spot on the ground in
 /// each one's area.
@@ -69,6 +80,8 @@ async fn adventurer(job: i16, skills: &[i32], etc: &[i32]) -> WorldSession {
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
     set_job(id, job, 90, 50).await.unwrap();
+    set_str(id, 32_000).await.unwrap();
+    set_weapon_attack(id, 1_999).await.unwrap();
     grant_item(id, SETUP, 1, KEYSTONE).await.unwrap();
     for &skill in skills {
         grant_skill(id, skill, 1).await.unwrap();
@@ -492,12 +505,128 @@ async fn the_keep_s_first_stages_clear_by_the_hidden_way_and_the_sigils() {
         );
     }
 
-    // And the way on leads to the sixth stage.
+    // Jack tells of the stage.
+    let t = told(&mut leader, talk(HUB, CWK_JACK)).await;
+    assert!(said(&t, keys::CWK_JACK_STAGE5_1), "{t:?}");
+
+    // And the way on leads to the sixth stage, for both.
+    let mut lt = Trace::default();
     touch_script_portal(&mut leader, HUB, WAY_ON).await;
     until(&mut leader.connection, &mut lt, |t| {
         t.warps.contains(&STAGE6)
     })
     .await;
+    let mut mt = Trace::default();
+    send(
+        &mut member.connection,
+        build_change_map(-1, "out00").unwrap(),
+    )
+    .await;
+    until(&mut member.connection, &mut mt, |t| t.warps.contains(&HUB)).await;
+    touch_script_portal(&mut member, HUB, WAY_ON).await;
+    until(&mut member.connection, &mut mt, |t| {
+        t.warps.contains(&STAGE6)
+    })
+    .await;
+
+    // Its host talks only to the leader, whom it welcomes before bringing
+    // out the escort.
+    let t = told(&mut member, talk(STAGE6, CWK_HOST)).await;
+    assert!(said(&t, keys::CWK_HOST_LEADER), "{t:?}");
+    let t = told(&mut leader, talk(STAGE6, CWK_HOST)).await;
+    assert!(said(&t, keys::CWK_HOST_WELCOME_1), "{t:?}");
+    told(&mut leader, answer(0, 1, None)).await;
+    // What the host brings out may reach the leader before the talk's
+    // answer is done, so the leader goes on from that.
+    lt = told(&mut leader, answer(0, 1, None)).await;
+    assert!(said(&lt, keys::CWK_HOST_WELCOME_3), "{lt:?}");
+    let escort = |t: &Trace| {
+        (CWK_ESCORT.iter()).all(|&(mob_id, count)| t.field.alive(mob_id).len() == count)
+    };
+    for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {
+        hears_item(player, t, keys::CWK_ESCORT_OUT).await;
+        until(&mut player.connection, t, escort).await;
+    }
+    let t = told(&mut leader, talk(STAGE6, CWK_HOST)).await;
+    assert!(said(&t, keys::CWK_HOST_ESCORTING), "{t:?}");
+
+    // With the escort gone, it brings out the Twisted Masters.
+    beat_all(&mut leader.connection, &mut lt).await;
+    let t = told(&mut leader, talk(STAGE6, CWK_HOST)).await;
+    assert!(said(&t, keys::CWK_HOST_ESCORT_BEATEN), "{t:?}");
+    lt = told(&mut leader, answer(0, 1, None)).await;
+    assert!(said(&lt, keys::CWK_HOST_MASTERS), "{lt:?}");
+    let masters =
+        |t: &Trace| (CWK_MASTERS.iter()).all(|&(mob_id, _)| t.field.alive(mob_id).len() == 1);
+    for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {
+        hears_item(player, t, keys::CWK_MASTERS_OUT).await;
+        until(&mut player.connection, t, masters).await;
+    }
+    let t = told(&mut leader, talk(STAGE6, CWK_HOST)).await;
+    assert!(said(&t, keys::CWK_HOST_MASTERS_ESCORTING), "{t:?}");
+
+    // With them gone too, the way on opens, and the Keep is won, with the
+    // stage's EXP and mesos for both.
+    beat_all(&mut leader.connection, &mut lt).await;
+    lt = told(&mut leader, talk(STAGE6, CWK_HOST)).await;
+    assert!(said(&lt, keys::CWK_HOST_BEATEN), "{lt:?}");
+    let (exp, meso) = (CWK.stage_exp(6), CWK.stage_meso(6));
+    for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {
+        hears(player, t, keys::CWK_BOSS_OPEN).await;
+        until(&mut player.connection, t, |t| {
+            cleared(t) && t.gains.contains(&exp) && t.meso_gains.contains(&meso)
+        })
+        .await;
+    }
+    for player in [&mut leader, &mut member] {
+        let t = told(player, talk(STAGE6, CWK_HOST)).await;
+        assert!(said(&t, keys::CWK_HOST_WELL_PLAYED), "{t:?}");
+    }
+
+    // Its way on leads to the rest room, where Jack tells of the armory,
+    // and on to the treasure room, on a clock of a minute, which sees
+    // them out when it runs out.
+    for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {
+        touch_script_portal(player, STAGE6, WAY_ON).await;
+        until(&mut player.connection, t, |t| t.warps.contains(&REST)).await;
+    }
+    let t = told(&mut member, talk(REST, CWK_JACK)).await;
+    assert!(said(&t, keys::CWK_JACK_REST), "{t:?}");
+    // The clock is the team's, so it sees out the member too, wherever
+    // they are by then.
+    touch_script_portal(&mut member, REST, WAY_ON).await;
+    lt = Trace::default();
+    touch_script_portal(&mut leader, REST, WAY_ON).await;
+    until(&mut leader.connection, &mut lt, |t| {
+        t.warps.contains(&TREASURE) && t.countdowns.iter().any(|&clock| clock <= 1)
+    })
+    .await;
+    for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {
+        until(&mut player.connection, t, |t| t.warps.contains(&CWK_LOBBY)).await;
+    }
+}
+
+/// Beat every mob `seen` sees alive, each hit once answered.
+async fn beat_all(c: &mut MapleTestConnection, seen: &mut Trace) {
+    let alive = |seen: &Trace| {
+        let mobs = seen.field.mobs.iter();
+        let mut alive = mobs.filter(|(oid, _)| !seen.field.killed.contains(oid));
+        alive.next().map(|&(oid, _)| oid)
+    };
+    while let Some(object_id) = alive(seen) {
+        for _ in 0..60 {
+            if seen.field.killed.contains(&object_id) {
+                break;
+            }
+            let bars = seen.field.hp_bars.len();
+            send(c, attack(object_id, HIT)).await;
+            until(c, seen, |t| {
+                t.field.hp_bars.len() > bars || t.field.killed.contains(&object_id)
+            })
+            .await;
+        }
+        assert!(seen.field.killed.contains(&object_id), "{seen:?}");
+    }
 }
 
 /// The fifth stage's altar `id`, as `t` saw it.

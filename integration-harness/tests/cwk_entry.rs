@@ -3,9 +3,11 @@
 //! entrance, and turns anyone else back in pink. There anyone of level 90
 //! gathers an expedition at the recruiter (9201113) and takes it into a
 //! copy of the Keep's first stage, on a clock of two minutes, which sees
-//! it out when it runs out. The harness lets two set out
+//! it out when it runs out. A minute in, the Keep's Master Guardians come
+//! for anyone still on it. The harness lets two set out
 //! (`RUSTMS_EXPEDITION_MIN`) and runs events 60 times as fast
-//! (`RUSTMS_EVENT_SCALE`), so the clock shows at most 2 seconds.
+//! (`RUSTMS_EVENT_SCALE`), so the clock shows at most 2 seconds and the
+//! guardians come after 1.
 
 use game_data::server_content::keys;
 use integration_harness::database::{grant_item, set_job};
@@ -14,7 +16,7 @@ use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
-use net::events::{CWK_ENTRY, CWK_LOBBY};
+use net::events::{CWK_ENTRY, CWK_LOBBY, CWK_MASTER_GUARDIAN};
 use net::npc_scripts::{CWK_GATE, CWK_RECRUITER};
 use packet::Packet;
 use tokio::time::Duration;
@@ -126,6 +128,15 @@ async fn the_keystone_s_holders_set_out_into_the_keep_until_the_time_is_up() {
     let clock = arrives(&mut member, &mut mt).await;
     assert!((1..=2).contains(&clock), "{mt:?}");
     assert!(mt.item_lines.contains(&(started, 0)), "{mt:?}");
+
+    // A minute in, both hear the guardians come, and see the twenty.
+    let line = (PINK, text.get(keys::CWK_GUARDIANS_DETECTED, &[]));
+    for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {
+        until(&mut player.connection, t, |t| {
+            t.broadcasts.contains(&line) && t.field.alive(CWK_MASTER_GUARDIAN).len() == 20
+        })
+        .await;
+    }
 
     // The time up sees them back out to the entrance.
     for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {

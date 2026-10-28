@@ -203,6 +203,9 @@ pub struct Cleared {
     /// How many have taken the Keep's third stage's way up, up to
     /// `CWK_STEPS` (`EventCommand::CwkStep`).
     steps: AtomicU8,
+    /// How many times the Keep's sixth stage's host has brought mobs out
+    /// (`EventCommand::CwkHost`).
+    host: AtomicU8,
 }
 
 impl Cleared {
@@ -274,6 +277,19 @@ impl Cleared {
 
     fn steps(&self) -> u8 {
         self.steps.load(Ordering::Acquire)
+    }
+
+    fn host(&self) -> u8 {
+        self.host.load(Ordering::Acquire)
+    }
+
+    /// The Keep's sixth stage's host moves on from `phase`; returns whether
+    /// it was there.
+    fn host_heard(&self, phase: u8) -> bool {
+        let next = phase.checked_add(1).unwrap_or(phase);
+        (self.host)
+            .compare_exchange(phase, next, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
     }
 
     /// Count one more up the Keep's third stage's way; returns how many
@@ -467,6 +483,11 @@ impl EventTicket {
     /// Whether `take_room(room)` has been.
     pub fn room_taken(&self, room: u8) -> bool {
         self.cleared.room_taken(room)
+    }
+
+    /// How many times the Keep's sixth stage's host has brought mobs out.
+    pub fn cwk_host(&self) -> u8 {
+        self.cleared.host()
     }
 
     /// Whether the party has cleared the last stage, so has no time limit.
@@ -990,6 +1011,9 @@ impl EventActor {
         }
         if self.kind.pyramid_mode().is_some() {
             self.start_pyramid_stage();
+        }
+        if self.kind == EventKind::Cwk {
+            self.cwk_guardians();
         }
         let mut over = false;
         while !over {
@@ -1638,7 +1662,10 @@ impl EventActor {
                 self.restart_clock(net::events::HORNTAIL_FIGHT_MINUTES);
             }
             EventCommand::RestartClock => debug!(client_id, "Restart not taken"),
-            EventCommand::Reached(map) if event.holds(map) && !won => {
+            // The Keep's treasure room comes after its win.
+            EventCommand::Reached(map)
+                if event.holds(map) && (!won || map == net::events::CWK_TREASURE) =>
+            {
                 if let Some(clock) = net::events::clock_on(map) {
                     if self.reached.insert(map) {
                         match clock {
@@ -1663,6 +1690,10 @@ impl EventActor {
                 self.cwk_step(client_id)
             }
             EventCommand::CwkStep => {}
+            EventCommand::CwkHost(phase) if leader && self.kind == EventKind::Cwk && !won => {
+                self.cwk_host(phase)
+            }
+            EventCommand::CwkHost(_) => {}
             EventCommand::SpearsSet(set) if self.kind == EventKind::GuildQuest => {
                 self.spears_set(client_id, set)
             }
@@ -2954,6 +2985,92 @@ impl EventActor {
         }
     }
 
+    /// The leader heard the Keep's sixth stage's host out after it had
+    /// brought mobs out `phase` times (Cosmic `9201115`'s `glpq6`), once
+    /// for each: everyone there hears what it brings out, the escort at
+    /// random along the floor, then the Twisted Masters; after them, the
+    /// way on opens and the Keep is won.
+    fn cwk_host(&mut self, phase: u8) {
+        use net::events::{CWK_ESCORT, CWK_ESCORT_X, CWK_ESCORT_Y, CWK_MASTERS};
+        use rand::Rng;
+        if !self.cleared.host_heard(phase) {
+            debug!(id = self.id, phase, "Host already heard");
+            return;
+        }
+        let text = net::content::text();
+        let mut rng = rand::thread_rng();
+        let mut sent = Vec::new();
+        match phase {
+            0 => {
+                let line = text.get(keys::CWK_ESCORT_OUT, &[]);
+                sent.extend(build_item_line(&line, 0).ok().map(FieldMessage::Show));
+                for (mob_id, count) in CWK_ESCORT {
+                    for _ in 0..count {
+                        let x = rng.gen_range(CWK_ESCORT_X.start, CWK_ESCORT_X.end);
+                        let at = (x, CWK_ESCORT_Y);
+                        sent.push(FieldMessage::BringOut { mob_id, at });
+                    }
+                }
+            }
+            1 => {
+                let line = text.get(keys::CWK_MASTERS_OUT, &[]);
+                sent.extend(build_item_line(&line, 0).ok().map(FieldMessage::Show));
+                for (mob_id, at) in CWK_MASTERS {
+                    sent.push(FieldMessage::BringOut { mob_id, at });
+                }
+            }
+            _ => {
+                // The way on opens with the win, before anyone hears.
+                self.win();
+                let line = text.get(keys::CWK_BOSS_OPEN, &[]);
+                let packet = build_broadcast(Broadcast::Pink, &line);
+                sent.extend(packet.ok().map(FieldMessage::Show));
+            }
+        }
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::events::CWK_BOSS,
+            instance_id: self.id,
+        });
+        tokio::spawn(async move {
+            for message in sent {
+                let _ = field.tx.send(message).await;
+            }
+        });
+    }
+
+    /// A minute after the Keep's copy opens, Master Guardians come onto its
+    /// first stage, if anyone is still there (Cosmic CWKPQ's
+    /// `spawnGuardians`), and those there hear in pink they were found.
+    fn cwk_guardians(&self) {
+        let (mob_id, at, count) = net::events::CWK_GUARDIANS;
+        let key = FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::events::CWK_ENTRY,
+            instance_id: self.id,
+        };
+        let line = net::content::text().get(keys::CWK_GUARDIANS_DETECTED, &[]);
+        let notice = build_broadcast(Broadcast::Pink, &line).ok();
+        let fields = self.fields.clone();
+        tokio::spawn(async move {
+            sleep(net::events::scaled(net::events::CWK_GUARDIANS_AFTER)).await;
+            // Only a copy still open: the event may be over.
+            let Some(field) = fields.running(|running| *running == key).pop() else {
+                return;
+            };
+            let (reply, here) = oneshot::channel();
+            let _ = field.tx.send(FieldMessage::Positions { reply }).await;
+            if here.await.map_or(true, |here| here.is_empty()) {
+                return;
+            }
+            let notice = notice.map(FieldMessage::Show);
+            let mobs = (0..count).map(|_| FieldMessage::BringOut { mob_id, at });
+            for message in notice.into_iter().chain(mobs) {
+                let _ = field.tx.send(message).await;
+            }
+        });
+    }
+
     /// `only`, or every member, sees `lines` in the chat log, as of an
     /// item.
     fn tell_items(&self, only: Option<ClientId>, lines: &[String]) {
@@ -3097,6 +3214,18 @@ mod tests {
             cleared.light_sigil(3, job);
         }
         assert_eq!(cleared.climb(), Open);
+    }
+
+    #[test]
+    fn the_keep_s_host_moves_on_once_from_each_phase() {
+        let cleared = Cleared::default();
+        // Two talks as it brings out the escort: only the first counts.
+        assert!(cleared.host_heard(0) && !cleared.host_heard(0));
+        assert_eq!(cleared.host(), 1);
+        // A talk of a phase gone by, or ahead, doesn't count.
+        assert!(!cleared.host_heard(2) && cleared.host_heard(1));
+        assert!(cleared.host_heard(2) && !cleared.host_heard(1));
+        assert_eq!(cleared.host(), 3);
     }
 
     #[test]

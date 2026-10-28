@@ -1119,6 +1119,37 @@ impl ClientActor {
         Ok(Some(NpcScript::cwk_keeper(npc_id, talk)))
     }
 
+    /// The host of the Keep's sixth stage (`events::cwk_host`, Cosmic
+    /// `9201115`), to a member there. `None` for anyone else.
+    pub(super) async fn cwk_host(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let on_stage = |ticket: &&EventTicket| {
+            ticket.kind == EventKind::Cwk && ticket.holds(map_id) && map_id == events::CWK_BOSS
+        };
+        if !self.event.as_ref().is_some_and(|ticket| on_stage(&ticket)) {
+            return Ok(None);
+        }
+        let (reply, mobs) = oneshot::channel();
+        self.send_to_field(FieldMessage::MobCount { reply }).await?;
+        let mobs = mobs.await.unwrap_or_default();
+        let Some(ticket) = self.event.as_ref().filter(on_stage) else {
+            return Ok(None);
+        };
+        let talk = events::cwk_host(ticket.won(), ticket.leader(), ticket.cwk_host(), mobs);
+        Ok(Some(NpcScript::cwk_host(talk)))
+    }
+
+    /// Jack (`events::cwk_jack`, Cosmic `9201112`): what the stage the
+    /// player is on is about, during the Keep's party quest.
+    pub(super) fn cwk_jack(&self) -> Result<NpcScript, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let in_cwk = self
+            .event
+            .as_ref()
+            .is_some_and(|ticket| ticket.kind == EventKind::Cwk && ticket.holds(map_id));
+        Ok(NpcScript::cwk_jack(in_cwk.then_some(map_id)))
+    }
+
     /// The Keep's third stage's way up (`scripts::CWK_STEP`, Cosmic
     /// `glpqPortal2`) takes a member back to the stage's start, and their
     /// event counts them (`EventCommand::CwkStep`). `None` elsewhere.
