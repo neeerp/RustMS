@@ -97,10 +97,6 @@ namespace ms
 		// the Free Market rooms).
 		bool allows_personal_shop() const;
 
-		// Whether drops never vanish here (info/everlast, the PQ storage
-		// rooms). v83 then refuses to drop items (FUN_004f31a5).
-		bool is_everlast() const;
-
 		// The map's fieldLimit bits.
 		int32_t get_fieldlimit() const;
 
@@ -160,7 +156,6 @@ namespace ms
 		no_skill::Lists no_skills;
 		bool town;
 		bool personal_shop = false;
-		bool everlast = false;
 		double recovery = 1.0;
 		bool hideminimap;
 		Range<int16_t> mapwalls;
