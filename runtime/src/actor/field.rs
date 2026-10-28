@@ -2170,6 +2170,9 @@ impl FieldActor {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
             (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
+            (net::mobs::LATANICA, net::events::ENGINE_ROOM) if self.key.instance_id != 0 => {
+                self.boss_falls()
+            }
             // The sealed Balrog comes out a little later (Cosmic
             // `BalrogBattle.spawnSealedBalrog`), and everyone here counts
             // the kill Balrog and the Seal (2239) asks for.

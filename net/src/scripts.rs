@@ -260,6 +260,10 @@ pub const ZPQ_OUT: &str = "Zakum03";
 /// client actor answers once the directory says whether the party may go
 /// (`papulatus_portal`).
 pub const PAPULATUS_IN: &str = "Populatus00";
+/// The way to Capt. Latanica on the ghost ship's last deck (`in00`),
+/// which the client actor answers once it knows whether the player holds a
+/// White Essence and their party may go (`latanica_portal`).
+pub const LATANICA_IN: &str = "captinsg00";
 /// The way from the Trial Grounds' first map into their rooms (`in00`),
 /// which the client actor answers once it knows who else is on the map
 /// (`htpq_into_rooms`).
@@ -3061,6 +3065,32 @@ pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
     }
 }
 
+/// The way to Capt. Latanica, for a player with no White Essence (`None`)
+/// or one whose party stands as `entry`: the leader takes it in, or is
+/// told in pink why not (Cosmic `captinsg00`). The essence stays with the
+/// player, for the Engine Room's reactor.
+pub fn latanica_portal(entry: Option<crate::events::Entry>) -> Vec<Effect> {
+    use crate::events::{Entry, EventKind, LATANICA};
+    let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+    match entry {
+        None => pink(keys::LATANICA_PORTAL_NO_ESSENCE),
+        Some(Entry::NoParty) => pink(keys::LATANICA_PORTAL_NO_PARTY),
+        Some(Entry::NotLeader) => pink(keys::LATANICA_PORTAL_NOT_LEADER),
+        Some(Entry::NotEligible) => {
+            let (least, most) = (
+                LATANICA.least().to_string(),
+                LATANICA.team.end().to_string(),
+            );
+            let vars = [("least", least.as_str()), ("most", most.as_str())];
+            vec![Effect::Pink(
+                content::text().get(keys::LATANICA_PORTAL_NOT_ELIGIBLE, &vars),
+            )]
+        }
+        Some(Entry::Busy) => pink(keys::LATANICA_PORTAL_BUSY),
+        Some(Entry::Ready) => vec![Effect::PortalSound, Effect::StartEvent(EventKind::Latanica)],
+    }
+}
+
 /// The portals along the top of each level of Ola Ola's variant 1.
 pub const RAND_OLA: &str = "rand_ola";
 
@@ -3244,6 +3274,38 @@ mod tests {
                 Effect::PortalSound,
                 Effect::StartEvent(EventKind::Papulatus)
             ]
+        );
+    }
+
+    #[test]
+    fn the_way_to_latanica_wants_the_essence_then_a_ready_party() {
+        use crate::events::{Entry, EventKind};
+        let text = |key, vars: &[(&str, &str)]| content::text().get(key, vars);
+        let refused = [
+            (None, text(keys::LATANICA_PORTAL_NO_ESSENCE, &[])),
+            (
+                Some(Entry::NoParty),
+                text(keys::LATANICA_PORTAL_NO_PARTY, &[]),
+            ),
+            (
+                Some(Entry::NotLeader),
+                text(keys::LATANICA_PORTAL_NOT_LEADER, &[]),
+            ),
+            (
+                Some(Entry::NotEligible),
+                text(
+                    keys::LATANICA_PORTAL_NOT_ELIGIBLE,
+                    &[("least", "1"), ("most", "6")],
+                ),
+            ),
+            (Some(Entry::Busy), text(keys::LATANICA_PORTAL_BUSY, &[])),
+        ];
+        for (entry, line) in refused {
+            assert_eq!(latanica_portal(entry), [Effect::Pink(line)]);
+        }
+        assert_eq!(
+            latanica_portal(Some(Entry::Ready)),
+            [Effect::PortalSound, Effect::StartEvent(EventKind::Latanica)]
         );
     }
 

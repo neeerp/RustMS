@@ -2347,6 +2347,14 @@ pub mod keys {
     pub const BALROG_SCROLLS_NO_LEATHER: &str = "balrog.scrolls.no_leather";
     pub const BALROG_SCROLLS_FULL: &str = "balrog.scrolls.full";
     pub const BALROG_SCROLLS_GIVEN: &str = "balrog.scrolls.given";
+    pub const LATANICA_PORTAL_NO_ESSENCE: &str = "latanica.portal.no_essence";
+    pub const LATANICA_PORTAL_NO_PARTY: &str = "latanica.portal.no_party";
+    pub const LATANICA_PORTAL_NOT_LEADER: &str = "latanica.portal.not_leader";
+    pub const LATANICA_PORTAL_NOT_ELIGIBLE: &str = "latanica.portal.not_eligible";
+    pub const LATANICA_PORTAL_BUSY: &str = "latanica.portal.busy";
+    pub const LATANICA_SUMMONED: &str = "latanica.summoned";
+    pub const LATANICA_BOB_LEAVE_ASK: &str = "latanica.bob.leave_ask";
+    pub const LATANICA_BOB_WON: &str = "latanica.bob.won";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";

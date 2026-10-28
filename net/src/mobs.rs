@@ -43,6 +43,9 @@ pub const TIME_SPHERE: i32 = 8500000;
 /// Papulatus himself: his death on the Origin of Clocktower wins the
 /// fight.
 pub const PAPULATUS_LAST: i32 = 8500002;
+/// Capt. Latanica, whom the White Essence calls out in the Engine Room:
+/// its death there wins the fight.
+pub const LATANICA: i32 = 9420513;
 /// The Darkstars the Papulatus Clock calls up (skill 200 levels 39 and
 /// 40), bombs that blow up when touched.
 pub const HIGH_DARKSTAR: i32 = 8500003;

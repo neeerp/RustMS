@@ -520,7 +520,14 @@ pub fn action(reactor_id: i32) -> Action {
         // holds the Purple Stone of Magic (Cosmic `3002001`); its eight
         // empty ones (3002002) drop nothing.
         2002003 | ELLIN_SPINE | ELLIN_STONE_BOX => Action::DropsAndClears,
-        // The sixth stage's altar (Cosmic `3001000`), which takes the stone.
+        // The Engine Room's `boss` (Cosmic `5411000`), which takes a White
+        // Essence and calls out Capt. Latanica.
+        LATANICA_BOSS => Action::SpawnAt {
+            mob_id: crate::mobs::LATANICA,
+            at: crate::events::LATANICA_AT,
+            notice: Some(keys::LATANICA_SUMMONED),
+            music: Some("Bgm09/TimeAttack"),
+        },
         // The statue in Showa's arena (`shouwaBoss`) takes the Lady Boss's
         // Comb and the first of The Boss's bodyguards comes out (Cosmic
         // `8001000`), unannounced.
@@ -530,6 +537,7 @@ pub fn action(reactor_id: i32) -> Action {
             notice: None,
             music: None,
         },
+        // The sixth stage's altar (Cosmic `3001000`), which takes the stone.
         ELLIN_ALTAR => Action::SpawnAt {
             mob_id: crate::events::ELLIN_GOLEM,
             at: crate::events::ELLIN_ALTAR_AT,
@@ -583,6 +591,8 @@ pub const ZPQ_MIMIC: i32 = 9300004;
 
 /// The cracked dimension where Papulatus comes out.
 pub const PAPULATUS_CRACK: i32 = 2201004;
+/// The Engine Room's reactor, where Capt. Latanica comes out.
+pub const LATANICA_BOSS: i32 = 5411000;
 
 /// Zakum's altar, and the music it plays as it brings Zakum out.
 pub const ZAKUM_ALTAR: i32 = 2111001;
@@ -855,6 +865,15 @@ mod tests {
         assert_eq!(
             (mob_id, at, music),
             (8500000, (-410, -400), Some("Bgm09/TimeAttack"))
+        );
+        assert_eq!(
+            action(LATANICA_BOSS),
+            Action::SpawnAt {
+                mob_id: 9420513,
+                at: (-146, 225),
+                notice: Some(keys::LATANICA_SUMMONED),
+                music: Some("Bgm09/TimeAttack")
+            }
         );
         // Showa's statue, unannounced.
         assert_eq!(

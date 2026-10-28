@@ -1953,7 +1953,7 @@ impl NpcScript {
     /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
     /// Ludibrium, Minerva's in the Tower of Goddess, Rolly's in the
     /// Ludibrium Maze's clear room, Konpei's in Showa's arena, Mu Young's
-    /// in the Balrog's tomb.
+    /// in the Balrog's tomb, Bob's in the ghost ship's Engine Room.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
@@ -1983,6 +1983,7 @@ impl NpcScript {
                 Some(konpei_arena(player, won, &mut rand::thread_rng()))
             }
             BALROG_KEEPER if player.stats.map_id == events::BALROG_TOMB => Some(balrog_keeper(won)),
+            BOB if player.stats.map_id == events::ENGINE_ROOM => Some(bob(won)),
             _ => None,
         }
     }
@@ -13271,6 +13272,25 @@ fn balrog_keeper(won: bool) -> NpcScript {
     NpcScript::new(BALROG_KEEPER, pages)
 }
 
+/// Bob in the Engine Room (Npc.nx "Ghostship Keeper", Cosmic `9270033`):
+/// before the win, the way out, asked first; after it, a word and the way
+/// out. Either way is the Peaceful Ship.
+const BOB: i32 = 9270033;
+
+fn bob(won: bool) -> NpcScript {
+    let out = vec![Effect::Warp(events::PEACEFUL_SHIP)];
+    let pages = if won {
+        vec![Page::Say(text(keys::LATANICA_BOB_WON)), Page::Done(out)]
+    } else {
+        vec![Page::Ask {
+            text: text(keys::LATANICA_BOB_LEAVE_ASK),
+            on_yes: out,
+            on_no: None,
+        }]
+    };
+    NpcScript::new(BOB, pages)
+}
+
 /// The Suspicious Man in the Balrog's hall (105100000, Npc.nx script
 /// `balog_scroll`, Cosmic `1061016`): one Piece of Balrog Leather for one
 /// of the Balrog's scrolls, the player's pick.
@@ -24240,6 +24260,25 @@ mod tests {
         );
         let clear = rider(50, 0, events::BALROG_CLEAR);
         assert!(NpcScript::in_event(BALROG_KEEPER, &clear, false, true).is_none());
+    }
+
+    #[test]
+    fn bob_takes_the_party_up_to_the_peaceful_ship_before_the_win_and_after() {
+        let room = rider(30, 0, events::ENGINE_ROOM);
+        let mut leave = NpcScript::in_event(BOB, &room, false, false).unwrap();
+        assert_eq!(question(&leave.begin()), text(keys::LATANICA_BOB_LEAVE_ASK));
+        assert_eq!(
+            leave.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(events::PEACEFUL_SHIP)]
+        );
+        let mut won = NpcScript::in_event(BOB, &room, true, true).unwrap();
+        assert_eq!(page_text(&won.begin()), text(keys::LATANICA_BOB_WON));
+        assert_eq!(
+            won.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Warp(events::PEACEFUL_SHIP)]
+        );
+        let deck = rider(30, 0, events::GHOST_SHIP_DECK);
+        assert!(NpcScript::in_event(BOB, &deck, false, false).is_none());
     }
 
     #[test]
