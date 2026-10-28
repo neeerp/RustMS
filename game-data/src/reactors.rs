@@ -27,6 +27,10 @@ pub struct ReactorEvent {
 pub const ITEM_DROPPED: i32 = 100;
 /// The event kind of a skill used near a reactor.
 pub const SKILL_USED: i32 = 5;
+/// The event kinds of a player stepping onto a reactor set off by touch,
+/// and off it.
+pub const TOUCHED: i32 = 6;
+pub const UNTOUCHED: i32 = 7;
 
 /// What can happen to a reactor in one state.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -44,6 +48,9 @@ pub struct ReactorTemplate {
     pub states: Vec<ReactorState>,
     /// The server script run when it breaks (`action`).
     pub action: Option<String>,
+    /// Set off by a player standing on it (`info/activateByTouch`): the
+    /// client tells as they step onto it and off it.
+    pub touch: bool,
 }
 
 /// How well an event of `kind` fits a swing with `flags` (bit 0 facing
@@ -122,6 +129,15 @@ impl ReactorTemplate {
         Some((u8::try_from(index).ok()?, event.next?, event.area?))
     }
 
+    /// The event someone stepping onto it (`touching`), or the last off
+    /// it, triggers in `state`, as its index, and the state it moves to.
+    pub fn touched(&self, state: u8, touching: bool) -> Option<(u8, u8)> {
+        let kind = if touching { TOUCHED } else { UNTOUCHED };
+        let events = &self.states.get(usize::from(state))?.events;
+        let index = events.iter().position(|event| event.kind == kind)?;
+        Some((u8::try_from(index).ok()?, events[index].next?))
+    }
+
     /// Whether an item dropped on it moves it on from `state`.
     pub fn takes_items(&self, state: u8) -> bool {
         self.states
@@ -175,8 +191,10 @@ impl ReactorData {
         };
         // A reactor that reuses another's states keeps its own action.
         let own_action = nx.string_child(image, "action")?;
+        let mut touch = None;
         // Some reactors reuse another reactor's states through info/link.
         if let Some(info) = nx.child_by_name(image, "info")? {
+            touch = nx.int_child(info, "activateByTouch")?;
             if let Some(link) = nx.string_child(info, "link")? {
                 if let Some(linked) = nx.child_by_name(0, &format!("{link}.img"))? {
                     image = linked;
@@ -187,6 +205,11 @@ impl ReactorData {
             Some(action) => Some(action),
             None => nx.string_child(image, "action")?,
         };
+        if touch.is_none() {
+            if let Some(info) = nx.child_by_name(image, "info")? {
+                touch = nx.int_child(info, "activateByTouch")?;
+            }
+        }
         let mut states = Vec::new();
         while let Some(node) = nx.child_by_name(image, &states.len().to_string())? {
             let mut state = ReactorState::default();
@@ -237,6 +260,7 @@ impl ReactorData {
             reactor_id,
             states,
             action,
+            touch: touch.is_some_and(|touch| touch != 0),
         }))
     }
 }
@@ -285,6 +309,21 @@ mod tests {
         let fourth = data.template(6109016).unwrap().unwrap();
         assert_eq!(fourth.skill_used(0, 1211002), None);
         assert_eq!(fourth.skill_used(1, 1211002), Some((0, 2, area)));
+        // The fourth stage's flames and stirges are set off by touch.
+        // They move to 1 as someone steps on, and back as the last steps
+        // off.
+        for id in [6109013, 6109014, 6109021, 6109027] {
+            let flame = data.template(id).unwrap().unwrap();
+            assert!(flame.touch, "{id}");
+            assert_eq!(flame.touched(0, true), Some((0, 1)));
+            assert_eq!(flame.touched(1, false), Some((0, 0)));
+            assert_eq!(
+                (flame.touched(0, false), flame.touched(1, true)),
+                (None, None)
+            );
+            assert!(!flame.is_last(1) && flame.swing(0, 2).is_none());
+        }
+        assert!(!sigil.touch && !fourth.touch);
     }
 
     #[test]

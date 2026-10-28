@@ -5,9 +5,10 @@ use crate::actor::object_ids::{self, ObjectIds};
 use game_data::reactors::ReactorTemplate;
 use game_data::MapReactorTemplate;
 use net::packet::build::world::reactor::ReactorView;
+use net::ClientId;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use tokio::time::{Duration, Instant};
 
 /// How far from a reactor a player can stand and still hit it: a little more
@@ -40,6 +41,8 @@ pub struct LiveReactor {
     pub flip: bool,
     /// When it goes back on its own, and to which state (`event/timeOut`).
     revert: Option<(Instant, u8)>,
+    /// Who stands on it, if it is set off by touch.
+    standing: BTreeSet<ClientId>,
 }
 
 impl LiveReactor {
@@ -69,6 +72,18 @@ pub enum Hit {
     /// which drops its loot as it takes the poison and fills again on its
     /// own (`ReactorTemplate::acts_in`), and its spine.
     Acted { view: ReactorView, event: u8 },
+}
+
+/// A player stepping onto a reactor set off by touch, or off it.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Touch {
+    pub reactor_id: i32,
+    pub touching: bool,
+    /// How many stand on it now.
+    pub standing: usize,
+    /// As the first stepped on, or the last off, it moved through the
+    /// event of that index to the view's state.
+    pub moved: Option<(ReactorView, u8)>,
 }
 
 pub struct ReactorSet {
@@ -142,6 +157,7 @@ impl ReactorSet {
                     y: spot.template.y,
                     flip: spot.template.flip,
                     revert: None,
+                    standing: BTreeSet::new(),
                 },
             );
             spawned.push(object_id);
@@ -207,6 +223,7 @@ impl ReactorSet {
                 y,
                 flip: false,
                 revert: None,
+                standing: BTreeSet::new(),
             },
         );
         object_id
@@ -372,6 +389,78 @@ impl ReactorSet {
         self.advance(object_id, event, next, now)
     }
 
+    /// The player `by`, at `from`, stepped onto `object_id` (`touching`) or
+    /// off it. `None` if it is gone, isn't set off by touch, or nothing
+    /// changed: they were already on it or off it, or stood out of reach
+    /// stepping on.
+    pub fn touch(
+        &mut self,
+        object_id: i32,
+        by: ClientId,
+        touching: bool,
+        from: (i16, i16),
+    ) -> Option<Touch> {
+        let reactor = self.live.get_mut(&object_id)?;
+        if !self.spots[reactor.spot].data.touch {
+            return None;
+        }
+        let changed = if touching {
+            let near = (i32::from(reactor.x) - i32::from(from.0)).abs() <= REACH_X
+                && (i32::from(reactor.y) - i32::from(from.1)).abs() <= REACH_Y;
+            near && reactor.standing.insert(by)
+        } else {
+            reactor.standing.remove(&by)
+        };
+        changed.then(|| self.touched(object_id, touching))
+    }
+
+    /// `by` left the field: they step off every reactor they stood on.
+    pub fn step_off(&mut self, by: ClientId) -> Vec<Touch> {
+        let left: Vec<i32> = (self.live.values_mut())
+            .filter(|reactor| reactor.standing.contains(&by))
+            .map(|reactor| {
+                reactor.standing.remove(&by);
+                reactor.object_id
+            })
+            .collect();
+        left.into_iter()
+            .map(|object_id| self.touched(object_id, false))
+            .collect()
+    }
+
+    /// `object_id` was stepped onto or off: as the first steps on, or the
+    /// last off, it moves through its event for that.
+    fn touched(&mut self, object_id: i32, touching: bool) -> Touch {
+        let reactor = &self.live[&object_id];
+        let standing = reactor.standing.len();
+        let mut touch = Touch {
+            reactor_id: reactor.reactor_id,
+            touching,
+            standing,
+            moved: None,
+        };
+        if standing == usize::from(touching) {
+            let data = &self.spots[reactor.spot].data;
+            if let Some((event, next)) = data.touched(reactor.state, touching) {
+                if let Some(reactor) = self.live.get_mut(&object_id) {
+                    reactor.state = next;
+                    reactor.revert = None;
+                    touch.moved = Some((reactor.view(), event));
+                }
+            }
+        }
+        touch
+    }
+
+    /// How many stand on the live reactors `reactor_id`, together.
+    pub fn standing_on(&self, reactor_id: i32) -> usize {
+        self.live
+            .values()
+            .filter(|reactor| reactor.reactor_id == reactor_id)
+            .map(|reactor| reactor.standing.len())
+            .sum()
+    }
+
     /// The reactor an item lying at `(x, y)` would move on: `quantity` of
     /// `item_id`, exactly, within the area of an event of its state.
     pub fn taking(&self, item_id: i32, quantity: i16, (x, y): (i16, i16)) -> Option<i32> {
@@ -498,6 +587,7 @@ mod tests {
                 reactor_id: 2001,
                 states: vec![hit(1), hit(2), hit(3), hit(4), ReactorState::default()],
                 action: Some("mBoxItem0".into()),
+                touch: false,
             },
         )
     }
@@ -706,6 +796,7 @@ mod tests {
                     },
                 ],
                 action: None,
+                touch: false,
             },
         )
     }
@@ -798,6 +889,7 @@ mod tests {
                     ReactorState::default(),
                 ],
                 action: None,
+                touch: false,
             },
         )
     }
@@ -871,6 +963,7 @@ mod tests {
                 },
             ],
             action: Some("pFItem0".into()),
+            touch: false,
         };
         let spine = ReactorTemplate {
             reactor_id: net::reactors::ELLIN_SPINE,
@@ -882,6 +975,7 @@ mod tests {
                 .chain([ReactorState::default()])
                 .collect(),
             action: None,
+            touch: false,
         };
         [
             (spot(3002000, 1057, ""), pond),
@@ -1006,6 +1100,7 @@ mod tests {
                 reactor_id: net::reactors::MUSIC,
                 states: (0..8).map(|_| records()).collect(),
                 action: None,
+                touch: false,
             },
         );
         let mut reactors = ReactorSet::new([music]);
@@ -1080,5 +1175,82 @@ mod tests {
         }
         assert_eq!(reactors.get(id).unwrap().state, 1);
         assert!(reactors.skill_used(id, 1211002, (0, 300), now).is_none());
+    }
+
+    #[test]
+    fn a_flame_counts_who_stands_on_it_and_those_who_leave_step_off() {
+        let on = |kind, next| ReactorState {
+            events: vec![ReactorEvent {
+                kind,
+                next: Some(next),
+                ..ReactorEvent::default()
+            }],
+            ..ReactorState::default()
+        };
+        let flame = |reactor_id, x| {
+            (
+                MapReactorTemplate {
+                    reactor_id,
+                    x,
+                    y: 0,
+                    flip: false,
+                    reactor_time: -1,
+                    name: String::new(),
+                },
+                ReactorTemplate {
+                    reactor_id,
+                    states: vec![on(6, 1), on(7, 0)],
+                    action: None,
+                    touch: reactor_id != 2001,
+                },
+            )
+        };
+        let mut reactors = ReactorSet::new([flame(6109014, 0), flame(2001, 1000)]);
+        let [id, other] = reactors.respawn(Instant::now())[..] else {
+            panic!("two reactors");
+        };
+        let touch = |touching, standing, state: Option<u8>| {
+            Some(Touch {
+                reactor_id: 6109014,
+                touching,
+                standing,
+                moved: state.map(|state| {
+                    let view = ReactorView {
+                        object_id: id,
+                        reactor_id: 6109014,
+                        state,
+                        x: 0,
+                        y: 0,
+                        flip: false,
+                    };
+                    (view, 0)
+                }),
+            })
+        };
+        // The first on moves it to 1.
+        assert_eq!(
+            reactors.touch(id, 1, true, (10, 0)),
+            touch(true, 1, Some(1))
+        );
+        // Telling twice changes nothing.
+        assert_eq!(reactors.touch(id, 1, true, (10, 0)), None);
+        assert_eq!(reactors.touch(id, 2, true, (-10, 0)), touch(true, 2, None));
+        // Out of reach, or a reactor not set off by touch.
+        assert_eq!(reactors.touch(id, 3, true, (900, 0)), None);
+        assert_eq!(reactors.touch(other, 3, true, (1000, 0)), None);
+        assert_eq!(reactors.standing_on(6109014), 2);
+        assert_eq!(
+            reactors.touch(id, 1, false, (900, 0)),
+            touch(false, 1, None)
+        );
+        assert_eq!(reactors.touch(id, 1, false, (900, 0)), None);
+        assert_eq!(reactors.get(id).unwrap().state, 1);
+        // The last to leave the field steps off it, and it goes back.
+        assert_eq!(
+            reactors.step_off(2),
+            vec![touch(false, 0, Some(0)).unwrap()]
+        );
+        assert!(reactors.step_off(2).is_empty());
+        assert_eq!(reactors.get(id).unwrap().state, 0);
     }
 }

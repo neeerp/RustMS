@@ -1457,6 +1457,28 @@ set off several. HeavenClient does the same, trying the reactors in the
 order they entered the map (`Combat::use_skill_at_reactors`,
 `Reactor::use_skill`, `reactor_rules::pick_skill_event`).
 
+Nine reactors go off by touch (`info/activateByTouch`, `ReactorTemplate::touch`): Crimsonwood
+Keep's fourth stage's stirges and flames (6109013, 6109014, 6109021 to
+6109027). Once a second (v83 polls on its update, `CField` reactor pool) the
+client checks which of them the player stands in, by each one's drawn
+rectangle, and on each change sends TOUCH_REACTOR (`0xCE`): stepped on or
+off. It keeps the set of reactors it stands in for the field and forgets
+it on a new field. HeavenClient does the same (`Stage::update`,
+`MapReactors::touch`, `reactor_rules::touch_changes`).
+
+The field keeps who stands on each (`ReactorSet::touch`), taking a step on
+only within 250×200 of the reactor by the field's idea of where the player
+is. The first one on moves it by its state's event of type 6, and the last
+one off by type 7, each shown with HIT_REACTOR and no delay
+(`ReactorTemplate::touched`; all nine go 0 to 1 and back). A player who
+leaves the field, or comes into it again, steps off everything
+(`ReactorSet::step_off`). What the stage does with them is in
+[party quests](./party-quests.md#crimsonwood-keep).
+
+| Op | Direction | Body |
+| --- | --- | --- |
+| 0xCE TOUCH_REACTOR | client to server | `i32` object id, `u8` 1 stepped on, 0 off |
+
 An event of type 100 takes an item instead: exactly `1` of item `0`
 landing within `lt`-`rb` of the reactor (`ReactorTemplate::item_dropped`).
 When a player drops such an item (not one that vanishes), or a mob or

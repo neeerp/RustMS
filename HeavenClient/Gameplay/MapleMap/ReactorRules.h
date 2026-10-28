@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <set>
 #include <vector>
 
 namespace ms
@@ -126,6 +127,58 @@ namespace ms
 		{
 			return std::max(a.left, b.left) < std::min(a.right, b.right) &&
 				   std::max(a.top, b.top) < std::min(a.bottom, b.bottom);
+		}
+
+		// Whether the point is in the box, as PtInRect has it.
+		inline bool contains(const Box &box, int32_t x, int32_t y)
+		{
+			return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
+		}
+
+		// A reactor set off by touch (`info/activateByTouch`), where it is
+		// drawn.
+		struct Touchable
+		{
+			int32_t oid = 0;
+			Box box;
+		};
+
+		// The user stepped onto a reactor (`inside`) or off it.
+		struct TouchChange
+		{
+			int32_t oid = 0;
+			bool inside = false;
+
+			bool operator==(const TouchChange &other) const
+			{
+				return oid == other.oid && inside == other.inside;
+			}
+		};
+
+		// The reactors the user at (x, y) stepped onto or off since the last
+		// poll, which `touched` holds those they stood on at (FUN_00735d90):
+		// each whose box holds the user and isn't in it goes in, and each in
+		// it whose box doesn't comes out. One with an empty box is passed
+		// over, and one gone stays in until the field changes.
+		inline std::vector<TouchChange> touch_changes(const std::vector<Touchable> &reactors, int32_t x, int32_t y,
+													  std::set<int32_t> &touched)
+		{
+			std::vector<TouchChange> changes;
+
+			for (const Touchable &reactor : reactors)
+			{
+				if (empty(reactor.box))
+					continue;
+
+				bool inside = contains(reactor.box, x, y);
+
+				if (inside && touched.insert(reactor.oid).second)
+					changes.push_back({ reactor.oid, true });
+				else if (!inside && touched.erase(reactor.oid))
+					changes.push_back({ reactor.oid, false });
+			}
+
+			return changes;
 		}
 
 		// The reactor a swing over `range` hits, as an index into `boxes`, or

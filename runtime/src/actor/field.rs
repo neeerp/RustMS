@@ -7,7 +7,7 @@ use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, BossBar, Cast, CastArea, Catch, Kill, MobSet, Sharer};
 use crate::actor::field_ox::{self, OxGame};
 use crate::actor::field_race::{self, Race};
-use crate::actor::field_reactors::{Hit, ReactorSet};
+use crate::actor::field_reactors::{Hit, ReactorSet, Touch};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_snowball::{self, SnowballGame};
 use crate::actor::field_summons::SummonSet;
@@ -315,6 +315,8 @@ pub struct FieldActor {
     ox: Option<OxGame>,
     /// On one of a timed GM event's maps, the event while it is on.
     race: Option<Race>,
+    /// Crimsonwood Keep's fourth stage's stirges are gone, for good.
+    stirges_gone: bool,
     tick: Duration,
 }
 
@@ -422,6 +424,7 @@ impl FieldActor {
                     OxGame::new(times.map(net::events::scaled))
                 }),
             race: None,
+            stirges_gone: false,
             tick,
         };
         // A wedding's copy of the hunting ground opens with its one Giant
@@ -446,6 +449,10 @@ impl FieldActor {
             for &(mob_id, at, count) in net::events::opening_mobs(key.map_id) {
                 field.board(mob_id, count, at);
             }
+        }
+        // Crimsonwood Keep's fourth stage opens with its fires lit.
+        if key.map_id == net::events::CWK_ENTRY + 300 {
+            field.obstacles = net::events::cwk_fires();
         }
         field
     }
@@ -1075,6 +1082,10 @@ impl FieldActor {
                     delay,
                     skill,
                 } => self.handle_hit_reactor(from, object_id, flags, delay, skill),
+                FieldRequest::TouchReactor {
+                    object_id,
+                    touching,
+                } => self.handle_touch_reactor(from, object_id, touching),
                 FieldRequest::CharInfo { character_id } => {
                     self.handle_char_info(from, character_id)
                 }
@@ -4123,6 +4134,52 @@ impl FieldActor {
         }
     }
 
+    /// A player stepped onto a reactor set off by touch, or off it.
+    fn handle_touch_reactor(&mut self, from: ClientId, object_id: i32, touching: bool) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let position = (occupant.avatar.x, occupant.avatar.y);
+        if let Some(touch) = self.reactors.touch(object_id, from, touching, position) {
+            self.reactor_touched(touch);
+        }
+    }
+
+    /// Show a reactor moved as the first stepped onto it or the last off,
+    /// and do what it does: a flame of the Keep's fourth stage flips its
+    /// fires, and with enough on its stirges, they are gone.
+    fn reactor_touched(&mut self, touch: Touch) {
+        if let Some((view, event)) = &touch.moved {
+            if let Ok(packet) = build_hit_reactor(view, 0, *event) {
+                self.broadcast(None, packet);
+            }
+            for &fire in net::events::cwk_flame(touch.reactor_id).unwrap_or_default() {
+                let state = self.obstacles.iter().find(|(name, _)| name == fire);
+                let state = net::events::cwk_flip(state.map(|&(_, state)| state));
+                self.move_obstacle(fire, state);
+            }
+        }
+        self.stirges_touched(touch);
+    }
+
+    /// With enough on the Keep's fourth stage's stirges at once, every
+    /// stirge there is gone.
+    fn stirges_touched(&mut self, touch: Touch) {
+        if touch.reactor_id == net::events::CWK_STIRGE
+            && touch.touching
+            && !self.stirges_gone
+            && self.reactors.standing_on(touch.reactor_id) >= net::events::CWK_STIRGE_STANDING
+        {
+            // Cosmic `mapMessage(6, ..)`, then `killAllMonsters`.
+            self.stirges_gone = true;
+            let notice = net::content::text().get(keys::CWK_STIRGES_GONE, &[]);
+            if let Ok(packet) = build_item_line(&notice, 0) {
+                self.broadcast(None, packet);
+            }
+            self.clear_mobs();
+        }
+    }
+
     /// Show a reactor's new state, or break it and do what it does: bring
     /// out its mob, or have the client actor of `by`, who broke it, roll
     /// its drops.
@@ -4420,6 +4477,9 @@ impl FieldActor {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
+        for touch in self.reactors.step_off(client_id) {
+            self.reactor_touched(touch);
+        }
         // On a Coconut Season field everyone plays, on the smaller team.
         if let Some(game) = &mut self.coconut {
             avatar.team = game.join(client_id);
@@ -5222,6 +5282,9 @@ impl FieldActor {
         let Some(left) = self.occupants.remove(&client_id) else {
             return;
         };
+        for touch in self.reactors.step_off(client_id) {
+            self.reactor_touched(touch);
+        }
         let out = self.trades.leave(client_id);
         self.deliver_trade(out);
         let out = self.shops.leave(client_id);

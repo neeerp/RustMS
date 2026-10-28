@@ -196,6 +196,8 @@ pub enum RecvOpcode {
     NpcAction = 0xC5,
     ItemPickup = 0xCA,
     DamageReactor = 0xCD,
+    /// The player stepped onto or off a reactor set off by touch (185 §6).
+    TouchReactor = 0xCE,
 
     PlayerMapTransfer = 0xCF,
     /// An attack hit a Snowball field's ball or snowman (b168).

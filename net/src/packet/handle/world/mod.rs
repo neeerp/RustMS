@@ -160,7 +160,7 @@ pub use self::player_interaction::PlayerInteractionHandler;
 pub use self::quest_action::QuestActionHandler;
 pub use self::quick_slots::QuickSlotHandler;
 pub use self::raise::{RaiseFeedHandler, RaiseRecordHandler};
-pub use self::reactor::DamageReactorHandler;
+pub use self::reactor::{DamageReactorHandler, TouchReactorHandler};
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::remote_gachapon::RemoteGachaponHandler;
 pub use self::ring::{

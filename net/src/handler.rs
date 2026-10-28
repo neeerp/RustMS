@@ -957,6 +957,9 @@ pub enum FieldRequest {
         delay: u16,
         skill: Option<i32>,
     },
+    /// The player stepped onto the reactor `object_id`, set off by touch, or
+    /// off it.
+    TouchReactor { object_id: i32, touching: bool },
     /// Show the player the info window for `character_id`, who must be on
     /// their map (and may be themselves).
     CharInfo { character_id: i32 },
@@ -1263,6 +1266,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
             (Op::DamageReactor, InGame(&world::DamageReactorHandler)),
+            (Op::TouchReactor, InGame(&world::TouchReactorHandler)),
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
             (Op::SpendAp, InGame(&world::SpendApHandler)),
             (Op::SpendSp, InGame(&world::SpendSpHandler)),

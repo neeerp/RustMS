@@ -59,9 +59,21 @@ namespace ms
 			reactor->destroy(state);
 	}
 
+	std::vector<reactor_rules::TouchChange> MapReactors::touch(Point<int16_t> user)
+	{
+		std::vector<reactor_rules::Touchable> touchable;
+
+		for (auto &mmo : reactors)
+			if (mmo.second)
+				touchable.push_back({ mmo.first, static_cast<Reactor *>(mmo.second.get())->get_touch_box() });
+
+		return reactor_rules::touch_changes(touchable, user.x(), user.y(), touched);
+	}
+
 	void MapReactors::clear()
 	{
 		reactors.clear();
+		touched.clear();
 	}
 
 	MapObjects *MapReactors::get_reactors()
