@@ -92,6 +92,10 @@ pub enum Action {
     /// stays: the knights' hall's gate moves to the number set, and the
     /// last opens it and clears the stage (`guild_quest::SPEAR_GATE`).
     Spear,
+    /// The King's Corridor's door (`guild_quest::KING_GATE_REACTOR`), which
+    /// takes Sharen III's earring and stays open: the dead of the guild's
+    /// quest revive in it from then on (Cosmic `9208009`'s `canRevive`).
+    KingGate,
     /// One of the fourteen spots on the Tower of Goddess's Salion stage
     /// (`2001002`-`2001015`), which breaks on the Cellion's drop: the
     /// field brings the next Cellion out at another spot (`salion_next`),
@@ -362,6 +366,7 @@ pub fn action(reactor_id: i32) -> Action {
         // nothing), its spears, and the gargoyles' altar (`9201000`).
         9208005 | 9208006 | 9208010..=9208012 => Action::Hold,
         crate::guild_quest::SPEAR => Action::Spear,
+        crate::guild_quest::KING_GATE_REACTOR => Action::KingGate,
         // The grave's altar, once dressed (Cosmic `9201001`).
         crate::guild_quest::CLOTHES_ALTAR => Action::Appear {
             npc_id: crate::guild_quest::SHAREN_SOUL,
@@ -628,7 +633,7 @@ pub fn first_state(reactor_id: i32) -> u8 {
 pub fn stays(reactor_id: i32) -> bool {
     matches!(
         action(reactor_id),
-        Action::Bloom | Action::Hold | Action::Spear
+        Action::Bloom | Action::Hold | Action::Spear | Action::KingGate
     ) || acts_staying(reactor_id)
 }
 
@@ -904,6 +909,15 @@ mod tests {
                 assert!(altar.item_dropped(state, other, 1, (0, 0)).is_none());
             }
             assert!(altar.is_last(4));
+        }
+        // The King's Corridor's door takes the earring and stays open.
+        use crate::guild_quest::{KING_GATE_ITEM, KING_GATE_REACTOR};
+        assert_eq!(action(KING_GATE_REACTOR), Action::KingGate);
+        assert!(stays(KING_GATE_REACTOR));
+        if let Some(gate) = template(KING_GATE_REACTOR) {
+            assert!(gate.item_dropped(0, KING_GATE_ITEM, 1, (0, 0)).is_some());
+            assert!(gate.item_dropped(0, 4001024, 1, (0, 0)).is_none());
+            assert!(gate.is_last(1) && gate.time_out(1).is_none());
         }
         let (Some(stone), Some(metal), Some(spear)) =
             (template(9208006), template(9208005), template(SPEAR))

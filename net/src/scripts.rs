@@ -2334,6 +2334,27 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
         },
+        // The King's Corridor's door and the crack beside it, open once
+        // the door takes the earring, to Ergoth's room (Cosmic
+        // `kinggate_open`, `kinggate2_open`).
+        "kinggate_open" | "kinggate2_open" => {
+            let way = (crate::guild_quest::KING_WAYS.iter()).position(|(way, _)| *way == script);
+            let (_, portal) = crate::guild_quest::KING_WAYS[way.unwrap_or(0)];
+            let shut = if way == Some(0) {
+                keys::GUILD_QUEST_GATE_CLOSED
+            } else {
+                keys::GUILD_QUEST_GATE_CRACK
+            };
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireReactorsSet(&[crate::guild_quest::KING_GATE]),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(crate::guild_quest::KING_ROOM, portal),
+                ],
+                block: false,
+                occupied: Some(content::text().get(shut, &[])),
+            }
+        }
         // The decks' ways on, once their crews are all gone, as the first
         // stage's (Cosmic `davy_next2`, `davy_next3`).
         "davy_next2" | "davy_next3" => ScriptOutcome {
@@ -4725,6 +4746,39 @@ mod tests {
                 Effect::WarpToPortal(GRAVE + 100, 0)
             ]
         );
+    }
+
+    #[test]
+    fn the_king_s_corridor_s_door_and_crack_open_on_the_earring() {
+        use crate::guild_quest::{KING_CORRIDOR, KING_GATE, KING_GATE_REACTOR, KING_ROOM};
+        let data = crate::get_game_data().unwrap();
+        let corridor = data.field(KING_CORRIDOR).unwrap();
+        let gate = corridor.reactors.iter().find(|r| r.name == KING_GATE);
+        assert_eq!(gate.map(|r| r.reactor_id), Some(KING_GATE_REACTOR));
+        let player = player_with(&[]);
+        for (name, (script, portal_id)) in ["boss00", "boss01"]
+            .into_iter()
+            .zip(crate::guild_quest::KING_WAYS)
+        {
+            let on = corridor.portal_by_name(name).unwrap().script.clone();
+            assert_eq!(on.as_deref(), Some(script));
+            assert!(data
+                .field(KING_ROOM)
+                .unwrap()
+                .portal_by_id(portal_id.into())
+                .is_some());
+            let outcome = portal(script, &player).unwrap();
+            assert_eq!(
+                outcome.effects,
+                [
+                    Effect::RequireReactorsSet(&[KING_GATE]),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(KING_ROOM, portal_id)
+                ]
+            );
+        }
+        let shut = |script| portal(script, &player).unwrap().occupied.unwrap();
+        assert_ne!(shut("kinggate_open"), shut("kinggate2_open"));
     }
 
     #[test]

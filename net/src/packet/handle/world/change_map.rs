@@ -274,7 +274,9 @@ fn direct_destination(
             )?);
             (player.stats.map_id, player.stats.spawn_point)
         } else {
-            let map_id = return_map_of(player.stats.map_id).unwrap_or(player.stats.map_id);
+            let map_id = (player.revive_to.take())
+                .or_else(|| return_map_of(player.stats.map_id))
+                .unwrap_or(player.stats.map_id);
             (map_id, 0)
         };
         replies.extend(revive(player)?);
@@ -409,6 +411,24 @@ mod tests {
         assert!(replies.is_empty());
         assert_eq!(p.stats.hp, RESPAWN_HP);
         assert!(p.is_dirty());
+    }
+
+    #[test]
+    fn an_event_s_way_out_takes_the_place_of_the_return_map_but_not_of_a_wheel() {
+        let mut p = player(0, 0);
+        p.revive_to = Some(990001100);
+        let (destination, _, _) =
+            direct_destination(&mut p, 180000000, false, &[], |_| Some(990000200)).unwrap();
+        assert_eq!(destination, 990001100);
+        assert_eq!(p.revive_to, None);
+        let mut p = player(0, 0);
+        p.stats.map_id = 990000800;
+        p.revive_to = Some(990001100);
+        p.inventory
+            .insert(InventoryType::Cash, 1, Item::stack(WHEEL_OF_DESTINY, 1));
+        let (destination, _, _) =
+            direct_destination(&mut p, 990000800, true, &[], |_| Some(990000200)).unwrap();
+        assert_eq!(destination, 990000800);
     }
 
     #[test]

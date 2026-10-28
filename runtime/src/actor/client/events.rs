@@ -1546,6 +1546,19 @@ impl ClientActor {
             .is_some_and(|stage| !ticket.cleared(stage))
     }
 
+    /// Where the player, if dead on one of their event's maps, revives
+    /// (`EventTicket::revive_to`): read as they answer the death dialog, as
+    /// the event may have let them stay since they died.
+    pub(super) fn set_revival(&mut self) {
+        let Some(game) = self.game.as_mut() else {
+            return;
+        };
+        let map_id = game.player.stats.map_id;
+        game.player.revive_to = (self.event.as_ref())
+            .filter(|ticket| !self.in_cash_shop && ticket.holds(map_id))
+            .and_then(|ticket| ticket.revive_to());
+    }
+
     /// A reactor on the player's map gave everyone there `exp`, such as
     /// the Forest of Poison Haze's fountain (Cosmic `giveCharacterExp`).
     pub(super) async fn reactor_exp(&mut self, exp: i32) -> Result<(), RuntimeError> {

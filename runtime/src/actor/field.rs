@@ -4124,6 +4124,7 @@ impl FieldActor {
                 match reactors::action(view.reactor_id) {
                     reactors::Action::Bloom => self.bloom(),
                     reactors::Action::Spear => self.spears_set(by),
+                    reactors::Action::KingGate => self.king_gate_opened(by),
                     reactors::Action::Lever => {
                         let name = self.reactors.name(view.object_id);
                         if let Some(n) = name.and_then(|name| name.strip_prefix("lever")) {
@@ -4628,6 +4629,15 @@ impl FieldActor {
         let occupant = (self.occupants.get(&by)).or_else(|| self.occupants.values().next());
         if let Some(occupant) = occupant {
             occupant.handle.send(ServerMessage::SpearsSet(set));
+        }
+    }
+
+    /// The King's Corridor's door took the earring: the event of whoever
+    /// set it, or of someone still here, hears of it.
+    fn king_gate_opened(&self, by: ClientId) {
+        let occupant = (self.occupants.get(&by)).or_else(|| self.occupants.values().next());
+        if let Some(occupant) = occupant {
+            occupant.handle.send(ServerMessage::KingGateOpened);
         }
     }
 

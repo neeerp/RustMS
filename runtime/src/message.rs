@@ -381,6 +381,9 @@ pub enum ServerMessage {
     /// The player's field, the Guild Quest's room of the spears, has this
     /// many spears set now: tell the event.
     SpearsSet(u8),
+    /// The player's field, the Guild Quest's King's Corridor, took the
+    /// earring on its door: tell the event.
+    KingGateOpened,
     /// The player's guild gains this many points, for something the guild
     /// did in the Guild Quest.
     GainGuildPoints(i32),

@@ -438,6 +438,9 @@ impl ClientActor {
                 .send(&mut build_blocked_map(BlockedMap::PortalClosed)?)
                 .await;
         }
+        if opcode == RecvOpcode::ChangeMap as i16 {
+            self.set_revival();
+        }
 
         let result = match (route, self.game.as_mut()) {
             (WorldRoute::PreGame(handler), None) => handler.handle(&mut packet),
@@ -1773,6 +1776,10 @@ impl ClientActor {
             }
             ServerMessage::SpearsSet(set) => {
                 self.tell_event(net::events::EventCommand::SpearsSet(set))
+                    .await
+            }
+            ServerMessage::KingGateOpened => {
+                self.tell_event(net::events::EventCommand::KingGateOpened)
                     .await
             }
             ServerMessage::GainGuildPoints(amount) => self.gain_guild_points(amount).await?,
