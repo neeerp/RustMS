@@ -43,7 +43,7 @@ Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
 room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 ([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
 married couples, has its entry, its way out, its end rules and its first
-stage; its later stages come in later slices ([the Amorian
+two stages; its later stages come in later slices ([the Amorian
 Challenge](#the-amorian-challenge)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
@@ -1453,6 +1453,22 @@ one's taker to its own copy of stage 2 (670010300-670010302) and turns
 the rest back as closed. The clear shows the map object `gate0` to
 `gate2` of the way drawn instead of the usual `gate`
 (`EventTicket::gate_object`), and so does entering the stage after.
+
+Stage 2 is played on whichever of the three copies the way led to; they
+count as one stage (`Event::stage_copies`), and their `next00` stays shut
+until it clears (`Event::gated`). Five of the team must hang on its three
+ropes (Map.nx `area` 0-2), as many on each as Amos wants
+(`events::draw_ropes`): each of the five is drawn to a rope at random.
+Cosmic's `generateCombo1` can want fewer than five, which no try meets;
+here it is always five (QUESTIONS b261). The harness pins it to two, two
+and one (`RUSTMS_AMORIA_ROPES`). Amos first tells the leader the task;
+after that, each talk to him is a try, judged by the event
+(`EventMessage::Ropes`, `events::Ropes`), unless monsters are about or the
+ropes don't hold five. A wrong try shows the wrong answer to the map, and
+the map hears in pink whether no rope or one rope holds the right weight.
+The seventh wrong try in a row draws the ropes anew and brings out two
+each of 9400515-9400517 below five points (`AMORIA_ROPE_MOBS_AT`). The
+right try clears the stage without a word, for 4000 EXP each.
 
 ## Jr. Balrog's room
 

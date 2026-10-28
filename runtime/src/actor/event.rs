@@ -36,8 +36,8 @@ use game_data::server_content::keys;
 use game_data::skills::CarnivalSkill;
 use net::events::{
     draw_combo, draw_question, htpq_room_key, Balloon, ClockOn, Cloto, Event, EventCommand,
-    EventKind, Puzzles, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT, MAZE_COUPONS_WANTED,
-    MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
+    EventKind, Puzzles, Ropes, RopesTalk, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT,
+    MAZE_COUPONS_WANTED, MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
 };
 use net::loot::Loot;
 use net::packet::build::world::carnival::{
@@ -78,6 +78,15 @@ pub enum EventMessage {
         client_id: ClientId,
         stage: u8,
         reply: oneshot::Sender<Option<Balloon>>,
+    },
+    /// `client_id` talks to Amos on the Amorian Challenge's rope stage,
+    /// with monsters about or not and `heads` on its ropes; None for anyone
+    /// not in the event.
+    Ropes {
+        client_id: ClientId,
+        mobs: bool,
+        heads: [u8; 3],
+        reply: oneshot::Sender<Option<RopesTalk>>,
     },
     /// `client_id` talks to the Guild Quest's statue keeper; None for
     /// anyone not in the event.
@@ -389,6 +398,24 @@ impl EventTicket {
         view.await.ok().flatten()
     }
 
+    /// What Amos makes of the member's talk on the Amorian Challenge's
+    /// rope stage, with monsters about or not and `heads` on its ropes;
+    /// a right try clears the stage. `None` if the event is over.
+    pub async fn ropes(&self, mobs: bool, heads: [u8; 3]) -> Option<RopesTalk> {
+        let (reply, talk) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Ropes {
+                client_id: self.member,
+                mobs,
+                heads,
+                reply,
+            })
+            .await
+            .ok()?;
+        talk.await.ok().flatten()
+    }
+
     /// Where the member stands with the NPC `stage` is handed in to, or
     /// `None` if the event is over.
     pub async fn balloon(&self, stage: u8) -> Option<Balloon> {
@@ -638,6 +665,7 @@ pub fn spawn(
         statues: Default::default(),
         vassals: Default::default(),
         heard: HashSet::new(),
+        ropes: Ropes::default(),
         cleared,
         leader: Arc::new(AtomicI32::new(start.leader)),
         directory: directory.clone(),
@@ -754,8 +782,11 @@ struct EventActor {
     statues: net::guild_quest::Statues,
     /// The Guild Quest's vassals' wish and the guild's tries at it.
     vassals: net::guild_quest::Vassals,
-    /// The hand-in stages whose NPC the leader has heard out.
+    /// The hand-in stages whose NPC the leader has heard out, and the
+    /// Amorian Challenge's rope stage.
     heard: HashSet<u8>,
+    /// The Amorian Challenge's ropes and the tries at them.
+    ropes: Ropes,
     cleared: Arc<Cleared>,
     /// The team's leader, for the tickets.
     leader: Arc<AtomicI32>,
@@ -856,6 +887,9 @@ impl EventActor {
                     }
                     Some(EventMessage::Balloon { client_id, stage, reply }) => {
                         let _ = reply.send(self.balloon(client_id, stage));
+                    }
+                    Some(EventMessage::Ropes { client_id, mobs, heads, reply }) => {
+                        let _ = reply.send(self.ropes(client_id, mobs, heads));
                     }
                     Some(EventMessage::Statues { client_id, reply }) => {
                         let _ = reply.send(self.statues(client_id));
@@ -1256,6 +1290,32 @@ impl EventActor {
         } else {
             Balloon::Ready
         })
+    }
+
+    /// The leader first hears what the rope stage asks; then, once no
+    /// monster is about, each try with five on the ropes is judged, and
+    /// the right one clears the stage (Cosmic `9201044`).
+    fn ropes(&mut self, client_id: ClientId, mobs: bool, heads: [u8; 3]) -> Option<RopesTalk> {
+        if !self.team.has(client_id) || self.kind != EventKind::Amoria {
+            return None;
+        }
+        let stage = net::events::AMORIA_ROPES_STAGE;
+        let talk = if self.cleared.has(stage) {
+            RopesTalk::Cleared
+        } else if client_id != self.team.leader() {
+            RopesTalk::NotLeader
+        } else if self.heard.insert(stage) {
+            RopesTalk::Intro
+        } else if mobs {
+            RopesTalk::Mobs
+        } else {
+            let draw = || net::events::draw_ropes(&mut rand::thread_rng());
+            self.ropes.try_heads(heads, draw)
+        };
+        if talk == RopesTalk::Right {
+            self.clear(stage);
+        }
+        Some(talk)
     }
 
     fn command(&mut self, client_id: ClientId, command: EventCommand) {

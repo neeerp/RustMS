@@ -14,7 +14,7 @@ use game_data::{Area, PortalTemplate};
 use net::carnival::SpendRefusal;
 use net::events::{
     self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, Entry, EventCommand, EventKind,
-    HeadCount, JailCheck, LeverCheck, Standing, Statue,
+    HeadCount, JailCheck, LeverCheck, RopesTalk, Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
@@ -29,7 +29,7 @@ use net::packet::build::world::field::{
     build_dojo_energy, build_dojo_warp_up, build_pyramid_score,
 };
 use net::packet::build::world::inventory::{build_char_look, build_inventory_operation};
-use net::packet::build::world::messaging::build_item_line;
+use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::packet::build::world::quest::{build_quest_ex_record, build_quest_record};
 use net::packet::build::world::stat::build_hp_mp;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
@@ -452,6 +452,53 @@ impl ClientActor {
         Ok(Some(NpcScript::glimmer_man(
             player, leader, fierry, shard, bare,
         )))
+    }
+
+    /// What Amos says to the player on the Amorian Challenge's rope stage,
+    /// if there: how the leader's try weighs, by where the team hangs on
+    /// the ropes. A wrong try shows to the map as a wrong answer, with a
+    /// pink line (Cosmic `9201044`'s `mapMessage`).
+    pub(super) async fn amoria_ropes(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let event = EventKind::Amoria.event();
+        if event.stage_on(map_id) != Some(events::AMORIA_ROPES_STAGE) {
+            return Ok(None);
+        }
+        let in_amoria =
+            |ticket: &&EventTicket| ticket.kind == EventKind::Amoria && ticket.holds(map_id);
+        if self.event.as_ref().filter(in_amoria).is_none() {
+            return Ok(None);
+        }
+        let (reply, mobs) = oneshot::channel();
+        self.send_to_field(FieldMessage::MobCount { reply }).await?;
+        let mobs = mobs.await.unwrap_or(1) > 0;
+        let Some(heads) = self.standing_on(map_id, events::heads_on).await? else {
+            return Ok(None);
+        };
+        let Some(ticket) = self.event.as_ref() else {
+            return Ok(None);
+        };
+        let Some(talk) = ticket.ropes(mobs, heads).await else {
+            return Ok(None);
+        };
+        let notice = match talk {
+            RopesTalk::Wrong { right: 0 } => Some(keys::AMORIA_PQ_STAGE2_ALL_DIFFER_NOTICE),
+            RopesTalk::Wrong { .. } => Some(keys::AMORIA_PQ_STAGE2_ONE_SAME_NOTICE),
+            RopesTalk::Reset => Some(keys::AMORIA_PQ_STAGE2_RESET_NOTICE),
+            _ => None,
+        };
+        if let Some(notice) = notice {
+            let line = net::content::text().get(notice, &[]);
+            let mut packet = build_broadcast(Broadcast::Pink, &line)?;
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::BroadcastAll(packet.clone()),
+            })
+            .await?;
+            self.send(&mut packet).await?;
+            self.show_wrong_answer().await?;
+        }
+        Ok(Some(NpcScript::amos_ropes(talk)))
     }
 
     /// What the hub's Romeo or Juliet, `npc_id`, says to the player in
@@ -1727,6 +1774,7 @@ impl ClientActor {
         let mut packets = Vec::new();
         // The knights' hall's clear shows on the maps off it too.
         let here = next.stats.map_id == map_id
+            || event.stage_on(next.stats.map_id) == Some(stage)
             || (ticket_kind == EventKind::GuildQuest
                 && map_id == net::guild_quest::KNIGHT_HALL
                 && net::guild_quest::KNIGHT_MAPS.contains(&next.stats.map_id));

@@ -85,6 +85,9 @@ services:
       # Magatia's rope rooms want ropes 0, 1, 2, 3, 0, 1, 2, 3, 0, 1 from
       # the bottom up (see tests/magatia_ropes.rs).
       RUSTMS_MAGATIA_ROPES: "0123012301"
+      # The Amorian Challenge's rope stage wants two, two and one on its
+      # ropes (see tests/amoria_stage2.rs).
+      RUSTMS_AMORIA_ROPES: "221"
       # Its first jail opens to levers 1, 3 and 5 (see tests/opq_jails.rs).
       RUSTMS_OPQ_JAIL1: "135"
       # The Guild Quest's four vassals wish for the four offerings in turn

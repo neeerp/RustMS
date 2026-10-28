@@ -2205,6 +2205,15 @@ pub mod keys {
     pub const AMORIA_PQ_AMOS_NOT_LEADER: &str = "amoria_pq.amos.not_leader";
     pub const AMORIA_PQ_STAGE1_INTRO: &str = "amoria_pq.stage1.intro";
     pub const AMORIA_PQ_STAGE1_SEE_GLIMMER: &str = "amoria_pq.stage1.see_glimmer";
+    pub const AMORIA_PQ_STAGE2_INTRO: &str = "amoria_pq.stage2.intro";
+    pub const AMORIA_PQ_STAGE2_MOBS: &str = "amoria_pq.stage2.mobs";
+    pub const AMORIA_PQ_STAGE2_FEW: &str = "amoria_pq.stage2.few";
+    pub const AMORIA_PQ_STAGE2_ALL_DIFFER: &str = "amoria_pq.stage2.all_differ";
+    pub const AMORIA_PQ_STAGE2_ALL_DIFFER_NOTICE: &str = "amoria_pq.stage2.all_differ_notice";
+    pub const AMORIA_PQ_STAGE2_ONE_SAME: &str = "amoria_pq.stage2.one_same";
+    pub const AMORIA_PQ_STAGE2_ONE_SAME_NOTICE: &str = "amoria_pq.stage2.one_same_notice";
+    pub const AMORIA_PQ_STAGE2_RESET: &str = "amoria_pq.stage2.reset";
+    pub const AMORIA_PQ_STAGE2_RESET_NOTICE: &str = "amoria_pq.stage2.reset_notice";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";
     pub const AMORIA_PQ_GLIMMER_MEMBER_TASK: &str = "amoria_pq.glimmer.member_task";
     pub const AMORIA_PQ_GLIMMER_FIERRY_OUT: &str = "amoria_pq.glimmer.fierry_out";

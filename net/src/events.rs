@@ -312,6 +312,10 @@ pub struct Event {
     /// Where those on a stage's map go when it is cleared: the stage and
     /// the portal on its map.
     pub clear_portals: &'static [(u8, &'static str)],
+    /// Other maps a stage is played on, each a copy of its map, one of
+    /// which a run plays: the map and its stage (the Amorian Challenge's
+    /// three rope stages).
+    pub stage_copies: &'static [(i32, u8)],
     /// The stage maps whose `next00` portal stays shut until their stage is
     /// cleared.
     pub gated: &'static [i32],
@@ -448,6 +452,7 @@ pub const KPQ: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[103_000_800, 103_000_801, 103_000_802, 103_000_803],
     puzzles: 2..=4,
     areas_taken: 3,
@@ -542,6 +547,7 @@ pub const HPQ: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -594,6 +600,7 @@ pub const LPQ: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[
         922_010_100,
         922_010_200,
@@ -804,6 +811,7 @@ pub const OPQ: Event = Event {
         OPQ_WIN_STAGE,
     ],
     clear_portals: &[(1, "st00")],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1037,6 +1045,7 @@ pub const ZPQ: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1103,6 +1112,7 @@ pub const ZAKUM: Event = Event {
     talk_clears: &[],
     member_clears: &[1],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1146,6 +1156,7 @@ pub const GUILD_QUEST: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[crate::guild_quest::WAITING_ROOM],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1197,6 +1208,7 @@ pub const PAPULATUS: Event = Event {
     talk_clears: &[],
     member_clears: &[1],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1246,6 +1258,7 @@ pub const HORNTAIL: Event = Event {
     talk_clears: &[],
     member_clears: &[1, 2, 3],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1339,6 +1352,7 @@ pub const HTPQ: Event = Event {
     talk_clears: &[5],
     member_clears: &[1, 2, 3, 4],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1425,6 +1439,7 @@ pub const DELLI: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1536,6 +1551,7 @@ pub const LUDIMAZE: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1594,6 +1610,7 @@ pub const TYLUS: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1681,6 +1698,7 @@ pub const ELLIN: Event = Event {
     // by its box, the last by the golem's death.
     member_clears: &[1, 2, 3, 4, 5, 6],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1892,6 +1910,7 @@ pub const PIRATE: Event = Event {
     talk_clears: &[],
     member_clears: &[1, 3, 4, 5],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -1938,6 +1957,95 @@ pub const FIERRY_AT: (i16, i16) = (-245, 810);
 /// the clear opens one, drawn at random (Cosmic `9201044`'s `clearStage`).
 pub const AMORIA_WAYS: [&str; 3] = ["go00", "go01", "go02"];
 pub const AMORIA_STAGE2: [i32; 3] = [670_010_300, 670_010_301, 670_010_302];
+/// Stage 2, played on whichever of `AMORIA_STAGE2` the way drawn led to:
+/// five of the team hang on its three ropes, as many on each as Amos has
+/// drawn (`draw_ropes`), and after seven wrong tries the ropes are drawn
+/// anew and these monsters come out, two of each below each point
+/// (Cosmic `9201044`'s `spawnMobs`).
+pub const AMORIA_ROPES_STAGE: u8 = 2;
+pub const AMORIA_ROPERS: u8 = 5;
+pub const AMORIA_ROPE_TRIES: u8 = 7;
+pub const AMORIA_ROPE_MOBS: [i32; 3] = [9_400_515, 9_400_516, 9_400_517];
+pub const AMORIA_ROPE_MOBS_AT: [(i16, i16); 5] = [
+    (619, -840),
+    (299, -840),
+    (47, -840),
+    (-140, -840),
+    (-471, -840),
+];
+pub const AMORIA_ROPE_MOBS_EACH: u8 = 2;
+
+/// How many of the five Amos wants on each of stage 2's ropes: each of
+/// the five drawn to a rope at random. Cosmic's `generateCombo1` drops the
+/// draw's leading zeros and can want fewer than five, which no try can
+/// meet (`v83ref/lanes/QUESTIONS.md` b261). For testing,
+/// `RUSTMS_AMORIA_ROPES` pins it as three digits that add up to 5
+/// (`"221"`).
+pub fn draw_ropes(rng: &mut impl rand::Rng) -> [u8; 3] {
+    static PINNED: OnceLock<Option<[u8; 3]>> = OnceLock::new();
+    let pinned = *PINNED.get_or_init(|| {
+        pinned_digits("RUSTMS_AMORIA_ROPES", 0..=AMORIA_ROPERS)
+            .filter(|ropes| ropes.iter().sum::<u8>() == AMORIA_ROPERS)
+    });
+    pinned.unwrap_or_else(|| {
+        let mut ropes = [0; 3];
+        for _ in 0..AMORIA_ROPERS {
+            ropes[rng.gen_range(0, ropes.len())] += 1;
+        }
+        ropes
+    })
+}
+
+/// What Amos makes of the leader's talk on stage 2.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RopesTalk {
+    /// The stage is cleared; the way on is open.
+    Cleared,
+    NotLeader,
+    /// The leader's first talk: what the stage asks.
+    Intro,
+    /// Monsters are still about.
+    Mobs,
+    /// Not five on the ropes.
+    Few,
+    /// A wrong try, `right` ropes with as many on them as wanted.
+    Wrong {
+        right: usize,
+    },
+    /// The seventh wrong try in a row: the ropes are drawn anew, and the
+    /// monsters come out.
+    Reset,
+    /// The right try, which clears the stage.
+    Right,
+}
+
+/// The ropes Amos wants on stage 2 and the team's wrong tries since they
+/// were drawn.
+#[derive(Debug, Default)]
+pub struct Ropes {
+    wanted: Option<[u8; 3]>,
+    misses: u8,
+}
+
+impl Ropes {
+    /// The leader tries with `heads` on the ropes, the ropes drawn by
+    /// `draw` if not yet (Cosmic `9201044`).
+    pub fn try_heads(&mut self, heads: [u8; 3], draw: impl FnOnce() -> [u8; 3]) -> RopesTalk {
+        let wanted = *self.wanted.get_or_insert_with(draw);
+        match tally(wanted, heads) {
+            HeadCount::Few => RopesTalk::Few,
+            HeadCount::Right => RopesTalk::Right,
+            HeadCount::Wrong { right } => {
+                self.misses += 1;
+                if self.misses < AMORIA_ROPE_TRIES {
+                    return RopesTalk::Wrong { right };
+                }
+                *self = Ropes::default();
+                RopesTalk::Reset
+            }
+        }
+    }
+}
 
 /// Where `portal` on `map_id` leads a player in the Amorian Challenge
 /// whose stage 1 opened the way numbered `open`, if any: the open one of
@@ -1977,7 +2085,8 @@ pub const AMORIA: Event = Event {
     talk_clears: &[],
     member_clears: &[],
     clear_portals: &[],
-    gated: &[],
+    stage_copies: &[(AMORIA_STAGE2[1], 2), (AMORIA_STAGE2[2], 2)],
+    gated: &AMORIA_STAGE2,
     puzzles: 1..=0,
     areas_taken: 0,
     items: &AMORIA_ITEMS,
@@ -2058,6 +2167,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
             MAGATIA_BOSS_STAGE,
         ],
         clear_portals: &[],
+        stage_copies: &[],
         gated: &[],
         puzzles: 1..=0,
         areas_taken: 0,
@@ -2365,6 +2475,7 @@ pub const DOJO: Event = Event {
     talk_clears: &[],
     member_clears: &DOJO_CLEARS,
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -2441,6 +2552,7 @@ pub const DOJO_TRIAL: Event = Event {
     talk_clears: &[],
     member_clears: &[1],
     clear_portals: &[],
+    stage_copies: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -3104,6 +3216,9 @@ impl Event {
 
     /// The stage played on `map_id`, if any; none is played in its rooms.
     pub fn stage_on(&self, map_id: i32) -> Option<u8> {
+        if let Some(&(_, stage)) = self.stage_copies.iter().find(|(map, _)| *map == map_id) {
+            return Some(stage);
+        }
         if !self.stage_maps.is_empty() {
             let index = self.stage_maps.iter().position(|&map| map == map_id)?;
             return u8::try_from(index + 1).ok();
@@ -3700,12 +3815,13 @@ pub fn draw_split(rng: &mut impl rand::Rng) -> [u8; 3] {
     })
 }
 
-/// How the team stands on the sealed room's platforms for Eak.
+/// How the team stands on the sealed room's platforms for Eak, or on
+/// Amoria's ropes for Amos.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeadCount {
-    /// Not three of them on the platforms in all.
+    /// Not as many on the platforms in all as wanted.
     Few,
-    /// Three, but not as he wants: `right` platforms have their number.
+    /// As many, but not as wanted: `right` platforms have their number.
     Wrong {
         right: usize,
     },
@@ -3715,6 +3831,12 @@ pub enum HeadCount {
 /// How `positions` stand on the first three of `areas` for `split`. A
 /// position counts for the first area that holds it.
 pub fn head_count(split: [u8; 3], areas: &[Area], positions: &[(i32, i32)]) -> HeadCount {
+    tally(split, heads_on(areas, positions))
+}
+
+/// How many of `positions` are on each of the first three of `areas`, each
+/// counted for the first that holds it.
+pub fn heads_on(areas: &[Area], positions: &[(i32, i32)]) -> [u8; 3] {
     let platforms = &areas[..areas.len().min(3)];
     let mut heads = [0u8; 3];
     for &(x, y) in positions {
@@ -3722,8 +3844,14 @@ pub fn head_count(split: [u8; 3], areas: &[Area], positions: &[(i32, i32)]) -> H
             heads[area] = heads[area].saturating_add(1);
         }
     }
+    heads
+}
+
+/// How `heads` on three platforms stand against `split`.
+fn tally(split: [u8; 3], heads: [u8; 3]) -> HeadCount {
+    let total = |of: [u8; 3]| of.iter().map(|&h| usize::from(h)).sum::<usize>();
     let right = heads.iter().zip(split).filter(|(h, s)| **h == *s).count();
-    if heads.iter().map(|&h| usize::from(h)).sum::<usize>() != 3 {
+    if total(heads) != total(split) {
         HeadCount::Few
     } else if right == 3 {
         HeadCount::Right
@@ -4094,6 +4222,45 @@ mod tests {
         assert_eq!(way("go02", Some(2)), Some(Some(670010302)));
         assert_eq!(way("male00", Some(0)), None);
         assert_eq!(amoria_way(AMORIA_STAGE2[0], "go00", Some(0)), None);
+    }
+
+    #[test]
+    fn amoria_s_ropes_take_five_and_seven_misses_draw_them_anew() {
+        for map in AMORIA_STAGE2 {
+            assert_eq!(AMORIA.stage_on(map), Some(AMORIA_ROPES_STAGE));
+            assert_eq!(AMORIA.gate_stage(map, "next00"), Some(2));
+        }
+        assert_eq!(AMORIA.stage_on(670_010_303), None);
+        assert_eq!(AMORIA.stage_on(670_010_400), Some(3));
+        let mut rng = rand::thread_rng();
+        for _ in 0..100 {
+            assert_eq!(draw_ropes(&mut rng).iter().sum::<u8>(), AMORIA_ROPERS);
+        }
+
+        let mut ropes = Ropes::default();
+        let wanted = || [2, 2, 1];
+        assert_eq!(ropes.try_heads([2, 2, 0], wanted), RopesTalk::Few);
+        assert_eq!(
+            ropes.try_heads([5, 0, 0], wanted),
+            RopesTalk::Wrong { right: 0 }
+        );
+        assert_eq!(
+            ropes.try_heads([2, 3, 0], wanted),
+            RopesTalk::Wrong { right: 1 }
+        );
+        // Drawn once: a later draw doesn't count.
+        let other = || [5, 0, 0];
+        for _ in 3..AMORIA_ROPE_TRIES {
+            assert!(matches!(
+                ropes.try_heads([5, 0, 0], other),
+                RopesTalk::Wrong { .. }
+            ));
+        }
+        // A few on the ropes is no try.
+        assert_eq!(ropes.try_heads([1, 0, 0], other), RopesTalk::Few);
+        assert_eq!(ropes.try_heads([1, 1, 3], other), RopesTalk::Reset);
+        // Drawn anew.
+        assert_eq!(ropes.try_heads([5, 0, 0], other), RopesTalk::Right);
     }
 
     #[test]
