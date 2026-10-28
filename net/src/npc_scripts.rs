@@ -10,7 +10,7 @@ use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
     self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, Find, HandIn, HeadCount,
-    LeverCheck, MagatiaSide, PyramidMode, Standing, Statue,
+    LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::guild_quest;
@@ -1697,6 +1697,12 @@ impl NpcScript {
     /// the shard or not, and once the stage is `cleared`.
     pub fn amos_stage1(leader: bool, fierry: bool, shard: bool, cleared: bool) -> Self {
         amos_stage1(leader, fierry, shard, cleared)
+    }
+
+    /// Amos on the Amorian Challenge's rope stage, as he makes of the
+    /// talk (`events::Ropes`).
+    pub fn amos_ropes(talk: RopesTalk) -> Self {
+        amos_ropes(talk)
     }
 
     /// The Glimmer Man on the Amorian Challenge's first stage, to
@@ -11865,6 +11871,35 @@ fn amos_stage1(leader: bool, fierry: bool, shard: bool, cleared: bool) -> NpcScr
         _ if shard => Page::Done(vec![Effect::EventCommand(EventCommand::ClearStage(1))]),
         _ if fierry => Page::Say(text(keys::AMORIA_PQ_STAGE1_SEE_GLIMMER)),
         _ => Page::Say(text(keys::AMORIA_PQ_STAGE1_INTRO)),
+    };
+    NpcScript::new(AMOS_STAGE, vec![page])
+}
+
+/// Amos on the Amorian Challenge's rope stage (Cosmic `9201044`): the
+/// leader hears what the stage asks, then how each try weighs; the right
+/// one clears it without a word, and the seventh wrong one in a row brings
+/// out the monsters. The rest of the map hears a wrong try in pink chat
+/// (`runtime`'s client).
+fn amos_ropes(talk: RopesTalk) -> NpcScript {
+    let page = match talk {
+        RopesTalk::Cleared => Page::Say(text(keys::AMORIA_PQ_AMOS_CLEARED)),
+        RopesTalk::NotLeader => Page::Say(text(keys::AMORIA_PQ_AMOS_NOT_LEADER)),
+        RopesTalk::Intro => Page::Say(text(keys::AMORIA_PQ_STAGE2_INTRO)),
+        RopesTalk::Mobs => Page::Say(text(keys::AMORIA_PQ_STAGE2_MOBS)),
+        RopesTalk::Few => Page::Say(text(keys::AMORIA_PQ_STAGE2_FEW)),
+        RopesTalk::Wrong { right: 0 } => Page::Say(text(keys::AMORIA_PQ_STAGE2_ALL_DIFFER)),
+        RopesTalk::Wrong { .. } => Page::Say(text(keys::AMORIA_PQ_STAGE2_ONE_SAME)),
+        RopesTalk::Reset => Page::Act {
+            text: text(keys::AMORIA_PQ_STAGE2_RESET),
+            effects: (events::AMORIA_ROPE_MOBS.iter())
+                .map(|&mob_id| Effect::BringOutMobs {
+                    mob_id,
+                    at: &events::AMORIA_ROPE_MOBS_AT,
+                    each: events::AMORIA_ROPE_MOBS_EACH,
+                })
+                .collect(),
+        },
+        RopesTalk::Right => Page::Done(Vec::new()),
     };
     NpcScript::new(AMOS_STAGE, vec![page])
 }
