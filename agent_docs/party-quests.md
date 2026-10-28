@@ -42,9 +42,8 @@ is taken alone ([Jr. Balrog's room](#jr-balrogs-room)), and so are King
 Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
 room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 ([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
-married couples, has its entry, its way out, its end rules and its six
-stages; its bonus comes in a later slice ([the Amorian
-Challenge](#the-amorian-challenge)).
+married couples, has its entry, its way out, its end rules, its six
+stages and its bonus ([the Amorian Challenge](#the-amorian-challenge)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1518,9 +1517,28 @@ above the map's first area: a living player who talks to him from inside
 that area (Map.nx `area` 0) is taken up to `st01` without a word, and a
 dead one is told so. Otherwise he sends the others to the leader, and asks
 the leader for the Fang; the leader's Fang wins the challenge for 11000
-EXP each, and the clock stops. After that the leader hears it is won and
-the others are told to wait for the leader; Cosmic's bonus maps
-(670010750 and 670010800) come in a later slice.
+EXP each, and the clock stops. After that the others are told to wait for
+the leader, and the leader's next talk starts the bonus
+(`EventCommand::StartBonus`).
+
+The bonus (`Bonus::couples`, Cosmic `9201045`'s `marriedGroup`): a team
+whose every member is married to another member (`EventStart::couples`,
+worked out by `DirectoryActor::start_event`) first goes to the couples'
+bonus, 670010750 (`AMORIA_COUPLES_BONUS`), for two minutes; any other team
+goes straight to the bonus, 670010800 (`AMORIA_BONUS`), for one. Each of
+the couples' bonus's boxes (6701000 to 6701002), hit open, brings out
+seven monsters, each one of 9400523 to 9400525 at random
+(`Action::BringOutAnyOf`); in the content pack only 9400524 has a drop,
+item 4031597. Its `stageBogo` portals (`scripts::AMORIA_BONUS_WAY`) take
+one player on to 670010800, on the same clock, and the leader's talk with
+Amos there (Map.nx has him on 670010750, not 9201046) takes the whole team
+on, on a clock of a minute. On 670010800 the crates (6702003 to 6702012)
+drop from their `rewards.json` entries, one roll each, and the other Amos
+(`AMOS_BONUS`, 9201046) only says time is short
+(`amoria_pq.bonus.hurry`). When a bonus's time is up, the team leaves for
+the exit, 670011000. Both maps shuffle their reactors on reset. Cosmic's
+9201046 also trades 35 pieces for a cape, but only on 670010750, where
+Map.nx never puts it, so that trade is left out.
 
 ## Jr. Balrog's room
 

@@ -4176,6 +4176,13 @@ impl FieldActor {
             reactors::Action::BringOutAt { mob_id, count, at } => {
                 self.board(mob_id, count, at);
             }
+            reactors::Action::BringOutAnyOf(mobs, count) => {
+                let at = (view.x, view.y.saturating_sub(10));
+                for _ in 0..count {
+                    let mob_id = mobs[rand::thread_rng().gen_range(0, mobs.len())];
+                    self.board(mob_id, 1, at);
+                }
+            }
             reactors::Action::BringOutLots(lots) => {
                 for (mob_id, count) in lots {
                     self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));

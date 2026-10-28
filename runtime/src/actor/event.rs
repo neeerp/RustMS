@@ -566,6 +566,9 @@ pub struct EventStart {
     /// A squad's whole roster, who may come in while it runs, those who
     /// stayed behind at the start too.
     pub roster: Vec<ClientId>,
+    /// Whether each member's partner came too (Cosmic AmoriaPQ's
+    /// `isTeamAllCouple`), for the couples' bonus.
+    pub couples: bool,
 }
 
 /// A queue for an event about to start, made by the directory so it can
@@ -704,6 +707,8 @@ pub fn spawn(
         everyone: everyone.clone(),
         failed: false,
         bonus_taken: false,
+        couples: start.couples,
+        couples_taken: false,
         moved_to: Vec::new(),
         reached: HashSet::new(),
         lord_pirate_out: false,
@@ -834,6 +839,10 @@ struct EventActor {
     failed: bool,
     /// The leader took the team to the bonus.
     bonus_taken: bool,
+    /// Each member's partner came too, and the leader took the team to the
+    /// couples' bonus (`Bonus::couples`).
+    couples: bool,
+    couples_taken: bool,
     /// The maps the team has been moved to (`EventCommand::MoveTeam`).
     moved_to: Vec<i32>,
     /// The maps whose first arrival has started the clock over
@@ -2109,6 +2118,19 @@ impl EventActor {
         let Some(bonus) = &self.kind.event().bonus else {
             return;
         };
+        // A team of couples plays its own bonus first (Cosmic AmoriaPQ's
+        // `marriedGroup`).
+        let first = bonus
+            .couples
+            .filter(|_| self.couples && !self.couples_taken);
+        if let Some((map, seconds)) = first {
+            let ends = Instant::now() + net::events::scaled(Duration::from_secs(seconds));
+            self.couples_taken = true;
+            self.ends = Some(ends);
+            self.move_team(None, map, Some(ends));
+            info!(kind = ?self.kind, id = self.id, "Couples' bonus started");
+            return;
+        }
         let ends = Instant::now() + bonus.duration();
         self.bonus_taken = true;
         self.ends = Some(ends);
@@ -2535,9 +2557,11 @@ impl EventActor {
         }
         let event = self.kind.event();
         match &event.bonus {
-            Some(bonus) if self.bonus_taken => {
+            Some(bonus) if self.bonus_taken || self.couples_taken => {
                 self.ends = None;
-                self.move_team(Some(bonus.map), bonus.exit, None);
+                // After the couples' bonus, some may still be on it.
+                let from = Some(bonus.map).filter(|_| !self.couples_taken);
+                self.move_team(from, bonus.exit, None);
                 info!(kind = ?self.kind, id = self.id, "Bonus over");
                 false
             }

@@ -42,6 +42,9 @@ pub enum Action {
         count: usize,
         at: (i16, i16),
     },
+    /// Bring out `count` mobs on the ground below it instead, each one of
+    /// these at random: the Amorian Challenge's couples' boxes.
+    BringOutAnyOf(&'static [i32], usize),
     /// Bring out two lots of mobs, each `count` of `mob_id`, on the ground
     /// below it instead: the Pirate Ship's mob boxes (Cosmic `2511000`).
     BringOutLots([(i32, usize); 2]),
@@ -375,6 +378,10 @@ pub fn action(reactor_id: i32) -> Action {
         // The Amorian Challenge's stage-5 gates, which stay open once hit
         // to their last state (`amoriaItem1` does nothing).
         crate::events::AMORIA_GATE => Action::Hold,
+        id if crate::events::AMORIA_BOXES.contains(&id) => Action::BringOutAnyOf(
+            &crate::events::AMORIA_BOX_MOBS,
+            crate::events::AMORIA_BOX_MOB_COUNT,
+        ),
         crate::guild_quest::SPEAR => Action::Spear,
         crate::guild_quest::KING_GATE_REACTOR => Action::KingGate,
         // The grave's altar, once dressed (Cosmic `9201001`).
@@ -683,10 +690,12 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 /// fourth stages, where invisible boxes (`2518000`) hold places for the
 /// real ones (`PiratePQ`), and those of the two rooms beside a Magatia
 /// hub, where the experiment files are (`MagatiaPQ`'s `shuffleReactors`
-/// of `2518000` to `2612004`, so not their ways back: `shuffles`).
+/// of `2518000` to `2612004`, so not their ways back: `shuffles`), and the
+/// Amorian Challenge's two bonus maps' boxes and crates (`AmoriaPQ`).
 pub fn shuffled(map_id: i32) -> bool {
     use crate::events::{
-        MagatiaSide, DOLLHOUSE_ROOM, ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM, PARTS_ROOM, PIRATE_STAGES,
+        MagatiaSide, AMORIA_BONUS, AMORIA_COUPLES_BONUS, DOLLHOUSE_ROOM, ELLIN_STAGES, MAZE_GOAL,
+        MAZE_ROOM, PARTS_ROOM, PIRATE_STAGES,
     };
     let magatia = MagatiaSide::ALL
         .iter()
@@ -699,6 +708,7 @@ pub fn shuffled(map_id: i32) -> bool {
         || map_id == ELLIN_STAGES[4]
         || [PIRATE_STAGES[0], PIRATE_STAGES[2], PIRATE_STAGES[3]].contains(&map_id)
         || magatia
+        || [AMORIA_COUPLES_BONUS, AMORIA_BONUS].contains(&map_id)
 }
 
 /// Whether reactor `reactor_id` changes places with the others on a
@@ -764,6 +774,9 @@ mod tests {
         assert_eq!(action(2401001), Action::BringOut(9300089, 1));
         assert_eq!(action(2401002), Action::BringOut(9300090, 1));
         assert_eq!(action(2201001), Action::BringOut(LPQ_BLOCTOPUS, 3));
+        let box_mobs = &crate::events::AMORIA_BOX_MOBS;
+        assert_eq!(action(6701001), Action::BringOutAnyOf(box_mobs, 7));
+        assert!(shuffled(crate::events::AMORIA_BONUS) && shuffled(670_010_750));
         assert!(matches!(
             action(2202004),
             Action::Spray { at_least: 15, .. }

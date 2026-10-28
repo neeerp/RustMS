@@ -229,6 +229,7 @@ impl WorldDirectory {
                 blessing: None,
                 queue,
                 roster: Vec::new(),
+                couples: false,
             },
             fields,
             directory,

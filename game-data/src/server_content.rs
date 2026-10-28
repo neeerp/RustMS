@@ -2228,7 +2228,7 @@ pub mod keys {
     pub const AMORIA_PQ_STAGE5_GATE_SHUT: &str = "amoria_pq.stage5.gate_shut";
     pub const AMORIA_PQ_STAGE6_FANG: &str = "amoria_pq.stage6.fang";
     pub const AMORIA_PQ_STAGE6_DONE: &str = "amoria_pq.stage6.done";
-    pub const AMORIA_PQ_STAGE6_WON: &str = "amoria_pq.stage6.won";
+    pub const AMORIA_PQ_BONUS_HURRY: &str = "amoria_pq.bonus.hurry";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";

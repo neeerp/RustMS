@@ -984,6 +984,8 @@ pub const AMOS_LOBBY: i32 = 9201048;
 pub const GLIMMER_MAN: i32 = 9201047;
 pub const AMOS_STAGE: i32 = 9201044;
 pub const AMOS_TRIALS: i32 = 9201045;
+/// Amos on the Amorian Challenge's crates' bonus.
+pub const AMOS_BONUS: i32 = 9201046;
 /// So Gong, who takes a challenger into the Mu Lung Dojo from its hall and
 /// stands on each of its floors, and the notice board in Mu Lung that
 /// leads to the Dojo.
@@ -1716,9 +1718,9 @@ impl NpcScript {
         amos_gather(talk)
     }
 
-    /// Amos on the Amorian Challenge's last stage, to `player`, who may
-    /// lead the team, once it is `won` or not, standing `below` in the
-    /// map's first area or not.
+    /// Amos on the Amorian Challenge's last stage and its couples' bonus,
+    /// to `player`, who may lead the team, once it is `won` or not,
+    /// standing `below` in the last stage's first area or not.
     pub fn amos_geist(player: &Player, leader: bool, won: bool, below: bool) -> Self {
         amos_geist(player, leader, won, below)
     }
@@ -2235,6 +2237,12 @@ impl NpcScript {
             }
             AMOS_HALL if player.stats.map_id == events::AMORIA_HALL => {
                 return Some(amos_hall(player));
+            }
+            // Cosmic `9201046`'s claim of 35 Cupid Code Pieces is on the
+            // couples' bonus, where Map.nx has 9201045 instead.
+            AMOS_BONUS if player.stats.map_id == events::AMORIA_BONUS => {
+                let page = Page::Say(text(keys::AMORIA_PQ_BONUS_HURRY));
+                return Some(NpcScript::new(AMOS_BONUS, vec![page]));
             }
             GLIMMER_MAN if player.stats.map_id == events::AMORIA_EXIT => {
                 return Some(NpcScript::new(
@@ -11987,10 +11995,11 @@ fn amos_gather(talk: GatherTalk) -> NpcScript {
 
 /// Amos on the Amorian Challenge's last stage (Cosmic `9201045`): he takes
 /// anyone alive below up to the Geist Balrog, and the leader's Geist Fang
-/// wins the challenge.
+/// wins the challenge. Once it is won, the leader's next talk takes the
+/// team on to the bonus, as does a talk on the couples' bonus.
 fn amos_geist(player: &Player, leader: bool, won: bool, below: bool) -> NpcScript {
     let page = match () {
-        _ if won && leader => Page::Say(text(keys::AMORIA_PQ_STAGE6_WON)),
+        _ if won && leader => Page::Done(vec![Effect::EventCommand(EventCommand::StartBonus)]),
         _ if won => Page::Say(text(keys::AMORIA_PQ_STAGE6_WAIT)),
         _ if below && player.stats.hp > 0 => {
             let map = events::AMORIA_STAGE6;

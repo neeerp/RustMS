@@ -737,6 +737,14 @@ impl WorldDirectory {
             .filter_map(|member| self.clients.get(member))
             .collect();
         let jobs: Vec<_> = team.iter().map(|entry| entry.presence.job).collect();
+        let ids: HashSet<ClientId> = team.iter().map(|entry| entry.handle.client_id).collect();
+        let couples = team.iter().all(|entry| {
+            let presence = &entry.presence;
+            presence.married
+                && presence
+                    .partner
+                    .is_some_and(|partner| ids.contains(&partner))
+        });
         Some(EventStart {
             id,
             kind,
@@ -746,6 +754,7 @@ impl WorldDirectory {
             blessing: kind.event().blessing(&jobs, &mut rand::thread_rng()),
             queue: Default::default(),
             roster: Vec::new(),
+            couples,
         })
     }
 

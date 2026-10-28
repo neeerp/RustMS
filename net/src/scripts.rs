@@ -1298,6 +1298,16 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 Effect::WarpToPortal(town, portal_id(town, is_market_portal)),
             )
         }
+        // The Amorian Challenge's couples' bonus: its ways up skip to the
+        // crates' bonus, on the same clock.
+        AMORIA_BONUS_WAY => ScriptOutcome {
+            effects: vec![
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::AMORIA_BONUS, 0),
+            ],
+            block: false,
+            occupied: None,
+        },
         // A town's Free Market entrance (market01 to market22).
         script if script.starts_with("market") => ScriptOutcome {
             effects: vec![
@@ -3044,6 +3054,8 @@ pub fn gender_go(map_id: i32, portal: &str, gender: u8) -> Vec<Effect> {
 /// The doors on the Amorian Challenge's fifth stage, `gtNNPCS`, one by
 /// each of its gates, `gateNN`.
 pub const AMORIA_DOOR: &str = "doorgo";
+/// The couples' bonus's `up00` to `up02`.
+pub const AMORIA_BONUS_WAY: &str = "stageBogo";
 
 /// The gate `portal`, one of the `doorgo` portals, is by, if any.
 pub fn amoria_door_gate(portal: &str) -> Option<&'static str> {
