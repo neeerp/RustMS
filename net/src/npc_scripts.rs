@@ -1716,6 +1716,13 @@ impl NpcScript {
         amos_gather(talk)
     }
 
+    /// Amos on the Amorian Challenge's last stage, to `player`, who may
+    /// lead the team, once it is `won` or not, standing `below` in the
+    /// map's first area or not.
+    pub fn amos_geist(player: &Player, leader: bool, won: bool, below: bool) -> Self {
+        amos_geist(player, leader, won, below)
+    }
+
     /// The Glimmer Man on the Amorian Challenge's first stage, to
     /// `player`, who may lead the team, once its fierry is out or not, the
     /// shard handed in or not, and the stage `bare` of mobs or not.
@@ -11974,6 +11981,38 @@ fn amos_gather(talk: GatherTalk) -> NpcScript {
         GatherTalk::Apart => Page::Say(text(keys::AMORIA_PQ_STAGE5_APART)),
         GatherTalk::Shut => Page::Say(text(keys::AMORIA_PQ_STAGE5_TELEPORTED)),
         GatherTalk::Right => Page::Say(text(keys::AMORIA_PQ_STAGE5_DONE)),
+    };
+    NpcScript::new(AMOS_TRIALS, vec![page])
+}
+
+/// Amos on the Amorian Challenge's last stage (Cosmic `9201045`): he takes
+/// anyone alive below up to the Geist Balrog, and the leader's Geist Fang
+/// wins the challenge.
+fn amos_geist(player: &Player, leader: bool, won: bool, below: bool) -> NpcScript {
+    let page = match () {
+        _ if won && leader => Page::Say(text(keys::AMORIA_PQ_STAGE6_WON)),
+        _ if won => Page::Say(text(keys::AMORIA_PQ_STAGE6_WAIT)),
+        _ if below && player.stats.hp > 0 => {
+            let map = events::AMORIA_STAGE6;
+            let up = scripts::named(map, events::AMORIA_LIFT_TO);
+            Page::Done(vec![Effect::WarpToPortal(map, up)])
+        }
+        _ if below => Page::Say(text(keys::AMORIA_PQ_STAGE6_DEAD)),
+        _ if !leader => Page::Say(text(keys::AMORIA_PQ_AMOS_NOT_LEADER)),
+        _ if player.inventory.count(events::GEIST_FANG) > 0 => Page::Act {
+            text: text(keys::AMORIA_PQ_STAGE6_DONE),
+            effects: vec![
+                Effect::TakeItem {
+                    item_id: events::GEIST_FANG,
+                    quantity: 1,
+                },
+                Effect::EventCommand(EventCommand::ClearStage(events::AMORIA_GEIST_STAGE)),
+            ],
+        },
+        _ => {
+            let fang = events::GEIST_FANG.to_string();
+            Page::Say(content::text().get(keys::AMORIA_PQ_STAGE6_FANG, &[("item", &fang)]))
+        }
     };
     NpcScript::new(AMOS_TRIALS, vec![page])
 }

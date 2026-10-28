@@ -1876,6 +1876,11 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     ];
     const BELLFLOWERS: [(i32, (i16, i16), usize); 2] =
         [(9_300_112, (0, 238), 10), (9_300_113, (1700, 238), 10)];
+    // The Amorian Challenge's boss (Cosmic `AmoriaPQ`'s `setup`).
+    const GEIST: [(i32, (i16, i16), usize); 1] = [(GEIST_BALROG, GEIST_BALROG_AT, 1)];
+    if map_id == AMORIA_STAGE6 {
+        return &GEIST;
+    }
     match PIRATE_STAGES[2..4]
         .iter()
         .find(|&&deck| deck == map_id || deck + 1 == map_id)
@@ -2011,7 +2016,18 @@ pub const AMORIA_GATES: [&str; 7] = [
 ];
 pub const AMORIA_GATE_OPEN: u8 = 4;
 pub const AMORIA_GATHER_AREA: usize = 2;
+/// Stage 6: the Geist Balrog waits on its map, in three forms, each coming
+/// out of the last as it dies (`revive`); only the last drops the Geist
+/// Fang. Amos (Cosmic `9201045`) takes anyone alive in the map's first
+/// area up to `st01`, and the leader hands him the Fang, which wins the
+/// challenge.
 pub const AMORIA_STAGE6: i32 = 670_010_700;
+pub const AMORIA_GEIST_STAGE: u8 = 6;
+pub const GEIST_BALROG: i32 = 9_400_536;
+pub const GEIST_BALROG_AT: (i16, i16) = (942, 478);
+pub const GEIST_FANG: i32 = 4_031_594;
+pub const AMORIA_LIFT_AREA: usize = 0;
+pub const AMORIA_LIFT_TO: &str = "st01";
 /// The stage maps whose way on stays shut until their stage is cleared.
 pub const AMORIA_GATED: [i32; 5] = [
     AMORIA_STAGE2[0],
@@ -4333,6 +4349,12 @@ mod tests {
         assert_eq!(AMORIA.stage_on(AMORIA_STAGE5), Some(AMORIA_GATES_STAGE));
         assert_eq!(AMORIA.stage_on(AMORIA_STAGE6), Some(AMORIA_GATES_STAGE + 1));
         assert!(AMORIA.maps.contains(&AMORIA_STAGE6));
+        assert_eq!(AMORIA.last_stage(), AMORIA_GEIST_STAGE);
+        assert_eq!(
+            opening_mobs(AMORIA_STAGE6),
+            [(GEIST_BALROG, GEIST_BALROG_AT, 1)]
+        );
+        assert!(AMORIA.items.contains(&GEIST_FANG));
         assert_eq!(AMORIA.hand_in_on(AMORIA_STAGE5, 9_201_045), None);
         let area = |x1, x2, y1, y2| Area { x1, x2, y1, y2 };
         let areas = [area(0, 10, 0, 10), area(0, 10, 0, 10), area(50, 60, 0, 10)];
