@@ -17,7 +17,7 @@ use crate::db::spawn_db;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::hired_merchant::{HiredMerchant, Stand};
 use game::mob_skill::{self, MobSkillEffect};
-use game::{wedding, FieldAvatar, MobStat};
+use game::{wedding, BuffStat, FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
 use game_data::server_content::keys;
 use game_data::skills::CarnivalSkill;
@@ -170,6 +170,25 @@ fn other_immunity(stat: MobStat) -> Option<MobStat> {
         MobStat::MImmune => Some(MobStat::PImmune),
         _ => None,
     }
+}
+
+/// The immunity that turns an attack whose mobs counter with `counter`
+/// (PCounter, or MCounter for a spell) aside.
+fn immunity_against(counter: MobStat) -> MobStat {
+    if counter == MobStat::MCounter {
+        MobStat::MImmune
+    } else {
+        MobStat::PImmune
+    }
+}
+
+/// How many of those in its reach a mob's disease takes: Seduce up to its
+/// `count`, the others all of them (Cosmic's `applyDisease`).
+fn diseased_most(stat: BuffStat, count: i32) -> usize {
+    usize::try_from(count)
+        .ok()
+        .filter(|&most| most > 0 && stat == BuffStat::Seduce)
+        .unwrap_or(usize::MAX)
 }
 
 /// How long to wait before reading or writing hired merchants again after
@@ -1045,6 +1064,7 @@ impl FieldActor {
                     broadcast,
                     skill,
                     counter,
+                    lines,
                     hits,
                     inflicts,
                     takes,
@@ -1060,7 +1080,7 @@ impl FieldActor {
                         from,
                         Some(broadcast),
                         Some(skill),
-                        Some(counter),
+                        Some((counter, lines)),
                         hits,
                         &inflicts,
                         takes,
@@ -1951,14 +1971,17 @@ impl FieldActor {
     /// as their v83 clients count it a miss (FUN_0068146c); a reflection
     /// (no skill) isn't judged. What it `takes` from them goes back to
     /// `from` as one message, and on a Nett's Pyramid stage what it did to
-    /// the mobs goes to their run.
+    /// the mobs goes to their run. A mob immune to the attack's kind
+    /// (PImmune, or MImmune for a spell) takes at most 1 a damage line
+    /// (Cosmic's `AbstractDealDamageHandler`): `counter` comes with the
+    /// lines it dealt each mob.
     #[allow(clippy::too_many_arguments)]
     fn handle_attack(
         &mut self,
         from: ClientId,
         broadcast: Option<Packet>,
         skill: Option<i32>,
-        counter: Option<MobStat>,
+        counter: Option<(MobStat, u8)>,
         hits: Vec<(i32, i64)>,
         inflicts: &[Inflict],
         takes: Takes,
@@ -1987,7 +2010,7 @@ impl FieldActor {
             .filter(|&(object_id, _)| !friendly(object_id) && !self.mobs.shielded(object_id))
             .collect();
         let now = Instant::now();
-        let countered: i32 = counter.map_or(0, |stat| {
+        let countered: i32 = counter.map_or(0, |(stat, _)| {
             hits.iter()
                 .map(|&(object_id, _)| self.mobs.counter(object_id, stat, rand::random()))
                 .filter(|&damage| damage > 0)
@@ -2024,7 +2047,13 @@ impl FieldActor {
             } else {
                 mob.info.cp
             };
-            let mut damage = if hurts { damage } else { 0 };
+            let immune =
+                counter.filter(|&(stat, _)| mob.statuses.contains_key(&immunity_against(stat)));
+            let mut damage = match immune {
+                _ if !hurts => 0,
+                Some((_, lines)) => damage.min(i64::from(lines)),
+                None => damage,
+            };
             let max_hp = i64::from(mob.info.max_hp);
             if let Some(cap) =
                 skill.and_then(|skill| net::skills::pq_strike_cap(skill, max_hp, mob.info.boss))
@@ -2766,11 +2795,12 @@ impl FieldActor {
         hits.into_iter()
             .zip(&blast.lines)
             .map(|((object_id, _), lines)| {
-                let fixed = self
-                    .mobs
-                    .get(object_id)
-                    .map_or(0, |mob| mob.info.fixed_damage);
-                let damage = lines
+                let mob = self.mobs.get(object_id);
+                let fixed = mob.map_or(0, |mob| mob.info.fixed_damage);
+                // Each target counts its own lines, so its immunity caps
+                // here, not at the attack's most.
+                let immune = mob.is_some_and(|mob| mob.statuses.contains_key(&MobStat::PImmune));
+                let damage: i64 = lines
                     .iter()
                     .map(|&(source, line)| match mesos[source] {
                         Some(amount) if line <= meso_explosion::line_cap(blast.x, amount) => {
@@ -2783,6 +2813,11 @@ impl FieldActor {
                         _ => 0,
                     })
                     .sum();
+                let damage = if immune {
+                    damage.min(lines.len() as i64)
+                } else {
+                    damage
+                };
                 (object_id, damage)
             })
             .collect()
@@ -3380,7 +3415,7 @@ impl FieldActor {
                     self.broadcast(None, packet);
                 }
             }
-            Some(MobSkillEffect::Disease(_)) => {
+            Some(MobSkillEffect::Disease(stat)) => {
                 if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
                     return;
                 }
@@ -3389,8 +3424,11 @@ impl FieldActor {
                 else {
                     return;
                 };
+                let most = diseased_most(stat, effect.count);
                 let map_id = self.key.map_id;
-                self.tell_reached(cast, |_| Some(ServerMessage::Diseased { disease, map_id }));
+                self.tell_reached(cast, |nth| {
+                    (nth < most).then_some(ServerMessage::Diseased { disease, map_id })
+                });
             }
             Some(MobSkillEffect::Dispel) => {
                 if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
@@ -6618,6 +6656,7 @@ mod tests {
                 broadcast: Packet::new_empty(),
                 skill: 0,
                 counter: game::MobStat::PCounter,
+                lines: 1,
                 hits: vec![(snail, damage)],
                 inflicts: Vec::new(),
                 takes,
@@ -6659,6 +6698,83 @@ mod tests {
         tx.send(attack(1, blow)).await.unwrap();
         tokio::time::sleep(Duration::from_millis(50)).await;
         assert_eq!(outcome(&mut client_rx), (vec![(1, 0)], true));
+    }
+
+    #[test]
+    fn seduce_takes_up_to_its_count_and_other_diseases_all() {
+        assert_eq!(diseased_most(BuffStat::Seduce, 10), 10);
+        assert_eq!(diseased_most(BuffStat::Seduce, 0), usize::MAX);
+        assert_eq!(diseased_most(BuffStat::Weakness, 1), usize::MAX);
+    }
+
+    #[tokio::test]
+    async fn an_immune_mob_takes_1_a_line_from_the_kind_it_is_immune_to() {
+        let mut mobs = MobSet::new([mob(100, false)]);
+        let snail = mobs.spawn_all(Instant::now())[0];
+        let now = Instant::now();
+        let immune = [(game::MobStat::PImmune, 1)];
+        let later = now + Duration::from_secs(60);
+        mobs.add_statuses(snail, &immune, 140, 0, now, later);
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (handle, mut client_rx) = client(1);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        opcodes(&mut client_rx).await;
+        // Drain gives back all it did, so it shows the damage dealt.
+        let drain = Takes {
+            hp: 100,
+            ..Takes::default()
+        };
+        let attack = |counter, lines, damage| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Attack {
+                broadcast: Packet::new_empty(),
+                skill: 0,
+                counter,
+                lines,
+                hits: vec![(snail, damage)],
+                inflicts: Vec::new(),
+                takes: drain,
+                blast: None,
+                pockets: Vec::new(),
+            },
+        };
+        let dealt = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let mut dealt = Vec::new();
+            while let Ok(message) = rx.try_recv() {
+                if let ServerMessage::Absorbed { hp, .. } = message {
+                    dealt.push(hp);
+                }
+            }
+            dealt
+        };
+
+        // Three lines of a swing do 1 each; a spell does all it did.
+        tx.send(attack(game::MobStat::PCounter, 3, 6))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(dealt(&mut client_rx), [3]);
+        tx.send(attack(game::MobStat::MCounter, 1, 4))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(dealt(&mut client_rx), [4]);
     }
 
     #[tokio::test]
@@ -6711,6 +6827,7 @@ mod tests {
                 broadcast: Packet::new_empty(),
                 skill: meso_explosion::MESO_EXPLOSION,
                 counter: game::MobStat::PCounter,
+                lines: 1,
                 hits: vec![(snail, 0)],
                 inflicts: Vec::new(),
                 takes: Takes::default(),

@@ -1693,6 +1693,12 @@ controller's client plays the cast and the server applies it
 - **Counters** (143 physical, 144 magic, 145 both) put PCounter and
   MCounter at `x` on the mobs it reaches: each attack on one hurts the
   attacker `x`, give or take half of `y` (`MobSkillEffect::Counters`).
+- **Immunities** (140 physical, 141 magic): a mob under PImmune takes at
+  most 1 a damage line from a player's weapon attack, and under MImmune
+  from a spell (`immunity_against` in `runtime/src/actor/field.rs`, as
+  Cosmic's `AbstractDealDamageHandler`). The attack's header gives the
+  lines; Meso Explosion caps each target by its own. A whole miss still
+  deals 0, and summons and reflected hits aren't judged.
 - **Dispel** (127) ends the skill buffs, and **Banish** (129) sends up to
   `count` players to the mob's `info/ban` map, of the players in its area,
   each cast landing by its `prop`. **Poison Mist** (131) lays a mob mist over
@@ -1708,7 +1714,8 @@ and Confuse (132) 51 (`game::mob_skill::inflicted`).
 
 - **Catching one:** a cast lands by its `prop`, rolled once, on every
   player in the caster's `lt`/`rb` box (mirrored when it faces right), or
-  without a box on its controller. A mob attack with `disease` and `level`
+  without a box on its controller. Seduce (128) takes at most its `count`
+  of them (`diseased_most`, as Cosmic's `applyDisease`). A mob attack with `disease` and `level`
   brings one by that level's `prop` when it does damage. A dead player, or
   one who has the stat already, catches nothing (`catch_disease`). The
   player gets GIVE_BUFF for `time` seconds; the map sees the shown ones

@@ -184,6 +184,45 @@ pub fn area_boss_spawns(map: i32, footholds: &Footholds) -> Vec<MapMobTemplate> 
 mod tests {
     use super::*;
 
+    /// Pink Bean's own data: it calls twelve minions once down to 80%, its
+    /// statue six at any time; the minions shrug off physical attacks; and
+    /// Munin sends one at a time to the Forgotten Twilight, which the
+    /// expedition's copy holds.
+    #[test]
+    fn pink_bean_and_its_guardians_skills() {
+        let (Some(pink_bean), Some(statue), Some(munin), Some(minion)) = (
+            info(PINK_BEAN),
+            info(PINK_BEAN_STATUE),
+            info(8820006),
+            info(8820007),
+        ) else {
+            return;
+        };
+        let has = |info: &MobInfo, skill, level| {
+            let has = info
+                .skills
+                .iter()
+                .any(|s| (s.skill, s.level) == (skill, level));
+            has.then(|| skill_level(skill, level).unwrap())
+        };
+        let calls = has(&pink_bean, 200, 101).unwrap();
+        assert_eq!((calls.hp, calls.summons.len()), (80, 12));
+        let calls = has(&statue, 200, 102).unwrap();
+        assert_eq!((calls.hp, calls.summons.len()), (100, 6));
+        assert!(calls.summons.iter().all(|&mob| mob == minion.mob_id));
+        let immune = has(&minion, 140, 12).unwrap();
+        assert_eq!(immune.prop, 100);
+        let banish = has(&munin, 129, 2).unwrap();
+        assert_eq!(banish.count, 1);
+        let to = munin.banish.clone().unwrap();
+        assert_eq!(
+            (to.map_id, to.portal.as_str()),
+            (crate::events::PINK_BEAN_REVIVE, "sp")
+        );
+        let seduce = has(&munin, 128, 8).unwrap();
+        assert_eq!(seduce.count, 10);
+    }
+
     #[test]
     fn area_bosses_come_out_on_their_maps_ground() {
         let Ok(data) = crate::get_game_data() else {
