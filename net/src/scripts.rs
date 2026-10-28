@@ -1553,6 +1553,11 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             UNDERGROUND_TEMPLE_STAIRS,
             named(UNDERGROUND_TEMPLE_STAIRS, "top00"),
         )),
+        // Pink Bean's Forgotten Twilight, where the dead come back, leads
+        // back to the fight in the expedition's copy (Cosmic `Pinkin`), and
+        // Between Twilight and Daybreak out to the gate (`PPinkOut`).
+        "Pinkin" => through(Effect::WarpToPortal(crate::events::PINK_BEAN_ARENA, 0)),
+        "PPinkOut" => through(Effect::WarpToPortal(crate::events::PINK_BEAN_GATE, 0)),
         // An Aran on To the Sealed Garden (21739) goes to its fight, alone.
         "enterNepenthes" if quest(TO_THE_SEALED_GARDEN) == QuestState::Started => ScriptOutcome {
             effects: vec![
@@ -4186,6 +4191,10 @@ mod tests {
             go("balogTemple", &fresh),
             Some((UNDERGROUND_TEMPLE_STAIRS, 2))
         );
+        let pink_bean = (crate::events::PINK_BEAN_ARENA, 0);
+        assert_eq!(go("Pinkin", &fresh), Some(pink_bean));
+        let gate = (crate::events::PINK_BEAN_GATE, 0);
+        assert_eq!(go("PPinkOut", &fresh), Some(gate));
         let leather = Effect::GiveItem {
             item_id: crate::events::BALROG_LEATHER,
             quantity: 1,
