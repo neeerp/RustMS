@@ -181,7 +181,8 @@ pub enum Action {
     /// (`crate::events::MAGATIA_BEAKERS`).
     Beaker,
     /// One of Crimsonwood Keep's sigils (`crate::events::cwk_sigil`), which
-    /// a skill of its job lights for good: the event counts it.
+    /// a skill of its job lights for good, or one of its altars, which
+    /// takes its job's weapon for good: the event counts it.
     Sigil,
     /// One of a Magatia hub's two doors (Cosmic `2618001`, `2618002`),
     /// which opens for two seconds as it takes a Card Key, and opens the
@@ -514,6 +515,10 @@ pub fn action(reactor_id: i32) -> Action {
         ELLIN_FOUNTAIN => Action::ExpToAll(crate::events::ELLIN_FOUNTAIN_EXP),
         MAGATIA_BEAKER => Action::Beaker,
         id if crate::events::cwk_sigil(id).is_some() => Action::Sigil,
+        // Crimsonwood Keep's thieves' room's watchful eyes, which stay
+        // struck, out of sight, for its keeper to see (Cosmic `9201110`'s
+        // `isAllReactorState`).
+        crate::events::CWK_EYE => Action::Hold,
         MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR => Action::SideDoor,
         // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
         // 400, 15)`, then Minerva, once).
@@ -695,7 +700,8 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 /// real ones (`PiratePQ`), and those of the two rooms beside a Magatia
 /// hub, where the experiment files are (`MagatiaPQ`'s `shuffleReactors`
 /// of `2518000` to `2612004`, so not their ways back: `shuffles`), and the
-/// Amorian Challenge's two bonus maps' boxes and crates (`AmoriaPQ`).
+/// Amorian Challenge's two bonus maps' boxes and crates (`AmoriaPQ`), and
+/// Crimsonwood Keep's pirates' room's chests (CWKPQ).
 pub fn shuffled(map_id: i32) -> bool {
     use crate::events::{
         MagatiaSide, AMORIA_BONUS, AMORIA_COUPLES_BONUS, DOLLHOUSE_ROOM, ELLIN_STAGES, MAZE_GOAL,
@@ -713,6 +719,7 @@ pub fn shuffled(map_id: i32) -> bool {
         || [PIRATE_STAGES[0], PIRATE_STAGES[2], PIRATE_STAGES[3]].contains(&map_id)
         || magatia
         || [AMORIA_COUPLES_BONUS, AMORIA_BONUS].contains(&map_id)
+        || map_id == crate::events::CWK_CHESTS_ROOM
 }
 
 /// Whether reactor `reactor_id` changes places with the others on a
@@ -903,6 +910,7 @@ mod tests {
         use crate::guild_quest::SPEAR;
         assert_eq!(action(9208005), Action::Hold);
         assert_eq!(action(crate::events::AMORIA_GATE), Action::Hold);
+        assert!(stays(crate::events::CWK_EYE));
         assert!(stays(crate::events::AMORIA_GATE));
         assert_eq!(action(9208006), Action::Hold);
         assert_eq!(action(SPEAR), Action::Spear);
@@ -1008,7 +1016,8 @@ mod tests {
         assert_eq!(action(ELLIN_FOUNTAIN), Action::ExpToAll(52_000));
         assert_eq!(action(MAGATIA_BEAKER), Action::Beaker);
         assert!(!stays(MAGATIA_BEAKER) && !acts_staying(MAGATIA_BEAKER));
-        for sigil in (6_109_000..=6_109_004).chain(6_109_016..=6_109_020) {
+        // The Keep's sigils, and its fifth stage's altars.
+        for sigil in (6_109_000..=6_109_009).chain(6_109_016..=6_109_020) {
             assert_eq!(action(sigil), Action::Sigil);
             assert!(stays(sigil) && !acts_staying(sigil));
         }

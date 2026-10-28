@@ -1628,9 +1628,33 @@ the stage's field starts, it wakes one at each place (`events::cwk_wake`,
 sigil of each job is among them (the last place has only fakes), and
 deals the eight places out among them afresh
 (`ReactorSet::shuffle_named`). Its woken sigils count as the second
-stage's do. Its fakes break on a swing. The job rooms of stage 5, the
-boss and the treasure room come in later slices, as does the fourth
-stage's flames.
+stage's do. Its fakes break on a swing. The fourth stage's flames come in
+a later slice.
+
+The fifth stage is a hub (610030500) with a way into a room for each job
+(`CWK_ROOMS`): `in01` to `in05` (`glpqPortal00` to `glpqPortal04`,
+`scripts::cwk_room_way`) take only a member of the room's job line
+(`job / 100 % 10`) to the warriors' (610030510), bowmen's (540),
+magicians' (521), thieves' (530) or pirates' (550) room. Anyone else hears
+in pink that the room is only for that job. Each room's keeper (9201107
+to 9201111, `cwk_keeper` in the client's dialogue chain) tells of the
+room's past on the hub and in the Keep's courtyard (610030000). In its
+room, during the event, it gives back the room's job weapon (4001256 to
+4001260) once per event (`EventTicket::take_room`), once the room is won.
+The warriors', bowmen's and magicians' rooms are won with every mob dead
+(`FieldMessage::MobCount`). The bowmen's five Master Guardians (9400594)
+are placed only in the event's copy (`opening_mobs`). The thieves' room is
+won with all five eyes (6108004, held in their broken state,
+`Action::Hold`) broken. The pirates' keeper only tells, since the
+pirates' weapon drops from the chest (6102001) shuffled among the room's
+boxes. A member with a full Etc tab hears so and gets nothing.
+
+The hub's five altars (6109005 to 6109009) each take one weapon dropped
+in their area, and count as the sigils do (`Cleared::light_sigil` for
+stage 5). Everyone hears each one restored (`cwk.weapon.restored`); with
+the fifth, everyone hears that the way on is open (`cwk.weapons.done`) and
+the stage clears. The boss and the treasure room come in later slices.
+The picks are in QUESTIONS b267.
 
 ## Jr. Balrog's room
 

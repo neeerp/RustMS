@@ -9,8 +9,8 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
-    self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, Find, GatherTalk, HandIn,
-    HeadCount, LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing, Statue,
+    self, Aura, Balloon, Cloto, CwkKeeper, Entry, EventCommand, EventKind, Find, GatherTalk,
+    HandIn, HeadCount, LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::guild_quest;
@@ -1590,6 +1590,23 @@ impl NpcScript {
             None => vec![Page::Done(vec![Effect::Warp(guild_quest::RETURNING_PATH)])],
         };
         Self::new(guild_quest::RUBIAN_KEEPER, pages)
+    }
+
+    /// A keeper of one of Crimsonwood Keep's fifth stage's rooms
+    /// (`crate::events::cwk_keeper`), `npc_id`, as `talk` (Cosmic
+    /// `9201107` to `9201111`).
+    pub fn cwk_keeper(npc_id: i32, talk: CwkKeeper) -> Self {
+        let page = match talk {
+            CwkKeeper::Says(key) => Page::Say(text(key)),
+            CwkKeeper::Gives(weapon) => Page::Act {
+                text: text(keys::CWK_ROOM_GIVEN),
+                effects: vec![Effect::GiveItem {
+                    item_id: weapon,
+                    quantity: 1,
+                }],
+            },
+        };
+        Self::new(npc_id, vec![page])
     }
 
     /// Shuang (9040000) at the Excavation Site's camp, to a member of rank
