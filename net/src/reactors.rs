@@ -189,6 +189,11 @@ pub enum Action {
     /// way back from the room it lets in to for as long
     /// (`crate::events::MagatiaSide::side_doors`).
     SideDoor,
+    /// The Twilight of Gods' reactor (Cosmic `2708000`), which the
+    /// lightning strikes as it takes the item the last wave's fall leaves
+    /// on it: Pink Bean's statue dies (Cosmic `killMonster(8820000)`), and
+    /// Pink Bean comes out where it stood.
+    Lightning,
 }
 
 /// The maze's boxes that bring out the same mobs in every room, from
@@ -565,6 +570,7 @@ pub fn action(reactor_id: i32) -> Action {
         ZPQ_TRAP => Action::Warp(Warp(crate::events::ZPQ_HUB, "sp")),
         ZPQ_MIMIC_BOX => Action::BringOut(ZPQ_MIMIC, 3),
         ZAKUM_ALTAR => Action::Zakum,
+        PINK_BEAN_LIGHTNING => Action::Lightning,
         HORNTAIL_STONE => Action::Horntail,
         HTPQ_PASS_KEY => Action::PassKey,
         // The real Bart among Lord Jonathan's gulls; the false ones
@@ -593,6 +599,9 @@ pub const ZPQ_MIMIC: i32 = 9300004;
 pub const PAPULATUS_CRACK: i32 = 2201004;
 /// The Engine Room's reactor, where Capt. Latanica comes out.
 pub const LATANICA_BOSS: i32 = 5411000;
+
+/// The reactor over Pink Bean's statue in the Twilight of Gods.
+pub const PINK_BEAN_LIGHTNING: i32 = 2708000;
 
 /// Zakum's altar, and the music it plays as it brings Zakum out.
 pub const ZAKUM_ALTAR: i32 = 2111001;
@@ -1315,6 +1324,12 @@ mod tests {
     fn zakums_altar_brings_zakum_out() {
         assert_eq!(action(ZAKUM_ALTAR), Action::Zakum);
         assert_eq!(breaker_notice(ZAKUM_ALTAR), None);
+    }
+
+    #[test]
+    fn the_twilights_reactor_calls_the_lightning() {
+        assert_eq!(action(PINK_BEAN_LIGHTNING), Action::Lightning);
+        assert_eq!(breaker_notice(PINK_BEAN_LIGHTNING), None);
     }
 
     #[test]
