@@ -10,7 +10,7 @@
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{
-    grant_stack, replace_item, set_job, set_str, set_weapon_attack,
+    grant_stack, replace_item, set_job, set_str, set_weapon_attack, start_quest,
 };
 use integration_harness::events::{cleared, said};
 use integration_harness::events::{party, party_of_one, talk, throw_down, told, waiting_in};
@@ -28,12 +28,15 @@ use tokio::time::Duration;
 
 const BOB: i32 = 9270033;
 const PINK: u8 = 5;
+/// Fight for the future, which asks for one kill of the captain.
+const FUTURE_QUEST: i16 = 4513;
 /// Under the most a level-50 character with 32000 STR and a 1999-attack
 /// sword may hit for.
 const HIT: i32 = 5_000_000;
 
 /// A new level-50 character hitting very hard and holding a White
-/// Essence, logged in on the ghost ship's last deck.
+/// Essence and on Fight for the future, logged in on the ghost ship's last
+/// deck.
 async fn hunter() -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
@@ -41,6 +44,7 @@ async fn hunter() -> WorldSession {
     tokio::time::sleep(Duration::from_millis(500)).await;
     set_job(id, 0, 50, 50).await.unwrap();
     grant_stack(id, 4, 1, WHITE_ESSENCE, 1).await.unwrap();
+    start_quest(id, FUTURE_QUEST).await.unwrap();
     replace_item(id, -1, -11, 1302000).await.unwrap();
     set_weapon_attack(id, 1_999).await.unwrap();
     set_str(id, 32_000).await.unwrap();
@@ -165,11 +169,15 @@ async fn the_white_essence_brings_out_latanica_whose_death_wins_the_fight() {
         "{ht:?}"
     );
 
-    // Its death wins the fight, and the clock stops.
+    // Its death wins the fight, counts for Fight for the future, and stops
+    // the clock.
     let m = &mut member.connection;
     let captain = ht.field.alive(LATANICA)[0];
     beat(h, &name, &mut ht, captain).await;
-    until(h, &mut ht, cleared).await;
+    until(h, &mut ht, |t| {
+        cleared(t) && t.progress.contains(&(FUTURE_QUEST, 1))
+    })
+    .await;
     until(m, &mut mt, cleared).await;
     tokio::time::sleep(Duration::from_secs(11)).await;
     barrier(m, &member.character_name, &mut mt).await;
