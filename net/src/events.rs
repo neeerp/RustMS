@@ -102,6 +102,9 @@ pub enum EventKind {
     /// channel (`crate::guild_quest`), its members let in by Shuang
     /// (9040000) at the Excavation Site's camp.
     GuildQuest,
+    /// The Amorian Challenge, Amoria's party quest for married couples,
+    /// started at Amos (9201048) on its Entrance.
+    Amoria,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -285,6 +288,9 @@ pub struct Event {
     pub spread: Option<u8>,
     /// How many may play, the leader included.
     pub team: RangeInclusive<usize>,
+    /// Whether every member must be married, and the team both men and
+    /// women (Cosmic AmoriaPQ's `onlyMarriedPlayers` and gender mask).
+    pub married: bool,
     /// Its time limit; 0 for none.
     pub minutes: u64,
     /// The EXP every member gets for clearing each stage, in order. Stage n
@@ -434,6 +440,7 @@ pub const KPQ: Event = Event {
     levels: 21..=30,
     spread: None,
     team: 3..=4,
+    married: false,
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
     stride: 1,
@@ -527,6 +534,7 @@ pub const HPQ: Event = Event {
     levels: 10..=u8::MAX,
     spread: None,
     team: 3..=6,
+    married: false,
     minutes: 10,
     exp_per_stage: &[1600],
     stride: 1,
@@ -578,6 +586,7 @@ pub const LPQ: Event = Event {
     levels: 35..=50,
     spread: None,
     team: 5..=6,
+    married: false,
     minutes: 45,
     exp_per_stage: &[210, 2520, 2940, 3360, 3770, 0, 4620, 5040, 5950],
     stride: 100,
@@ -770,6 +779,7 @@ pub const OPQ: Event = Event {
     levels: 51..=70,
     spread: None,
     team: 5..=6,
+    married: false,
     minutes: 60,
     exp_per_stage: &[3500, 3500, 3500, 3500, 3500, 3500, 3500, 0, 3500],
     stride: 100,
@@ -1019,6 +1029,7 @@ pub const ZPQ: Event = Event {
     levels: 50..=u8::MAX,
     spread: None,
     team: 1..=6,
+    married: false,
     minutes: 30,
     exp_per_stage: &[12_000],
     stride: 10,
@@ -1084,6 +1095,7 @@ pub const ZAKUM: Event = Event {
     levels: 50..=u8::MAX,
     spread: None,
     team: 6..=30,
+    married: false,
     minutes: 120,
     exp_per_stage: &[0],
     stride: 1,
@@ -1126,6 +1138,7 @@ pub const GUILD_QUEST: Event = Event {
     levels: 1..=u8::MAX,
     spread: None,
     team: 6..=30,
+    married: false,
     minutes: 90,
     exp_per_stage: &[0; 10],
     stride: 100,
@@ -1176,6 +1189,7 @@ pub const PAPULATUS: Event = Event {
     levels: 1..=u8::MAX,
     spread: None,
     team: 1..=6,
+    married: false,
     minutes: 45,
     exp_per_stage: &[0],
     stride: 1,
@@ -1224,6 +1238,7 @@ pub const HORNTAIL: Event = Event {
     levels: 100..=u8::MAX,
     spread: None,
     team: 6..=30,
+    married: false,
     minutes: 120,
     exp_per_stage: &[0, 0, 0],
     stride: 1,
@@ -1310,6 +1325,7 @@ pub const HTPQ: Event = Event {
     levels: 120..=u8::MAX,
     spread: None,
     team: 6..=6,
+    married: false,
     minutes: 25,
     exp_per_stage: &[0; 6],
     stride: 1,
@@ -1401,6 +1417,7 @@ pub const DELLI: Event = Event {
     levels: 120..=u8::MAX,
     spread: None,
     team: 1..=2,
+    married: false,
     minutes: 6,
     exp_per_stage: &[0],
     stride: 1,
@@ -1511,6 +1528,7 @@ pub const LUDIMAZE: Event = Event {
     levels: 51..=70,
     spread: None,
     team: 3..=6,
+    married: false,
     minutes: 15,
     exp_per_stage: &[0],
     stride: 1,
@@ -1568,6 +1586,7 @@ pub const TYLUS: Event = Event {
     levels: 80..=u8::MAX,
     spread: None,
     team: 1..=4,
+    married: false,
     minutes: 10,
     exp_per_stage: &[0],
     stride: 1,
@@ -1651,6 +1670,7 @@ pub const ELLIN: Event = Event {
     levels: 44..=55,
     spread: None,
     team: 4..=6,
+    married: false,
     minutes: 30,
     exp_per_stage: &[0; 6],
     stride: 1,
@@ -1864,6 +1884,7 @@ pub const PIRATE: Event = Event {
     levels: 55..=100,
     spread: None,
     team: 3..=6,
+    married: false,
     minutes: 4,
     exp_per_stage: &[0; 6],
     stride: 1,
@@ -1879,6 +1900,66 @@ pub const PIRATE: Event = Event {
     hand_ins: &[],
     gates: false,
     clear_map: Some(PIRATE_CLEAR),
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+};
+
+/// Amos' Training Ground (670010000), off Purplewood Forest 2, where Amos
+/// the Strong (9201043) lets one with an Entrance Ticket into the
+/// Amorian Challenge's entrance, and where its exit lets out.
+pub const AMORIA_HALL: i32 = 670_010_000;
+/// The Entrance of Amorian Challenge, where the party gathers.
+pub const AMORIA_LOBBY: i32 = 670_010_100;
+/// Stage 1, the Magik Mirror; the later stages follow a hundred map ids
+/// apart, up to the Geist Balrog's 670010700, and Amos' Vaults after it.
+pub const AMORIA_ENTRY: i32 = 670_010_200;
+pub const AMORIA_EXIT: i32 = 670_011_000;
+/// The Entrance Ticket Amos takes for the way in, and the Lip Lock Keys,
+/// ten of which he trades for one (Cosmic `9201043`).
+pub const AMORIA_TICKET: i32 = 4_031_592;
+pub const LIP_LOCK_KEY: i32 = 4_031_593;
+pub const AMORIA_KEYS_PER_TICKET: i16 = 10;
+/// The Geist Fang, the Magik Mirror Shard, the Wing Hammer and the Cupid
+/// Code Pieces, of use only in the challenge (Cosmic AmoriaPQ's
+/// `setEventExclusives`).
+pub const AMORIA_ITEMS: [i32; 4] = [4_031_594, 4_031_595, 4_031_596, 4_031_597];
+
+/// The Amorian Challenge (Cosmic `AmoriaPQ`): six of a party, all married,
+/// men and women among them, of level 40 or more, on the Entrance with
+/// their leader, go into their own copy of its stages for 75 minutes.
+/// Losing any of the six ends it. Stage EXP is Cosmic's. The defaults are
+/// in `v83ref/lanes/QUESTIONS.md` b258.
+pub const AMORIA: Event = Event {
+    lobby: AMORIA_LOBBY,
+    entrances: &[],
+    maps: AMORIA_ENTRY..=AMORIA_ENTRY + 600,
+    entry: AMORIA_ENTRY,
+    entries: 1,
+    exit: AMORIA_EXIT,
+    levels: 40..=u8::MAX,
+    spread: None,
+    team: 6..=6,
+    married: true,
+    minutes: 75,
+    exp_per_stage: &[2000, 4000, 6000, 8000, 9000, 11000],
+    stride: 100,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &AMORIA_ITEMS,
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
     bonus: None,
     blessings: &[],
     squad: false,
@@ -1937,6 +2018,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         levels: 71..=85,
         spread: None,
         team: 4..=4,
+        married: false,
         minutes: 45,
         exp_per_stage: &[0, 10_000, 20_000, 0, 20_000, 20_000, 0],
         stride: 1,
@@ -2250,6 +2332,7 @@ pub const DOJO: Event = Event {
     levels: 25..=u8::MAX,
     spread: None,
     team: 1..=1,
+    married: false,
     minutes: 5,
     exp_per_stage: &[0; DOJO_FLOORS as usize],
     stride: 100,
@@ -2325,6 +2408,7 @@ pub const DOJO_TRIAL: Event = Event {
     levels: 25..=u8::MAX,
     spread: None,
     team: 1..=1,
+    married: false,
     minutes: 0,
     exp_per_stage: &[0],
     stride: 100,
@@ -2785,7 +2869,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 45] = [
+    pub const ALL: [EventKind; 46] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2831,6 +2915,7 @@ impl EventKind {
         EventKind::RockSpirit,
         EventKind::RockSpiritVip,
         EventKind::GuildQuest,
+        EventKind::Amoria,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -2883,6 +2968,7 @@ impl EventKind {
             EventKind::RockSpirit => &ROCK_SPIRIT,
             EventKind::RockSpiritVip => &ROCK_SPIRIT_VIP,
             EventKind::GuildQuest => &GUILD_QUEST,
+            EventKind::Amoria => &AMORIA,
         }
     }
 
@@ -2907,6 +2993,9 @@ pub struct Candidate {
     pub id: ClientId,
     pub level: u8,
     pub map_id: i32,
+    pub married: bool,
+    /// 0 for a man, 1 for a woman.
+    pub gender: u8,
 }
 
 /// Whether a player's party may start an event, as its NPC tells them.
@@ -3110,11 +3199,14 @@ impl Event {
             .collect();
         let levels = team.iter().map(|c| c.level);
         let apart = levels.clone().max().unwrap_or(0) - levels.min().unwrap_or(0);
+        let genders = team.iter().fold(0u8, |mask, c| mask | 1 << c.gender.min(1));
+        let couples = !self.married || team.iter().all(|c| c.married) && genders == 0b11;
         let team: Vec<_> = team.iter().map(|c| c.id).collect();
         (team.contains(&leader)
             && (self.least()..=*self.team.end()).contains(&team.len())
-            && self.spread.is_none_or(|spread| apart <= spread))
-        .then_some(team)
+            && self.spread.is_none_or(|spread| apart <= spread)
+            && couples)
+            .then_some(team)
     }
 
     /// The blessing a team of these `jobs` gets, if any: one of
@@ -3871,7 +3963,13 @@ mod tests {
     use super::*;
 
     fn at(id: ClientId, level: u8, map_id: i32) -> Candidate {
-        Candidate { id, level, map_id }
+        Candidate {
+            id,
+            level,
+            map_id,
+            married: false,
+            gender: 0,
+        }
     }
 
     #[test]
@@ -3909,6 +4007,51 @@ mod tests {
         let broad = DOJO_PARTY.team(1, &[at(1, 30, lobby), at(2, 61, lobby)]);
         assert_eq!(broad, None);
         assert_eq!(DOJO_PARTY.team(1, &[at(1, 30, lobby)]), Some(vec![1]));
+    }
+
+    #[test]
+    fn the_amorian_challenge_takes_six_married_men_and_women() {
+        let couple = |id: ClientId| Candidate {
+            married: true,
+            gender: (id % 2) as u8,
+            ..at(id, 40, AMORIA_LOBBY)
+        };
+        let six: Vec<_> = (1..=6).map(couple).collect();
+        assert_eq!(AMORIA.team(1, &six), Some(vec![1, 2, 3, 4, 5, 6]));
+        // Five aren't enough, nor is one of the six below level 40.
+        assert_eq!(AMORIA.team(1, &six[..5]), None);
+        let young = |c: &Candidate| Candidate { level: 39, ..*c };
+        let one_young: Vec<_> = (six.iter())
+            .map(|c| if c.id == 6 { young(c) } else { *c })
+            .collect();
+        assert_eq!(AMORIA.team(1, &one_young), None);
+        // One unmarried, or all men, and the six can't go.
+        let single = |c: &Candidate| Candidate {
+            married: false,
+            ..*c
+        };
+        let one_single: Vec<_> = (six.iter())
+            .map(|c| if c.id == 4 { single(c) } else { *c })
+            .collect();
+        assert_eq!(AMORIA.team(1, &one_single), None);
+        let men: Vec<_> = (six.iter())
+            .map(|c| Candidate { gender: 0, ..*c })
+            .collect();
+        assert_eq!(AMORIA.team(1, &men), None);
+        // Other events take the unmarried.
+        assert!(
+            !KPQ.married
+                && KPQ
+                    .team(
+                        1,
+                        &[
+                            at(1, 21, KPQ.lobby),
+                            at(2, 21, KPQ.lobby),
+                            at(3, 21, KPQ.lobby)
+                        ]
+                    )
+                    .is_some()
+        );
     }
 
     #[test]

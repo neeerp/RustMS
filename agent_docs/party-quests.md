@@ -41,7 +41,9 @@ end rules and its first four stages; its other stages come in later slices
 is taken alone ([Jr. Balrog's room](#jr-balrogs-room)), and so are King
 Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
 room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
-([the Wedding Hall](#the-wedding-hall)).
+([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
+married couples, has its entry, its way out and its end rules; its stages
+come in later slices ([the Amorian Challenge](#the-amorian-challenge)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1399,6 +1401,32 @@ our Map.nx never names) leads back to the side's room. The event's items
 (4001130-4001135) are taken from whoever leaves. The maps'
 `onFirstUserEnter` scripts (`StageMsg_romio`, `StageMsg_juliet`) do
 nothing yet. Its lines are placeholders (`magatia.*`).
+
+## The Amorian Challenge
+
+Amoria's party quest for married couples
+(`v83ref/reports/b258-amoria-pq.md`; picks in `v83ref/lanes/QUESTIONS.md`
+b258). Amos the Strong (9201043) stands on his training ground
+(670010000), not in Amoria itself. He trades 10 Lip Lock Keys (4031593)
+for an Entrance Ticket (4031592), but only to a player who holds no
+ticket. He takes a ticket to let its holder into the Entrance of the
+Amorian Challenge (670010100). That map has no portal out and returns to
+itself, so Amos (9201048) on it also sends a player back to the training
+ground's `st00`. This is a server addition.
+
+The leader asks Amos on the Entrance to take the party in. He takes it
+only when there are exactly six members, all of them there, all at level
+40 or above, all married (to anyone, as in Cosmic) and both men and women
+among them (`Event::married`). Each member's `Presence` carries whether
+they are married and their gender for that check. The party gets its own
+copy of the stages, 670010200-670010800 (`events::AMORIA`,
+`EventKind::Amoria`), on a 75-minute clock. Losing anyone ends it: time
+running out, the leader leaving, or a member leaving the party. Everyone
+then lands on the way out (670011000), whose Glimmer Man (9201047) sends
+them back to the training ground's `st00`. The event's items (4031594-7)
+are taken from whoever leaves. Its lines are placeholders (`amoria_pq.*`).
+Mr. Sandman's (9201042) shop of "AmoriaPQ Extras" is Cosmic's own and is
+left out.
 
 ## Jr. Balrog's room
 

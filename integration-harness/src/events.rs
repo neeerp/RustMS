@@ -4,7 +4,8 @@
 //! the party in.
 
 use crate::database::{
-    grant_stack, replace_item, set_dojo_trial_done, set_job, set_str, set_weapon_attack,
+    grant_stack, marry, replace_item, set_dojo_trial_done, set_gender, set_job, set_str,
+    set_weapon_attack,
 };
 use crate::hunting::{hit_reactor, walk_to, MapReactor};
 use crate::preconditions::load_harness_config_or_fail;
@@ -12,7 +13,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{Event, ELLIN, HPQ, HTPQ, KPQ, LPQ, OPQ, PIRATE, ZPQ};
+use net::events::{Event, AMORIA, ELLIN, HPQ, HTPQ, KPQ, LPQ, OPQ, PIRATE, ZPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -307,6 +308,50 @@ pub async fn enter_ellin(team: &mut [WorldSession]) -> Vec<Trace> {
 /// as `enter_lpq` does, once any party before it is off.
 pub async fn enter_pirate(team: &mut [WorldSession]) -> Vec<Trace> {
     enter_from_menu(team, &PIRATE, net::npc_scripts::GUON, 20).await
+}
+
+/// The party's leader, first, takes it into the Amorian Challenge from
+/// Amos, as `enter_lpq` does, once any party before it is out.
+pub async fn enter_amoria(team: &mut [WorldSession]) -> Vec<Trace> {
+    enter_from_menu(team, &AMORIA, net::npc_scripts::AMOS_LOBBY, 20).await
+}
+
+/// `pairs` married couples of new characters at `level`, a man and then
+/// his wife (with a Moonstone ring box), each holding `items` as
+/// `waiting_in` does, logged in and waiting on `lobby`.
+pub async fn couples_in(
+    lobby: i32,
+    level: i16,
+    pairs: usize,
+    items: &[(i32, i16)],
+) -> Vec<WorldSession> {
+    let mut configs = Vec::new();
+    for n in 0..pairs * 2 {
+        let config = load_harness_config_or_fail().await;
+        let id = login_to_world_session(&config).await.unwrap().character_id;
+        drop(relogin(&config).await);
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        set_job(id, 0, level, 50).await.unwrap();
+        set_gender(id, (n % 2) as i16).await.unwrap();
+        for (slot, &(item_id, quantity)) in (1..).zip(items) {
+            grant_stack(id, 4, slot, item_id, quantity).await.unwrap();
+        }
+        configs.push((config, id));
+    }
+    for couple in configs.chunks(2) {
+        marry(couple[0].1, couple[1].1, 2240000).await.unwrap();
+    }
+    let mut sessions = Vec::new();
+    for (config, _) in &configs {
+        let mut session = relogin(config).await;
+        let mut trace = Trace::default();
+        assert_eq!(
+            warp(&mut session.connection, lobby, "", &mut trace).await,
+            lobby
+        );
+        sessions.push(session);
+    }
+    sessions
 }
 
 /// The leader picks the first choice of `npc`'s menu in `event`'s lobby,
