@@ -216,7 +216,21 @@ impl ReactorSet {
     /// may stand where another stood; those that stay put
     /// (`net::reactors::shuffles`) keep theirs.
     pub fn shuffle(&mut self, rng: &mut impl Rng) {
-        let moving = |r: &&mut LiveReactor| net::reactors::shuffles(r.reactor_id);
+        self.shuffle_among(
+            |reactor, _| net::reactors::shuffles(reactor.reactor_id),
+            rng,
+        );
+    }
+
+    /// As `shuffle`, among only the reactors named one of `names` (Cosmic
+    /// `shuffleReactors` of a list).
+    pub fn shuffle_named(&mut self, names: &[&str], rng: &mut impl Rng) {
+        self.shuffle_among(|_, name| names.contains(&name), rng);
+    }
+
+    fn shuffle_among(&mut self, moves: impl Fn(&LiveReactor, &str) -> bool, rng: &mut impl Rng) {
+        let spots = &self.spots;
+        let moving = |r: &&mut LiveReactor| moves(r, &spots[r.spot].template.name);
         let mut places: Vec<_> = (self.live.values_mut().filter(moving))
             .map(|r| (r.x, r.y))
             .collect();
@@ -630,6 +644,38 @@ mod tests {
             moved |= places != xs;
             places.sort();
             assert_eq!(places, xs);
+        }
+        assert!(moved);
+    }
+
+    #[test]
+    fn reactors_shuffled_by_name_change_places_only_between_them() {
+        let xs = [100, 200, 300, 400, 500];
+        let named = |x, name: &str| {
+            let (mut spot, template) = scrap_box(x, 0);
+            spot.name = name.into();
+            (spot, template)
+        };
+        let names = ["a", "b", "c", "d", "e"];
+        let mut reactors = ReactorSet::new(xs.into_iter().zip(names).map(|(x, n)| named(x, n)));
+        reactors.respawn(Instant::now());
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let mut moved = false;
+        for _ in 0..8 {
+            reactors.shuffle_named(&["a", "c", "e"], &mut rng);
+            let at = |reactors: &ReactorSet, name| {
+                let mut live = reactors.live();
+                live.find(|r| reactors.spots[r.spot].template.name == name)
+                    .map(|r| r.x)
+            };
+            assert_eq!(
+                (at(&reactors, "b"), at(&reactors, "d")),
+                (Some(200), Some(400))
+            );
+            let mut places: Vec<_> = ["a", "c", "e"].map(|n| at(&reactors, n).unwrap()).into();
+            moved |= places != [100, 300, 500];
+            places.sort();
+            assert_eq!(places, [100, 300, 500]);
         }
         assert!(moved);
     }

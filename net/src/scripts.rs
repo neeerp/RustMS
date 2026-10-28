@@ -2841,6 +2841,9 @@ const CWK_WAYS: [(&str, Option<(u8, &str)>); 7] = [
     ("glpqPortal7", None),
 ];
 
+/// The Keep's third stage's way up, which counts those who take it.
+pub const CWK_STEP: &str = "glpqPortal2";
+
 /// What the Keep's way on `script` does for a member: once the stage it
 /// needs is `cleared`, it takes them to the next stage's map, the n-th
 /// way to the (n+1)-th stage's; until then it stays shut, with a pink

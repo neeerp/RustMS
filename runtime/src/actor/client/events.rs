@@ -1059,6 +1059,26 @@ impl ClientActor {
         Ok(ticket.and_then(|ticket| scripts::cwk_way_on(script, |stage| ticket.cleared(stage))))
     }
 
+    /// The Keep's third stage's way up (`scripts::CWK_STEP`, Cosmic
+    /// `glpqPortal2`) takes a member back to the stage's start, and their
+    /// event counts them (`EventCommand::CwkStep`). `None` elsewhere.
+    pub(super) async fn cwk_step(&mut self) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let on_stage = self.event.as_ref().is_some_and(|ticket| {
+            ticket.kind == EventKind::Cwk
+                && ticket.holds(map_id)
+                && map_id == events::CWK_ENTRY + 200
+        });
+        if !on_stage {
+            return Ok(None);
+        }
+        self.tell_event(EventCommand::CwkStep).await;
+        Ok(Some(vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(map_id, 0),
+        ]))
+    }
+
     /// The player, having moved, stands where the Keep's first stage
     /// hides its way on (`events::cwk_hidden_way`): before anyone has
     /// found it, it clears the stage and takes them back to the stage's

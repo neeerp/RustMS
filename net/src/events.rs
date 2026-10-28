@@ -2373,6 +2373,72 @@ pub fn cwk_sigil(reactor_id: i32) -> Option<u8> {
         })
 }
 
+/// What everyone hears as each job's sigil lights on the third stage,
+/// where it also sets the stage's menhirs going.
+pub const CWK_MENHIR_LINES: [&str; 5] = [
+    game_data::server_content::keys::CWK_MENHIRS_WARRIOR,
+    game_data::server_content::keys::CWK_MENHIRS_ARCHER,
+    game_data::server_content::keys::CWK_MENHIRS_MAGE,
+    game_data::server_content::keys::CWK_MENHIRS_THIEF,
+    game_data::server_content::keys::CWK_MENHIRS_PIRATE,
+];
+
+/// The third stage's menhirs (traps) that job `job`'s sigil sets going
+/// (Cosmic `6109000`-`6109004`'s `moveEnvironment`).
+pub fn cwk_menhirs(job: u8) -> &'static [&'static str] {
+    match job {
+        0 => &["menhir0"],
+        1 => &["menhir1", "menhir2"],
+        2 => &["menhir3"],
+        3 => &["menhir4"],
+        4 => &["menhir5"],
+        _ => &[],
+    }
+}
+
+/// How many must take the third stage's way up (`glpqPortal2`) before its
+/// way on opens, with all its sigils lit.
+pub const CWK_STEPS: u8 = 5;
+
+/// The fourth stage's reactors that may wake, by the eight places they
+/// stand at: a sigil of each job's (`4skillN`, N its job) or a fake
+/// (`4fake`), several at each place (Cosmic CWKPQ's
+/// `generateMapReactors`).
+pub const CWK_WAKING: [&[&str]; 8] = [
+    &["4skill0a", "4skill0b", "4fake1c", "4fake1d", "4skill0e"],
+    &["4fake0a", "4skill4b", "4skill3c", "4skill3d", "4skill3e"],
+    &["4skill1a", "4skill3b", "4skill4c", "4skill2d", "4skill2e"],
+    &["4skill2a", "4fake1b", "4skill0c", "4skill1d", "4fake1e"],
+    &["4skill3a", "4skill2b", "4skill1c", "4skill0d", "4fake0e"],
+    &["4skill4a", "4skill1b", "4fake0c", "4skill4d", "4skill1e"],
+    &["4fake1a", "4skill2c", "4skill4e"],
+    &["4fake0b", "4fake0d"],
+];
+
+/// The job of the fourth stage's sigil named `name`, none for a fake.
+fn cwk_waking_job(name: &str) -> Option<u8> {
+    let job = name.strip_prefix("4skill")?.bytes().next()?;
+    Some(job - b'0')
+}
+
+/// The fourth stage's reactors that wake, one at each place, drawn until
+/// every job has its sigil among them (the last place has only fakes, so
+/// a fake always wakes too). The stage then deals their places out among
+/// them afresh.
+pub fn cwk_wake(rng: &mut impl rand::Rng) -> [&'static str; 8] {
+    use rand::seq::SliceRandom;
+    loop {
+        let names = CWK_WAKING.map(|place| *place.choose(rng).unwrap_or(&""));
+        let jobs: HashSet<_> = names
+            .iter()
+            .filter_map(|&name| cwk_waking_job(name))
+            .collect();
+        if jobs.len() == 5 {
+            return names;
+        }
+    }
+}
+
 /// The Keep's items of use only in it, taken from whoever leaves.
 pub const CWK_ITEMS: [i32; 5] = [4_001_256, 4_001_257, 4_001_258, 4_001_259, 4_001_260];
 
@@ -3912,6 +3978,9 @@ pub enum EventCommand {
     /// A member lit Crimsonwood Keep's sigil of job `job`
     /// (`cwk_sigil`) on `map_id`.
     SigilLit { map_id: i32, job: u8 },
+    /// A member took Crimsonwood Keep's third stage's way up
+    /// (`glpqPortal2`).
+    CwkStep,
     /// The Guild Quest's room of the spears has this many spears set.
     SpearsSet(u8),
     /// The Guild Quest's King's Corridor's door took the earring.
@@ -4586,6 +4655,25 @@ mod tests {
         assert_eq!(cwk_sigil(6_109_020), Some(4));
         assert_eq!(cwk_sigil(6_109_021), None);
         assert_eq!(cwk_sigil(6_108_999), None);
+        // The third stage's sigils set its menhirs going.
+        assert_eq!(cwk_menhirs(1), ["menhir1", "menhir2"]);
+        assert_eq!(cwk_menhirs(4), ["menhir5"]);
+        assert!(cwk_menhirs(5).is_empty());
+        // The fourth stage wakes one at each place, each job's sigil among
+        // them, and a fake.
+        assert_eq!(cwk_waking_job("4skill3c"), Some(3));
+        assert_eq!(cwk_waking_job("4fake1c"), None);
+        let mut rng = <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(3);
+        for _ in 0..50 {
+            let woken = cwk_wake(&mut rng);
+            for (name, place) in woken.iter().zip(CWK_WAKING) {
+                assert!(place.contains(name), "{woken:?}");
+            }
+            let mut jobs: Vec<_> = woken.iter().map(|&name| cwk_waking_job(name)).collect();
+            jobs.sort();
+            jobs.dedup();
+            assert_eq!(jobs, [None, Some(0), Some(1), Some(2), Some(3), Some(4)]);
+        }
         // Any member's find clears it.
         assert!(CWK.member_clears.contains(&1));
         let mesos: Vec<_> = (1..=7).map(|stage| CWK.stage_meso(stage)).collect();
