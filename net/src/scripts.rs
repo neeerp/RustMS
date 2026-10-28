@@ -2860,6 +2860,21 @@ pub fn cwk_way_on(script: &str, cleared: impl Fn(u8) -> bool) -> Option<Vec<Effe
     })
 }
 
+/// What one of the Keep's fifth stage's ways into its rooms (`script`)
+/// does for a member of job line `line` (`job / 100 % 10`): it takes one
+/// of the room's job in, and tells anyone else with a pink line (Cosmic
+/// `glpqPortal00` to `glpqPortal04`). `None` for any other portal.
+pub fn cwk_room_way(script: &str, line: i16) -> Option<Vec<Effect>> {
+    let room = crate::events::CWK_ROOMS
+        .iter()
+        .find(|room| room.way == script)?;
+    Some(if room.line == line {
+        vec![Effect::PortalSound, Effect::WarpToPortal(room.map, 0)]
+    } else {
+        vec![Effect::Pink(content::text().get(room.only, &[]))]
+    })
+}
+
 /// The way out of the forest's last stage (Cosmic `party6_out`).
 pub const ELLIN_OUT: &str = "party6_out";
 /// The prize map's way home (Cosmic `party6_stage800`).
@@ -4563,7 +4578,7 @@ mod tests {
     }
 
     #[test]
-    fn the_keep_s_ways_on_open_as_their_stages_clear() {
+    fn the_keep_s_ways_on_open_as_their_stages_clear_and_its_rooms_for_their_jobs() {
         use crate::events::CWK_ENTRY;
         let on = |to| Some(vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)]);
         let shut = |key| Some(vec![Effect::Pink(content::text().get(key, &[]))]);
@@ -4592,6 +4607,21 @@ mod tests {
         // one of them.
         assert_eq!(cwk_way_on("glpqPortal7", none), on(CWK_ENTRY + 700));
         assert_eq!(cwk_way_on("glpqPortal2", |_| true), None);
+        // The fifth stage's rooms let in only their job's.
+        assert_eq!(cwk_room_way("glpqPortal00", 1), on(CWK_ENTRY + 410));
+        assert_eq!(cwk_room_way("glpqPortal01", 3), on(CWK_ENTRY + 440));
+        assert_eq!(cwk_room_way("glpqPortal02", 2), on(CWK_ENTRY + 421));
+        assert_eq!(cwk_room_way("glpqPortal03", 4), on(CWK_ENTRY + 430));
+        assert_eq!(cwk_room_way("glpqPortal04", 5), on(CWK_ENTRY + 450));
+        assert_eq!(
+            cwk_room_way("glpqPortal00", 0),
+            shut(keys::CWK_ROOM_ONLY_WARRIOR)
+        );
+        assert_eq!(
+            cwk_room_way("glpqPortal03", 1),
+            shut(keys::CWK_ROOM_ONLY_THIEF)
+        );
+        assert_eq!(cwk_room_way("glpqPortal5", 1), None);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! Crimsonwood Keep's first four stages and their ways on. The first's way
+//! Crimsonwood Keep's first five stages and their ways on. The first's way
 //! on stays shut until a member finds the stage's hidden way, behind the
 //! pillar by the Lion Shield; that takes the finder back to the stage's
 //! start and clears it for all, with its EXP and mesos. The way on then
@@ -6,22 +6,26 @@
 //! until a skill of each job has lit that job's sigil. The third's way on
 //! waits on its sigils, which set its menhirs going, and on five trips up
 //! its way up; the fourth wakes a sigil of each job, which clear it once
-//! lit. The harness lets two set out (`RUSTMS_EXPEDITION_MIN`) and runs
-//! events 60 times as fast (`RUSTMS_EVENT_SCALE`), so the first stage's
-//! clock lasts 2 seconds and the later ones' 10.
+//! lit. The fifth's hub has a room for each job, whose keeper gives back
+//! its weapon once the room is won, and an altar for each weapon; with all
+//! five restored, it clears. The harness lets two set out
+//! (`RUSTMS_EXPEDITION_MIN`) and runs events 60 times as fast
+//! (`RUSTMS_EVENT_SCALE`), so the first stage's clock lasts 2 seconds, the
+//! next three's 10 and the fifth's 20.
 
 use game_data::server_content::keys;
 use integration_harness::database::{grant_item, grant_skill, set_job};
-use integration_harness::events::{cleared, talk, told};
+use integration_harness::events::{cleared, said, talk, throw_down, told};
 use integration_harness::guild_quest::touch_script_portal;
-use integration_harness::hunting::{skill_at_reactor, walk_to, MapReactor};
+use integration_harness::hunting::{hit_reactor, skill_at_reactor, walk_to, MapReactor};
+use integration_harness::packets::build_change_map;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{
-    cwk_menhirs, CWK, CWK_ENTRY, CWK_HIDDEN_WAY, CWK_LATER_SIGILS, CWK_LOBBY, CWK_MENHIR_LINES,
-    CWK_SIGILS, CWK_SIGIL_LINES,
+    cwk_menhirs, CWK, CWK_ENTRY, CWK_EYE, CWK_HIDDEN_WAY, CWK_LATER_SIGILS, CWK_LOBBY,
+    CWK_MASTER_GUARDIAN, CWK_MENHIR_LINES, CWK_ROOMS, CWK_SIGILS, CWK_SIGIL_LINES,
 };
 use net::npc_scripts::CWK_RECRUITER;
 use tokio::time::Duration;
@@ -34,6 +38,18 @@ const WAY_ON: &str = "next00";
 const STAGE2: i32 = CWK_ENTRY + 100;
 const STAGE3: i32 = CWK_ENTRY + 200;
 const STAGE4: i32 = CWK_ENTRY + 300;
+const HUB: i32 = CWK_ENTRY + 400;
+const STAGE6: i32 = CWK_ENTRY + 500;
+const ETC: i16 = 4;
+/// The fifth stage's altars, in job order, and a spot on the ground in
+/// each one's area.
+const ALTARS: [(i32, i16, i16); 5] = [
+    (6_109_005, 1093, -586),
+    (6_109_006, 1280, -415),
+    (6_109_007, 825, -939),
+    (6_109_008, 1343, -887),
+    (6_109_009, 1296, -559),
+];
 /// The third stage's way up, and its way on.
 const WAY_UP: &str = "next00";
 const STAGE3_WAY_ON: &str = "next01";
@@ -42,12 +58,12 @@ const FAKES: [i32; 3] = [6_108_000, 6_108_001, 6_108_005];
 /// A skill of each job that lights its sigil: a White Knight's, a
 /// Ranger's, a Fire/Poison Wizard's, a Hermit's and a Marauder's.
 const SIGIL_SKILLS: [i32; 5] = [1_211_002, 3_211_006, 2_111_002, 4_111_005, 5_111_005];
-const WHITE_KNIGHT: i16 = 121;
+const HERMIT: i16 = 411;
 const RANGER: i16 = 321;
 
-/// A new character of level 90 of `job` with the Keystone and `skills`,
-/// logged in at the Inner Sanctum's entrance.
-async fn adventurer(job: i16, skills: &[i32]) -> WorldSession {
+/// A new character of level 90 of `job` with the Keystone, `skills` and
+/// the Etc items `etc`, logged in at the Inner Sanctum's entrance.
+async fn adventurer(job: i16, skills: &[i32], etc: &[i32]) -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
     drop(relogin(&config).await);
@@ -56,6 +72,9 @@ async fn adventurer(job: i16, skills: &[i32]) -> WorldSession {
     grant_item(id, SETUP, 1, KEYSTONE).await.unwrap();
     for &skill in skills {
         grant_skill(id, skill, 1).await.unwrap();
+    }
+    for (slot, &item) in (1..).zip(etc) {
+        grant_item(id, ETC, slot, item).await.unwrap();
     }
     let mut session = relogin(&config).await;
     let mut seen = Trace::default();
@@ -98,8 +117,13 @@ fn all_sigils(t: &Trace) -> bool {
 // One test: a channel holds one expedition at a time.
 #[tokio::test]
 async fn the_keep_s_first_stages_clear_by_the_hidden_way_and_the_sigils() {
-    let mut leader = adventurer(WHITE_KNIGHT, &SIGIL_SKILLS).await;
-    let mut member = adventurer(RANGER, &SIGIL_SKILLS[1..2]).await;
+    // The leader, a thief, has the other jobs' weapons already.
+    let others: Vec<_> = (CWK_ROOMS.iter())
+        .map(|room| room.weapon)
+        .filter(|&weapon| weapon != CWK_ROOMS[3].weapon)
+        .collect();
+    let mut leader = adventurer(HERMIT, &SIGIL_SKILLS, &others).await;
+    let mut member = adventurer(RANGER, &SIGIL_SKILLS[1..2], &[]).await;
     let recruiter = || talk(CWK_LOBBY, CWK_RECRUITER);
 
     // The leader gathers an expedition, the member joins, and they set
@@ -360,6 +384,133 @@ async fn the_keep_s_first_stages_clear_by_the_hidden_way_and_the_sigils() {
             && t.meso_gains.contains(&meso)
     })
     .await;
+
+    // The way on leads to the fifth stage's hub, with its altars.
+    let mut lt = Trace::default();
+    touch_script_portal(&mut leader, STAGE4, WAY_ON).await;
+    until(&mut leader.connection, &mut lt, |t| {
+        t.warps.contains(&HUB) && ALTARS.iter().all(|a| altar(t, a.0).is_some())
+    })
+    .await;
+    let altars: Vec<_> = ALTARS.iter().map(|a| altar(&lt, a.0).unwrap()).collect();
+    let mut mt = Trace::default();
+    touch_script_portal(&mut member, STAGE3, STAGE3_WAY_ON).await;
+    until(&mut member.connection, &mut mt, |t| {
+        t.warps.contains(&STAGE4)
+    })
+    .await;
+    touch_script_portal(&mut member, STAGE4, WAY_ON).await;
+    until(&mut member.connection, &mut mt, |t| t.warps.contains(&HUB)).await;
+
+    // Its keepers there tell of their rooms; its way on is shut.
+    let t = told(&mut leader, talk(HUB, CWK_ROOMS[0].keeper)).await;
+    assert!(said(&t, CWK_ROOMS[0].lore[0]), "{t:?}");
+    let mut lt = Trace::default();
+    touch_script_portal(&mut leader, HUB, WAY_ON).await;
+    hears(&mut leader, &mut lt, keys::CWK_WAY_SHUT).await;
+
+    // The warriors' room is only for warriors; the thieves' takes the
+    // leader in.
+    touch_script_portal(&mut leader, HUB, "in01").await;
+    hears(&mut leader, &mut lt, keys::CWK_ROOM_ONLY_WARRIOR).await;
+    assert!(lt.warps.is_empty(), "{lt:?}");
+    let thieves = &CWK_ROOMS[3];
+    touch_script_portal(&mut leader, HUB, "in04").await;
+    until(&mut leader.connection, &mut lt, |t| {
+        t.warps.contains(&thieves.map) && eyes(t).len() == 5
+    })
+    .await;
+    let eyes = eyes(&lt);
+
+    // Whose keeper wants its eyes broken first.
+    let t = told(&mut leader, talk(thieves.map, thieves.keeper)).await;
+    assert!(said(&t, keys::CWK_ROOM_EYES), "{t:?}");
+    let c = &mut leader.connection;
+    for eye in &eyes {
+        send(c, walk_to(eye.x, eye.y)).await;
+        send(c, hit_reactor(eye.object_id)).await;
+    }
+    until(c, &mut lt, |t| {
+        (eyes.iter()).all(|eye| t.field.reactor_hits.contains(&(eye.object_id, 1)))
+    })
+    .await;
+
+    // Then gives back the thieves' weapon, once.
+    let t = told(&mut leader, talk(thieves.map, thieves.keeper)).await;
+    assert!(said(&t, keys::CWK_ROOM_GIVEN), "{t:?}");
+    let given = t
+        .added
+        .iter()
+        .find(|a| (a.0, a.2) == (ETC as u8, thieves.weapon));
+    let (_, slot, _) = *given.unwrap_or_else(|| panic!("{t:?}"));
+    let t = told(&mut leader, talk(thieves.map, thieves.keeper)).await;
+    assert!(said(&t, keys::CWK_ROOM_TAKEN), "{t:?}");
+
+    // The bowmen's room takes the member in, to its five Master
+    // Guardians, whom its keeper wants gone first.
+    let bowmen = &CWK_ROOMS[1];
+    touch_script_portal(&mut member, HUB, "in02").await;
+    until(&mut member.connection, &mut mt, |t| {
+        t.warps.contains(&bowmen.map) && t.field.alive(CWK_MASTER_GUARDIAN).len() == 5
+    })
+    .await;
+    let t = told(&mut member, talk(bowmen.map, bowmen.keeper)).await;
+    assert!(said(&t, keys::CWK_ROOM_MASTERS), "{t:?}");
+
+    // Back on the hub, the leader lays each weapon on its altar; each is
+    // restored, and with the fifth the stage clears.
+    let mut lt = Trace::default();
+    send(
+        &mut leader.connection,
+        build_change_map(-1, "out00").unwrap(),
+    )
+    .await;
+    until(&mut leader.connection, &mut lt, |t| t.warps.contains(&HUB)).await;
+    let c = &mut leader.connection;
+    for (room, &(_, x, y)) in CWK_ROOMS.iter().zip(&ALTARS) {
+        let from = match others.iter().position(|&weapon| weapon == room.weapon) {
+            Some(n) => n as i16 + 1,
+            None => slot,
+        };
+        send(c, walk_to(x, y)).await;
+        send(c, throw_down(from, 1)).await;
+    }
+    let restored = line(keys::CWK_WEAPON_RESTORED);
+    let (exp, meso) = (CWK.stage_exp(5), CWK.stage_meso(5));
+    until(c, &mut lt, |t| {
+        t.item_lines.iter().filter(|&l| *l == restored).count() == 5
+            && t.item_lines.contains(&line(keys::CWK_WEAPONS_DONE))
+            && cleared(t)
+            && t.gains.contains(&exp)
+            && t.meso_gains.contains(&meso)
+    })
+    .await;
+    for altar in &altars {
+        assert!(
+            lt.field.reactor_hits.contains(&(altar.object_id, 1)),
+            "{lt:?}"
+        );
+    }
+
+    // And the way on leads to the sixth stage.
+    touch_script_portal(&mut leader, HUB, WAY_ON).await;
+    until(&mut leader.connection, &mut lt, |t| {
+        t.warps.contains(&STAGE6)
+    })
+    .await;
+}
+
+/// The fifth stage's altar `id`, as `t` saw it.
+fn altar(t: &Trace, id: i32) -> Option<MapReactor> {
+    let mut reactors = t.field.reactors.iter();
+    reactors.find(|r| r.reactor_id == id).copied()
+}
+
+/// The thieves' room's eyes that `t` saw.
+fn eyes(t: &Trace) -> Vec<MapReactor> {
+    let reactors = t.field.reactors.iter();
+    let eyes = reactors.filter(|r| r.reactor_id == CWK_EYE);
+    eyes.copied().collect()
 }
 
 /// `player` hears `key` in the chat log, as of an item.

@@ -4145,7 +4145,12 @@ impl FieldActor {
                     reactors::Action::Bloom => self.bloom(),
                     reactors::Action::Sigil => {
                         let job = net::events::cwk_sigil(view.reactor_id);
-                        if let (Some(job), Some(occupant)) = (job, self.occupants.get(&by)) {
+                        // An altar takes its weapon a while after it lands,
+                        // when the one who dropped it may have gone, so
+                        // anyone still here tells the event.
+                        let teller =
+                            (self.occupants.get(&by)).or_else(|| self.occupants.values().next());
+                        if let (Some(job), Some(occupant)) = (job, teller) {
                             occupant.handle.send(ServerMessage::SigilLit(job));
                         }
                         // The third stage's set its menhirs going.

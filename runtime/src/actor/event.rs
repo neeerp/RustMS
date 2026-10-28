@@ -50,7 +50,7 @@ use net::packet::build::world::guild::{build_quest_registrant_left, build_quest_
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU16, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -197,9 +197,9 @@ pub struct Cleared {
     /// Which of the Amorian Challenge's stage 1 ways its clear opened,
     /// counted from 1; 0 before.
     way: AtomicU8,
-    /// Crimsonwood Keep's sigils lit, five bits a stage from the second
-    /// (`EventCommand::SigilLit`).
-    sigils: AtomicU16,
+    /// Crimsonwood Keep's sigils lit, five bits a stage from the second,
+    /// the fifth's its altars (`EventCommand::SigilLit`).
+    sigils: AtomicU32,
     /// How many have taken the Keep's third stage's way up, up to
     /// `CWK_STEPS` (`EventCommand::CwkStep`).
     steps: AtomicU8,
@@ -252,11 +252,14 @@ impl Cleared {
         self.way.load(Ordering::Acquire).checked_sub(1)
     }
 
-    /// Light the Keep's sigil of `job` on `stage`; returns the stage's
-    /// sigils lit before, or `None` if it already was.
-    fn light_sigil(&self, stage: u8, job: u8) -> Option<u16> {
+    /// Light the Keep's sigil of `job` on `stage`, or on the fifth stage
+    /// fill its altar; returns the stage's sigils lit before, or `None` if
+    /// it already was.
+    fn light_sigil(&self, stage: u8, job: u8) -> Option<u32> {
         let shift = stage.checked_sub(2)?.checked_mul(5)?.checked_add(job)?;
-        let bit = 1u16.checked_shl(shift.into()).filter(|_| job < 5)?;
+        let bit = 1u32
+            .checked_shl(shift.into())
+            .filter(|_| job < 5 && stage <= 5)?;
         let before = self.sigils.fetch_or(bit, Ordering::AcqRel);
         (before & bit == 0).then(|| (before >> (shift - job)) & 0b1_1111)
     }
@@ -264,7 +267,7 @@ impl Cleared {
     /// Whether all five of the Keep's sigils on `stage` are lit.
     fn sigils_lit(&self, stage: u8) -> bool {
         let shift = stage.checked_sub(2).and_then(|n| n.checked_mul(5));
-        shift.filter(|&shift| shift < 15).is_some_and(|shift| {
+        shift.filter(|&shift| shift < 20).is_some_and(|shift| {
             (self.sigils.load(Ordering::Acquire) >> shift) & 0b1_1111 == 0b1_1111
         })
     }
@@ -293,6 +296,12 @@ impl Cleared {
             None if lit => Climb::Open,
             None => Climb::NotAll,
         }
+    }
+
+    /// Whether room `room` is taken.
+    fn room_taken(&self, room: u8) -> bool {
+        1u8.checked_shl(room.into())
+            .is_some_and(|bit| self.rooms.load(Ordering::Acquire) & bit != 0)
     }
 
     /// Take rope room `room`; returns whether no one had.
@@ -447,10 +456,17 @@ impl EventTicket {
         self.cleared.escort_failed()
     }
 
-    /// Take the Magatia rope room `room`, from 0, for the member; returns
-    /// whether no one had (Cosmic `rnj4_r1`'s `statusStg5`).
+    /// Take the Magatia rope room `room`, from 0, for the member, or the
+    /// weapon of Crimsonwood Keep's fifth stage's room of job `room`;
+    /// returns whether no one had (Cosmic `rnj4_r1`'s `statusStg5`,
+    /// `9201107`'s `glpq5_room`).
     pub fn take_room(&self, room: u8) -> bool {
         self.cleared.take_room(room)
+    }
+
+    /// Whether `take_room(room)` has been.
+    pub fn room_taken(&self, room: u8) -> bool {
+        self.cleared.room_taken(room)
     }
 
     /// Whether the party has cleared the last stage, so has no time limit.
@@ -2877,10 +2893,11 @@ impl EventActor {
         });
     }
 
-    /// A member lit the Keep's sigil of `job` on `map_id`: everyone hears
-    /// of it, and when all five of the second or fourth stage's are lit,
-    /// that its way on is open, and the stage clears (Cosmic `6109000`'s
-    /// and `6109016`'s `act`). The third stage's also wait on its way up.
+    /// A member lit the Keep's sigil of `job` on `map_id`, or filled the
+    /// fifth stage's altar of `job`: everyone hears of it, and when all
+    /// five of the stage's are, that its way on is open, and the stage
+    /// clears (Cosmic `6109000`'s, `6109016`'s and `6109005`'s `act`). The
+    /// third stage's also wait on its way up.
     fn sigil_lit(&self, map_id: i32, job: u8) {
         let Some(stage) = self.kind.event().stage_on(map_id) else {
             return;
@@ -2889,19 +2906,22 @@ impl EventActor {
             return debug!(stage, job, "Sigil already lit");
         };
         // The third stage's sigils also set its menhirs going.
-        let lines = match stage {
-            3 => net::events::CWK_MENHIR_LINES,
-            _ => net::events::CWK_SIGIL_LINES,
+        let line = match stage {
+            3 => net::events::CWK_MENHIR_LINES[usize::from(job)],
+            5 => keys::CWK_WEAPON_RESTORED,
+            _ => net::events::CWK_SIGIL_LINES[usize::from(job)],
         };
-        let mut lines = vec![lines[usize::from(job)]];
+        let mut lines = vec![line];
         // The third stage's also waits on its way up.
         let done = before | 1 << job == 0b1_1111
             && match stage {
-                2 | 4 => true,
+                2 | 4 | 5 => true,
                 3 => self.cleared.steps() == CWK_STEPS,
                 _ => false,
             };
-        if done {
+        if done && stage == 5 {
+            lines.push(keys::CWK_WEAPONS_DONE);
+        } else if done {
             lines.push(keys::CWK_SIGILS_DONE);
         }
         let text = net::content::text();
@@ -3025,9 +3045,11 @@ mod tests {
         }
         assert_eq!(cleared.light_sigil(2, 4), Some(0b0_1111));
         assert_eq!(cleared.light_sigil(3, 4), Some(0b0_1000));
-        // No sigils on the first stage, nor past the fifth job's.
+        // No sigils on the first stage, nor past the fifth job's, nor past
+        // the fifth stage's altars.
         assert_eq!(cleared.light_sigil(1, 0), None);
         assert_eq!(cleared.light_sigil(2, 5), None);
+        assert_eq!(cleared.light_sigil(6, 0), None);
         // All of a stage's lit.
         assert!(!cleared.sigils_lit(3));
         for job in 0..4 {
@@ -3035,6 +3057,12 @@ mod tests {
         }
         assert!(cleared.sigils_lit(2) && cleared.sigils_lit(3) && !cleared.sigils_lit(4));
         assert!(!cleared.sigils_lit(1) && !cleared.sigils_lit(5));
+        // The fifth stage's altars, its own too.
+        for job in 0..4 {
+            assert_eq!(cleared.light_sigil(5, job), Some((1 << job) - 1));
+        }
+        assert_eq!(cleared.light_sigil(5, 4), Some(0b0_1111));
+        assert!(cleared.sigils_lit(5) && !cleared.sigils_lit(6));
     }
 
     #[test]

@@ -7,14 +7,15 @@ use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
 use crate::message::{CarnivalPick, DirectoryMessage, FieldKey, FieldMessage};
+use game::inventory::InventoryType;
 use game::quest_ex::{self, PartyQuestOutcome};
 use game::QuestState;
 use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
 use net::carnival::SpendRefusal;
 use net::events::{
-    self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, Entry, EventCommand, EventKind,
-    HeadCount, JailCheck, LeverCheck, RopesTalk, Standing, Statue,
+    self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, CwkKeeper, Entry, EventCommand,
+    EventKind, HeadCount, JailCheck, LeverCheck, RopesTalk, Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
@@ -1050,13 +1051,72 @@ impl ClientActor {
         }
     }
 
-    /// What Crimsonwood Keep's ways on do for a member there
-    /// (`scripts::cwk_way_on`). `None` for any other portal.
+    /// What Crimsonwood Keep's ways on, and its fifth stage's ways into
+    /// its rooms, do for a member there (`scripts::cwk_way_on`,
+    /// `scripts::cwk_room_way`). `None` for any other portal.
     pub(super) fn cwk_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
-        let map_id = self.in_game()?.player.stats.map_id;
+        let stats = &self.in_game()?.player.stats;
         let ticket = (self.event.as_ref())
-            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Cwk);
-        Ok(ticket.and_then(|ticket| scripts::cwk_way_on(script, |stage| ticket.cleared(stage))))
+            .filter(|ticket| ticket.holds(stats.map_id) && ticket.kind == EventKind::Cwk);
+        let Some(ticket) = ticket else {
+            return Ok(None);
+        };
+        Ok(scripts::cwk_way_on(script, |stage| ticket.cleared(stage))
+            .or_else(|| scripts::cwk_room_way(script, stats.job / 100 % 10)))
+    }
+
+    /// What a keeper of one of the Keep's fifth stage's rooms, `npc_id`,
+    /// tells the player (Cosmic `9201107` to `9201111`): of the room on the
+    /// stage's hub, and of the job's heroes on the courtyard. In the room,
+    /// to a member, once it is won (its monsters all down, or the thieves'
+    /// watchful eyes all struck), the keeper gives its weapon, the first
+    /// time and with room for it. `None` for anyone else, or elsewhere.
+    pub(super) async fn cwk_keeper(
+        &mut self,
+        npc_id: i32,
+    ) -> Result<Option<NpcScript>, RuntimeError> {
+        let Some((job, room)) = events::cwk_keeper(npc_id) else {
+            return Ok(None);
+        };
+        let player = &self.in_game()?.player;
+        let map_id = player.stats.map_id;
+        let full = player.inventory.free(InventoryType::Etc) == 0;
+        let says = |key| Ok(Some(NpcScript::cwk_keeper(npc_id, CwkKeeper::Says(key))));
+        match map_id {
+            events::CWK_HUB => return says(room.lore[0]),
+            events::CWK_COURTYARD => return says(room.lore[1]),
+            _ => {}
+        }
+        let Some(not_yet) = room.not_yet.filter(|_| map_id == room.map) else {
+            return Ok(None);
+        };
+        let in_cwk = |ticket: &&EventTicket| ticket.kind == EventKind::Cwk && ticket.holds(map_id);
+        if !self.event.as_ref().is_some_and(|ticket| in_cwk(&ticket)) {
+            return Ok(None);
+        }
+        let won = if map_id == events::CWK_EYES_ROOM {
+            let eyes = self.reactor_states(&events::CWK_EYES).await?;
+            eyes.iter().all(|&state| state == Some(1))
+        } else {
+            let (reply, mobs) = oneshot::channel();
+            self.send_to_field(FieldMessage::MobCount { reply }).await?;
+            mobs.await.is_ok_and(|mobs| mobs == 0)
+        };
+        let Some(ticket) = self.event.as_ref().filter(in_cwk) else {
+            return Ok(None);
+        };
+        let talk = if !won {
+            CwkKeeper::Says(not_yet)
+        } else if ticket.room_taken(job) {
+            CwkKeeper::Says(keys::CWK_ROOM_TAKEN)
+        } else if full {
+            CwkKeeper::Says(keys::CWK_ROOM_FULL)
+        } else if ticket.take_room(job) {
+            CwkKeeper::Gives(room.weapon)
+        } else {
+            CwkKeeper::Says(keys::CWK_ROOM_TAKEN)
+        };
+        Ok(Some(NpcScript::cwk_keeper(npc_id, talk)))
     }
 
     /// The Keep's third stage's way up (`scripts::CWK_STEP`, Cosmic

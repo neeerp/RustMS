@@ -1884,8 +1884,10 @@ pub fn only_mobs(map_id: i32) -> Option<i32> {
 /// (9300125) at each end of each of its two floors; each of its bellflower
 /// rooms with ten more of each of its two kinds of Bellflower (9300112,
 /// 9300113), one kind at each end (Cosmic `PiratePQ`'s `setup`). A room of
-/// Pharaoh Yeti's Tomb opens with its Pharaoh Jr. Yeti, at its spawn. None
-/// come back.
+/// Pharaoh Yeti's Tomb opens with its Pharaoh Jr. Yeti, at its spawn.
+/// Crimsonwood Keep's bowmen's room, which has no spawn points, opens with
+/// five Master Guardians (9400594) along its slopes (Cosmic CWKPQ's
+/// `setup`). None come back.
 pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     const YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_YETI, (0, 0), 1)];
     const HELL_YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_HELL_YETI, (0, 0), 1)];
@@ -1909,6 +1911,16 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     const GEIST: [(i32, (i16, i16), usize); 1] = [(GEIST_BALROG, GEIST_BALROG_AT, 1)];
     if map_id == AMORIA_STAGE6 {
         return &GEIST;
+    }
+    const MASTER_GUARDIANS: [(i32, (i16, i16), usize); 5] = [
+        (CWK_MASTER_GUARDIAN, (944, -204), 1),
+        (CWK_MASTER_GUARDIAN, (401, -384), 1),
+        (CWK_MASTER_GUARDIAN, (28, -504), 1),
+        (CWK_MASTER_GUARDIAN, (-332, -384), 1),
+        (CWK_MASTER_GUARDIAN, (-855, -204), 1),
+    ];
+    if map_id == CWK_ROOMS[1].map {
+        return &MASTER_GUARDIANS;
     }
     match PIRATE_STAGES[2..4]
         .iter()
@@ -2363,9 +2375,14 @@ pub const CWK_SIGIL_LINES: [&str; 5] = [
     game_data::server_content::keys::CWK_SIGIL_PIRATE,
 ];
 
-/// Which job's sigil `reactor_id` is, from 0, if it is one.
+/// The fifth stage's hub's altars (Cosmic `6109005`-`6109009`), each
+/// taking its job's weapon (`CwkRoom::weapon`), in the same order. The
+/// event counts them as it does sigils.
+pub const CWK_ALTARS: i32 = 6_109_005;
+
+/// Which job's sigil or altar `reactor_id` is, from 0, if it is one.
 pub fn cwk_sigil(reactor_id: i32) -> Option<u8> {
-    [CWK_SIGILS, CWK_LATER_SIGILS]
+    [CWK_SIGILS, CWK_ALTARS, CWK_LATER_SIGILS]
         .into_iter()
         .find_map(|first| {
             let job = reactor_id.checked_sub(first)?;
@@ -2441,6 +2458,123 @@ pub fn cwk_wake(rng: &mut impl rand::Rng) -> [&'static str; 8] {
 
 /// The Keep's items of use only in it, taken from whoever leaves.
 pub const CWK_ITEMS: [i32; 5] = [4_001_256, 4_001_257, 4_001_258, 4_001_259, 4_001_260];
+
+/// The Keep's fifth stage's hub, with a way into a room for each job, and
+/// the altars (`CWK_ALTARS`) that take the weapons won in them.
+pub const CWK_HUB: i32 = CWK_ENTRY + 400;
+/// The Keep's courtyard, outside its party quest, where one of the rooms'
+/// keepers also stands.
+pub const CWK_COURTYARD: i32 = 610_030_000;
+
+/// One of the Keep's fifth stage's rooms, for one job.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CwkRoom {
+    /// Its way in on the hub (Cosmic `glpqPortal00` to `glpqPortal04`).
+    pub way: &'static str,
+    /// The job line (`job / 100 % 10`) that may go in.
+    pub line: i16,
+    pub map: i32,
+    /// What the way tells anyone else (Cosmic's `playerMessage(5, ...)`).
+    pub only: &'static str,
+    /// The weapon won in it, which its job's altar takes.
+    pub weapon: i32,
+    /// Its keeper (Cosmic `9201107` to `9201111`), who gives the weapon
+    /// once the room is won, and tells of the room on the hub and of its
+    /// job's heroes on the courtyard.
+    pub keeper: i32,
+    /// What the keeper says before the room is won; none for the pirates',
+    /// whose weapon is in one of its chests, with no keeper there.
+    pub not_yet: Option<&'static str>,
+    /// What the keeper says on the hub and on the courtyard.
+    pub lore: [&'static str; 2],
+}
+
+/// The fifth stage's rooms, by job in the sigils' order: warrior, bowman,
+/// magician, thief, pirate.
+pub const CWK_ROOMS: [CwkRoom; 5] = {
+    use game_data::server_content::keys;
+    [
+        CwkRoom {
+            way: "glpqPortal00",
+            line: 1,
+            map: CWK_ENTRY + 410,
+            only: keys::CWK_ROOM_ONLY_WARRIOR,
+            weapon: 4_001_259,
+            keeper: 9_201_107,
+            not_yet: Some(keys::CWK_ROOM_GUARDIANS),
+            lore: [keys::CWK_LORE_WARRIOR_HUB, keys::CWK_LORE_WARRIOR_COURTYARD],
+        },
+        CwkRoom {
+            way: "glpqPortal01",
+            line: 3,
+            map: CWK_ENTRY + 440,
+            only: keys::CWK_ROOM_ONLY_ARCHER,
+            weapon: 4_001_258,
+            keeper: 9_201_108,
+            not_yet: Some(keys::CWK_ROOM_MASTERS),
+            lore: [keys::CWK_LORE_ARCHER_HUB, keys::CWK_LORE_ARCHER_COURTYARD],
+        },
+        CwkRoom {
+            way: "glpqPortal02",
+            line: 2,
+            map: CWK_ENTRY + 421,
+            only: keys::CWK_ROOM_ONLY_MAGE,
+            weapon: 4_001_257,
+            keeper: 9_201_109,
+            not_yet: Some(keys::CWK_ROOM_MOBS),
+            lore: [keys::CWK_LORE_MAGE_HUB, keys::CWK_LORE_MAGE_COURTYARD],
+        },
+        CwkRoom {
+            way: "glpqPortal03",
+            line: 4,
+            map: CWK_EYES_ROOM,
+            only: keys::CWK_ROOM_ONLY_THIEF,
+            weapon: 4_001_256,
+            keeper: 9_201_110,
+            not_yet: Some(keys::CWK_ROOM_EYES),
+            lore: [keys::CWK_LORE_THIEF_HUB, keys::CWK_LORE_THIEF_COURTYARD],
+        },
+        CwkRoom {
+            way: "glpqPortal04",
+            line: 5,
+            map: CWK_CHESTS_ROOM,
+            only: keys::CWK_ROOM_ONLY_PIRATE,
+            weapon: 4_001_260,
+            keeper: 9_201_111,
+            not_yet: None,
+            lore: [keys::CWK_LORE_PIRATE_HUB, keys::CWK_LORE_PIRATE_COURTYARD],
+        },
+    ]
+};
+
+/// The Keep's Master Guardian, which the bowmen's room opens with
+/// (`opening_mobs`).
+pub const CWK_MASTER_GUARDIAN: i32 = 9_400_594;
+
+/// The thieves' room, won once its watchful eyes (`CWK_EYES`, Cosmic
+/// `6108004`), not its monsters, are all struck (Cosmic `9201110`'s
+/// `isAllReactorState(6108004, 1)`).
+pub const CWK_EYES_ROOM: i32 = CWK_ENTRY + 430;
+pub const CWK_EYES: [&str; 5] = ["thief0", "thief1", "thief2", "thief3", "thief4"];
+pub const CWK_EYE: i32 = 6_108_004;
+/// The pirates' room, whose chests change places (CWKPQ's
+/// `shuffleReactors`): the weapon is in the one of `6102001`.
+pub const CWK_CHESTS_ROOM: i32 = CWK_ENTRY + 450;
+
+/// What one of the fifth stage's rooms' keepers does for a member.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CwkKeeper {
+    Says(&'static str),
+    /// Gives the room's weapon.
+    Gives(i32),
+}
+
+/// The room of the fifth stage that `keeper` keeps, and which job's, from
+/// 0, if it is one's.
+pub fn cwk_keeper(keeper: i32) -> Option<(u8, &'static CwkRoom)> {
+    let job = CWK_ROOMS.iter().position(|room| room.keeper == keeper)?;
+    Some((job as u8, &CWK_ROOMS[job]))
+}
 
 /// Magatia's lobbies for Romeo and Juliet's party quest: Romeo's room on
 /// the Zenumist side, Juliet's on the Alcadno side.
@@ -4647,10 +4781,12 @@ mod tests {
         assert!(!cwk_hidden_way(CWK_ENTRY, (824, 328)));
         assert!(!cwk_hidden_way(CWK_ENTRY + 100, (x, y)));
         // The sigils, by job, on the second and third stages and the
-        // fourth.
+        // fourth, and the fifth's altars.
         assert_eq!(cwk_sigil(6_109_000), Some(0));
         assert_eq!(cwk_sigil(6_109_004), Some(4));
-        assert_eq!(cwk_sigil(6_109_005), None);
+        assert_eq!(cwk_sigil(CWK_ALTARS), Some(0));
+        assert_eq!(cwk_sigil(6_109_009), Some(4));
+        assert_eq!(cwk_sigil(6_109_010), None);
         assert_eq!(cwk_sigil(6_109_016), Some(0));
         assert_eq!(cwk_sigil(6_109_020), Some(4));
         assert_eq!(cwk_sigil(6_109_021), None);

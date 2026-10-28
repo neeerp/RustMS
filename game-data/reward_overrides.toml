@@ -360,6 +360,13 @@ add = [{ item = 4001162, prob = 1.0 }]
 # boxes (3002002) drop nothing.
 add = [{ item = 4001163, prob = 1.0 }]
 
+[reactors.6102001]
+# Crimsonwood Keep's pirates' room (Map.nx 610030550): its one real chest
+# (Reactor.nx 6102001, `dropItems`; the four 6108003 beside it drop nothing)
+# holds the pirates' weapon 4001260, which the hub's pirate altar takes
+# (Reactor.nx 6109009, item event); every time.
+replace = [{ item = 4001260, prob = 1.0 }]
+
 [mobs.9300182]
 # The Forest of Poison Haze's Poison Golem (Map.nx 930000600) drops the
 # Golem's Marble 4001164 that the prize map's fountain takes (Reactor.nx
