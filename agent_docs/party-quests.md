@@ -43,7 +43,7 @@ Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
 room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 ([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
 married couples, has its entry, its way out, its end rules and its first
-three stages; its later stages come in later slices ([the Amorian
+four stages; its later stages come in later slices ([the Amorian
 Challenge](#the-amorian-challenge)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
@@ -1482,6 +1482,17 @@ right, which is the team's only hint. As on the ropes, no try is judged
 while monsters are about. The platforms are never drawn anew. The right
 try clears the stage without a word, for 6000 EXP each, and opens
 `next00` to 670010500.
+
+Stage 4 (670010500, `AMORIA_STAGE4`) is a hand-in (`Event::hand_ins`), to
+the second Amos (9201045, `AMOS_TRIALS`) who stands on the last three
+stages. Its monsters (9400524, 9400530, 9400531) each drop a Cupid Code
+Piece (4031597) in `rewards.json`. The leader first hears the task, then
+hands in 50 (`npc_scripts::amos_hand_in`), which clears the stage for
+8000 EXP each and opens `next00` to 670010600. With at least five minutes
+left, the clock is cut to four (`EventActor::amoria_clock`), and the time
+it would have run to is kept for stage 5 to give back. Either way the team
+hears in pink that time is short (`amoria_pq.stage4.notice`). With the
+harness's 60-fold clock, the cut clock shows 4 seconds.
 
 ## Jr. Balrog's room
 

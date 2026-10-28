@@ -669,6 +669,7 @@ pub fn spawn(
         vassals: Default::default(),
         heard: HashSet::new(),
         ropes: Ropes::default(),
+        rushed_from: None,
         cleared,
         leader: Arc::new(AtomicI32::new(start.leader)),
         directory: directory.clone(),
@@ -790,6 +791,9 @@ struct EventActor {
     heard: HashSet<u8>,
     /// The Amorian Challenge's ropes and the tries at them.
     ropes: Ropes,
+    /// When the Amorian Challenge's clock ran out before stage 4 cut it
+    /// short; stage 5 gives it back.
+    rushed_from: Option<Instant>,
     cleared: Arc<Cleared>,
     /// The team's leader, for the tickets.
     leader: Arc<AtomicI32>,
@@ -1349,6 +1353,9 @@ impl EventActor {
                     debug!(stage, client_id, "Clear not taken");
                 } else if stage == event.last_stage() {
                     self.win();
+                } else if self.kind == EventKind::Amoria && !self.cleared.has(stage) {
+                    self.amoria_clock(stage);
+                    self.clear(stage);
                 } else {
                     self.clear(stage);
                 }
@@ -2049,6 +2056,44 @@ impl EventActor {
         self.ends = Some(ends);
         info!(kind = ?self.kind, id = self.id, minutes, "Clock restarted");
         self.tell_clock();
+    }
+
+    /// The Amorian Challenge's clock on clearing `stage` (Cosmic
+    /// `9201045`): stage 4 cuts it short, if there is time enough to, and
+    /// tells the team in pink; stage 5 gives back what was cut.
+    fn amoria_clock(&mut self, stage: u8) {
+        use net::events::{AMORIA_CODES_STAGE, AMORIA_RUSH_FROM, AMORIA_RUSH_MINUTES};
+        if stage == AMORIA_CODES_STAGE {
+            let enough = net::events::scaled(Duration::from_secs(AMORIA_RUSH_FROM * 60));
+            let ends = self.ends.filter(|ends| *ends >= Instant::now() + enough);
+            if let Some(ends) = ends {
+                self.rushed_from = Some(ends);
+                self.restart_clock(AMORIA_RUSH_MINUTES);
+            }
+            self.tell_team(keys::AMORIA_PQ_STAGE4_NOTICE);
+        } else if stage == AMORIA_CODES_STAGE + 1 {
+            if let Some(ends) = self.rushed_from.take() {
+                self.ends = Some(ends);
+                info!(kind = ?self.kind, id = self.id, "Clock given back");
+                self.tell_clock();
+            }
+        }
+    }
+
+    /// Every member hears `key` in pink.
+    fn tell_team(&self, key: &str) {
+        let text = net::content::text().get(key, &[]);
+        let Ok(line) = build_broadcast(Broadcast::Pink, &text) else {
+            return;
+        };
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventPackets {
+                    id: self.id,
+                    packets: vec![line.clone()],
+                });
+            }
+        }
     }
 
     /// The clock stops, and the time no longer runs out, as on a Dojo rest

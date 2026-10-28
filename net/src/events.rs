@@ -1988,12 +1988,23 @@ pub const AMORIA_SLIMES_AT: [(i16, i16); 5] = [
     (1379, 150),
     (1171, 240),
 ];
+/// Stage 4: the leader hands Amos (Cosmic `9201045`) the Cupid Code
+/// Pieces its monsters drop. With at least `AMORIA_RUSH_FROM` minutes
+/// left, the clock is cut to `AMORIA_RUSH_MINUTES` until stage 5 clears,
+/// which gives the rest back.
+pub const AMORIA_STAGE4: i32 = 670_010_500;
+pub const AMORIA_CODES_STAGE: u8 = 4;
+pub const CUPID_CODE_PIECE: i32 = 4_031_597;
+pub const AMORIA_CODES: i16 = 50;
+pub const AMORIA_RUSH_FROM: u64 = 5;
+pub const AMORIA_RUSH_MINUTES: u64 = 4;
 /// The stage maps whose way on stays shut until their stage is cleared.
-pub const AMORIA_GATED: [i32; 4] = [
+pub const AMORIA_GATED: [i32; 5] = [
     AMORIA_STAGE2[0],
     AMORIA_STAGE2[1],
     AMORIA_STAGE2[2],
     AMORIA_STAGE3,
+    AMORIA_STAGE4,
 ];
 
 /// How many of the five Amos wants on each of stage 2's ropes: each of
@@ -2138,7 +2149,14 @@ pub const AMORIA: Event = Event {
     areas_taken: 0,
     items: &AMORIA_ITEMS,
     passes: 0,
-    hand_ins: &[],
+    hand_ins: &[HandIn {
+        stage: AMORIA_CODES_STAGE,
+        npc: 9_201_045,
+        item: CUPID_CODE_PIECE,
+        count: AMORIA_CODES,
+        prize: None,
+        intro: true,
+    }],
     gates: false,
     clear_map: None,
     bonus: None,
@@ -4281,7 +4299,13 @@ mod tests {
         assert_eq!(AMORIA.stage_on(670_010_303), None);
         assert_eq!(AMORIA.stage_on(AMORIA_STAGE3), Some(AMORIA_PLATFORMS_STAGE));
         assert_eq!(AMORIA.gate_stage(AMORIA_STAGE3, "next00"), Some(3));
-        assert_eq!(AMORIA.gate_stage(670_010_500, "next00"), None);
+        assert_eq!(AMORIA.gate_stage(AMORIA_STAGE4, "next00"), Some(4));
+        assert_eq!(AMORIA.gate_stage(670_010_600, "next00"), None);
+        let codes = AMORIA.hand_in_on(AMORIA_STAGE4, 9_201_045).unwrap();
+        assert_eq!(codes.stage, AMORIA_CODES_STAGE);
+        assert_eq!((codes.item, codes.count), (CUPID_CODE_PIECE, AMORIA_CODES));
+        assert!(AMORIA.items.contains(&CUPID_CODE_PIECE));
+        assert_eq!(AMORIA.hand_in_on(AMORIA_STAGE3, 9_201_045), None);
         let mut rng = rand::thread_rng();
         for _ in 0..100 {
             assert_eq!(draw_ropes(&mut rng).iter().sum::<u8>(), AMORIA_ROPERS);
