@@ -2214,6 +2214,8 @@ pub mod keys {
     pub const AMORIA_PQ_STAGE2_ONE_SAME_NOTICE: &str = "amoria_pq.stage2.one_same_notice";
     pub const AMORIA_PQ_STAGE2_RESET: &str = "amoria_pq.stage2.reset";
     pub const AMORIA_PQ_STAGE2_RESET_NOTICE: &str = "amoria_pq.stage2.reset_notice";
+    pub const AMORIA_PQ_STAGE3_INTRO: &str = "amoria_pq.stage3.intro";
+    pub const AMORIA_PQ_STAGE3_FEW: &str = "amoria_pq.stage3.few";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";
     pub const AMORIA_PQ_GLIMMER_MEMBER_TASK: &str = "amoria_pq.glimmer.member_task";
     pub const AMORIA_PQ_GLIMMER_FIERRY_OUT: &str = "amoria_pq.glimmer.fierry_out";

@@ -79,13 +79,14 @@ pub enum EventMessage {
         stage: u8,
         reply: oneshot::Sender<Option<Balloon>>,
     },
-    /// `client_id` talks to Amos on the Amorian Challenge's rope stage,
-    /// with monsters about or not and `heads` on its ropes; None for anyone
-    /// not in the event.
+    /// `client_id` talks to Amos on the Amorian Challenge's rope or
+    /// platform `stage`, with monsters about or not and `heads` on each of
+    /// its areas; None for anyone not in the event.
     Ropes {
         client_id: ClientId,
+        stage: u8,
         mobs: bool,
-        heads: [u8; 3],
+        heads: Vec<u8>,
         reply: oneshot::Sender<Option<RopesTalk>>,
     },
     /// `client_id` talks to the Guild Quest's statue keeper; None for
@@ -399,14 +400,16 @@ impl EventTicket {
     }
 
     /// What Amos makes of the member's talk on the Amorian Challenge's
-    /// rope stage, with monsters about or not and `heads` on its ropes;
-    /// a right try clears the stage. `None` if the event is over.
-    pub async fn ropes(&self, mobs: bool, heads: [u8; 3]) -> Option<RopesTalk> {
+    /// rope or platform `stage`, with monsters about or not and `heads` on
+    /// each of its areas; a right try clears the stage. `None` if the
+    /// event is over.
+    pub async fn ropes(&self, stage: u8, mobs: bool, heads: Vec<u8>) -> Option<RopesTalk> {
         let (reply, talk) = oneshot::channel();
         self.event
             .tx
             .send(EventMessage::Ropes {
                 client_id: self.member,
+                stage,
                 mobs,
                 heads,
                 reply,
@@ -888,8 +891,8 @@ impl EventActor {
                     Some(EventMessage::Balloon { client_id, stage, reply }) => {
                         let _ = reply.send(self.balloon(client_id, stage));
                     }
-                    Some(EventMessage::Ropes { client_id, mobs, heads, reply }) => {
-                        let _ = reply.send(self.ropes(client_id, mobs, heads));
+                    Some(EventMessage::Ropes { client_id, stage, mobs, heads, reply }) => {
+                        let _ = reply.send(self.ropes(client_id, stage, mobs, &heads));
                     }
                     Some(EventMessage::Statues { client_id, reply }) => {
                         let _ = reply.send(self.statues(client_id));
@@ -1292,14 +1295,22 @@ impl EventActor {
         })
     }
 
-    /// The leader first hears what the rope stage asks; then, once no
-    /// monster is about, each try with five on the ropes is judged, and
-    /// the right one clears the stage (Cosmic `9201044`).
-    fn ropes(&mut self, client_id: ClientId, mobs: bool, heads: [u8; 3]) -> Option<RopesTalk> {
-        if !self.team.has(client_id) || self.kind != EventKind::Amoria {
+    /// The leader first hears what the rope or platform stage asks; then,
+    /// once no monster is about, each try with five on the ropes or
+    /// platforms is judged, and the right one clears the stage (Cosmic
+    /// `9201044`).
+    fn ropes(
+        &mut self,
+        client_id: ClientId,
+        stage: u8,
+        mobs: bool,
+        heads: &[u8],
+    ) -> Option<RopesTalk> {
+        use net::events::{AMORIA_PLATFORMS_STAGE, AMORIA_ROPES_STAGE};
+        let on = [AMORIA_ROPES_STAGE, AMORIA_PLATFORMS_STAGE];
+        if !self.team.has(client_id) || self.kind != EventKind::Amoria || !on.contains(&stage) {
             return None;
         }
-        let stage = net::events::AMORIA_ROPES_STAGE;
         let talk = if self.cleared.has(stage) {
             RopesTalk::Cleared
         } else if client_id != self.team.leader() {
@@ -1308,9 +1319,11 @@ impl EventActor {
             RopesTalk::Intro
         } else if mobs {
             RopesTalk::Mobs
-        } else {
+        } else if stage == AMORIA_ROPES_STAGE {
             let draw = || net::events::draw_ropes(&mut rand::thread_rng());
-            self.ropes.try_heads(heads, draw)
+            self.ropes.try_heads(net::events::first_three(heads), draw)
+        } else {
+            self.ropes.try_platforms(heads, draw_amoria_platforms)
         };
         if talk == RopesTalk::Right {
             self.clear(stage);
@@ -2673,6 +2686,15 @@ impl EventActor {
         }
         true
     }
+}
+
+/// The platforms Amos wants on the Amorian Challenge's stage 3, five of
+/// its map's.
+fn draw_amoria_platforms() -> Option<u32> {
+    let field = net::get_game_data()
+        .ok()?
+        .field(net::events::AMORIA_STAGE3)?;
+    draw_combo(field.areas.len(), net::events::AMORIA_ROPERS.into())
 }
 
 /// A combo for puzzle stage `stage` of `event`, from its map's areas.

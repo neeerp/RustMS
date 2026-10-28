@@ -1974,6 +1974,27 @@ pub const AMORIA_ROPE_MOBS_AT: [(i16, i16); 5] = [
     (-471, -840),
 ];
 pub const AMORIA_ROPE_MOBS_EACH: u8 = 2;
+/// Stage 3: five of the team stand one on each of the five of its nine
+/// platforms Amos has drawn (`draw_combo`). Each wrong try brings out a
+/// slime for each platform they got right, each one of these at one of
+/// these points, both at random (Cosmic `9201044`'s `spawnMobs`).
+pub const AMORIA_STAGE3: i32 = 670_010_400;
+pub const AMORIA_PLATFORMS_STAGE: u8 = 3;
+pub const AMORIA_SLIMES: [i32; 4] = [9_400_519, 9_400_520, 9_400_521, 9_400_522];
+pub const AMORIA_SLIMES_AT: [(i16, i16); 5] = [
+    (2303, 240),
+    (1832, 150),
+    (1656, 300),
+    (1379, 150),
+    (1171, 240),
+];
+/// The stage maps whose way on stays shut until their stage is cleared.
+pub const AMORIA_GATED: [i32; 4] = [
+    AMORIA_STAGE2[0],
+    AMORIA_STAGE2[1],
+    AMORIA_STAGE2[2],
+    AMORIA_STAGE3,
+];
 
 /// How many of the five Amos wants on each of stage 2's ropes: each of
 /// the five drawn to a rope at random. Cosmic's `generateCombo1` drops the
@@ -1996,7 +2017,7 @@ pub fn draw_ropes(rng: &mut impl rand::Rng) -> [u8; 3] {
     })
 }
 
-/// What Amos makes of the leader's talk on stage 2.
+/// What Amos makes of the leader's talk on stage 2 or 3.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RopesTalk {
     /// The stage is cleared; the way on is open.
@@ -2006,9 +2027,10 @@ pub enum RopesTalk {
     Intro,
     /// Monsters are still about.
     Mobs,
-    /// Not five on the ropes.
+    /// Not five on the ropes or platforms.
     Few,
-    /// A wrong try, `right` ropes with as many on them as wanted.
+    /// A wrong try, `right` ropes with as many on them as wanted, or
+    /// `right` of the platforms wanted with one on each.
     Wrong {
         right: usize,
     },
@@ -2020,11 +2042,13 @@ pub enum RopesTalk {
 }
 
 /// The ropes Amos wants on stage 2 and the team's wrong tries since they
-/// were drawn.
+/// were drawn, and the platforms he wants on stage 3, as a bit per
+/// platform.
 #[derive(Debug, Default)]
 pub struct Ropes {
     wanted: Option<[u8; 3]>,
     misses: u8,
+    platforms: Option<u32>,
 }
 
 impl Ropes {
@@ -2040,9 +2064,32 @@ impl Ropes {
                 if self.misses < AMORIA_ROPE_TRIES {
                     return RopesTalk::Wrong { right };
                 }
-                *self = Ropes::default();
+                (self.wanted, self.misses) = (None, 0);
                 RopesTalk::Reset
             }
+        }
+    }
+
+    /// The leader tries on stage 3 with `heads` on each platform, the
+    /// platforms drawn by `draw` if not yet. A wrong try never draws them
+    /// anew. `Few` if none can be drawn.
+    pub fn try_platforms(&mut self, heads: &[u8], draw: impl FnOnce() -> Option<u32>) -> RopesTalk {
+        let Some(wanted) = self.platforms.or_else(draw) else {
+            return RopesTalk::Few;
+        };
+        self.platforms = Some(wanted);
+        let bit = |area: usize| wanted.checked_shr(area as u32).unwrap_or(0) & 1;
+        let total = heads.iter().map(|&h| u32::from(h)).sum::<u32>();
+        let right = (heads.iter().enumerate())
+            .filter(|&(area, &h)| h == 1 && bit(area) == 1)
+            .count();
+        let wrong = (heads.iter().enumerate()).any(|(area, &h)| u32::from(h) != bit(area));
+        if total != u32::from(AMORIA_ROPERS) {
+            RopesTalk::Few
+        } else if wrong {
+            RopesTalk::Wrong { right }
+        } else {
+            RopesTalk::Right
         }
     }
 }
@@ -2086,7 +2133,7 @@ pub const AMORIA: Event = Event {
     member_clears: &[],
     clear_portals: &[],
     stage_copies: &[(AMORIA_STAGE2[1], 2), (AMORIA_STAGE2[2], 2)],
-    gated: &AMORIA_STAGE2,
+    gated: &AMORIA_GATED,
     puzzles: 1..=0,
     areas_taken: 0,
     items: &AMORIA_ITEMS,
@@ -3831,20 +3878,27 @@ pub enum HeadCount {
 /// How `positions` stand on the first three of `areas` for `split`. A
 /// position counts for the first area that holds it.
 pub fn head_count(split: [u8; 3], areas: &[Area], positions: &[(i32, i32)]) -> HeadCount {
-    tally(split, heads_on(areas, positions))
+    tally(
+        split,
+        first_three(&heads_on(&areas[..areas.len().min(3)], positions)),
+    )
 }
 
-/// How many of `positions` are on each of the first three of `areas`, each
-/// counted for the first that holds it.
-pub fn heads_on(areas: &[Area], positions: &[(i32, i32)]) -> [u8; 3] {
-    let platforms = &areas[..areas.len().min(3)];
-    let mut heads = [0u8; 3];
+/// How many of `positions` are on each of `areas`, each counted for the
+/// first that holds it.
+pub fn heads_on(areas: &[Area], positions: &[(i32, i32)]) -> Vec<u8> {
+    let mut heads = vec![0u8; areas.len()];
     for &(x, y) in positions {
-        if let Some(area) = platforms.iter().position(|area| area.contains(x, y)) {
+        if let Some(area) = areas.iter().position(|area| area.contains(x, y)) {
             heads[area] = heads[area].saturating_add(1);
         }
     }
     heads
+}
+
+/// The heads on the first three of some areas, none on any missing.
+pub fn first_three(heads: &[u8]) -> [u8; 3] {
+    std::array::from_fn(|area| heads.get(area).copied().unwrap_or(0))
 }
 
 /// How `heads` on three platforms stand against `split`.
@@ -4105,16 +4159,10 @@ pub fn standing(combo: u32, taken: u32, areas: &[Area], positions: &[(i32, i32)]
 /// its areas, and none on the others. A position counts for the first of
 /// `areas` that holds it; one on none of them doesn't count.
 pub fn on_areas(combo: u32, areas: &[Area], positions: &[(i32, i32)]) -> bool {
-    let mut standing = vec![0; areas.len()];
-    for &(x, y) in positions {
-        if let Some(area) = areas.iter().position(|area| area.contains(x, y)) {
-            standing[area] += 1;
-        }
-    }
-    standing
+    heads_on(areas, positions)
         .iter()
         .enumerate()
-        .all(|(area, &count)| count == combo.checked_shr(area as u32).unwrap_or(0) & 1)
+        .all(|(area, &count)| u32::from(count) == combo.checked_shr(area as u32).unwrap_or(0) & 1)
 }
 
 #[cfg(test)]
@@ -4231,7 +4279,9 @@ mod tests {
             assert_eq!(AMORIA.gate_stage(map, "next00"), Some(2));
         }
         assert_eq!(AMORIA.stage_on(670_010_303), None);
-        assert_eq!(AMORIA.stage_on(670_010_400), Some(3));
+        assert_eq!(AMORIA.stage_on(AMORIA_STAGE3), Some(AMORIA_PLATFORMS_STAGE));
+        assert_eq!(AMORIA.gate_stage(AMORIA_STAGE3, "next00"), Some(3));
+        assert_eq!(AMORIA.gate_stage(670_010_500, "next00"), None);
         let mut rng = rand::thread_rng();
         for _ in 0..100 {
             assert_eq!(draw_ropes(&mut rng).iter().sum::<u8>(), AMORIA_ROPERS);
@@ -4261,6 +4311,37 @@ mod tests {
         assert_eq!(ropes.try_heads([1, 1, 3], other), RopesTalk::Reset);
         // Drawn anew.
         assert_eq!(ropes.try_heads([5, 0, 0], other), RopesTalk::Right);
+    }
+
+    #[test]
+    fn amoria_s_platforms_take_one_on_each_of_the_five_drawn() {
+        let mut ropes = Ropes::default();
+        assert_eq!(ropes.try_platforms(&[1; 9], || None), RopesTalk::Few);
+        // Platforms 0-3 and 5.
+        let wanted = || Some(0b10_1111);
+        let few = [1, 1, 1, 1, 0, 0, 0, 0, 0];
+        assert_eq!(ropes.try_platforms(&few, wanted), RopesTalk::Few);
+        let four = [1, 1, 1, 1, 1, 0, 0, 0, 0];
+        assert_eq!(
+            ropes.try_platforms(&four, wanted),
+            RopesTalk::Wrong { right: 4 }
+        );
+        // Drawn once: a wrong try keeps them.
+        let other = || Some(0b1_1111);
+        let stacked = [2, 0, 1, 1, 0, 1, 0, 0, 0];
+        assert_eq!(
+            ropes.try_platforms(&stacked, other),
+            RopesTalk::Wrong { right: 3 }
+        );
+        let none = [0, 0, 0, 0, 1, 0, 1, 1, 2];
+        assert_eq!(
+            ropes.try_platforms(&none, other),
+            RopesTalk::Wrong { right: 0 }
+        );
+        let right = [1, 1, 1, 1, 0, 1, 0, 0, 0];
+        assert_eq!(ropes.try_platforms(&right, other), RopesTalk::Right);
+        // Stage 2's ropes are their own.
+        assert_eq!(ropes.try_heads([5, 0, 0], || [5, 0, 0]), RopesTalk::Right);
     }
 
     #[test]
