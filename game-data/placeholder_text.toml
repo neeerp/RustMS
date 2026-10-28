@@ -1999,3 +1999,4 @@
 "guild_quest.vassals.failed" = "[placeholder] Seven tries and still they are not pleased. They have changed their wishes, and their knights come."
 "guild_quest.gate.closed" = "[placeholder] The gate is shut."
 "guild_quest.gate.blocked" = "[placeholder] The door is blocked."
+"guild_quest.gate.too_high" = "[placeholder] Only those of level 30 or lower may go this way."

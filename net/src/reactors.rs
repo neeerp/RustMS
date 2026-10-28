@@ -35,6 +35,13 @@ pub enum Action {
     Spray { at_least: usize, mesos: (i32, i32) },
     /// Bring out `count` of `mob_id` on the ground below it instead.
     BringOut(i32, usize),
+    /// Bring out `count` of `mob_id` on the ground below `at`, a fixed point
+    /// on its map, instead.
+    BringOutAt {
+        mob_id: i32,
+        count: usize,
+        at: (i16, i16),
+    },
     /// Bring out two lots of mobs, each `count` of `mob_id`, on the ground
     /// below it instead: the Pirate Ship's mob boxes (Cosmic `2511000`).
     BringOutLots([(i32, usize); 2]),
@@ -77,8 +84,9 @@ pub enum Action {
     Statue,
     /// One of the scars on the Tower of Goddess's hub (`2008000`-`2008005`),
     /// where a piece of Minerva's statue goes: it keeps the piece set in it.
-    /// The Guild Quest's stone and metal gates (`9208006`, `9208005`) keep
-    /// theirs too, and stay open.
+    /// The Guild Quest's stone and metal gates (`9208006`, `9208005`) and
+    /// the waterway's doors (`9208010`-`9208012`) keep theirs too, and stay
+    /// open.
     Hold,
     /// One of the Guild Quest's spears (`9208007`), which takes a spear and
     /// stays: the knights' hall's gate moves to the number set, and the
@@ -349,10 +357,16 @@ pub fn action(reactor_id: i32) -> Action {
         2401002 => Action::BringOut(9300090, 1),
         9108000..=9108005 => Action::Bloom,
         9208000..=9208002 => Action::Statue,
-        // The Guild Quest's metal and stone gates (their `9208005`,
-        // `9208006` scripts do nothing), and its spears.
-        9208005 | 9208006 => Action::Hold,
+        // The Guild Quest's metal and stone gates and the waterway's doors
+        // (their `9208005`, `9208006`, `9208010`-`9208012` scripts do
+        // nothing), its spears, and the gargoyles' altar (`9201000`).
+        9208005 | 9208006 | 9208010..=9208012 => Action::Hold,
         crate::guild_quest::SPEAR => Action::Spear,
+        crate::guild_quest::GARGOYLE_ALTAR => Action::BringOutAt {
+            mob_id: crate::guild_quest::JR_GARGOYLE,
+            count: crate::guild_quest::JR_GARGOYLES,
+            at: crate::guild_quest::JR_GARGOYLES_AT,
+        },
         // Ludibrium's stage 3 boxes (`ludiMob1`): three Bloctopuses come out.
         2201001 => Action::BringOut(LPQ_BLOCTOPUS, 3),
         // Stage 7's (`ludiMob2`), which take the other pass, and the
@@ -844,6 +858,27 @@ mod tests {
         assert_eq!(action(SPEAR), Action::Spear);
         assert_eq!(action(9208004), Action::Drops);
         assert!(stays(9208005) && stays(9208006) && stays(SPEAR));
+        // The waterway's doors take a stack of exactly so many Marks.
+        for (door, marks) in [(9208010, 9), (9208011, 8), (9208012, 20)] {
+            assert_eq!(action(door), Action::Hold);
+            assert!(stays(door));
+            let Some(door) = template(door) else { continue };
+            assert!(door.item_dropped(0, 4001035, marks, (0, 0)).is_some());
+            assert!(door.item_dropped(0, 4001035, marks - 1, (0, 0)).is_none());
+            assert!(door.is_last(1) && door.time_out(1).is_none());
+        }
+        use crate::guild_quest::{GARGOYLE_ALTAR, JR_GARGOYLE, JR_GARGOYLES, JR_GARGOYLES_AT};
+        assert_eq!(
+            action(GARGOYLE_ALTAR),
+            Action::BringOutAt {
+                mob_id: JR_GARGOYLE,
+                count: JR_GARGOYLES,
+                at: JR_GARGOYLES_AT
+            }
+        );
+        if let Some(altar) = template(GARGOYLE_ALTAR) {
+            assert!(altar.item_dropped(0, 4001036, 1, (0, 0)).is_some());
+        }
         let (Some(stone), Some(metal), Some(spear)) =
             (template(9208006), template(9208005), template(SPEAR))
         else {

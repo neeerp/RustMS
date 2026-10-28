@@ -4172,6 +4172,9 @@ impl FieldActor {
             reactors::Action::BringOut(mob_id, count) => {
                 self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
             }
+            reactors::Action::BringOutAt { mob_id, count, at } => {
+                self.board(mob_id, count, at);
+            }
             reactors::Action::BringOutLots(lots) => {
                 for (mob_id, count) in lots {
                     self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));

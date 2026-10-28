@@ -1833,6 +1833,7 @@ unsourced = [
     "guild_quest.vassals.failed",
     "guild_quest.gate.closed",
     "guild_quest.gate.blocked",
+    "guild_quest.gate.too_high",
 ]
 
 [text."glTutoMsg0.message"]
