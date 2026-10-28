@@ -2348,6 +2348,31 @@ pub const CWK_CLOCKS: [(i32, u64); 6] = [
     (CWK_ENTRY + 700, 1),
 ];
 
+/// The Keep's sigils, lit by a job's skills, on its second and third
+/// stages (Cosmic `6109000`-`6109004`) and its fourth (`6109016`-`6109020`,
+/// which the stage wakes first), each in the order warrior, bowman,
+/// magician, thief, pirate.
+pub const CWK_SIGILS: i32 = 6_109_000;
+pub const CWK_LATER_SIGILS: i32 = 6_109_016;
+/// What everyone hears as each job's sigil lights, in that order.
+pub const CWK_SIGIL_LINES: [&str; 5] = [
+    game_data::server_content::keys::CWK_SIGIL_WARRIOR,
+    game_data::server_content::keys::CWK_SIGIL_ARCHER,
+    game_data::server_content::keys::CWK_SIGIL_MAGE,
+    game_data::server_content::keys::CWK_SIGIL_THIEF,
+    game_data::server_content::keys::CWK_SIGIL_PIRATE,
+];
+
+/// Which job's sigil `reactor_id` is, from 0, if it is one.
+pub fn cwk_sigil(reactor_id: i32) -> Option<u8> {
+    [CWK_SIGILS, CWK_LATER_SIGILS]
+        .into_iter()
+        .find_map(|first| {
+            let job = reactor_id.checked_sub(first)?;
+            u8::try_from(job).ok().filter(|&job| job < 5)
+        })
+}
+
 /// The Keep's items of use only in it, taken from whoever leaves.
 pub const CWK_ITEMS: [i32; 5] = [4_001_256, 4_001_257, 4_001_258, 4_001_259, 4_001_260];
 
@@ -3884,6 +3909,9 @@ pub enum EventCommand {
     ShowStatues,
     /// A member struck the statue numbered this, from 1.
     StatueStruck(u8),
+    /// A member lit Crimsonwood Keep's sigil of job `job`
+    /// (`cwk_sigil`) on `map_id`.
+    SigilLit { map_id: i32, job: u8 },
     /// The Guild Quest's room of the spears has this many spears set.
     SpearsSet(u8),
     /// The Guild Quest's King's Corridor's door took the earring.
@@ -4549,6 +4577,15 @@ mod tests {
         // Not the stage's way on, `next00`, nor elsewhere.
         assert!(!cwk_hidden_way(CWK_ENTRY, (824, 328)));
         assert!(!cwk_hidden_way(CWK_ENTRY + 100, (x, y)));
+        // The sigils, by job, on the second and third stages and the
+        // fourth.
+        assert_eq!(cwk_sigil(6_109_000), Some(0));
+        assert_eq!(cwk_sigil(6_109_004), Some(4));
+        assert_eq!(cwk_sigil(6_109_005), None);
+        assert_eq!(cwk_sigil(6_109_016), Some(0));
+        assert_eq!(cwk_sigil(6_109_020), Some(4));
+        assert_eq!(cwk_sigil(6_109_021), None);
+        assert_eq!(cwk_sigil(6_108_999), None);
         // Any member's find clears it.
         assert!(CWK.member_clears.contains(&1));
         let mesos: Vec<_> = (1..=7).map(|stage| CWK.stage_meso(stage)).collect();

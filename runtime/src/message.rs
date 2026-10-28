@@ -378,6 +378,9 @@ pub enum ServerMessage {
     /// The player struck the Guild Quest's statue numbered this, from 1:
     /// tell the event.
     StatueStruck(u8),
+    /// The player lit Crimsonwood Keep's sigil of this job
+    /// (`net::events::cwk_sigil`): tell the event.
+    SigilLit(u8),
     /// The player's field, the Guild Quest's room of the spears, has this
     /// many spears set now: tell the event.
     SpearsSet(u8),

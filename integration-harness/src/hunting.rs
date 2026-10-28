@@ -159,6 +159,19 @@ pub fn hit_reactor(object_id: i32) -> Packet {
     p
 }
 
+/// DAMAGE_REACTOR: skill `skill_id` used by a reactor, facing right on a
+/// foothold, landing after 800 ms as the client's do.
+pub fn skill_at_reactor(object_id: i32, skill_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::DamageReactor as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_int(1).unwrap();
+    p.write_int(2).unwrap();
+    p.write_short(800).unwrap();
+    p.write_int(skill_id).unwrap();
+    p
+}
+
 /// ITEM_PICKUP of a drop, standing at (x, y).
 pub fn pickup(object_id: i32, x: i16, y: i16) -> Packet {
     let mut p = Packet::new_empty();

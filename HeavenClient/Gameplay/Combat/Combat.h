@@ -352,6 +352,10 @@ namespace ms
 		// one. Returns whether it did.
 		bool swing_at_reactor();
 
+		// Tell each reactor whose state takes `skill` where the player
+		// stands that it was used by it (FUN_00735ab7).
+		void use_skill_at_reactors(int32_t skill);
+
 		// On Coconut Season's field a basic attack swings whatever is in
 		// reach, and tells the server of the first nut it hits
 		// (FUN_00549902).

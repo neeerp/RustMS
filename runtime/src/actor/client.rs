@@ -1786,6 +1786,13 @@ impl ClientActor {
                 self.tell_event(net::events::EventCommand::StatueStruck(statue))
                     .await
             }
+            ServerMessage::SigilLit(job) => {
+                let map_id = self.game.as_ref().map(|game| game.player.stats.map_id);
+                if let Some(map_id) = map_id {
+                    self.tell_event(net::events::EventCommand::SigilLit { map_id, job })
+                        .await
+                }
+            }
             ServerMessage::SpearsSet(set) => {
                 self.tell_event(net::events::EventCommand::SpearsSet(set))
                     .await

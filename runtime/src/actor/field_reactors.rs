@@ -15,6 +15,9 @@ use tokio::time::{Duration, Instant};
 /// is trails their movement.
 const REACH_X: i32 = 250;
 const REACH_Y: i32 = 200;
+/// How far outside a reactor's area for a skill a player can stand and
+/// still set it off, for the same reason.
+const SKILL_SLACK: i32 = 100;
 
 struct Spot {
     template: MapReactorTemplate,
@@ -325,6 +328,33 @@ impl ReactorSet {
             return None;
         }
         let (event, next) = self.spots[reactor.spot].data.swing(reactor.state, flags)?;
+        self.advance(object_id, event, next, now)
+    }
+
+    /// A player at `from` used `skill_id` by `object_id`. `None` if it is
+    /// gone, no event of its state takes the skill, or the player stood
+    /// outside that event's area, by more than the field's idea of where
+    /// they are trails.
+    pub fn skill_used(
+        &mut self,
+        object_id: i32,
+        skill_id: i32,
+        from: (i16, i16),
+        now: Instant,
+    ) -> Option<Hit> {
+        let reactor = self.live.get(&object_id)?;
+        let data = &self.spots[reactor.spot].data;
+        let (event, next, ((left, top), (right, bottom))) =
+            data.skill_used(reactor.state, skill_id)?;
+        let (dx, dy) = (
+            i32::from(from.0) - i32::from(reactor.x),
+            i32::from(from.1) - i32::from(reactor.y),
+        );
+        let x_in = (i32::from(left) - SKILL_SLACK..=i32::from(right) + SKILL_SLACK).contains(&dx);
+        let y_in = (i32::from(top) - SKILL_SLACK..=i32::from(bottom) + SKILL_SLACK).contains(&dy);
+        if !x_in || !y_in {
+            return None;
+        }
         self.advance(object_id, event, next, now)
     }
 
@@ -701,6 +731,7 @@ mod tests {
                 next: Some(next),
                 item: Some((item_id, 1)),
                 area: Some(((-40, -40), (40, 0))),
+                skills: Vec::new(),
             }],
             ..ReactorState::default()
         };
@@ -767,6 +798,7 @@ mod tests {
             next: Some(next),
             item: Some((item_id, 1)),
             area: Some(((-100, -50), (100, 30))),
+            skills: Vec::new(),
         };
         let spot = |reactor_id, x, name: &str| MapReactorTemplate {
             reactor_id,
@@ -910,6 +942,7 @@ mod tests {
                     next: Some(day + 1),
                     item: Some((net::reactors::SUNDAY_RECORD + i32::from(day), 1)),
                     area: Some(((-52, -64), (40, 79))),
+                    skills: Vec::new(),
                 })
                 .collect(),
             ..ReactorState::default()
@@ -963,5 +996,43 @@ mod tests {
         }
         assert_eq!(reactors.get(id).unwrap().state, 1);
         assert!(!reactors.takes_items(id));
+    }
+
+    #[test]
+    fn a_sigil_lights_for_its_job_s_skill_by_it_and_stays_lit() {
+        let (mut template, mut data) = scrap_box(0, -1);
+        template.reactor_id = 6109000;
+        data.reactor_id = 6109000;
+        data.states = vec![
+            ReactorState {
+                events: vec![ReactorEvent {
+                    kind: game_data::reactors::SKILL_USED,
+                    next: Some(1),
+                    area: Some(((-125, -19), (123, 122))),
+                    skills: vec![1211002, 1311003],
+                    ..ReactorEvent::default()
+                }],
+                ..ReactorState::default()
+            },
+            ReactorState::default(),
+        ];
+        let mut reactors = ReactorSet::new([(template, data)]);
+        let now = Instant::now();
+        let id = reactors.respawn(now)[0];
+        // A swing, another job's skill, and the skill from too far off do
+        // nothing.
+        assert!(reactors.hit(id, SWING, (0, 254), now).is_none());
+        assert!(reactors.skill_used(id, 3211006, (0, 300), now).is_none());
+        assert!(reactors.skill_used(id, 1211002, (400, 300), now).is_none());
+        assert!(reactors
+            .skill_used(id, 1211002, (0, 254 + 230), now)
+            .is_none());
+        // Within the area, give or take the slack, it lights for good.
+        match reactors.skill_used(id, 1311003, (-200, 254 - 100), now) {
+            Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, 1),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(reactors.get(id).unwrap().state, 1);
+        assert!(reactors.skill_used(id, 1211002, (0, 300), now).is_none());
     }
 }

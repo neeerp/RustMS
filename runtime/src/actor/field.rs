@@ -1063,7 +1063,8 @@ impl FieldActor {
                     object_id,
                     flags,
                     delay,
-                } => self.handle_hit_reactor(from, object_id, flags, delay),
+                    skill,
+                } => self.handle_hit_reactor(from, object_id, flags, delay, skill),
                 FieldRequest::CharInfo { character_id } => {
                     self.handle_char_info(from, character_id)
                 }
@@ -4079,9 +4080,16 @@ impl FieldActor {
         }
     }
 
-    /// A player hit a reactor: show its new state, or break it and have the
-    /// player's client actor roll its drops.
-    fn handle_hit_reactor(&mut self, from: ClientId, object_id: i32, flags: i32, delay: u16) {
+    /// A player hit a reactor, or used `skill` by it: show its new state,
+    /// or break it and have the player's client actor roll its drops.
+    fn handle_hit_reactor(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        flags: i32,
+        delay: u16,
+        skill: Option<i32>,
+    ) {
         let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
@@ -4095,10 +4103,12 @@ impl FieldActor {
             return;
         }
         let position = (occupant.avatar.x, occupant.avatar.y);
-        if let Some(hit) = self
-            .reactors
-            .hit(object_id, flags, position, Instant::now())
-        {
+        let now = Instant::now();
+        let hit = match skill {
+            Some(skill_id) => self.reactors.skill_used(object_id, skill_id, position, now),
+            None => self.reactors.hit(object_id, flags, position, now),
+        };
+        if let Some(hit) = hit {
             self.show_reactor_hit(from, hit, delay);
         }
     }
@@ -4123,6 +4133,12 @@ impl FieldActor {
                 }
                 match reactors::action(view.reactor_id) {
                     reactors::Action::Bloom => self.bloom(),
+                    reactors::Action::Sigil => {
+                        let job = net::events::cwk_sigil(view.reactor_id);
+                        if let (Some(job), Some(occupant)) = (job, self.occupants.get(&by)) {
+                            occupant.handle.send(ServerMessage::SigilLit(job));
+                        }
+                    }
                     reactors::Action::Spear => self.spears_set(by),
                     reactors::Action::KingGate => self.king_gate_opened(by),
                     reactors::Action::Lever => {

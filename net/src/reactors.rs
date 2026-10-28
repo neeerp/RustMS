@@ -180,6 +180,9 @@ pub enum Action {
     /// `BEAKER_FULL` counts, and the third counted clears the stage
     /// (`crate::events::MAGATIA_BEAKERS`).
     Beaker,
+    /// One of Crimsonwood Keep's sigils (`crate::events::cwk_sigil`), which
+    /// a skill of its job lights for good: the event counts it.
+    Sigil,
     /// One of a Magatia hub's two doors (Cosmic `2618001`, `2618002`),
     /// which opens for two seconds as it takes a Card Key, and opens the
     /// way back from the room it lets in to for as long
@@ -510,6 +513,7 @@ pub fn action(reactor_id: i32) -> Action {
         },
         ELLIN_FOUNTAIN => Action::ExpToAll(crate::events::ELLIN_FOUNTAIN_EXP),
         MAGATIA_BEAKER => Action::Beaker,
+        id if crate::events::cwk_sigil(id).is_some() => Action::Sigil,
         MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR => Action::SideDoor,
         // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
         // 400, 15)`, then Minerva, once).
@@ -661,7 +665,7 @@ pub fn first_state(reactor_id: i32) -> u8 {
 pub fn stays(reactor_id: i32) -> bool {
     matches!(
         action(reactor_id),
-        Action::Bloom | Action::Hold | Action::Spear | Action::KingGate
+        Action::Bloom | Action::Hold | Action::Spear | Action::KingGate | Action::Sigil
     ) || acts_staying(reactor_id)
 }
 
@@ -1004,6 +1008,10 @@ mod tests {
         assert_eq!(action(ELLIN_FOUNTAIN), Action::ExpToAll(52_000));
         assert_eq!(action(MAGATIA_BEAKER), Action::Beaker);
         assert!(!stays(MAGATIA_BEAKER) && !acts_staying(MAGATIA_BEAKER));
+        for sigil in (6_109_000..=6_109_004).chain(6_109_016..=6_109_020) {
+            assert_eq!(action(sigil), Action::Sigil);
+            assert!(stays(sigil) && !acts_staying(sigil));
+        }
         for door in MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR {
             assert_eq!(action(door), Action::SideDoor);
             assert!(acts_staying(door) && shuffles(door));

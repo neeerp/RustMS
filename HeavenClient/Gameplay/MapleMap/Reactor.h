@@ -61,6 +61,14 @@ namespace ms
 		// Where a swing hits it, or an empty box if it takes none now.
 		reactor_rules::Box get_swing_box() const;
 
+		// The local player, at `user`, used `skill`: if an event of its
+		// state takes that there, it plays it in 800 ms and returns its
+		// index, else -1 (FUN_00735ab7).
+		int8_t use_skill(int32_t skill, Point<int16_t> user);
+
+		// How long after a skill used by it its hit plays.
+		static constexpr uint16_t SKILL_DELAY = 800;
+
 	private:
 		enum class Phase
 		{
@@ -95,6 +103,7 @@ namespace ms
 		std::map<int8_t, Sound> hitsounds;
 
 		std::vector<int32_t> event_types(int8_t state) const;
+		std::vector<reactor_rules::SkillEvent> skill_events(int8_t state) const;
 		bool start_hit();
 		void play_hit(int8_t state);
 	};

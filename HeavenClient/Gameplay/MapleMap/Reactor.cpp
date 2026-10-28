@@ -64,6 +64,31 @@ namespace ms
 		return types;
 	}
 
+	std::vector<reactor_rules::SkillEvent> Reactor::skill_events(int8_t s) const
+	{
+		std::vector<reactor_rules::SkillEvent> found;
+		nl::node events = src[std::to_string(s)]["event"];
+
+		for (size_t i = 0; events[std::to_string(i)]; i++)
+		{
+			nl::node event = events[std::to_string(i)];
+			nl::node skills = event["activeSkillID"];
+			Point<int16_t> lt = event["lt"];
+			Point<int16_t> rb = event["rb"];
+
+			reactor_rules::SkillEvent skill_event;
+			skill_event.type = event["type"].get_integer();
+			skill_event.area = { lt.x(), lt.y(), rb.x(), rb.y() };
+
+			for (size_t j = 0; skills[std::to_string(j)]; j++)
+				skill_event.skills.push_back(skills[std::to_string(j)].get_integer());
+
+			found.push_back(std::move(skill_event));
+		}
+
+		return found;
+	}
+
 	void Reactor::play_hit(int8_t s)
 	{
 		auto sound = hitsounds.find(s);
@@ -187,6 +212,26 @@ namespace ms
 		flags = f;
 		deadline = std::max<int32_t>(delay, 1);
 		event = UNKNOWN_EVENT;
+	}
+
+	int8_t Reactor::use_skill(int32_t skill, Point<int16_t> user)
+	{
+		if (!active || phase != Phase::IDLE || cooldown > 0)
+			return -1;
+
+		Point<int16_t> from = user - get_position();
+		int32_t index = reactor_rules::pick_skill_event(skill_events(state), skill, from.x(), from.y());
+
+		if (index < 0)
+			return -1;
+
+		// The event is this state's, whatever hit the reactor last.
+		phase = Phase::DELAY;
+		deadline = SKILL_DELAY;
+		previous = state;
+		event = static_cast<int8_t>(index);
+
+		return event;
 	}
 
 	reactor_rules::Box Reactor::get_swing_box() const

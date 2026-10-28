@@ -16,12 +16,17 @@ pub struct ReactorEvent {
     /// For an item dropped on it (100): the item and how many, exactly.
     pub item: Option<(i32, i16)>,
     /// For an item dropped on it: where the item must land, from the
-    /// reactor's position (`lt`, `rb`).
+    /// reactor's position (`lt`, `rb`). For a skill (5): where the user
+    /// must stand.
     pub area: Option<((i16, i16), (i16, i16))>,
+    /// For a skill (5): the skills that set it off (`activeSkillID`).
+    pub skills: Vec<i32>,
 }
 
 /// The event kind of an item dropped on a reactor.
 pub const ITEM_DROPPED: i32 = 100;
+/// The event kind of a skill used near a reactor.
+pub const SKILL_USED: i32 = 5;
 
 /// What can happen to a reactor in one state.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -101,6 +106,22 @@ impl ReactorTemplate {
         Some((u8::try_from(index).ok()?, events[index].next?))
     }
 
+    /// The event a skill `skill_id` used in `state` triggers, as its index,
+    /// the state it moves to, and where its user must stand, from the
+    /// reactor's position (v83 0x735ab7: the first that lists the skill).
+    pub fn skill_used(
+        &self,
+        state: u8,
+        skill_id: i32,
+    ) -> Option<(u8, u8, ((i16, i16), (i16, i16)))> {
+        let events = &self.states.get(usize::from(state))?.events;
+        let index = events
+            .iter()
+            .position(|event| event.kind == SKILL_USED && event.skills.contains(&skill_id))?;
+        let event = &events[index];
+        Some((u8::try_from(index).ok()?, event.next?, event.area?))
+    }
+
     /// Whether an item dropped on it moves it on from `state`.
     pub fn takes_items(&self, state: u8) -> bool {
         self.states
@@ -177,18 +198,27 @@ impl ReactorData {
                     let kind = nx.int_child(event, "type")?.unwrap_or(0);
                     let mut item = None;
                     let mut area = None;
+                    let mut skills = Vec::new();
+                    let corner = |key| -> Result<Option<(i16, i16)>, GameDataError> {
+                        Ok(nx.vector_child(event, key)?.and_then(|(x, y)| {
+                            Some((i16::try_from(x).ok()?, i16::try_from(y).ok()?))
+                        }))
+                    };
                     if kind == ITEM_DROPPED {
                         // Some item ids are strings.
                         item = nx.int_child(event, "0")?.zip(
                             nx.int_child(event, "1")?
                                 .and_then(|count| i16::try_from(count).ok()),
                         );
-                        let corner = |key| -> Result<Option<(i16, i16)>, GameDataError> {
-                            Ok(nx.vector_child(event, key)?.and_then(|(x, y)| {
-                                Some((i16::try_from(x).ok()?, i16::try_from(y).ok()?))
-                            }))
-                        };
                         area = corner("lt")?.zip(corner("rb")?);
+                    }
+                    if kind == SKILL_USED {
+                        area = corner("lt")?.zip(corner("rb")?);
+                        if let Some(list) = nx.child_by_name(event, "activeSkillID")? {
+                            while let Some(skill) = nx.int_child(list, &skills.len().to_string())? {
+                                skills.push(skill);
+                            }
+                        }
                     }
                     state.events.push(ReactorEvent {
                         kind,
@@ -197,6 +227,7 @@ impl ReactorData {
                             .and_then(|next| u8::try_from(next).ok()),
                         item,
                         area,
+                        skills,
                     });
                 }
             }
@@ -230,6 +261,30 @@ mod tests {
         }
         assert_eq!((hits, state), (4, 4));
         assert!(data.template(9999998).unwrap().is_none());
+    }
+
+    #[test]
+    fn crimsonwood_keep_s_sigils_light_for_their_job_s_skills() {
+        let Some(path) = crate::test_assets::path("Reactor.nx") else {
+            return;
+        };
+        let data = ReactorData::load(path).unwrap();
+        let area = ((-125, -19), (123, 122));
+        // The warriors' sigil of the second and third stages, lit from its
+        // first state.
+        let sigil = data.template(6109000).unwrap().unwrap();
+        assert_eq!(sigil.action.as_deref(), Some("glpqskill0"));
+        assert_eq!(sigil.skill_used(0, 1211002), Some((0, 1, area)));
+        assert_eq!(sigil.skill_used(0, 1111008), Some((0, 1, area)));
+        assert_eq!(sigil.skill_used(0, 3211006), None);
+        assert!(sigil.swing(0, 2).is_none() && sigil.is_last(1));
+        // The pirates', for Flash Fist among others.
+        let pirates = data.template(6109004).unwrap().unwrap();
+        assert!(pirates.skill_used(0, 5001001).is_some());
+        // The fourth stage's: only once it is set to its first state.
+        let fourth = data.template(6109016).unwrap().unwrap();
+        assert_eq!(fourth.skill_used(0, 1211002), None);
+        assert_eq!(fourth.skill_used(1, 1211002), Some((0, 2, area)));
     }
 
     #[test]

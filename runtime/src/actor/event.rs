@@ -50,7 +50,7 @@ use net::packet::build::world::guild::{build_quest_registrant_left, build_quest_
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU16, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -184,6 +184,9 @@ pub struct Cleared {
     /// Which of the Amorian Challenge's stage 1 ways its clear opened,
     /// counted from 1; 0 before.
     way: AtomicU8,
+    /// Crimsonwood Keep's sigils lit, five bits a stage from the second
+    /// (`EventCommand::SigilLit`).
+    sigils: AtomicU16,
 }
 
 impl Cleared {
@@ -231,6 +234,15 @@ impl Cleared {
     /// The Amorian Challenge's open way from stage 1 (`net::events::AMORIA_WAYS`).
     pub fn way(&self) -> Option<u8> {
         self.way.load(Ordering::Acquire).checked_sub(1)
+    }
+
+    /// Light the Keep's sigil of `job` on `stage`; returns the stage's
+    /// sigils lit before, or `None` if it already was.
+    fn light_sigil(&self, stage: u8, job: u8) -> Option<u16> {
+        let shift = stage.checked_sub(2)?.checked_mul(5)?.checked_add(job)?;
+        let bit = 1u16.checked_shl(shift.into()).filter(|_| job < 5)?;
+        let before = self.sigils.fetch_or(bit, Ordering::AcqRel);
+        (before & bit == 0).then(|| (before >> (shift - job)) & 0b1_1111)
     }
 
     /// Take rope room `room`; returns whether no one had.
@@ -1577,6 +1589,10 @@ impl EventActor {
                 self.statues.struck(statue, std::time::Instant::now());
             }
             EventCommand::StatueStruck(_) => {}
+            EventCommand::SigilLit { map_id, job } if self.kind == EventKind::Cwk && !won => {
+                self.sigil_lit(map_id, job)
+            }
+            EventCommand::SigilLit { .. } => {}
             EventCommand::SpearsSet(set) if self.kind == EventKind::GuildQuest => {
                 self.spears_set(client_id, set)
             }
@@ -2807,6 +2823,39 @@ impl EventActor {
         });
     }
 
+    /// A member lit the Keep's sigil of `job` on `map_id`: everyone hears
+    /// of it, and when all five of the second or fourth stage's are lit,
+    /// that its way on is open, and the stage clears (Cosmic `6109000`'s
+    /// and `6109016`'s `act`). The third stage's also wait on its menhirs.
+    fn sigil_lit(&self, map_id: i32, job: u8) {
+        let Some(stage) = self.kind.event().stage_on(map_id) else {
+            return;
+        };
+        let Some(before) = self.cleared.light_sigil(stage, job) else {
+            return debug!(stage, job, "Sigil already lit");
+        };
+        let mut lines = vec![net::events::CWK_SIGIL_LINES[usize::from(job)]];
+        let done = before | 1 << job == 0b1_1111 && matches!(stage, 2 | 4);
+        if done {
+            lines.push(keys::CWK_SIGILS_DONE);
+        }
+        let packets: Vec<_> = lines
+            .into_iter()
+            .filter_map(|key| build_item_line(&net::content::text().get(key, &[]), 0).ok())
+            .collect();
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventPackets {
+                    id: self.id,
+                    packets: packets.clone(),
+                });
+            }
+        }
+        if done {
+            self.clear(stage);
+        }
+    }
+
     /// The way on from `stage` opens before anyone hears of the clear, so a
     /// member who sees it can go through. A stage clears once; returns
     /// whether this cleared it.
@@ -2864,6 +2913,25 @@ async fn until(ends: Option<Instant>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_keep_s_sigils_count_once_each_by_stage() {
+        let cleared = Cleared::default();
+        assert_eq!(cleared.light_sigil(2, 0), Some(0));
+        assert_eq!(cleared.light_sigil(2, 0), None);
+        assert_eq!(cleared.light_sigil(2, 3), Some(0b1));
+        // Another stage's are its own.
+        assert_eq!(cleared.light_sigil(3, 3), Some(0));
+        assert_eq!(cleared.light_sigil(4, 4), Some(0));
+        for job in [1, 2] {
+            cleared.light_sigil(2, job);
+        }
+        assert_eq!(cleared.light_sigil(2, 4), Some(0b0_1111));
+        assert_eq!(cleared.light_sigil(3, 4), Some(0b0_1000));
+        // No sigils on the first stage, nor past the fifth job's.
+        assert_eq!(cleared.light_sigil(1, 0), None);
+        assert_eq!(cleared.light_sigil(2, 5), None);
+    }
 
     #[test]
     fn cleared_keeps_one_bit_per_stage() {

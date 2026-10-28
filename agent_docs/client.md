@@ -671,7 +671,7 @@ side yet.
 | GM slash commands (`GmCommand`, `GmCommands`) | As v83 does (report b175): for grade bit 0 or a sub-grade of 0x20, 0x40 or 0x80, and by the rank `AccountGrade::rank` gives as FUN_0052f031 does, the chat bar reads `/h N`, `/ch N`, `/u`, `/w NAME MSG` (a warning, so a GM's `/w` doesn't whisper), `/ban NAME`, `/uclip`, the twelve `/alert*`, `/notice*` and `/slide*` broadcasts with `/alertm` and `/noticem`, and `/slideax`, before the players' commands; each is followed by ADMIN_LOG with the line (see "The client's slash commands" in `server-architecture.md`). ADMIN_RESULT (144, `AdminResult`) shows the server's answers as v83's FUN_005352e9 does: lines for modes 4, 5, 6, 9, 0x13 (a hired merchant's map or channel, which reads 0x1d's byte after), 0x1d, 0x1e and 0x26, and the minimap off and on for 0x1b and 0x1c. Not done: `/flag`, `/block`'s dialog, `/c`, `/clip`, and `/u N` |
 | Raise items (`Character/Inventory/Raise.h`, `UIRaise`) | Implemented, as v83's `CUIRaise`: double-clicking a 4220 item with a record, art and grade opens its window, which sends 0xED and asks for its record with 0xEC; items dropped on it are fed with 0xEE, and quest record messages for its record grow it or close it. See "Raise items" in `inventory.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
-| Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
+| Reactors | Spawning, swings, skills, hits and breaking; no touch or quest gates; see `combat.md` |
 | Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |
 | Mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
@@ -1070,7 +1070,8 @@ These were corrected:
     a stance and frame delay; it carries the delay, the event of the old
     state, and a cooldown. An attack also sent `0xCD` for the nearest reactor
     it reached, as well as hitting mobs; it now swings at a reactor instead
-    of the mobs. See `combat.md`.
+    of the mobs. A skill used by a reactor now also sends `0xCD`, kind 1.
+    See `combat.md`.
 13. Pets: SPAWN_PLAYER read a byte before each pet that v83 doesn't send, and
     dropped the pets it read. The stat change read the three pet bits as one
     short after MESO; v83 sends 8 bytes for each bit set, right after HAIR.

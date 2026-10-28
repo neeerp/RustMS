@@ -1418,7 +1418,7 @@ air event beats a plain one, and a plain one is better on the ground.
 The field's `field_reactors::ReactorSet` spawns every reactor on load
 (SPAWN_REACTOR `0x117`, also sent to players entering). DAMAGE_REACTOR
 (`0xCD`) swings at one if the player is within 250×200 of it, by the
-field's idea of where they are. A hit that leaves it short of its last
+field's idea of where they are, or uses a skill by it (below). A hit that leaves it short of its last
 state is shown to everyone (HIT_REACTOR `0x115`, with the event and the
 client's delay); the hit into the last state removes it (REMOVE_REACTOR
 `0x118` with the state it reached) and the hitter rolls its drops
@@ -1436,8 +1436,26 @@ the next player.
 | 0x115 HIT_REACTOR | server to client | `i32` object id, `u8` new state, `i16` x, y, `u16` delay, `i8` event of the old state (-1 its own hit), `i8` cooldown in 100 ms |
 | 0x118 REMOVE_REACTOR | server to client | `i32` object id, `u8` state reached, `i16` x, y |
 
-The server ignores skill swings (kind 1); only guild quest reactors take
-them.
+A skill used by a reactor (kind 1) moves it by an event of type 5, which
+lists the skills it takes (`activeSkillID`) and where the user must stand,
+`lt`-`rb` from the reactor (`ReactorTemplate::skill_used`). The handler
+takes only a skill the player has. The field takes the first such event of
+the reactor's state that lists the skill, if the player stands in its area
+by the field's idea of where they are, give or take 100 px
+(`ReactorSet::skill_used`, `SKILL_SLACK`), since the field's position
+trails the client's. Of the reactors that take skills, only Crimsonwood
+Keep's sigils do anything more on the server (`Action::Sigil`).
+
+In v83 every active skill the player uses, an attack's or a buff's, right
+after it readies the pet's MP potion, goes through the map's reactors
+(FUN_00735ab7, from 0x9693ce). For each reactor not already playing a hit
+and not cooling down, the first type-5 event of its state that lists the
+skill and whose area, moved to the reactor, holds the player sets it off:
+the client plays that event's hit 800 ms on and sends kind 1 with the
+skill and that delay. It goes on to the other reactors, so one skill can
+set off several. HeavenClient does the same, trying the reactors in the
+order they entered the map (`Combat::use_skill_at_reactors`,
+`Reactor::use_skill`, `reactor_rules::pick_skill_event`).
 
 An event of type 100 takes an item instead: exactly `1` of item `0`
 landing within `lt`-`rb` of the reactor (`ReactorTemplate::item_dropped`).
@@ -1544,6 +1562,8 @@ middle passes v83's "in front" test wins, else the last the range reaches.
 Facing left, v83 negates the middle rather than the difference, so the
 test there asks whether the middle is at or left of minus the user's x.
 HeavenClient keeps that.
+A skill sets off reactors as described above, with the event of the
+reactor's current state.
 A swing sends the attack (`0x2C`, no mobs) and then `0xCD`, and the attack
 hits no mobs. The rules are in `Gameplay/MapleMap/ReactorRules.h` and
 tested in `tests/reactor_rules.cpp`.
@@ -1554,9 +1574,8 @@ last (`ExclRequest::USE_WAIT`). HeavenClient checks this only before
 swinging at a reactor, so a request the server leaves unanswered can't stop
 a player attacking.
 
-Not yet: skill hits (event type 5 and `0xCD` kind 1) and touching a
-reactor (`0xCE`), which only the Crimsonwood Keep party quest's reactors
-(`6109xxx`, actions `glpq*`) and `9222000` use.
+Not yet: touching a reactor (`0xCE`), which only the Crimsonwood Keep
+party quest's reactors (`6109xxx`, actions `glpq*`) and `9222000` use.
 v83 also skips a swing at a reactor whose `info/quest` isn't in progress,
 but no v83 reactor has one.
 
