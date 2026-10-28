@@ -1772,8 +1772,23 @@ player leaves by `left00` or the time runs out, back to the door.
   only told that she keeps it. Her `q2335s` gives the Security Room's key
   (4032405) with "Eliminating the Rest" (2335), which the room's door near
   Skyscraper 3 (`go_secretroom`) completes; see `quests.md`.
-- Cosmic's refights through the Blocked Entrance (1300013) once 2331 is
-  done are not there.
+- Once "The Seal of the Empire" (2331) is done, the door opens the hidden
+  Blocked Entrance (1300013) instead, whose menu offers the Prime
+  Minister's refight (`prime_minister.menu`, `prime_minister.enter`;
+  `events::PRIME_MINISTER_EVENT`, `EventKind::PrimeMinister`, Cosmic
+  `MK_PrimeMinister2`). The leader takes one to three of the party, all at
+  the door and of level 30 or more, into their own copy of the hall
+  (106021601) for ten minutes; one with no party goes alone
+  (`Event::alone`). A member who isn't the leader is told so
+  (`prime_minister.not_leader`), a party that doesn't fit hears the terms
+  (`prime_minister.not_eligible`), and while another team is in, it's busy
+  (`prime_minister.busy`). The Prime Minister comes out at once at
+  (292, 143) (`opening_mobs`); its death clears the event's one stage and
+  stops the clock, with no reward from the event. The team leaves by
+  `left00`, or the time up sends it back to the door, and the event lasts
+  until it is empty. Violetta stands in the copy as in the hall. Cosmic's
+  menu also offers King Pepe's room, which isn't here. The picks are in
+  `v83ref/lanes/QUESTIONS.md` b290.
 
 ## Eos Tower's dollhouse room
 

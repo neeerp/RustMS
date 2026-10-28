@@ -1751,9 +1751,13 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             WEDDING_HALL_ENTRANCE,
             named(WEDDING_HALL_ENTRANCE, "out00"),
         )),
-        // The Wedding Hall's door (Cosmic `TD_MC_enterboss2`): straight into
-        // the hall once the Prime Minister is beaten for good; into the
-        // player's own copy of it from the key's 2332 on; locked before.
+        // The Wedding Hall's door (Cosmic `TD_MC_enterboss2`): the Blocked
+        // Entrance's refights once The Seal of the Empire is done; straight
+        // into the hall once the Prime Minister is beaten for good; into
+        // the player's own copy of it from the key's 2332 on; locked before.
+        "TD_MC_enterboss2" if quest(crate::events::SEAL_OF_THE_EMPIRE) == QuestState::Completed => {
+            opens(crate::events::BLOCKED_ENTRANCE)
+        }
         "TD_MC_enterboss2" => match (quest(WHERES_VIOLETTA), quest(STORY_OF_BETRAYAL)) {
             (_, QuestState::Completed) => through(Effect::WarpToPortal(
                 WEDDING_HALL,
@@ -3517,6 +3521,34 @@ mod tests {
         }
         assert_eq!(
             door(&[(WHERES_VIOLETTA, done), (STORY_OF_BETRAYAL, done)]).effects,
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(WEDDING_HALL, named(WEDDING_HALL, "left00")),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_wedding_halls_door_opens_the_blocked_entrance_after_the_seal() {
+        let done = QuestState::Completed;
+        let sealed = player_with(&[
+            (WHERES_VIOLETTA, done),
+            (STORY_OF_BETRAYAL, done),
+            (crate::events::SEAL_OF_THE_EMPIRE, done),
+        ]);
+        let way = portal("TD_MC_enterboss2", &sealed).unwrap();
+        assert_eq!(
+            way.effects,
+            [Effect::OpenNpc(crate::events::BLOCKED_ENTRANCE)]
+        );
+        // On the seal's quest, still straight into the hall.
+        let sealing = player_with(&[
+            (WHERES_VIOLETTA, done),
+            (STORY_OF_BETRAYAL, done),
+            (crate::events::SEAL_OF_THE_EMPIRE, QuestState::Started),
+        ]);
+        assert_eq!(
+            portal("TD_MC_enterboss2", &sealing).unwrap().effects,
             [
                 Effect::PortalSound,
                 Effect::WarpToPortal(WEDDING_HALL, named(WEDDING_HALL, "left00")),

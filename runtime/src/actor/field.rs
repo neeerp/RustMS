@@ -2206,6 +2206,11 @@ impl FieldActor {
             (net::mobs::LATANICA, net::events::ENGINE_ROOM) if self.key.instance_id != 0 => {
                 self.boss_falls()
             }
+            (net::events::PRIME_MINISTER, net::events::WEDDING_HALL_COPY)
+                if self.key.instance_id != 0 =>
+            {
+                self.boss_falls()
+            }
             // The sealed Balrog comes out a little later (Cosmic
             // `BalrogBattle.spawnSealedBalrog`), and everyone here counts
             // the kill Balrog and the Seal (2239) asks for.

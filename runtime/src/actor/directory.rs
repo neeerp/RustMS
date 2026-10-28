@@ -665,11 +665,13 @@ impl WorldDirectory {
             married: entry.presence.married,
             gender: entry.presence.gender,
         };
-        let candidates: Vec<_> = if kind.event().solo() {
-            // Party or not (Cosmic `2091005`'s solo run).
+        let party = self.parties.of(from);
+        let candidates: Vec<_> = if kind.event().solo() || kind.event().alone && party.is_none() {
+            // Party or not (Cosmic `2091005`'s solo run), or alone with
+            // none where that may be.
             vec![candidate(asker)]
         } else {
-            let Some(party) = self.parties.of(from) else {
+            let Some(party) = party else {
                 return Err(events::Entry::NoParty);
             };
             if party.leader != from {

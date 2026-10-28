@@ -119,6 +119,16 @@ impl ClientActor {
                 return self.talk_about_event(kind).await;
             }
         }
+        // The hall's door opens the Blocked Entrance once The Seal of the
+        // Empire is done.
+        if npc_id == net::events::BLOCKED_ENTRANCE
+            && player.stats.map_id == net::events::WEDDING_HALL_DOOR
+            && player.quests.state(net::events::SEAL_OF_THE_EMPIRE) == game::QuestState::Completed
+        {
+            return self
+                .talk_about_event(net::events::EventKind::PrimeMinister)
+                .await;
+        }
         if npc_id == net::npc_scripts::GUON && player.stats.map_id == net::events::PIRATE.lobby {
             return self.talk_about_event(net::events::EventKind::Pirate).await;
         }
