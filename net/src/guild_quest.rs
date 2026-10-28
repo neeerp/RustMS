@@ -166,6 +166,18 @@ pub const GRAVE_ARRIVAL: u8 = 1;
 /// The waterway's `st00`, the way back for one who never came through a
 /// room (Cosmic has no such case).
 pub const WATERWAY_ARRIVAL: u8 = 1;
+/// The King's Corridor (990000800), whose door (9208009, `kinggate`) takes
+/// Sharen III's earring (`KING_GATE_ITEM`) and stays open, letting the
+/// guild on to Ergoth's room by its two ways, `KING_WAYS` (Cosmic
+/// `kinggate_open`, `kinggate2_open`). Before it opens, a member who dies
+/// in the quest revives on its way out and leaves it; from then on, on its
+/// maps (Cosmic `9208009`'s `canRevive`).
+pub const KING_CORRIDOR: i32 = 990_000_800;
+pub const KING_GATE: &str = "kinggate";
+pub const KING_GATE_REACTOR: i32 = 9_208_009;
+pub const KING_GATE_ITEM: i32 = 1_032_033;
+pub const KING_ROOM: i32 = 990_000_900;
+pub const KING_WAYS: [(&str, u8); 2] = [("kinggate_open", 1), ("kinggate2_open", 2)];
 
 /// Where the grid's way `script` leads a member who last came from `room`,
 /// and the room it records: `None` for any other portal.

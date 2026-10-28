@@ -147,6 +147,9 @@ pub struct Cleared {
     escort_failed: AtomicBool,
     /// The Magatia rope rooms taken, one bit each from the first.
     rooms: AtomicU8,
+    /// The Guild Quest's King's Corridor's door took the earring
+    /// (`EventCommand::KingGateOpened`).
+    king_gate: AtomicBool,
 }
 
 impl Cleared {
@@ -177,6 +180,10 @@ impl Cleared {
 
     pub fn escort_failed(&self) -> bool {
         self.escort_failed.load(Ordering::Acquire)
+    }
+
+    pub fn king_gate(&self) -> bool {
+        self.king_gate.load(Ordering::Acquire)
     }
 
     /// Take rope room `room`; returns whether no one had.
@@ -281,6 +288,15 @@ impl EventTicket {
     /// Whether Romeo or Juliet has read the other's letter.
     pub fn shocked(&self) -> bool {
         self.cleared.shocked()
+    }
+
+    /// Where the member, dead on one of the event's maps, revives instead
+    /// of their map's return map: the Guild Quest's way out, which they
+    /// leave it by, until the King's Corridor's door takes the earring
+    /// (Cosmic `playerRevive` while `canRevive` is 0).
+    pub fn revive_to(&self) -> Option<i32> {
+        let event = self.kind.event();
+        (self.kind == EventKind::GuildQuest && !self.cleared.king_gate()).then_some(event.exit)
     }
 
     /// Whether Yulete left his office caught off guard.
@@ -1313,6 +1329,12 @@ impl EventActor {
                 self.spears_set(client_id, set)
             }
             EventCommand::SpearsSet(_) => {}
+            EventCommand::KingGateOpened if self.kind == EventKind::GuildQuest => {
+                if !self.cleared.king_gate.swap(true, Ordering::AcqRel) {
+                    info!(id = self.id, client_id, "King's Corridor opened");
+                }
+            }
+            EventCommand::KingGateOpened => {}
             // Kept by the member's own ticket.
             EventCommand::PrizeTaken => {}
             // Each in turn, by the leader (Cosmic `2094002`).

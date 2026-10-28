@@ -286,6 +286,10 @@ pub struct Player {
     /// client asks for by id when the scene ends; not saved, and gone once
     /// the player leaves the map.
     pub scene_exit: Option<i32>,
+    /// Where the player, dead, revives instead of their map's return map,
+    /// such as an event's way out (the client actor sets it as they
+    /// answer the death dialog); not saved.
+    pub revive_to: Option<i32>,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
     /// The skill macros, by place in the list.
@@ -379,6 +383,7 @@ impl Player {
             last_catch: None,
             mist_face: None,
             scene_exit: None,
+            revive_to: None,
             teleport_rocks: TeleportRocks::default(),
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),

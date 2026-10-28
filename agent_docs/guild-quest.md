@@ -246,6 +246,29 @@ Sharen III's Grave (990000700, `GRAVE`) is stage 8.
 - **The gate.** `next00` (`ghostgate_open`) is shut until the gate is
   open, then leads on to 990000800's portal 0.
 
+## The King's Corridor
+
+The King's Corridor (990000800, `KING_CORRIDOR`) is stage 9; nothing
+clears it.
+
+- **The door.** Reactor "kinggate" (9208009, `KING_GATE_REACTOR`) takes
+  the earring (1032033, `KING_GATE_ITEM`), unworn and thrown down on it,
+  and stays open (`Action::KingGate`). The field tells the event of
+  whoever threw it (`ServerMessage::KingGateOpened`,
+  `EventCommand::KingGateOpened`), which sets `Cleared::king_gate`.
+- **The ways on.** `boss00` (`kinggate_open`) and the crack `boss01`
+  (`kinggate2_open`) are shut, each with its own pink line, until the door
+  is open, then lead to Ergoth's room (990000900) portals 1 and 2
+  (`KING_WAYS`).
+- **Death.** Until the door opens, a member who dies on any of the quest's
+  maps revives on the Returning Path, the event's exit, and so leaves the
+  quest; their leaving may end it as any other (Cosmic `playerRevive` with
+  `canRevive` 0). After it, they revive on their map's return map,
+  990000200, in the quest. As they answer the death dialog, the client
+  actor sets `Player::revive_to` from `EventTicket::revive_to`, which
+  `change_map::direct_destination` takes over the return map. A Wheel of
+  Destiny still revives them where they fell.
+
 ## The quest's items
 
 `events::GUILD_QUEST.items` (`guild_quest::ITEMS`) are Cosmic's exclusive
@@ -331,6 +354,17 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
   has the doors' and the altars' actions, and `net/src/scripts.rs`
   (`the_waterway_s_doors_open_on_their_marks_and_its_last_room_on_low_levels`)
   the portals.
+- `integration-harness/tests/guild_quest_king.rs`: a death before the
+  door opens taking the member out to the Returning Path, the door and the
+  crack shut with their lines, the earring taken off and thrown down
+  opening the door, a death after it reviving on 990000200 in the quest,
+  and both ways to Ergoth's room. `net/src/scripts.rs`
+  (`the_king_s_corridor_s_door_and_crack_open_on_the_earring`) has the
+  portals, `net/src/reactors.rs`
+  (`the_guild_quest_s_gates_and_spears_stay_set`) the door, and
+  `net/src/packet/handle/world/change_map.rs`
+  (`an_event_s_way_out_takes_the_place_of_the_return_map_but_not_of_a_wheel`)
+  the revival.
 - `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)
   and `net/src/scripts.rs` (`shuang_briefs_whoever_reaches_sharenians_outskirts`).
 - `HeavenClient/tests/guild.cpp`: the waitlist lines.

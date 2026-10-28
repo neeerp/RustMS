@@ -2004,3 +2004,4 @@
 "guild_quest.gate.closed" = "[placeholder] The gate is shut."
 "guild_quest.gate.blocked" = "[placeholder] The door is blocked."
 "guild_quest.gate.too_high" = "[placeholder] Only those of level 30 or lower may go this way."
+"guild_quest.gate.crack" = "[placeholder] The door beside the crack keeps it shut."
