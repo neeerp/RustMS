@@ -74,6 +74,21 @@ However the statue dies, Pink Bean (8820001, `mobs::PINK_BEAN`) comes out
 on the ground where it stood. The wave lines reach only those in the
 fight, not the dead waiting in the Forgotten Twilight.
 
+## Their skills
+
+The skills are Mob.nx's, cast through the usual mob skill path (see
+`combat.md`). The statue (8820000) heals, powers up, guards and summons
+six 8820007 (200/102) while warded: a ward keeps its controller, so its
+skills are still granted. Pink Bean (8820001) summons twelve 8820007
+(200/101) at 80% HP, turns attacks back (145/2) and makes players Undead
+(133/1). 8820007 is immune to weapon attacks (140/12), which then deal
+at most 1 a line. Munin (8820006) Seduces up to `count` players (128/8-10)
+and banishes one (129/2) to the copy's Forgotten Twilight (270050200,
+portal `sp`), since a banish lands in the copy when the event's ticket
+holds its map. Ariel (8820002) heals, dispels, lays Poison Mist, makes
+players Undead, and turns weapons (140/9) or spells (141/8) aside. The picks are b286 in v83ref's QUESTIONS; the boss bar still shows
+only once Pink Bean is hurt.
+
 ## Tests
 
 - `net`: the event's maps and terms and the guardians' waves
@@ -84,7 +99,11 @@ fight, not the dead waiting in the Forgotten Twilight.
   the leader through `Pinkin`. The member leaves and may rejoin, and the
   last out ends the expedition. `PPinkOut` leads to the gate.
 - `runtime`: a warded mob keeps its controller and takes no harm until
-  the ward lifts (`field_mobs.rs`).
+  the ward lifts, and is still granted its skills (`field_mobs.rs`); an
+  immune mob takes 1 a line from the kind it is immune to, and Seduce
+  takes at most its count (`field.rs`).
+- `net`: Pink Bean's and its guardians' skills and Munin's banish, from
+  the NX data (`mobs.rs`).
 - Harness `pink_bean_waves`: the five waves wake in order out of their
   statues, the warded statue takes no hit, and after the fifth the item
   falls on the reactor, the statue dies and Pink Bean comes out.

@@ -865,6 +865,8 @@ pub enum FieldRequest {
         broadcast: Packet,
         skill: i32,
         counter: game::MobStat,
+        /// How many damage lines it dealt each mob.
+        lines: u8,
         hits: Vec<(i32, i64)>,
         inflicts: Vec<crate::skills::Inflict>,
         takes: crate::skills::Takes,

@@ -313,7 +313,7 @@ impl WorldHandler for AttackHandler {
         let spent = charge::after_attack(ctx.player, &attack, rand::random());
         let pockets = skills::pickpocket(ctx.player, &attack, rand::random);
         let beacon = beacon::after_attack(ctx.player, &attack);
-        let skill = attack.skill;
+        let (skill, lines) = (attack.skill, attack.hit_count);
         let hits = attack
             .hits
             .into_iter()
@@ -333,6 +333,7 @@ impl WorldHandler for AttackHandler {
             broadcast,
             skill,
             counter,
+            lines,
             hits,
             inflicts,
             takes,

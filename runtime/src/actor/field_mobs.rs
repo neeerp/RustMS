@@ -2531,6 +2531,19 @@ mod tests {
     }
 
     #[test]
+    fn a_warded_mob_is_still_granted_its_skills() {
+        let now = Instant::now();
+        let (_, info) = stumpy();
+        let mut mobs = MobSet::default();
+        let stumpy = mobs.place(info, (0, 0), 5, None, now);
+        mobs.ward(100100, true);
+        mobs.assign_uncontrolled(1);
+        let ask = (true, NO_ACTION, 0);
+        let act = mobs.act(stumpy, ask, now, &stumpy_levels, 0.99).unwrap();
+        assert_eq!(act.grant, Some((200, 1)));
+    }
+
+    #[test]
     fn the_balrog_s_body_stays_shielded_while_its_claw_gives_way_to_its_arm() {
         use net::mobs::{BALROG_BODY, BALROG_CLAW, BALROG_LEFT_ARM, BALROG_RIGHT_ARM};
         let now = Instant::now();
