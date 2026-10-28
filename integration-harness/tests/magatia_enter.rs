@@ -21,6 +21,9 @@ use tokio::time::Duration;
 
 /// Somewhere outside Magatia's rooms to step away to.
 const ELSEWHERE: i32 = 261_000_000;
+/// PARTY_OPERATION's update of the party window, which members get when
+/// one moves.
+const SILENT_UPDATE: u8 = 0x07;
 
 /// `key`, with who may play.
 fn terms(key: &str, side: MagatiaSide) -> String {
@@ -108,6 +111,10 @@ async fn romeo_takes_four_in_and_a_retreat_ends_the_run_for_all() {
     let mut trace = Trace::default();
     let away = &mut team[3].connection;
     assert_eq!(warp(away, ELSEWHERE, "", &mut trace).await, ELSEWHERE);
+    // The party hears of the move only once the server has it, so Romeo
+    // sees the member gone after this, not just after the warp.
+    let mut trace = Trace::default();
+    until(away, &mut trace, |t| t.party_ops.contains(&SILENT_UPDATE)).await;
     told(&mut team[0], talk(ZENUMIST_LOBBY, ROMEO)).await;
     let mut trace = told(&mut team[0], answer(4, 1, Some(0))).await;
     // The party check asks other actors, so the line can come after the barrier.
