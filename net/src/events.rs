@@ -119,6 +119,10 @@ pub enum EventKind {
     /// which a party's leader holding a White Essence starts by its portal
     /// on the ship's last deck.
     Latanica,
+    /// The battle with Pink Bean in the Temple of Time's Twilight of Gods,
+    /// an expedition gathered at its last gate (2141001)
+    /// (`crate::squads`).
+    PinkBean,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -2568,6 +2572,63 @@ pub const WHITE_ESSENCE: i32 = 4_000_381;
 /// `5411000`).
 pub const LATANICA_AT: (i16, i16) = (-146, 225);
 
+/// The battle with Pink Bean (Cosmic `PinkBeanBattle`): an expedition of
+/// 6 to 30 of level 120 or more, gathered at the Temple of Time's last
+/// gate (2141001), goes into its own copy of the Twilight of Gods for two
+/// hours and twenty minutes. Its one stage is cleared by any member there.
+/// The dead come back in the copy's Forgotten Twilight, whose portal leads
+/// back to the fight; the Temple Keeper (2141002) takes anyone out to the
+/// gate. It ends when its last member leaves, or its time is up, when
+/// those left go to Between Twilight and Daybreak. The defaults are in
+/// `v83ref/lanes/QUESTIONS.md` b283.
+pub const PINK_BEAN: Event = Event {
+    lobby: PINK_BEAN_GATE,
+    entrances: &[],
+    maps: PINK_BEAN_ARENA..=PINK_BEAN_REVIVE,
+    entry: PINK_BEAN_ARENA,
+    entries: 1,
+    exit: PINK_BEAN_OUT,
+    levels: 120..=u8::MAX,
+    spread: None,
+    team: 6..=30,
+    married: false,
+    minutes: 140,
+    exp_per_stage: &[0],
+    meso_per_stage: &[],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: true,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+};
+
+/// The Temple of Time's last gate ("Forgotten Twilight", 270050000), where
+/// the expeditions gather; the Twilight of Gods, where Pink Bean is fought;
+/// the Forgotten Twilight past it, where the dead come back (Cosmic's wz
+/// `returnMap`), whose `in00` (`Pinkin`) leads back in; and Between
+/// Twilight and Daybreak, the way out, whose `in00` (`PPinkOut`) leads to
+/// the gate.
+pub const PINK_BEAN_GATE: i32 = 270_050_000;
+pub const PINK_BEAN_ARENA: i32 = 270_050_100;
+pub const PINK_BEAN_REVIVE: i32 = 270_050_200;
+pub const PINK_BEAN_OUT: i32 = 270_050_300;
+
 /// Crimsonwood Keep's Inner Sanctum's entrance, where its expeditions
 /// gather and come back to, and the Keep's first stage.
 pub const CWK_LOBBY: i32 = 610_030_020;
@@ -3878,7 +3939,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 50] = [
+    pub const ALL: [EventKind; 51] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -3929,6 +3990,7 @@ impl EventKind {
         EventKind::Showa,
         EventKind::Balrog,
         EventKind::Latanica,
+        EventKind::PinkBean,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -3986,6 +4048,7 @@ impl EventKind {
             EventKind::Showa => &SHOWA,
             EventKind::Balrog => &BALROG,
             EventKind::Latanica => &LATANICA,
+            EventKind::PinkBean => &PINK_BEAN,
         }
     }
 
@@ -5133,6 +5196,23 @@ mod tests {
         assert_eq!((SHOWA.entry, SHOWA.exit), (SHOWA_ARENA, SHOWA_ARMORY));
         assert_eq!(SHOWA.clear_map, None);
         assert_eq!(SHOWA_REWARDS.iter().filter(|r| r.0 == 2_022_306).count(), 2);
+    }
+
+    #[test]
+    fn pink_bean_s_expedition_holds_the_fight_and_its_revival_but_not_the_way_out() {
+        assert_eq!(EventKind::PinkBean.event().lobby, PINK_BEAN_GATE);
+        assert!(PINK_BEAN.squad && PINK_BEAN.lasts_until_empty());
+        assert_eq!(
+            (PINK_BEAN.team.clone(), *PINK_BEAN.levels.start()),
+            (6..=30, 120)
+        );
+        assert_eq!((PINK_BEAN.minutes, PINK_BEAN.last_stage()), (140, 1));
+        assert!(PINK_BEAN.holds(PINK_BEAN_ARENA) && PINK_BEAN.holds(PINK_BEAN_REVIVE));
+        assert!(!PINK_BEAN.holds(PINK_BEAN_GATE) && !PINK_BEAN.holds(PINK_BEAN_OUT));
+        assert_eq!(
+            (PINK_BEAN.entry, PINK_BEAN.exit),
+            (PINK_BEAN_ARENA, PINK_BEAN_OUT)
+        );
     }
 
     #[test]

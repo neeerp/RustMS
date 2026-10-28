@@ -1953,7 +1953,8 @@ impl NpcScript {
     /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
     /// Ludibrium, Minerva's in the Tower of Goddess, Rolly's in the
     /// Ludibrium Maze's clear room, Konpei's in Showa's arena, Mu Young's
-    /// in the Balrog's tomb, Bob's in the ghost ship's Engine Room.
+    /// in the Balrog's tomb, Bob's in the ghost ship's Engine Room, the
+    /// Temple Keeper's at Pink Bean.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
@@ -1984,6 +1985,9 @@ impl NpcScript {
             }
             BALROG_KEEPER if player.stats.map_id == events::BALROG_TOMB => Some(balrog_keeper(won)),
             BOB if player.stats.map_id == events::ENGINE_ROOM => Some(bob(won)),
+            TEMPLE_KEEPER if events::PINK_BEAN.holds(player.stats.map_id) => {
+                Some(temple_keeper(won))
+            }
             _ => None,
         }
     }
@@ -10534,6 +10538,10 @@ pub const CWK_RECRUITER: i32 = 9201113;
 /// Konpei (9120201) in the Armory of Showa's gang hideout.
 pub const SHOWA_RECRUITER: i32 = 9120201;
 
+/// The gatherer (2141001, no name in String.nx) at the Temple of Time's
+/// last gate.
+pub const PINK_BEAN_RECRUITER: i32 = 2141001;
+
 /// The NPC who gathers a kind of expedition.
 #[derive(Clone, Copy, Debug)]
 pub struct Recruiter {
@@ -10566,13 +10574,17 @@ pub fn recruiter(kind: EventKind) -> Option<Recruiter> {
             npc: MU_YOUNG,
             needs: None,
         }),
+        EventKind::PinkBean => Some(Recruiter {
+            npc: PINK_BEAN_RECRUITER,
+            needs: None,
+        }),
         _ => None,
     }
 }
 
 /// The NPC who gathers the channel's expedition of `kind`
 /// (`crate::squads`; Cosmic `2030013`, `2083004`, `9201113`, `9120201`,
-/// `1061014`):
+/// `1061014`, `2141001`):
 /// one of the levels, with the item it needs if any (Zakum's Eye of Fire,
 /// Showa's Lady Boss's Comb), opens it, others of the
 /// levels join, and its leader turns members out, takes it in, or calls it
@@ -13289,6 +13301,25 @@ fn bob(won: bool) -> NpcScript {
         }]
     };
     NpcScript::new(BOB, pages)
+}
+
+/// The Forgotten Temple Keeper in Pink Bean's Twilight of Gods and its
+/// Forgotten Twilight (Cosmic `2141002`): the way out to the gate, asked
+/// first, and after the win with a word of thanks.
+const TEMPLE_KEEPER: i32 = 2141002;
+
+fn temple_keeper(won: bool) -> NpcScript {
+    let ask = if won {
+        keys::PINK_BEAN_KEEPER_WON
+    } else {
+        keys::PINK_BEAN_KEEPER_LEAVE_ASK
+    };
+    let pages = vec![Page::Ask {
+        text: text(ask),
+        on_yes: vec![Effect::Warp(events::PINK_BEAN_GATE)],
+        on_no: None,
+    }];
+    NpcScript::new(TEMPLE_KEEPER, pages)
 }
 
 /// The Suspicious Man in the Balrog's hall (105100000, Npc.nx script
@@ -20568,6 +20599,14 @@ mod tests {
         assert_eq!(page_text(&low.begin()), level);
         let ask = event_terms(&events::BALROG, keys::BALROG_SQUAD_ASK);
         assert_eq!(question(&gather(EventKind::Balrog, 50).begin()), ask);
+        // The temple's gatherer gathers Pink Bean's from level 120, wanting
+        // nothing.
+        let low = gather(EventKind::PinkBean, 119);
+        assert_eq!(low.npc_id, PINK_BEAN_RECRUITER);
+        let level = event_terms(&events::PINK_BEAN, keys::PINK_BEAN_SQUAD_LEVEL);
+        assert_eq!(page_text(&low.begin()), level);
+        let ask = event_terms(&events::PINK_BEAN, keys::PINK_BEAN_SQUAD_ASK);
+        assert_eq!(question(&gather(EventKind::PinkBean, 120).begin()), ask);
         let taken = NpcScript::squad(EventKind::Horntail, SquadView::Taken, &at(100));
         assert_eq!(
             page_text(&taken.unwrap().begin()),
@@ -24279,6 +24318,24 @@ mod tests {
         );
         let deck = rider(30, 0, events::GHOST_SHIP_DECK);
         assert!(NpcScript::in_event(BOB, &deck, false, false).is_none());
+    }
+
+    #[test]
+    fn the_temple_keeper_asks_before_taking_anyone_out_to_the_gate() {
+        let out = [Effect::Warp(events::PINK_BEAN_GATE)];
+        for map in [events::PINK_BEAN_ARENA, events::PINK_BEAN_REVIVE] {
+            let there = rider(120, 0, map);
+            for (won, ask) in [
+                (false, keys::PINK_BEAN_KEEPER_LEAVE_ASK),
+                (true, keys::PINK_BEAN_KEEPER_WON),
+            ] {
+                let mut keeper = NpcScript::in_event(TEMPLE_KEEPER, &there, false, won).unwrap();
+                assert_eq!(question(&keeper.begin()), text(ask));
+                assert_eq!(keeper.respond(ScriptInput::Yes).unwrap().effects, out);
+            }
+        }
+        let gate = rider(120, 0, events::PINK_BEAN_GATE);
+        assert!(NpcScript::in_event(TEMPLE_KEEPER, &gate, false, false).is_none());
     }
 
     #[test]

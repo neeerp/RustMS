@@ -456,10 +456,16 @@ impl EventTicket {
     /// Where the member, dead on one of the event's maps, revives instead
     /// of their map's return map: the Guild Quest's way out, which they
     /// leave it by, until the King's Corridor's door takes the earring
-    /// (Cosmic `playerRevive` while `canRevive` is 0).
+    /// (Cosmic `playerRevive` while `canRevive` is 0); Pink Bean's
+    /// Forgotten Twilight, in the copy, whose portal leads back to the
+    /// fight (Cosmic's wz `returnMap`; Royals's Map.nx sends them out).
     pub fn revive_to(&self) -> Option<i32> {
         let event = self.kind.event();
-        (self.kind == EventKind::GuildQuest && !self.cleared.king_gate()).then_some(event.exit)
+        match self.kind {
+            EventKind::GuildQuest if !self.cleared.king_gate() => Some(event.exit),
+            EventKind::PinkBean => Some(net::events::PINK_BEAN_REVIVE),
+            _ => None,
+        }
     }
 
     /// Whether Yulete left his office caught off guard.

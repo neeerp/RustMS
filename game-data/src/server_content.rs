@@ -2355,6 +2355,16 @@ pub mod keys {
     pub const LATANICA_SUMMONED: &str = "latanica.summoned";
     pub const LATANICA_BOB_LEAVE_ASK: &str = "latanica.bob.leave_ask";
     pub const LATANICA_BOB_WON: &str = "latanica.bob.won";
+    pub const PINK_BEAN_SQUAD_LEVEL: &str = "pink_bean.squad.level";
+    pub const PINK_BEAN_SQUAD_ASK: &str = "pink_bean.squad.ask";
+    pub const PINK_BEAN_SQUAD_START_CHOICE: &str = "pink_bean.squad.start_choice";
+    pub const PINK_BEAN_SQUAD_JOIN_ASK: &str = "pink_bean.squad.join_ask";
+    pub const PINK_BEAN_SQUAD_REJOIN_ASK: &str = "pink_bean.squad.rejoin_ask";
+    pub const PINK_BEAN_SQUAD_TAKEN: &str = "pink_bean.squad.taken";
+    pub const PINK_BEAN_SQUAD_NOTICE_OPENED: &str = "pink_bean.squad.notice.opened";
+    pub const PINK_BEAN_SQUAD_NOTICE_STARTED: &str = "pink_bean.squad.notice.started";
+    pub const PINK_BEAN_KEEPER_LEAVE_ASK: &str = "pink_bean.keeper.leave_ask";
+    pub const PINK_BEAN_KEEPER_WON: &str = "pink_bean.keeper.won";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";
