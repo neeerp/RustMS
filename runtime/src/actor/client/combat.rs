@@ -71,7 +71,8 @@ impl ClientActor {
         self.remember_spawn_point();
         let player = &mut self.in_game_mut()?.player;
         let mut packets = death_penalty(player)?;
-        self.send_all(&mut packets).await
+        self.send_all(&mut packets).await?;
+        self.fell_in_king_room().await
     }
 }
 

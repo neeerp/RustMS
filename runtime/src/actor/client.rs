@@ -438,8 +438,8 @@ impl ClientActor {
                 .send(&mut build_blocked_map(BlockedMap::PortalClosed)?)
                 .await;
         }
-        if opcode == RecvOpcode::ChangeMap as i16 {
-            self.set_revival();
+        if opcode == RecvOpcode::ChangeMap as i16 && self.set_revival() {
+            self.tell_event(net::events::EventCommand::Revived).await;
         }
 
         let result = match (route, self.game.as_mut()) {

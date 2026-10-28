@@ -1548,15 +1548,54 @@ impl ClientActor {
 
     /// Where the player, if dead on one of their event's maps, revives
     /// (`EventTicket::revive_to`): read as they answer the death dialog, as
-    /// the event may have let them stay since they died.
-    pub(super) fn set_revival(&mut self) {
+    /// the event may have let them stay since they died. Returns whether
+    /// they are dead there, so the event hears they revive.
+    pub(super) fn set_revival(&mut self) -> bool {
         let Some(game) = self.game.as_mut() else {
-            return;
+            return false;
         };
         let map_id = game.player.stats.map_id;
-        game.player.revive_to = (self.event.as_ref())
-            .filter(|ticket| !self.in_cash_shop && ticket.holds(map_id))
-            .and_then(|ticket| ticket.revive_to());
+        let ticket =
+            (self.event.as_ref()).filter(|ticket| !self.in_cash_shop && ticket.holds(map_id));
+        game.player.revive_to = ticket.and_then(|ticket| ticket.revive_to());
+        ticket.is_some() && game.player.stats.hp <= 0
+    }
+
+    /// The player died in the Guild Quest's last room: the quest hears who
+    /// stands there and how many mobs are left.
+    pub(super) async fn fell_in_king_room(&mut self) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let in_gq =
+            |ticket: &EventTicket| ticket.kind == EventKind::GuildQuest && ticket.holds(map_id);
+        if map_id != net::guild_quest::KING_ROOM || !self.event.as_ref().is_some_and(in_gq) {
+            return Ok(());
+        }
+        let (reply, here) = oneshot::channel();
+        self.send_to_field(FieldMessage::Positions { reply })
+            .await?;
+        let here = here.await.unwrap_or_default().len();
+        let (reply, mobs) = oneshot::channel();
+        self.send_to_field(FieldMessage::MobCount { reply }).await?;
+        let mobs = mobs.await.unwrap_or_default();
+        self.tell_event(EventCommand::KingRoomFell { here, mobs })
+            .await;
+        Ok(())
+    }
+
+    /// What the Rubian's keeper in Ergoth's room tells the player (Cosmic
+    /// `9040010`): out of the quest, they are sent on its way out.
+    pub(super) async fn rubian_keeper(&mut self) -> Result<NpcScript, RuntimeError> {
+        use net::guild_quest::RUBIAN;
+        let player = &self.in_game()?.player;
+        let (map_id, count) = (player.stats.map_id, player.inventory.count(RUBIAN));
+        let in_gq =
+            |ticket: &&EventTicket| ticket.kind == EventKind::GuildQuest && ticket.holds(map_id);
+        let talk = match self.event.as_ref().filter(in_gq) {
+            Some(ticket) => ticket.rubian(count > 0).await,
+            None => None,
+        };
+        let count = i16::try_from(count).unwrap_or(i16::MAX);
+        Ok(NpcScript::rubian_keeper(talk, count))
     }
 
     /// A reactor on the player's map gave everyone there `exp`, such as

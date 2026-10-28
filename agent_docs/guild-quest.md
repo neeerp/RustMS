@@ -269,6 +269,37 @@ clears it.
   `change_map::direct_destination` takes over the return map. A Wheel of
   Destiny still revives them where they fell.
 
+## Ergoth's room
+
+Ergoth's room (990000900, `KING_ROOM`) is stage 10, the last.
+
+- **The altar.** Reactor 9201002 (`ERGOTH_ALTAR`) breaks on its fifth hit
+  (`Action::Summon`): Ergoth's music (`Bgm10/Eregos`) plays, Ergoth
+  (9300028) comes out below it, and its four guards (9300029 to 9300032)
+  at their fixed points (`ERGOTH_GUARDS`; Cosmic `9201002`). Ergoth drops
+  the Rubian (4001024, `RUBIAN`) by the content pack.
+- **The Rubian.** Its keeper (9040010, `RUBIAN_KEEPER`) refuses a member
+  with a line and the registrant without it with another. The
+  registrant's is taken, all of it, with no word said
+  (`NpcScript::rubian_keeper`), and wins the quest
+  (`EventMessage::Rubian`): the first time, the guild earns 1000 points
+  less one for every six seconds since the event was set up, its
+  gathering too, but never under 100 (`guild_quest::rubian_points`;
+  Cosmic's `entryTimestamp`). Anyone out of the quest who talks to the
+  keeper is sent to the Returning Path.
+- **The win.** As Cosmic's `clearPQ`: the clock stops, the stage clears,
+  the guild's line moves on, and the win takes the team to the treasure
+  room (990001000, `BONUS_MAP`) for 30 seconds (`GUILD_QUEST.bonus`, in
+  `Bonus::seconds`), then to the Returning Path. The treasure room's boxes
+  (9202012, `TREASURE_BOX`) break on their fifth hit and spray their
+  loot, topped up to ten drops with piles of 30 to 60 mesos.
+- **The room falling.** A member who dies here tells the event who stands
+  in the room and how many mobs are alive
+  (`EventCommand::KingRoomFell`); it keeps the members dead here who
+  haven't revived (`EventCommand::Revived`, told as a dead member answers
+  the death dialog). With everyone in the room dead and a mob left, the
+  quest ends (Cosmic `playerDead`), taking the whole guild out.
+
 ## The quest's items
 
 `events::GUILD_QUEST.items` (`guild_quest::ITEMS`) are Cosmic's exclusive
@@ -364,7 +395,15 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
   (`the_guild_quest_s_gates_and_spears_stay_set`) the door, and
   `net/src/packet/handle/world/change_map.rs`
   (`an_event_s_way_out_takes_the_place_of_the_return_map_but_not_of_a_wheel`)
-  the revival.
+  the revival. Then the altar's music, Ergoth and its guards, and the
+  quest ending once both in the room are dead, the one outside going out
+  too; then the keeper's refusal of a member, the registrant's Rubian
+  winning with the guild's points, the treasure room and the way out.
+  `net/src/guild_quest.rs`
+  (`the_rubian_earns_a_point_less_every_six_seconds_down_to_a_hundred`,
+  `ergoth_s_room_holds_the_altar_and_the_rubian_s_keeper_and_the_win_its_treasure`)
+  has the points, the maps and the bonus, and `net/src/reactors.rs`
+  (`the_guild_quest_s_gates_and_spears_stay_set`) the altar and the boxes.
 - `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)
   and `net/src/scripts.rs` (`shuang_briefs_whoever_reaches_sharenians_outskirts`).
 - `HeavenClient/tests/guild.cpp`: the waitlist lines.

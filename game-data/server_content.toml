@@ -1839,6 +1839,8 @@ unsourced = [
     "guild_quest.gate.blocked",
     "guild_quest.gate.too_high",
     "guild_quest.gate.crack",
+    "guild_quest.rubian.not_leader",
+    "guild_quest.rubian.missing",
 ]
 
 [text."glTutoMsg0.message"]

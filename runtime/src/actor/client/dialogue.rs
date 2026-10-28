@@ -158,6 +158,10 @@ impl ClientActor {
                 return self.start_script(script).await;
             }
         }
+        if npc_id == net::guild_quest::RUBIAN_KEEPER {
+            let script = self.rubian_keeper().await?;
+            return self.start_script(script).await;
+        }
         if npc_id == net::guild_quest::VASSAL_KEEPER {
             if let Some(script) = self.vassal_keeper().await? {
                 return self.start_script(script).await;
