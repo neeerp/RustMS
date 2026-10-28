@@ -48,9 +48,20 @@ Bob (9270033) in the Engine Room asks before the win whether to leave, and
 sends those who say yes to the Peaceful Ship. After the win, Bob says a
 line and takes them up.
 
-Not yet: the drops of the Ghost Ship's mobs and Latanica (9420509 to
-9420513). The content pack has none, so quest 4513's Black Essence has no
-source yet.
+## Drops
+
+The content pack has no drops for the Ghost Ship's mobs or the captain
+(9420509 to 9420513). Theirs come from `game-data/reward_overrides.toml`:
+Cosmic's tables, with each mob's mesos as one pile. Each of these drops its
+essence 3 times in 10:
+
+- Pac Pinky (9420509): 4000380;
+- Selkie Jr. (9420511): the Blue Essence 4000382;
+- Mr. Anchor (9420512): the Red Essence 4000383, which Ralph's 4522 asks for;
+- the captain (9420513): the Black Essence 4000384, which Fight for the
+  future (4513) asks for, and a Soul Lantern (4000385).
+
+The captain's kill in the copy counts for 4513, like any kill.
 
 ## Tests
 
@@ -62,4 +73,5 @@ two in and drops the essence on the reactor. It turns away the next party
 while the fight is on, and has Bob offer only the way out. It waits for the
 pink line, the music and the captain, then beats the captain and sees the
 clear. It checks that the clock stopped, and has Bob take both up. Last, it
-lets the next party in and has its time run out.
+lets the next party in and has its time run out. The hunter is on 4513 and
+sees the kill count. `game-data` checks the drops load without the pack.

@@ -4754,6 +4754,26 @@ mod tests {
         assert!((2040728..=2040739).all(|s| scrolls.iter().any(|d| d.item == Some(s))));
     }
 
+    #[test]
+    fn the_ghost_ship_and_its_captain_drop_their_essences_without_the_pack() {
+        let table = RewardTable::load(None).unwrap();
+        for (mob, essence) in [
+            (9420509, 4000380),
+            (9420511, 4000382),
+            (9420512, 4000383),
+            (9420513, 4000384),
+        ] {
+            let drops = table.drops(mob);
+            let drop = drops.iter().find(|d| d.item == Some(essence)).unwrap();
+            assert_eq!(drop.prob, 0.3, "{mob}");
+        }
+        assert_eq!(table.drops(9420510).len(), 33);
+        let captain = table.drops(9420513);
+        assert_eq!((captain[0].money, captain.len()), (Some(2000), 31));
+        let potions = captain.iter().find(|d| d.item == Some(2000006)).unwrap();
+        assert_eq!((potions.min, potions.max), (Some(1), Some(4)));
+    }
+
     fn quest_item(item: i32, quest: i16) -> RewardEntry {
         RewardEntry {
             item: Some(item),
