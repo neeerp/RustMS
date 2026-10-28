@@ -2,15 +2,15 @@
 
 The battle with Pink Bean in the Temple of Time, after Cosmic's
 `PinkBeanBattle`. The analysis and its open questions are in v83ref's
-`reports/b274-pink-bean.md`; the defaults shipped are under "b283" in
-`lanes/QUESTIONS.md`.
+`reports/b274-pink-bean.md`; the defaults shipped are under "b283" and
+"b284" in `lanes/QUESTIONS.md`.
 
 All dialogue is placeholder text (`pink_bean.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
 
-So far only the way in and out is done (slice 1). The statue, its guardians'
-waves, Pink Bean itself, the win, the deaths count and the drops are still
-to come.
+So far the way in and out (slice 1) and the statue's guardians (slice 2)
+are done. Pink Bean's own fight, the win, the deaths count and the drops
+are still to come.
 
 ## The expedition
 
@@ -45,11 +45,46 @@ there is no reward from the keeper.
 
 Between Twilight and Daybreak's `in00` (`PPinkOut`) leads to the gate.
 
+## The statue and its guardians
+
+Every copy of the Twilight of Gods opens with Pink Bean's statue (8820000,
+`mobs::PINK_BEAN_STATUE`) at (0,-42) (`events::opening_mobs`). The map's own
+life holds the five guardians' statues (8820019-23), which come with the
+field. The statue is warded (`FieldMobs::ward` in
+`runtime/src/actor/field_mobs.rs`): unlike Zakum's or the Balrog's shields,
+a ward keeps the statue's controller, so it still casts its skills, but no
+attack or poison hurts it.
+
+The first to arrive in the copy hears, in pink, that the first wave wakes
+in 15 seconds (`pink_bean.wave.first`, `FieldMessage::GuardiansWake`).
+Wave n wakes the first n guardians of `events::PINK_BEAN_GUARDIANS`, in
+Cosmic's order: Solomon the Wise (8820003), Rex the Wise (8820004), Hugin
+(8820005), Munin (8820006) and Ariel (8820002). Each comes out of one of
+its statues, which goes, or at (5,-42) if none is left. When a wave's last
+guardian falls, the next stirs 15 seconds later (`pink_bean.wave.next`).
+A guardian's death leaves a statue behind (its `revive` in Mob.nx), which
+the next wave wakes again.
+
+When the fifth wave falls, the ward lifts and a 4001193 drops for anyone
+on the statue's reactor (2708000, `reactors::PINK_BEAN_LIGHTNING`), with an
+item line in the chat log (`pink_bean.wave.last`). The reactor takes it as
+it takes any item dropped on it (`ITEM_TAKEN_AFTER` in the field, five
+seconds), which strikes the statue dead (`reactors::Action::Lightning`).
+However the statue dies, Pink Bean (8820001, `mobs::PINK_BEAN`) comes out
+on the ground where it stood. The wave lines reach only those in the
+fight, not the dead waiting in the Forgotten Twilight.
+
 ## Tests
 
-- `net`: the event's maps and terms (`events.rs`), the gatherer's level and
+- `net`: the event's maps and terms and the guardians' waves
+  (`events.rs`), the reactor's action (`reactors.rs`), the gatherer's level and
   ask (`npc_scripts.rs`), the keeper, and the two portals (`scripts.rs`).
 - Harness `pink_bean_entry`: two gather and set out. The keeper asks first,
   and a dead member comes back in the Forgotten Twilight and goes back to
   the leader through `Pinkin`. The member leaves and may rejoin, and the
   last out ends the expedition. `PPinkOut` leads to the gate.
+- `runtime`: a warded mob keeps its controller and takes no harm until
+  the ward lifts (`field_mobs.rs`).
+- Harness `pink_bean_waves`: the five waves wake in order out of their
+  statues, the warded statue takes no hit, and after the fifth the item
+  falls on the reactor, the statue dies and Pink Bean comes out.

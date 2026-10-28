@@ -855,6 +855,10 @@ pub enum FieldMessage {
     Slay {
         mob_id: i32,
     },
+    /// The goddess's guardians of the wave due wake in the Twilight of
+    /// Gods' copy (Cosmic `PinkBeanBattle.startWave`; the copy sends it to
+    /// itself).
+    GuardiansWake,
     /// `summoner` spent CP on `index` of the Monster Carnival window's tab
     /// `tab`, which everyone on the field hears of.
     CarnivalAnnounce {

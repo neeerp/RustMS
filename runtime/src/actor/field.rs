@@ -317,6 +317,10 @@ pub struct FieldActor {
     race: Option<Race>,
     /// Crimsonwood Keep's fourth stage's stirges are gone, for good.
     stirges_gone: bool,
+    /// In the Twilight of Gods' copy, once the first has come in, the wave
+    /// of the goddess's guardians due or out, from the first; one past the
+    /// last once that is down.
+    guardians_wave: Option<usize>,
     /// What this field does to itself later, once due: the Balrog's tomb
     /// lets its claw go a minute in, and brings out the sealed Balrog after
     /// the win.
@@ -429,6 +433,7 @@ impl FieldActor {
                 }),
             race: None,
             stirges_gone: false,
+            guardians_wave: None,
             later: Vec::new(),
             tick,
         };
@@ -462,6 +467,11 @@ impl FieldActor {
                 mob_id: net::mobs::BALROG_CLAW,
             };
             field.after(net::events::BALROG_CLAW_AFTER, claw);
+        }
+        // The Twilight of Gods' statue takes no harm while the goddess's
+        // guardians stand.
+        if key.map_id == net::events::PINK_BEAN_ARENA && key.instance_id != 0 {
+            field.mobs.ward(net::mobs::PINK_BEAN_STATUE, true);
         }
         // Crimsonwood Keep's fourth stage opens with its fires lit.
         if key.map_id == net::events::CWK_ENTRY + 300 {
@@ -744,14 +754,8 @@ impl FieldActor {
             FieldMessage::BringOut { mob_id, at } => {
                 self.board(mob_id, 1, at);
             }
-            FieldMessage::Slay { mob_id } => {
-                let now = Instant::now();
-                for object_id in self.out(mob_id) {
-                    if let Some(kill) = self.mobs.slay(object_id, now) {
-                        self.killed(&kill);
-                    }
-                }
-            }
+            FieldMessage::Slay { mob_id } => self.slay(mob_id),
+            FieldMessage::GuardiansWake => self.guardians_wake(),
             FieldMessage::CarnivalSummon {
                 summoner,
                 index,
@@ -2203,6 +2207,18 @@ impl FieldActor {
                 self.boss_falls();
                 self.clear_mobs();
             }
+            // Pink Bean comes out where its statue fell (Royals's statue
+            // has no `revive`, unlike Cosmic's).
+            (net::mobs::PINK_BEAN_STATUE, net::events::PINK_BEAN_ARENA)
+                if self.key.instance_id != 0 && self.out(net::mobs::PINK_BEAN).is_empty() =>
+            {
+                self.board(net::mobs::PINK_BEAN, 1, (kill.x, kill.y));
+            }
+            (mob_id, net::events::PINK_BEAN_ARENA)
+                if net::events::pink_bean_guardian(mob_id) && self.key.instance_id != 0 =>
+            {
+                self.guardian_falls()
+            }
             (mob_id, _) if net::events::is_frankenroid(mob_id) => self.frankenroid_falls(),
             (mob_id, map_id)
                 if net::events::is_lord_pirate(mob_id)
@@ -2473,6 +2489,96 @@ impl FieldActor {
     fn out(&self, mob_id: i32) -> Vec<i32> {
         let mobs = self.mobs.live().filter(|mob| mob.info.mob_id == mob_id);
         mobs.map(|mob| mob.object_id).collect()
+    }
+
+    /// Kill every live `mob_id` here outright, as one that dies, giving
+    /// nothing, as no one hurt it.
+    fn slay(&mut self, mob_id: i32) {
+        let now = Instant::now();
+        for object_id in self.out(mob_id) {
+            if let Some(kill) = self.mobs.slay(object_id, now) {
+                self.killed(&kill);
+            }
+        }
+    }
+
+    /// Everyone in the Twilight of Gods hears the guardians' next wave is
+    /// coming, which wakes a while later (Cosmic `dropMessage(5, ..)`, then
+    /// `schedule("startWave", 15 * 1000)`).
+    fn guardians_stir(&mut self, notice: &str) {
+        let notice = net::content::text().get(notice, &[]);
+        if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+            self.broadcast(None, packet);
+        }
+        let wake = FieldMessage::GuardiansWake;
+        self.after(net::events::PINK_BEAN_WAVE_AFTER, wake);
+    }
+
+    /// The guardians of the wave due wake, as many as its number, in their
+    /// order: each where one of its statues stands, which goes, or at the
+    /// statues' spot if none does (Cosmic `startWave`'s `spawnJrBoss`).
+    fn guardians_wake(&mut self) {
+        let Some(wave) = self.guardians_wave else {
+            return;
+        };
+        let guardians = net::events::PINK_BEAN_GUARDIANS;
+        let now = Instant::now();
+        for &(statues, guardian) in guardians.iter().take(wave) {
+            let statue = self
+                .mobs
+                .live()
+                .find(|mob| statues.contains(&mob.info.mob_id))
+                .map(|mob| (mob.object_id, (mob.x, mob.y)));
+            let at = match statue {
+                Some((object_id, at)) => {
+                    let gone = self.mobs.take_away_one(object_id, now);
+                    self.show_left(gone);
+                    at
+                }
+                None => net::events::PINK_BEAN_GUARDIANS_AT,
+            };
+            self.board(guardian, 1, at);
+        }
+    }
+
+    /// One of the goddess's guardians fell. With none left awake, the next
+    /// wave stirs; after the last, the item that calls the lightning falls
+    /// on the statue's reactor, and the statue takes harm (Cosmic
+    /// `PinkBeanBattle.monsterKilled`).
+    fn guardian_falls(&mut self) {
+        let awake = self
+            .mobs
+            .live()
+            .any(|mob| net::events::pink_bean_guardian(mob.info.mob_id));
+        let Some(wave) = self.guardians_wave.filter(|_| !awake) else {
+            return;
+        };
+        if wave > net::events::PINK_BEAN_WAVES {
+            return;
+        }
+        self.guardians_wave = Some(wave + 1);
+        if wave < net::events::PINK_BEAN_WAVES {
+            self.guardians_stir(keys::PINK_BEAN_WAVE_NEXT);
+            return;
+        }
+        self.mobs.ward(net::mobs::PINK_BEAN_STATUE, false);
+        let spot = self.reactors.spot_of(reactors::PINK_BEAN_LIGHTNING);
+        let owner = self.occupants.keys().next().copied();
+        let (Some((x, y)), Some(owner)) = (spot, owner) else {
+            // No one here to drop it for: the lightning strikes at once.
+            self.slay(net::mobs::PINK_BEAN_STATUE);
+            return;
+        };
+        let lightning = net::loot::Loot::Item {
+            item_id: net::events::PINK_BEAN_LIGHTNING_ITEM,
+            quantity: 1,
+            quest: None,
+        };
+        self.spawn_loot(owner, Ownership::FreeForAll, vec![lightning], x, y, 0);
+        let notice = net::content::text().get(keys::PINK_BEAN_WAVE_LAST, &[]);
+        if let Ok(packet) = build_item_line(&notice, 0) {
+            self.broadcast(None, packet);
+        }
     }
 
     /// All eight of Horntail's dead parts are out: he dies, then they do,
@@ -4299,6 +4405,8 @@ impl FieldActor {
                     reactors::Action::Beaker if view.state == reactors::BEAKER_FULL => {
                         self.fill_beaker(view.object_id)
                     }
+                    // Cosmic `2708000`'s `hit`: `killMonster(8820000)`.
+                    reactors::Action::Lightning => self.slay(net::mobs::PINK_BEAN_STATUE),
                     _ => {}
                 }
                 return;
@@ -4744,6 +4852,15 @@ impl FieldActor {
         }
         if let Some(boss) = self.dojo_boss.take() {
             self.bring_out_dojo_boss(boss);
+        }
+        // The first into the Twilight of Gods' copy starts the guardians'
+        // first wave's clock (Cosmic `PinkBeanBattle.afterSetup`).
+        if self.key.map_id == net::events::PINK_BEAN_ARENA
+            && self.key.instance_id != 0
+            && self.guardians_wave.is_none()
+        {
+            self.guardians_wave = Some(1);
+            self.guardians_stir(keys::PINK_BEAN_WAVE_FIRST);
         }
     }
 

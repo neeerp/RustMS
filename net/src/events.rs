@@ -1901,7 +1901,8 @@ pub fn only_mobs(map_id: i32) -> Option<i32> {
 /// Pharaoh Yeti's Tomb opens with its Pharaoh Jr. Yeti, at its spawn.
 /// Crimsonwood Keep's bowmen's room, which has no spawn points, opens with
 /// five Master Guardians (9400594) along its slopes (Cosmic CWKPQ's
-/// `setup`). None come back.
+/// `setup`). The Twilight of Gods opens with Pink Bean's statue
+/// (`PinkBeanBattle`'s `setup`). None come back.
 pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     const YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_YETI, (0, 0), 1)];
     const HELL_YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_HELL_YETI, (0, 0), 1)];
@@ -1944,6 +1945,11 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     ];
     if map_id == CWK_ROOMS[1].map {
         return &MASTER_GUARDIANS;
+    }
+    const PINK_BEAN_STATUE: [(i32, (i16, i16), usize); 1] =
+        [(crate::mobs::PINK_BEAN_STATUE, PINK_BEAN_STATUE_AT, 1)];
+    if map_id == PINK_BEAN_ARENA {
+        return &PINK_BEAN_STATUE;
     }
     match PIRATE_STAGES[2..4]
         .iter()
@@ -2628,6 +2634,37 @@ pub const PINK_BEAN_GATE: i32 = 270_050_000;
 pub const PINK_BEAN_ARENA: i32 = 270_050_100;
 pub const PINK_BEAN_REVIVE: i32 = 270_050_200;
 pub const PINK_BEAN_OUT: i32 = 270_050_300;
+
+/// Where Pink Bean's statue stands in the Twilight of Gods' copy, from its
+/// opening (Cosmic `PinkBeanBattle`'s `setup`) until the lightning strikes
+/// it, and where the map's five guardian statues stand.
+pub const PINK_BEAN_STATUE_AT: (i16, i16) = (0, -42);
+pub const PINK_BEAN_GUARDIANS_AT: (i16, i16) = (5, -42);
+/// The goddess's guardians in the order the waves wake them, Solomon the
+/// Wise first and Ariel last (Cosmic `startWave`'s `8820019 + i % 5`):
+/// each as the statues it may stand as (the map's, then the one it
+/// leaves where it falls, Royals's Mob.nx `revive`) and itself.
+pub const PINK_BEAN_GUARDIANS: [(&[i32], i32); 5] = [
+    (&[8_820_020, 8_820_024], 8_820_003),
+    (&[8_820_021, 8_820_025], 8_820_004),
+    (&[8_820_022, 8_820_026], 8_820_005),
+    (&[8_820_023, 8_820_027], 8_820_006),
+    (&[8_820_019], 8_820_002),
+];
+/// A wave wakes as many guardians as its number, a while after the line
+/// that warns of it; the last wave is the fifth.
+pub const PINK_BEAN_WAVE_AFTER: Duration = Duration::from_secs(15);
+pub const PINK_BEAN_WAVES: usize = PINK_BEAN_GUARDIANS.len();
+/// The Transparent Item for Lightning, which falls on the statue's reactor
+/// (`crate::reactors::PINK_BEAN_LIGHTNING`) once the last wave is down.
+pub const PINK_BEAN_LIGHTNING_ITEM: i32 = 4_001_193;
+
+/// Whether `mob_id` is one of the goddess's guardians awake.
+pub fn pink_bean_guardian(mob_id: i32) -> bool {
+    PINK_BEAN_GUARDIANS
+        .iter()
+        .any(|&(_, guardian)| guardian == mob_id)
+}
 
 /// Crimsonwood Keep's Inner Sanctum's entrance, where its expeditions
 /// gather and come back to, and the Keep's first stage.
@@ -5213,6 +5250,25 @@ mod tests {
             (PINK_BEAN.entry, PINK_BEAN.exit),
             (PINK_BEAN_ARENA, PINK_BEAN_OUT)
         );
+    }
+
+    #[test]
+    fn pink_bean_s_waves_wake_the_guardians_in_cosmic_s_order() {
+        assert_eq!(
+            opening_mobs(PINK_BEAN_ARENA),
+            [(crate::mobs::PINK_BEAN_STATUE, PINK_BEAN_STATUE_AT, 1)]
+        );
+        assert_eq!(PINK_BEAN_WAVES, 5);
+        for (i, &(statues, guardian)) in PINK_BEAN_GUARDIANS.iter().enumerate() {
+            // `startWave`'s `8820019 + i % 5`, from 1, and `id - 17`.
+            let statue = 8_820_019 + (i as i32 + 1) % 5;
+            assert_eq!((statues[0], guardian), (statue, statue - 17));
+            assert!(pink_bean_guardian(guardian) && !pink_bean_guardian(statue));
+            // Each falls leaving one of its statues, to wake from again.
+            let info = crate::mobs::info(guardian).unwrap();
+            assert_eq!(info.revive, [*statues.last().unwrap()], "{guardian}");
+        }
+        assert!(!pink_bean_guardian(crate::mobs::PINK_BEAN_STATUE));
     }
 
     #[test]

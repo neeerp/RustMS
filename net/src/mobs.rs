@@ -80,6 +80,11 @@ pub const BALROG_CLAW: i32 = 8830006;
 /// String.nx's Korean-only 9101003): no mob of its own, but each one in the
 /// tomb when the body falls (Cosmic `dispatchRaiseQuestMobCount`).
 pub const BALROG_SEALED_CREDIT: i32 = 9101003;
+/// Pink Bean's statue in the Twilight of Gods, which takes no harm until
+/// the goddess's guardians are down, and Pink Bean, who comes out where it
+/// falls.
+pub const PINK_BEAN_STATUE: i32 = 8820000;
+pub const PINK_BEAN: i32 = 8820001;
 
 /// Whether a `guard` out keeps a `mob_id` from harm: Zakum's arms its body
 /// (Cosmic `MapleMap.damageMonster`), and the Balrog's arms and claw its

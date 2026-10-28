@@ -569,6 +569,9 @@ pub struct MobSet {
     closed: bool,
     /// Only this mob comes, filling every point of its own (`only`).
     only: Option<i32>,
+    /// Mobs that take no harm for now, though they move and fight as any
+    /// other (`ward`).
+    warded: Vec<i32>,
     rng: StdRng,
 }
 
@@ -614,6 +617,7 @@ impl MobSet {
             last_pass: None,
             closed: false,
             only: None,
+            warded: Vec::new(),
             rng: StdRng::from_entropy(),
         }
     }
@@ -852,11 +856,34 @@ impl MobSet {
                 .any(|guard| net::mobs::shields(guard, mob_id))
     }
 
-    /// Whether the mob `object_id` takes no harm yet (see `shields`).
+    /// Whether the mob `object_id` takes no harm yet: it is shielded (see
+    /// `shields`) or warded (`ward`).
     pub fn shielded(&self, object_id: i32) -> bool {
         self.live
             .get(&object_id)
+            .is_some_and(|mob| self.unharmed(mob))
+    }
+
+    /// Whether no one may control the mob `object_id`: it is shielded.
+    fn uncontrolled(&self, object_id: i32) -> bool {
+        self.live
+            .get(&object_id)
             .is_some_and(|mob| self.shields(mob))
+    }
+
+    /// Whether nothing may hurt `mob`: shielded, or warded (`ward`).
+    fn unharmed(&self, mob: &LiveMob) -> bool {
+        self.shields(mob) || self.warded.contains(&mob.info.mob_id)
+    }
+
+    /// Keep every `mob_id` from harm, or no longer: Pink Bean's statue
+    /// while the goddess's guardians stand. Unlike a shielded mob, a
+    /// warded one keeps its controller, so it still uses its skills.
+    pub fn ward(&mut self, mob_id: i32, warded: bool) {
+        self.warded.retain(|&id| id != mob_id);
+        if warded {
+            self.warded.push(mob_id);
+        }
     }
 
     /// The mobs that the death of a `mob_id` left unshielded: they are
@@ -939,7 +966,7 @@ impl MobSet {
         object_id: i32,
         now: Instant,
     ) -> Option<Option<ClientId>> {
-        if self.shielded(object_id) {
+        if self.uncontrolled(object_id) {
             return None;
         }
         let mob = self.live.get_mut(&object_id)?;
@@ -967,7 +994,7 @@ impl MobSet {
         distance: i32,
         now: Instant,
     ) -> Option<Option<ClientId>> {
-        if self.shielded(object_id) {
+        if self.uncontrolled(object_id) {
             return None;
         }
         let mob = self.live.get_mut(&object_id)?;
@@ -1437,7 +1464,7 @@ impl MobSet {
         let shielded: Vec<i32> = self
             .live
             .values()
-            .filter(|mob| self.shields(mob) || mob.link == Some(Link::Body))
+            .filter(|mob| self.unharmed(mob) || mob.link == Some(Link::Body))
             .map(|mob| mob.object_id)
             .collect();
         let mut hurt = Vec::new();
@@ -1578,6 +1605,16 @@ impl MobSet {
             mob.object_id == object_id && mob.info.remove_on_miss
         });
         gone.first().map(|&(_, leave, _)| leave)
+    }
+
+    /// Take the mob `object_id` away, as if its time were up: a guardian's
+    /// statue as the guardian wakes in its place.
+    pub fn take_away_one(
+        &mut self,
+        object_id: i32,
+        now: Instant,
+    ) -> Vec<(i32, u8, Option<BossBar>)> {
+        self.take_away(now, |mob| mob.object_id == object_id)
     }
 
     /// Take away every mob, as if its time were up.
@@ -2463,6 +2500,34 @@ mod tests {
         assert!(!mobs.shielded(body));
         assert_eq!(mobs.assign_uncontrolled(2), [body]);
         assert_eq!(mobs.damage(2, body, 60, now), Some(Ok(40)));
+    }
+
+    #[test]
+    fn a_warded_mob_takes_no_harm_but_keeps_its_controller() {
+        let now = Instant::now();
+        let mut mobs = MobSet::default();
+        let statue = MobInfo {
+            mob_id: net::mobs::PINK_BEAN_STATUE,
+            max_hp: 100,
+            ..MobInfo::default()
+        };
+        let statue = mobs.place(statue, (0, 0), 5, None, now);
+        mobs.ward(net::mobs::PINK_BEAN_STATUE, true);
+        // It moves, and uses its skills, under whoever comes in first or
+        // provokes it, but neither hits nor poison hurt it.
+        assert_eq!(mobs.assign_uncontrolled(1), [statue]);
+        assert!(mobs.shielded(statue));
+        assert_eq!(mobs.provoke(2, statue, now), Some(Some(1)));
+        let until = now + Duration::from_secs(10);
+        let poison = [(MobStat::Poison, 3)];
+        mobs.add_statuses(statue, &poison, 2101005, 1, now, until);
+        assert!(mobs.hurt_by_statuses(now + HURT_INTERVAL).is_empty());
+        assert_eq!(mobs.damage(1, statue, 60, now), Some(Ok(100)));
+        // Warded once more, and then no longer, it takes harm.
+        mobs.ward(net::mobs::PINK_BEAN_STATUE, true);
+        mobs.ward(net::mobs::PINK_BEAN_STATUE, false);
+        assert!(!mobs.shielded(statue));
+        assert_eq!(mobs.damage(1, statue, 60, now), Some(Ok(40)));
     }
 
     #[test]
