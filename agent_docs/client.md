@@ -999,9 +999,21 @@ the screen size.
   player's own and repeats ("There are repeating character names."); only one
   name is sent here, so it isn't checked. Otherwise OK swaps the art for
   `CSNotice/1` and asks for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
-  and message, after asking "This contains an item that will disappear once
-  the expiration date has passed. Do you want to give it as a gift?" for an
-  item with a period (`0x46ec85`). On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
+  and message. The server answers with the receiver (0x147, `GiftInfoResultHandler`,
+  v83 `0x46ec85`), and `UICashShop::gift_looked_up` asks v83's questions:
+  "You don't have enough cash." when NX Credit is short of the price; then,
+  through `cash_gift::questions` (`Data/CashGift.h`, report b347), "This
+  contains an item that will disappear once the expiration date has passed. Do
+  you want to give it as a gift?" for an item with a period, and whether the
+  receiver can use it: pet items (519, 524) without the first pet out, the
+  Scissors of Karma with nothing to work on, an equip whose reqJob, reqLevel or
+  reqPOP the receiver doesn't meet, a cash weapon with no art for the
+  receiver's worn weapon, a mount without Monster Riding. Each is a Yes/No; an
+  equip with no data ends it with "Due to an unknown error, the request for
+  Cash Shop has failed.". A package asks at most once, for its first member
+  that needs it. Then "ITEM (PRICE NX) Will you buy this item as a gift for
+  'NAME'?", and Yes sends 0x04 again, or 0x1F for a package. v83 offers only
+  NX Credit to pay with there; this asks Yes/No. On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
   NAME. PRICE NX Prepaid were spent in the process.", or a failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
   For each gift in 0x4D the receiver gets v83's dialog (`UIGiftNotice`,
   `CSNotice/3`, FUN_0047959e): the item's icon and name, the sender, their
@@ -1016,10 +1028,9 @@ the screen size.
   "The item is not on sale now."; then it opens the commodity's tab, subtab and
   page, and runs the gift dialog with the name filled in and fixed: the
   birthday code, NX Prepaid against the price, the message, then "ITEM (PRICE
-  NX) Will you buy this item as a gift for 'NAME'?", and Yes sends 0x04. v83
-  sends a package as 0x1F after the server's 0x147 (report b331), which the
-  server doesn't send, so packages go as 0x04 too, and the server gifts
-  their items. The message page of a present or a ring is v83's dialog (7e4cf7) on
+  NX) Will you buy this item as a gift for 'NAME'?", and Yes sends 0x1F for
+  a package, sent at once, or 0x04 for an item, which the server looks up
+  and the client asks about as for GIFT. The message page of a present or a ring is v83's dialog (7e4cf7) on
   `CSNotice/2`, whose art carries "Enter your message here,"; it is covered
   while a field has the keys or the message has text (7e5467). Its OK
   (7e5863) refuses, leaving the dialog open, a name not 4 to 12 characters

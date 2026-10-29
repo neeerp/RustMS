@@ -336,6 +336,7 @@ namespace ms
 		SET_CASH_SHOP = 127,
 		QUERY_CASH_RESULT = 324,
 		CASHSHOP_OPERATION = 325,
+		GIFT_INFO_RESULT = 327,
 		CHECK_NEW_NAME_RESULT = 328,
 		NAME_CHANGE_RULES_RESULT = 329,
 
@@ -603,6 +604,7 @@ namespace ms
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();
 		emplace<QUERY_CASH_RESULT, QueryCashResultHandler>();
 		emplace<CASHSHOP_OPERATION, CashShopOperationHandler>();
+		emplace<GIFT_INFO_RESULT, GiftInfoResultHandler>();
 		emplace<CHECK_NEW_NAME_RESULT, CheckNewNameResultHandler>();
 		emplace<NAME_CHANGE_RULES_RESULT, NameChangeRulesResultHandler>();
 		emplace<CANCEL_NAME_CHANGE_RESULT, CancelNameChangeResultHandler>();

@@ -233,7 +233,15 @@ A gift (0x04) names the commodity, a receiving character and a message of 1 to
 73 bytes, and carries the birthday code the client asked for. Accounts don't
 record a birthday, so any real date passes, and anything else fails with 0xC4.
 The receiver must exist (0xA9), belong to another account (0xA8), and be of a
-gender the item is for (0xAA). `db::cash_shop::gift` takes the price from the
+gender the item is for (0xAA). Gifts take two asks, as in v83 (report b331).
+The first 0x04 is only looked up: the server answers GIFT_INFO_RESULT (0x147:
+`u8 1`, the birthday code, SN, name and message echoed, then the receiver's
+character data as SET_FIELD sends it) and remembers the ask, with no balance
+after it. The client asks its own questions about the receiver and sends the
+same 0x04 again, which sends the gift; any other Cash Shop request forgets the
+ask. A package's second ask is 0x1F (the same fields), which sends at once,
+as the wish list's present of a package does; 0x1F for anything else fails.
+`db::cash_shop::gift` takes the price from the
 sender's NX Credit, or from their NX Prepaid if the credit is short (never Maple
 Points), and inserts the item into the receiver's account with `gift_from` and
 `gift_message` set, in one transaction. The sender gets 0x5E (receiver, item,

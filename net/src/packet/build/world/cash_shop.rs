@@ -388,6 +388,27 @@ pub fn build_cash_gifts(gifts: &[CashItem]) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// GIFT_INFO_RESULT: the gift asked about, as it was asked, and its
+/// receiver's character, which the client checks the gift against before
+/// asking the giver to pay and sending the same gift again (0x46ec85).
+pub fn build_gift_info(
+    birthday: i32,
+    sn: i32,
+    to: &str,
+    message: &str,
+    receiver: &Player,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::GiftInfoResult as i16)?;
+    packet.write_byte(1)?;
+    packet.write_int(birthday)?;
+    packet.write_int(sn)?;
+    packet.write_str_with_length(to)?;
+    packet.write_str_with_length(message)?;
+    encode_character_data(&mut packet, receiver)?;
+    Ok(packet)
+}
+
 /// CASHSHOP_OPERATION: `count` of `item_id` went to the character named `to`
 /// for `price`.
 pub fn build_gift_sent(
@@ -471,6 +492,20 @@ mod tests {
             }
         }
         expect.int(0).short(0).byte(0).int(75);
+        expect.end();
+    }
+
+    #[test]
+    fn gift_info_echoes_the_gift_before_the_receiver() {
+        let player = player();
+        let packet = build_gift_info(19830113, 20000053, "bob", "enjoy", &player).unwrap();
+
+        let mut character = Packet::new_empty();
+        encode_character_data(&mut character, &player).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x147).byte(1).int(19830113).int(20000053);
+        expect.string("bob").string("enjoy");
+        expect.bytes(&character.bytes);
         expect.end();
     }
 

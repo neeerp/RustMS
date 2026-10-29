@@ -2,9 +2,9 @@ use integration_harness::connection::{MapleTestConnection, PacketEnvelope};
 use integration_harness::database::{item_owner_and_hours, set_meso, set_nx_credit};
 use integration_harness::packets::{
     build_cash_shop_buy, build_cash_shop_buy_package, build_cash_shop_buy_with_mesos,
-    build_cash_shop_expand, build_cash_shop_gift, build_cash_shop_put_back,
-    build_cash_shop_take_out, build_cash_shop_wish_list, build_check_cash, build_enter_cash_shop,
-    opcode_name,
+    build_cash_shop_expand, build_cash_shop_gift, build_cash_shop_package_gift,
+    build_cash_shop_put_back, build_cash_shop_take_out, build_cash_shop_wish_list,
+    build_check_cash, build_enter_cash_shop, opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::{login_to_world_session, relogin};
@@ -197,12 +197,14 @@ async fn gifts_need_a_birthday_code_another_account_and_cash() {
         ),
     ];
     for (birthday, to, code, phase) in cases {
+        let gift = || build_cash_shop_gift(birthday, TICKET, to, "for you").unwrap();
+        // The client checks the balance it has; the server, on paying.
+        if code == 0xA5 {
+            look_up(&mut session.connection, gift(), phase).await;
+        }
         session
             .connection
-            .send_packet(
-                build_cash_shop_gift(birthday, TICKET, to, "for you").unwrap(),
-                "gift",
-            )
+            .send_packet(gift(), "gift")
             .await
             .expect("send gift");
         assert_eq!(
@@ -239,6 +241,27 @@ async fn credit(connection: &mut MapleTestConnection, phase: &'static str) -> i3
     Cursor::new(&balance.packet.bytes[2..])
         .read_int()
         .expect("NX Credit")
+}
+
+/// Ask about a gift, and read the receiver's character id from the answer,
+/// which echoes the gift first.
+async fn look_up(
+    connection: &mut MapleTestConnection,
+    packet: packet::Packet,
+    phase: &'static str,
+) -> i32 {
+    connection.send_packet(packet, phase).await.expect(phase);
+    let reply = read_until(connection, phase, SendOpcode::GiftInfoResult).await;
+    let mut reply = Cursor::new(&reply.packet.bytes[2..]);
+    assert_eq!(reply.read_byte().unwrap(), 1, "{phase}: the receiver found");
+    reply.read_int().unwrap();
+    reply.read_int().unwrap();
+    reply.read_str_with_length().unwrap();
+    reply.read_str_with_length().unwrap();
+    // The character data's flags, then its stats.
+    assert_eq!(reply.read_long().unwrap(), -1);
+    reply.read_byte().unwrap();
+    reply.read_int().unwrap()
 }
 
 /// Send a Cash Shop request and return the CASHSHOP_OPERATION reply.
@@ -315,8 +338,9 @@ async fn nx_buys_items_packages_gifts_and_slots() {
     assert_eq!(bought[..2], [0x89, 3], "a package's three items");
     assert_eq!(credit(connection, "buy a package").await, 12_100);
 
-    let gift = build_cash_shop_gift(19830113, TICKET, &receiver_config.character_name, "enjoy");
-    let sent = request(connection, gift.unwrap(), "gift").await;
+    let gift = || build_cash_shop_gift(19830113, TICKET, &receiver_config.character_name, "enjoy");
+    look_up(connection, gift().unwrap(), "ask about a gift").await;
+    let sent = request(connection, gift().unwrap(), "gift").await;
     assert_eq!(sent[0], 0x5E, "send a gift");
     assert_eq!(credit(connection, "gift").await, 11_100);
 
@@ -416,11 +440,10 @@ async fn nx_buys_items_packages_gifts_and_slots() {
 async fn packages_go_as_gifts_of_their_items() {
     let config = load_harness_config_or_fail().await;
     let receiver_config = load_harness_config_or_fail().await;
-    drop(
-        login_to_world_session(&receiver_config)
-            .await
-            .expect("receiver login failed"),
-    );
+    let receiver_id = login_to_world_session(&receiver_config)
+        .await
+        .expect("receiver login failed")
+        .character_id;
     let mut session = login_to_world_session(&config)
         .await
         .expect("login-to-world session flow failed");
@@ -430,8 +453,13 @@ async fn packages_go_as_gifts_of_their_items() {
     enter_cash_shop(&mut session.connection).await;
     let connection = &mut session.connection;
 
+    // The first ask is answered with the receiver, whose package the client
+    // then sends as such.
     let to = &receiver_config.character_name;
     let gift = build_cash_shop_gift(19830113, PACKAGE, to, "enjoy").unwrap();
+    let look_up_id = look_up(connection, gift, "ask about a package").await;
+    assert_eq!(look_up_id, receiver_id, "the receiver");
+    let gift = build_cash_shop_package_gift(19830113, PACKAGE, to, "enjoy").unwrap();
     let sent = request(connection, gift, "gift a package").await;
     assert_eq!(sent[0], 0x5E, "send a package");
     let mut reply = Cursor::new(&sent[1..]);

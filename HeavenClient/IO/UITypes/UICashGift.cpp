@@ -70,7 +70,7 @@ namespace ms
 		const Point<int16_t> CANCEL_FROM_CORNER = Point<int16_t>(73, 31);
 	}
 
-	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), period(commodity.period), credit(0), points(0), prepaid(0), preset(false)
+	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), credit(0), points(0), prepaid(0), preset(false)
 	{
 		background = NxFiles::ui_classic["CashShop.img"]["CSGift"]["backgrnd"];
 
@@ -222,24 +222,18 @@ namespace ms
 
 		if (asking_birthday)
 		{
-			// The server answers a wrong code with its own notice. v83
-			// (FUN_007e47ef) stars out curse words in both lines first.
-			auto send = [code = cash_catalog::birthday_code(birthday.get_text()), sn = sn, receiver = CurseData::filter(to.get_text()),
-						 note = CurseData::filter(message.get_text())]()
-			{
-				if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
-					GiftCashItemPacket(code, sn, receiver, note).dispatch();
-			};
+			// The server answers a wrong code with its own notice, and a
+			// right one with the receiver, whose answer asks the rest
+			// (GIFT_INFO_RESULT). v83 (FUN_007e47ef) stars out curse words
+			// in both lines first.
+			int32_t code = cash_catalog::birthday_code(birthday.get_text());
+			std::string receiver = CurseData::filter(to.get_text());
+			std::string note = CurseData::filter(message.get_text());
 
 			close();
 
-			// An item that expires asks first (v83 46ec85, StringPool
-			// 0x155f). The question replaces this dialog.
-			if (period != 0)
-				UI::get().emplace<UIYesNo>("This contains an item that will disappear once \\nthe expiration date has passed. Do you want to give it as a gift?",
-										   [send](bool yes) { if (yes) send(); });
-			else
-				send();
+			if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
+				GiftCashItemPacket(code, sn, receiver, note).dispatch();
 
 			return;
 		}
@@ -360,11 +354,13 @@ namespace ms
 		{
 			std::string question = ItemData::get(commodity.item_id).get_name() + " (" + std::to_string(commodity.price) +
 								   " NX)\\nWill you buy this item as a gift for\\n'" + to.get_text() + "'?";
+			// A package goes at once; an item is looked up first, like the
+			// Gift button's (v83 472c67).
 			auto send = [code = cash_catalog::birthday_code(birthday.get_text()), sn = commodity.sn, receiver = to.get_text(),
-						 note = CurseData::filter(message.get_text())]()
+						 note = CurseData::filter(message.get_text()), mode = static_cast<uint8_t>(commodity.item_id / 10000 == 910 ? 0x1F : 4)]()
 			{
 				if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
-					GiftCashItemPacket(code, sn, receiver, note).dispatch();
+					GiftCashItemPacket(code, sn, receiver, note, mode).dispatch();
 			};
 
 			close();

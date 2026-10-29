@@ -70,12 +70,17 @@ pub enum CashShopRequest {
         cash_type: CashType,
         commodity: Commodity,
     },
-    /// Pay for `commodity` and send it to the character named `to`, whose
-    /// gender the runtime still has to check.
+    /// Send `commodity` to the character named `to`, whose gender the
+    /// runtime still has to check. v83 asks twice (report b331): the first
+    /// ask is answered with the receiver's character (GIFT_INFO_RESULT), for
+    /// the client's own checks and question, and the same ask again, or a
+    /// package's `confirmed` one, pays for the gift.
     Gift {
+        birthday: i32,
         commodity: Commodity,
         to: String,
         message: String,
+        confirmed: bool,
     },
     /// Pay for the crush or friendship ring `commodity`: one for the
     /// Cash Inventory and its partner for the character named `to`, whose
