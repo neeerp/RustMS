@@ -537,7 +537,9 @@ namespace ms
 		switch (type)
 		{
 			case 0:
-				// StringPool 0x37a
+			case 12:
+			case 13:
+				// StringPool 0x37a; v83 shows 12 and 13 as notices too.
 				if (chatbar)
 					chatbar->send_chatline("[Notice] " + message, UIChatBar::LineType::BLUE);
 				break;

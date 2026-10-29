@@ -121,6 +121,14 @@ moves only get an enable-actions stat update.
 
 HeavenClient checks a wear before asking (`UIItemInventory::can_wear_equip`),
 in v83's order (FUN_004f1c2d): a second Unique Equipped Item is refused; a
+cash weapon (170xxxx) needs a weapon under it ("You need to equip yourself
+with an item to use it.") that it has art for, a child of its
+`Character/Weapon/<id>.img` named for the weapon's type ("This item is not
+available with the weapon you're currenly using.", sic); a weapon going under
+a cash weapon needs the same ("You may not use the item with the cash item
+you're currently equipped with."); a cash shield needs a shield ("You are
+able to use this only when you are wearing a shield.",
+`cash_weapon::refusal`); a
 tamed monster or saddle that doesn't fit the saddle or monster worn on the same
 layer (both normal or both cash) is refused without a word; then stats too low;
 then a cash tamed monster or saddle with no normal one under it is refused
