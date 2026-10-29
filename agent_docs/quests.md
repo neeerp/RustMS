@@ -519,6 +519,15 @@ Reef (1032108, in 910100001) thanks the player through a start script
 (`Act/1 pop`, through `Effect::GainFame`, since `FinishQuest` gives no
 `Act/1` rewards). Its line is a placeholder (`reef.thanks`).
 
+"A Mysterious Small Egg" (2230) starts from the data: an `autoStart` quest
+at level 15 whose `Act/0` puts a Mysterious Egg (4032086) in the player's
+pocket. Mar the Fairy (1032102, in 101000200) ends it through `q2230e`
+(Cosmic `2230.js`): a one-choice menu, four pages about pets, and a yes or
+no; yes, then the last page, takes the egg, completes the quest and hatches
+a Rune Snail (5000054) that lives 5 hours (`Effect::GivePet`; see
+[Pets](./pets.md)). A full Cash inventory gets a line instead and nothing
+changes. The lines are placeholders (`mar.egg.*`).
+
 "Baby Steps" (21704) is another: Lilin's start script (`q21704s`) completes
 it at once with Cosmic's 500 EXP, as the data has no end rewards.
 

@@ -109,6 +109,19 @@ pub fn create(item_id: i32, quantity: i16) -> Option<Item> {
     })
 }
 
+/// A new pet of `item_id`, named after its kind, that lives until `until`,
+/// still without its cash serial; `None` if the item data has no such pet.
+pub fn new_pet(item_id: i32, until: SystemTime) -> Option<Item> {
+    if !game::pet::is_pet(item_id) {
+        return None;
+    }
+    Some(Item {
+        expiration: Some(until),
+        pet: Some(game::PetData::new(&pet_name(item_id))),
+        ..create(item_id, 1)?
+    })
+}
+
 /// Whether `quantity` of `item_id` can't come into `inventory` because the
 /// item is one of a kind (`info/only`): it comes alone, and not to someone
 /// who holds one, worn or not.

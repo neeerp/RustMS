@@ -156,6 +156,14 @@ pub fn gift_receiver(name: &str) -> crate::Result<Option<GiftReceiver>> {
         .optional()?)
 }
 
+/// A new cash serial number from the Cash Inventory's own, for a cash item
+/// that comes to a character from elsewhere (a quest's pet), so that it may
+/// be put in the Cash Inventory later.
+pub fn new_serial() -> crate::Result<i64> {
+    let next = diesel::dsl::sql::<diesel::sql_types::BigInt>("nextval('cash_items_id_seq')");
+    Ok(diesel::select(next).get_result(&mut crate::connection()?)?)
+}
+
 /// The account's Cash Inventory item with cash serial `id`.
 pub fn cash_item(account_id: i32, id: i64) -> crate::Result<Option<CashItem>> {
     Ok(cash_items::table

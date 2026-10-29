@@ -443,6 +443,37 @@ pub async fn pet_skills(serial: i64) -> Result<(i32, i16), HarnessError> {
     Ok((skills.skill, skills.attribute))
 }
 
+/// The cash serial and saved name of the pet `item_id` that `character_id`
+/// carries.
+pub async fn carried_pet(character_id: i32, item_id: i32) -> Result<(i64, String), HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = BigInt)]
+        serial: i64,
+        #[diesel(sql_type = Text)]
+        name: String,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read a carried pet",
+        message,
+    };
+    let row = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT p.serial, p.name FROM inventory_items i JOIN pets p ON p.serial = i.cash_serial \
+             WHERE i.character_id = $1 AND i.item_id = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(item_id)
+        .get_result::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok((row.serial, row.name))
+}
+
 /// Date the pet `serial`, whose owner is logged out, to dry up `seconds`
 /// from now; in the past if negative.
 pub async fn date_pet(serial: i64, seconds: i32) -> Result<(), HarnessError> {
