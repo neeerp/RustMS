@@ -162,8 +162,13 @@ notice for each.
 A package (0x1E, items 910xxxx) is bought the same way, but
 `Etc.nx` `CashPackage.img` lists the commodities it holds, and each joins the
 Cash Inventory; the client gets them all in 0x89 (v83 `0x479a1b`, whose
-trailing short is the MaplePoints received, 0 here). Packages can't be gifted,
-and every other 9xxxxxx item is refused. Slot expansions come two ways. The Cash Inventory's slot buttons
+trailing short is the MaplePoints received, 0 here). A package gifted
+with 0x04 goes as its items: each joins the receiver's Cash Inventory with the
+sender's name, only the first carries the message (so 0x4D announces it
+once), and the sender's 0x5E names the package itself, which HeavenClient
+finds under `Item.nx` `Special` (report b331). v83 gifts a package with
+0x1F only after the server's 0x147 shows it the receiver; that round trip
+isn't served. Every other 9xxxxxx item is refused. Slot expansions come two ways. The Cash Inventory's slot buttons
 (0x06 mode 0 with a bag, 0x07 mode 0 for the storage) add four slots for
 4,000 NX. The expansion commodities (0x06 or 0x07 mode 1 with the SN; items
 9110000 for the storage and 9111000-9114000 for the bags) add eight for their

@@ -243,9 +243,14 @@ pub fn buy(
 }
 
 /// Pay `price` from the sender's NX Credit, or its NX Prepaid if the credit
-/// is short, and put `gift` in the receiver's Cash Inventory, in one
-/// transaction. `None` if neither balance covers the price.
-pub fn gift(sender: i32, price: i32, gift: &NewGift) -> crate::Result<Option<Balance>> {
+/// is short, for the commodity `sn`, and put `gifts`, its item or a
+/// package's items, in the receiver's Cash Inventory, in one transaction.
+/// `None` if neither balance covers the price.
+pub fn gift(
+    sender: i32,
+    (sn, price): (i32, i32),
+    gifts: &[NewGift],
+) -> crate::Result<Option<Balance>> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
         if !pay(conn, sender, CashType::Credit, price)?
@@ -254,9 +259,9 @@ pub fn gift(sender: i32, price: i32, gift: &NewGift) -> crate::Result<Option<Bal
             return Ok(None);
         }
         diesel::insert_into(cash_items::table)
-            .values(gift)
+            .values(gifts)
             .execute(conn)?;
-        record_sale(conn, gift.sn)?;
+        record_sale(conn, sn)?;
         Ok(Some(balance_of(conn, sender)?))
     })?)
 }

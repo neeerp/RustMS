@@ -410,6 +410,63 @@ async fn nx_buys_items_packages_gifts_and_slots() {
     panic!("no gift list");
 }
 
+/// A package goes as a gift of its items: the sender is told of the package
+/// and the receiver once, of its first item (report b331).
+#[tokio::test]
+async fn packages_go_as_gifts_of_their_items() {
+    let config = load_harness_config_or_fail().await;
+    let receiver_config = load_harness_config_or_fail().await;
+    drop(
+        login_to_world_session(&receiver_config)
+            .await
+            .expect("receiver login failed"),
+    );
+    let mut session = login_to_world_session(&config)
+        .await
+        .expect("login-to-world session flow failed");
+    set_nx_credit(&config.username, 20_000)
+        .await
+        .expect("grant NX");
+    enter_cash_shop(&mut session.connection).await;
+    let connection = &mut session.connection;
+
+    let to = &receiver_config.character_name;
+    let gift = build_cash_shop_gift(19830113, PACKAGE, to, "enjoy").unwrap();
+    let sent = request(connection, gift, "gift a package").await;
+    assert_eq!(sent[0], 0x5E, "send a package");
+    let mut reply = Cursor::new(&sent[1..]);
+    assert_eq!(&reply.read_str_with_length().unwrap(), to);
+    assert_eq!(reply.read_int().unwrap(), 9102232, "the package");
+    assert_eq!(reply.read_short().unwrap(), 1);
+    assert_eq!(reply.read_int().unwrap(), 16_900);
+    assert_eq!(credit(connection, "gift a package").await, 3_100);
+    drop(session);
+
+    let mut receiver = relogin(&receiver_config).await;
+    let connection = &mut receiver.connection;
+    connection
+        .send_packet(build_enter_cash_shop(), "enter cash shop")
+        .await
+        .expect("send ENTER_CASHSHOP");
+    let mut in_inventory = false;
+    for _ in 0..3 {
+        let list = read_until(connection, "receiver lists", SendOpcode::CashShopOperation).await;
+        let list = &list.packet.bytes[2..];
+        if list[0] == 0x4B {
+            assert_eq!(list[1..3], [3, 0], "the package's items");
+            in_inventory = true;
+        }
+        if list[0] == 0x4D {
+            assert!(in_inventory, "the items aren't in the Cash Inventory");
+            assert_eq!(list[1..3], [1, 0], "one notice");
+            let item_id = Cursor::new(&list[11..]).read_int().unwrap();
+            assert_eq!(item_id, 5000066, "the first item");
+            return;
+        }
+    }
+    panic!("no gift list");
+}
+
 /// The Golden Bell, sold for 1 meso, and a commodity of the same range off
 /// sale (report b094).
 const GOLDEN_BELL: i32 = 80000001;
