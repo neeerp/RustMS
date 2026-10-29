@@ -1598,10 +1598,9 @@ last (`ExclRequest::USE_WAIT`). HeavenClient checks this only before
 swinging at a reactor, so a request the server leaves unanswered can't stop
 a player attacking.
 
-Not yet: touching a reactor (`0xCE`), which only the Crimsonwood Keep
-party quest's reactors (`6109xxx`, actions `glpq*`) and `9222000` use.
-v83 also skips a swing at a reactor whose `info/quest` isn't in progress,
-but no v83 reactor has one.
+Reactors touched rather than hit (`0xCE`) are covered above. v83 also
+skips a swing at a reactor whose `info/quest` isn't in progress, but no v83
+reactor has one.
 
 ## Mob attacks
 
