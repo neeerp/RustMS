@@ -215,6 +215,10 @@ impl ClientActor {
                     mob_id: *mob_id,
                     at: *at,
                 }),
+                Effect::BringOutNpc { npc_id, at } => to_field.push(FieldRequest::BringOutNpc {
+                    npc_id: *npc_id,
+                    at: *at,
+                }),
                 Effect::BringOutMobs { mob_id, at, each } => {
                     to_field.push(FieldRequest::BringOutMobs {
                         mob_id: *mob_id,

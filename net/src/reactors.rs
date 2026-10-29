@@ -398,6 +398,12 @@ pub fn action(reactor_id: i32) -> Action {
         ),
         crate::guild_quest::SPEAR => Action::Spear,
         crate::guild_quest::KING_GATE_REACTOR => Action::KingGate,
+        // The Nine Spirit's Nest's egg, once hit (Cosmic `2406000`'s
+        // `act`): the Baby Dragon comes out of it.
+        2406000 => Action::Appear {
+            npc_id: crate::events::NINE_SPIRIT_BABY,
+            notice: keys::NINE_SPIRIT_EGG_HATCHES,
+        },
         // The grave's altar, once dressed (Cosmic `9201001`).
         crate::guild_quest::CLOTHES_ALTAR => Action::Appear {
             npc_id: crate::guild_quest::SHAREN_SOUL,

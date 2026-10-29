@@ -1690,6 +1690,8 @@ unsourced = [
     "nine_spirit.baby.hatched",
     "nine_spirit.baby.stone_held",
     "nine_spirit.baby.full",
+    "nine_spirit.nest.busy",
+    "nine_spirit.nest.hatched",
     "reef.thanks",
     "tristan.room_taken",
     "dollhouse.hint",

@@ -620,7 +620,9 @@ open once 3706 is done), has a start script (`q3714s`) and no end. It
 takes a Nine Spirit's Egg (4001094) and gives a Dragon Stone (2041200) and
 Cosmic's 42,000 EXP, completing the quest at once. The quest repeats
 (`interval 0`), once for each egg, but not while a Dragon Stone is held,
-as in Cosmic. Its lines are placeholders (`nine_spirit.baby.*`). 3706's
+as in Cosmic. Its lines are placeholders (`nine_spirit.baby.*`). 3706
+itself ends at another Baby Dragon (2081008), hatched from an egg in the
+Nine Spirit's Nest ([horntail](./horntail.md#the-nine-spirits-nest)). 3706's
 `Act/1/map` and `message` (and 2282-2284's `Act/0/message`) are read by
 neither v83's client nor Cosmic, so they are ignored (`INERT_ACTIONS`).
 

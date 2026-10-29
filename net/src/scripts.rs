@@ -891,6 +891,12 @@ pub enum Effect {
         mob_id: i32,
         at: (i16, i16),
     },
+    /// Bring out NPC `npc_id` on the ground below `at` in the player's
+    /// map, unless it is there already, until the map closes.
+    BringOutNpc {
+        npc_id: i32,
+        at: (i16, i16),
+    },
     /// Bring out `each` of `mob_id` on the ground below each point of `at`
     /// in the player's map, as the Magic Library's black shadow sets Blue
     /// Mushrooms on the player. They never respawn.
@@ -1124,6 +1130,18 @@ pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
                     at: WAREHOUSE_GENTLEMAN_AT,
                 },
             ]
+        }
+        // Back in the Nine Spirit's Nest after placing an egg there, the
+        // Baby Dragon is waiting (Cosmic NineSpirit's `playerEntry`, for
+        // one without the egg).
+        crate::events::NINE_SPIRIT_NEST
+            if player.quests.state(crate::events::NINE_SPIRIT_EGG_PLACED)
+                != QuestState::NotStarted =>
+        {
+            vec![Effect::BringOutNpc {
+                npc_id: crate::events::NINE_SPIRIT_BABY,
+                at: crate::events::NINE_SPIRIT_NEST_EGG_AT,
+            }]
         }
         // Shuang tells whoever reaches Sharenian's outskirts what to do there.
         crate::guild_quest::OUTSKIRTS => vec![Effect::OpenNpc(crate::guild_quest::SHUANG)],
@@ -2251,13 +2269,52 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             TIGER_RIDGE,
             named(TIGER_RIDGE, "east00"),
         )),
-        // Cosmic starts the Nine Spirit's egg event for a player on quest
-        // 100203 or holding item 4001094; that isn't in, so they're kept
-        // out as anyone else.
+        // After Dragon Squad's Mission, the hatched Baby Dragon's nest;
+        // before it, alone into the Nine Spirit's Nest with the egg, or
+        // after placing one there (Cosmic `dragonNest`, whose quest 100203
+        // is our marker).
         "dragonNest" if quest(3706) == QuestState::Completed => {
             through(Effect::WarpToPortal(240040612, named(240040612, "out00")))
         }
+        "dragonNest"
+            if quest(crate::events::NINE_SPIRIT_EGG_PLACED) != QuestState::NotStarted
+                || player.inventory.count(crate::npc_scripts::NINE_SPIRIT_EGG) > 0 =>
+        {
+            ScriptOutcome {
+                effects: vec![
+                    Effect::PortalSound,
+                    Effect::StartEvent(EventKind::NineSpirit),
+                ],
+                block: false,
+                occupied: Some(content::text().get(keys::NINE_SPIRIT_NEST_BUSY, &[])),
+            }
+        }
         "dragonNest" => refused(keys::NINE_SPIRIT_NEST_BLOCKED),
+        // The touch portal on the nest's egg: the first Nine Spirit's Egg
+        // brought there is placed in it, for a hit to hatch (reactor
+        // 2406000, Cosmic's `touch`). Not in Cosmic, whose WZ makes the
+        // reactor itself touched instead.
+        "summondragon"
+            if quest(crate::events::NINE_SPIRIT_EGG_PLACED) == QuestState::NotStarted
+                && player.inventory.count(crate::npc_scripts::NINE_SPIRIT_EGG) > 0 =>
+        {
+            ScriptOutcome {
+                effects: vec![
+                    Effect::TakeItem {
+                        item_id: crate::npc_scripts::NINE_SPIRIT_EGG,
+                        quantity: 1,
+                    },
+                    Effect::SetReactorState {
+                        name: crate::events::NINE_SPIRIT_NEST_EGG,
+                        state: 1,
+                    },
+                    Effect::Mark(crate::events::NINE_SPIRIT_EGG_PLACED),
+                ],
+                block: false,
+                occupied: None,
+            }
+        }
+        "summondragon" => ScriptOutcome::default(),
         "go_secretroom" if quest(SECURITY_ROOM_QUEST) == QuestState::Completed => {
             through(Effect::WarpToPortal(SECURITY_ROOM, 1))
         }
@@ -5204,6 +5261,98 @@ mod tests {
             .inventory
             .insert(InventoryType::Etc, 1, game::Item::stack(item, 1));
         player
+    }
+
+    #[test]
+    fn the_nine_spirits_nest_takes_one_alone_to_place_the_egg_for_its_baby_dragon() {
+        use crate::events::{
+            BELOW_THE_NEST, NINE_SPIRIT_BABY, NINE_SPIRIT_EGG_PLACED, NINE_SPIRIT_NEST,
+            NINE_SPIRIT_NEST_EGG, NINE_SPIRIT_NEST_EGG_AT,
+        };
+        use crate::npc_scripts::NINE_SPIRIT_EGG;
+        let data = crate::get_game_data().unwrap();
+        let below = data.field(BELOW_THE_NEST).unwrap();
+        let door = below.portal_by_name("in00").unwrap();
+        assert_eq!(door.script.as_deref(), Some("dragonNest"));
+        let nest = data.field(NINE_SPIRIT_NEST).unwrap();
+        assert_eq!(nest.on_user_enter, None);
+        let touch = nest.portal_by_name("act01").unwrap();
+        assert_eq!(
+            (touch.script.as_deref(), touch.portal_type),
+            (Some("summondragon"), 9)
+        );
+        let egg = nest
+            .reactors
+            .iter()
+            .find(|r| r.reactor_id == 2406000)
+            .unwrap();
+        assert_eq!(egg.name, NINE_SPIRIT_NEST_EGG);
+        assert_eq!((egg.x, egg.y), NINE_SPIRIT_NEST_EGG_AT);
+        assert_eq!(
+            crate::reactors::action(2406000),
+            crate::reactors::Action::Appear {
+                npc_id: NINE_SPIRIT_BABY,
+                notice: keys::NINE_SPIRIT_EGG_HATCHES,
+            }
+        );
+
+        // In with the egg, alone, or after placing one.
+        let enter = [
+            Effect::PortalSound,
+            Effect::StartEvent(EventKind::NineSpirit),
+        ];
+        let with_egg = holding(&[], NINE_SPIRIT_EGG);
+        let placed = player_with(&[(NINE_SPIRIT_EGG_PLACED, QuestState::Started)]);
+        for player in [&with_egg, &placed] {
+            let outcome = portal("dragonNest", player).unwrap();
+            assert_eq!(outcome.effects, enter);
+            assert_eq!(
+                outcome.occupied,
+                Some(content::text().get(keys::NINE_SPIRIT_NEST_BUSY, &[]))
+            );
+        }
+        assert!(pink(&portal("dragonNest", &player_with(&[])).unwrap()));
+
+        // The first egg brought onto the nest is placed in it.
+        let placing = portal("summondragon", &with_egg).unwrap();
+        assert_eq!(
+            placing.effects,
+            [
+                Effect::TakeItem {
+                    item_id: NINE_SPIRIT_EGG,
+                    quantity: 1
+                },
+                Effect::SetReactorState {
+                    name: NINE_SPIRIT_NEST_EGG,
+                    state: 1
+                },
+                Effect::Mark(NINE_SPIRIT_EGG_PLACED),
+            ]
+        );
+        let again = holding(
+            &[(NINE_SPIRIT_EGG_PLACED, QuestState::Started)],
+            NINE_SPIRIT_EGG,
+        );
+        for player in [&again, &player_with(&[])] {
+            assert_eq!(
+                portal("summondragon", player),
+                Some(ScriptOutcome::default())
+            );
+        }
+
+        // Back in after placing it, the Baby Dragon is there.
+        let mut back = placed.clone();
+        back.stats.map_id = NINE_SPIRIT_NEST;
+        assert_eq!(
+            unscripted_map_enter(&back),
+            [Effect::BringOutNpc {
+                npc_id: NINE_SPIRIT_BABY,
+                at: NINE_SPIRIT_NEST_EGG_AT,
+            }]
+        );
+        let mut first = with_egg.clone();
+        first.stats.map_id = NINE_SPIRIT_NEST;
+        assert!(unscripted_map_enter(&first).is_empty());
     }
 
     #[test]

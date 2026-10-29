@@ -958,6 +958,8 @@ pub mod keys {
     pub const NINE_SPIRIT_HATCHED: &str = "nine_spirit.baby.hatched";
     pub const NINE_SPIRIT_STONE_HELD: &str = "nine_spirit.baby.stone_held";
     pub const NINE_SPIRIT_FULL: &str = "nine_spirit.baby.full";
+    pub const NINE_SPIRIT_NEST_BUSY: &str = "nine_spirit.nest.busy";
+    pub const NINE_SPIRIT_EGG_HATCHES: &str = "nine_spirit.nest.hatched";
 
     /// Reef's Gratitude (quest 2228, `q2228s`): Reef (NPC 1032108) thanks
     /// the player for beating Faust. No licensed script has the text.
@@ -4309,6 +4311,8 @@ mod tests {
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,
+                keys::NINE_SPIRIT_NEST_BUSY,
+                keys::NINE_SPIRIT_EGG_HATCHES,
                 keys::DYLE_TRASH_CAN_NOT_YET,
                 keys::DYLE_TRASH_CAN_FULL,
                 keys::DYLE_TRASH_CAN_FOUND,

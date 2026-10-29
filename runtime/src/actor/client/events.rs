@@ -128,13 +128,15 @@ impl ClientActor {
             // The East Castle Tower's portal takes the player in, and the
             // Wedding Hall's door likewise; Olson's own talk the dollhouse
             // room's, Cheng's the Toy Factory's Sector 4 and Kenta's the
-            // Watch Hog's room; the Tera Forest's `in00` Guardian Nex's.
+            // Watch Hog's room; the Tera Forest's `in00` Guardian Nex's,
+            // and `dragonNest` the Nine Spirit's Nest.
             EventKind::KingPepe
             | EventKind::WeddingHall
             | EventKind::Dollhouse
             | EventKind::MechanicalParts
             | EventKind::MonsterRiding
             | EventKind::GuardianNex(_)
+            | EventKind::NineSpirit
             | EventKind::NeoBoss(_) => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
@@ -1644,7 +1646,12 @@ impl ClientActor {
         if dojo {
             self.send(&mut build_dojo_energy(0)?).await?;
         }
-        self.warp_within_event(entry).await?;
+        if kind == EventKind::NineSpirit {
+            self.warp_within_event_to(entry, events::NINE_SPIRIT_NEST_ARRIVAL)
+                .await?;
+        } else {
+            self.warp_within_event(entry).await?;
+        }
         // A Monster Carnival's try is its battle, not its waiting room.
         if !matches!(kind, EventKind::Carnival(_)) {
             self.record_party_quest(kind, PartyQuestOutcome::Entered)
