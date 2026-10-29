@@ -47,6 +47,9 @@ stages and its bonus ([the Amorian Challenge](#the-amorian-challenge)).
 Crimsonwood Keep's party quest is an expedition's, which ends like a
 party's; it has its gate, its squad, its clocks, its end rules, its
 stages, its win and its rooms after ([Crimsonwood Keep](#crimsonwood-keep)).
+Happyville's Holiday PQ has its three lobbies, its entry, its arenas'
+clock and its ways out; its snowman, Scrooge and gifts come in later
+slices ([the Holiday PQ](#the-holiday-pq)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1711,6 +1714,29 @@ Within the event, its advice follows the map (`events::cwk_jack`,
 `cwk.jack.stageN.*`, `cwk.jack.rest`); anywhere else, or on a map with no
 advice, it gives one idle line (`cwk.jack.idle`). The picks are in
 QUESTIONS b268.
+
+## The Holiday PQ
+
+Happyville's Holiday PQ (`EventKind::Holiday(level)`, `events::HOLIDAY`;
+`v83ref/reports/b282-snow-man.md`; picks in `v83ref/lanes/QUESTIONS.md`
+b295) comes in three difficulties, each with a lobby, an arena and an
+exit map of its own: 889100000, 889100001 and 889100002 for levels 21 to
+30, the next ten maps up (…010 to …012) for 31 to 40, and …020 to …022
+for 41 to 50 (`HOLIDAY_LOBBIES`, `events::holiday_lobby`). Nothing leads
+into the lobbies yet, so only a GM's or a debug warp reaches them.
+
+In a lobby, the Snow Spirit (`SNOW_SPIRIT`, 9105004) offers a menu: to go
+in, or to hear what the party must do (`holiday.*`). Its leader takes 3 to
+6 of the difficulty's levels who are there into the arena, one party a
+channel and difficulty, on a clock of 15, 20 or 25 minutes. The
+difficulty's quest items (4032094 and 4032095) are taken on leaving. The
+arena keeps its Map.nx spawns for now; the snowman to build up comes
+later.
+
+The Snowman (`SNOWMAN`, 9105005) offers the way home to Happyville in a
+lobby, and in an arena the way out to the exit map, which leaves the
+event (`NpcScript::snowman`). The exit map's portal `st01`
+(`08_xmas_out`) leads back to the lobby.
 
 ## Jr. Balrog's room
 

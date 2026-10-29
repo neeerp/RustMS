@@ -129,6 +129,18 @@ impl ClientActor {
                 .talk_about_event(net::events::EventKind::PrimeMinister)
                 .await;
         }
+        if npc_id == net::npc_scripts::SNOW_SPIRIT {
+            if let Some(level) = net::events::holiday_lobby(player.stats.map_id) {
+                return self
+                    .talk_about_event(net::events::EventKind::Holiday(level))
+                    .await;
+            }
+        }
+        if npc_id == net::npc_scripts::SNOWMAN {
+            if let Some(script) = net::npc_scripts::NpcScript::snowman(player.stats.map_id) {
+                return self.start_script(script).await;
+            }
+        }
         if npc_id == net::npc_scripts::GUON && player.stats.map_id == net::events::PIRATE.lobby {
             return self.talk_about_event(net::events::EventKind::Pirate).await;
         }

@@ -1862,6 +1862,10 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             cursed_forest(player, hour)
         }
         "elevator" => elevator(player.stats.map_id, crate::conti::now()),
+        // A Holiday PQ exit map's way back to its lobby.
+        "08_xmas_out" if crate::events::holiday_lobby(player.stats.map_id - 2).is_some() => {
+            through(Effect::WarpToPortal(player.stats.map_id - 2, 0))
+        }
         script if PLAIN_WARPS.iter().any(|&(name, _, _)| name == script) => {
             let &(_, map, portal) = PLAIN_WARPS.iter().find(|&&(name, _, _)| name == script)?;
             let mut outcome = through(to(map, portal));
@@ -3492,6 +3496,19 @@ mod tests {
             portal("ludi021", &player).unwrap().effects,
             [&[taken][..], &back].concat()
         );
+    }
+
+    #[test]
+    fn a_holiday_pq_exit_leads_back_to_its_lobby() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = 889100012;
+        let out = portal("08_xmas_out", &player).unwrap();
+        assert_eq!(
+            out.effects,
+            [Effect::PortalSound, Effect::WarpToPortal(889100010, 0)]
+        );
+        player.stats.map_id = 889100001;
+        assert!(portal("08_xmas_out", &player).is_none());
     }
 
     #[test]

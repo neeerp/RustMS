@@ -974,6 +974,11 @@ pub const MAGATIA_THANKS: i32 = 2112018;
 /// Guon Over the Pirate Ship, who sends a party aboard against the Lord
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
+/// The Snow Spirit (Cosmic `9105004`), who starts the Holiday PQ in its
+/// lobbies, and the Snowman (Cosmic `9105005`) beside it, the way back to
+/// Happyville there and out of the arena inside.
+pub const SNOW_SPIRIT: i32 = 9105004;
+pub const SNOWMAN: i32 = 9105005;
 pub const GUON_ABOARD: i32 = 2094002;
 /// Amos the Strong on his training ground, who lets a ticket holder into
 /// the Amorian Challenge's Entrance and trades keys for tickets; Amos on
@@ -1750,6 +1755,18 @@ impl NpcScript {
     /// or may not face the Prime Minister again.
     pub fn blocked_entrance(entry: Entry) -> Self {
         blocked_entrance(entry)
+    }
+
+    /// The Snow Spirit in the lobby of the Holiday PQ's difficulty `level`
+    /// (1 to 3), for a player whose party may or may not go in.
+    pub fn snow_spirit(level: u8, entry: Entry) -> Self {
+        snow_spirit(level, entry)
+    }
+
+    /// The Snowman on `map_id`: the way back to Happyville from a Holiday
+    /// PQ lobby, and out to its exit from an arena; none elsewhere.
+    pub fn snowman(map_id: i32) -> Option<Self> {
+        snowman(map_id)
     }
 
     /// Guon Over the Pirate Ship, for a player whose party may or may not
@@ -11981,6 +11998,60 @@ fn guon(entry: Entry) -> NpcScript {
     // Someone left or moved since Guon checked, or another party went in.
     script.refused = Some(event_terms(&events::PIRATE, keys::PIRATE_NOT_ELIGIBLE));
     script
+}
+
+/// The Snow Spirit (Cosmic `9105004`) in the lobby of the Holiday PQ's
+/// difficulty `level`: the leader takes the party into the arena, and
+/// anyone may hear what it is about. Cosmic's Party Search toggle has no
+/// counterpart here, as for Guon.
+fn snow_spirit(level: u8, entry: Entry) -> NpcScript {
+    let kind = EventKind::Holiday(level);
+    let event = kind.event();
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::HOLIDAY_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::HOLIDAY_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(event, keys::HOLIDAY_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::HOLIDAY_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(kind)]),
+    };
+    let mut script = NpcScript::new(
+        SNOW_SPIRIT,
+        vec![Page::Menu {
+            text: text(keys::HOLIDAY_MENU),
+            choices: vec![
+                (text(keys::HOLIDAY_ENTER), vec![enter]),
+                (
+                    text(keys::HOLIDAY_ABOUT),
+                    vec![Page::Say(text(keys::HOLIDAY_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since the spirit checked, or another party
+    // went in.
+    script.refused = Some(event_terms(event, keys::HOLIDAY_NOT_ELIGIBLE));
+    script
+}
+
+/// The Snowman (Cosmic `9105005`): in a Holiday PQ lobby it offers the way
+/// back to Happyville, and in an arena the way out to the difficulty's
+/// exit map, which leaves the event.
+fn snowman(map_id: i32) -> Option<NpcScript> {
+    let (ask, to) = if events::holiday_lobby(map_id).is_some() {
+        (keys::HOLIDAY_SNOWMAN_HOME, events::HAPPYVILLE)
+    } else if events::holiday_lobby(map_id - 1).is_some() {
+        (keys::HOLIDAY_SNOWMAN_LEAVE, map_id + 1)
+    } else {
+        return None;
+    };
+    Some(NpcScript::new(
+        SNOWMAN,
+        vec![Page::Ask {
+            text: text(ask),
+            on_yes: vec![Effect::WarpToPortal(to, 0)],
+            on_no: None,
+        }],
+    ))
 }
 
 /// Amos the Strong (Cosmic `9201043`) on his training ground: a player
@@ -23794,6 +23865,45 @@ mod tests {
         entrance.begin();
         let step = entrance.respond(ScriptInput::Select(0)).unwrap();
         assert!(page_text(&step).contains("1 to 3"), "{step:?}");
+    }
+
+    #[test]
+    fn the_snow_spirit_takes_the_party_into_its_difficultys_arena() {
+        let mut ready = NpcScript::snow_spirit(2, Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Holiday(2))]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NoParty, keys::HOLIDAY_NO_PARTY),
+            (Entry::NotLeader, keys::HOLIDAY_NOT_LEADER),
+            (Entry::Busy, keys::HOLIDAY_BUSY),
+        ] {
+            let mut spirit = NpcScript::snow_spirit(1, entry);
+            spirit.begin();
+            let step = spirit.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut spirit = NpcScript::snow_spirit(3, Entry::NotEligible);
+        spirit.begin();
+        let step = spirit.respond(ScriptInput::Select(0)).unwrap();
+        assert!(page_text(&step).contains("41 to 50"), "{step:?}");
+    }
+
+    #[test]
+    fn the_snowman_leads_home_from_a_lobby_and_out_of_an_arena() {
+        let yes = |map_id| {
+            let mut snowman = NpcScript::snowman(map_id).unwrap();
+            snowman.begin();
+            snowman.respond(ScriptInput::Yes).unwrap().effects
+        };
+        assert_eq!(
+            yes(889100010),
+            [Effect::WarpToPortal(events::HAPPYVILLE, 0)]
+        );
+        assert_eq!(yes(889100021), [Effect::WarpToPortal(889100022, 0)]);
+        assert!(NpcScript::snowman(889100002).is_none());
+        assert!(NpcScript::snowman(889100100).is_none());
     }
 
     #[test]

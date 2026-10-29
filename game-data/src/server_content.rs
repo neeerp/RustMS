@@ -2673,6 +2673,16 @@ pub mod keys {
     pub const PIRATE_GUON_DECK: &str = "pirate.guon.deck";
     pub const PIRATE_GUON_BONUS: &str = "pirate.guon.bonus";
     pub const PIRATE_GUON_CREW: &str = "pirate.guon.crew";
+    pub const HOLIDAY_MENU: &str = "holiday.menu";
+    pub const HOLIDAY_ENTER: &str = "holiday.enter";
+    pub const HOLIDAY_ABOUT: &str = "holiday.about";
+    pub const HOLIDAY_INFO: &str = "holiday.info";
+    pub const HOLIDAY_NO_PARTY: &str = "holiday.no_party";
+    pub const HOLIDAY_NOT_LEADER: &str = "holiday.not_leader";
+    pub const HOLIDAY_NOT_ELIGIBLE: &str = "holiday.not_eligible";
+    pub const HOLIDAY_BUSY: &str = "holiday.busy";
+    pub const HOLIDAY_SNOWMAN_HOME: &str = "holiday.snowman.home";
+    pub const HOLIDAY_SNOWMAN_LEAVE: &str = "holiday.snowman.leave";
     pub const PIRATE_GUON_DOORS: &str = "pirate.guon.doors";
     pub const PIRATE_GUON_BOSS: &str = "pirate.guon.boss";
     pub const PIRATE_PORTAL_SHUT: &str = "pirate.portal_shut";
@@ -4303,6 +4313,16 @@ mod tests {
                 keys::PIRATE_GUON_DECK,
                 keys::PIRATE_GUON_BONUS,
                 keys::PIRATE_GUON_CREW,
+                keys::HOLIDAY_MENU,
+                keys::HOLIDAY_ENTER,
+                keys::HOLIDAY_ABOUT,
+                keys::HOLIDAY_INFO,
+                keys::HOLIDAY_NO_PARTY,
+                keys::HOLIDAY_NOT_LEADER,
+                keys::HOLIDAY_NOT_ELIGIBLE,
+                keys::HOLIDAY_BUSY,
+                keys::HOLIDAY_SNOWMAN_HOME,
+                keys::HOLIDAY_SNOWMAN_LEAVE,
                 keys::PIRATE_GUON_DOORS,
                 keys::PIRATE_GUON_BOSS,
                 keys::PIRATE_PORTAL_SHUT,
