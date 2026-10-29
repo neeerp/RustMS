@@ -3,6 +3,7 @@
 #include "UINpcTalk.h"
 
 #include "../UIElement.h"
+#include "../Components/Slider.h"
 
 #include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Text.h"
@@ -36,6 +37,9 @@ namespace ms
 		void update_screen(int16_t new_width, int16_t new_height) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void send_scroll(double yoffset) override;
+		void remove_cursor() override;
 
 		UIElement::Type get_type() const override;
 
@@ -80,6 +84,10 @@ namespace ms
 		Text prompt;
 		// The question's images (#i, #v, #f and #s), laid out as its boxes.
 		std::vector<UINpcTalk::InlineImage> prompt_images;
+		// A question taller than its box scrolls, a step at a time.
+		bool scrolls;
+		int16_t scroll;
+		Slider slider;
 		Text name;
 	};
 }
