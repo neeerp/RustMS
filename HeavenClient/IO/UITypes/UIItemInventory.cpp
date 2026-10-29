@@ -55,6 +55,7 @@
 #include "../../Character/GachaExp.h"
 #include "../../Character/Marriage.h"
 #include "../../Character/MountRules.h"
+#include "../../Character/Look/CashWeapon.h"
 #include "../../Character/Look/TamingMob.h"
 #include "../../Character/MorphRules.h"
 #include "../../Character/Pets.h"
@@ -1920,6 +1921,30 @@ namespace ms
 		if (const char* notice = marriage::equip_gate(item_id, replaced, rings))
 		{
 			UI::get().emplace<UIOk>(notice, [](bool)
+			{});
+			return false;
+		}
+
+		// A cash weapon needs a weapon under it, and the two must fit; a cash
+		// shield needs a shield (FUN_004f1c2d).
+		auto equipped = [&](int16_t position)
+		{
+			return inventory.get_item_id(InventoryType::Id::EQUIPPED, position);
+		};
+		auto covers = [](int32_t sticker, int32_t weapon)
+		{
+			int32_t type = cash_weapon::type(weapon);
+			nl::node art = nl::nx::character["Weapon"]["0" + std::to_string(sticker) + ".img"];
+
+			return type != 0 && art[std::to_string(type)].size() > 0;
+		};
+		int16_t weapon = EquipSlot::Id::WEAPON;
+		int16_t shield = EquipSlot::Id::SHIELD;
+
+		if (const char* refusal = cash_weapon::refusal(part, item_id, ItemData::get(item_id).is_cashitem(), equipped(weapon),
+				equipped(weapon + Inventory::CASH_EQUIP), equipped(shield), covers))
+		{
+			UI::get().emplace<UIOk>(refusal, [](bool)
 			{});
 			return false;
 		}
