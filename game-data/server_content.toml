@@ -1718,6 +1718,7 @@ unsourced = [
     "thief_door.ask",
     "thief_door.wrong",
     "thief_door.shut",
+    "forgotten_darkness.full",
     "francis.intruder",
     "francis.hideout_busy",
     "fake_tru.call",

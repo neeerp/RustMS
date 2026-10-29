@@ -971,6 +971,7 @@
 "thief_door.ask" = "[placeholder] A voice comes from somewhere near the rocks: \"#bPassword#k!\""
 "thief_door.wrong" = "[placeholder] #rThat's not it.#k Nothing moves."
 "thief_door.shut" = "[placeholder] The password was right, but the door won't open."
+"forgotten_darkness.full" = "[placeholder] Free a slot in your Etc inventory to take what you came for."
 "puppeteer_door.searched" = "[placeholder] (No sign of the Puppeteer here, and some strong force bars the way. Better tell #b#p1061019##k.)"
 "francis.intruder" = "[placeholder] Hey! What are you doing in here? You shouldn't be here!"
 "francis.hideout_busy" = "[placeholder] Someone is already in the hideout. Come back later."
