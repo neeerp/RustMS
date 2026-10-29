@@ -897,8 +897,20 @@ the screen size.
   either and its first gendered equip is; after its first item anything
   more disables Buy Avatar. Default Avatar goes back to the player's look
   and Take Off takes everything off; both enable Buy Avatar. Tabs don't
-  change it. v83 also tries pets and some other cash items on, and tries a
-  package on when its row is selected or with Enter; HC doesn't.
+  change it. A pet (500xxxx) stands 80 px right of it; the same pet again
+  sends it away, unless a package brings it (`0x4acd22`). Both buttons clear
+  the pet, and Buy Avatar buys it too unless it is the kind of the player's
+  first pet out (`0x4acda4`). v83 also tries some other cash items on; HC
+  doesn't.
+- **List keys** (`0x4b7417`): the page's first row is selected
+  (`CSList/ItemIcon` framed over its icon) and double-clicking an icon
+  selects its row. The arrows move the selection over the two columns,
+  wrapping, and show its tooltip as if the cursor were on its icon. Enter
+  tries the row on and gives its BUY the key focus (`keyFocused`); then
+  Left and Right move the focus over BUY, GIFT and RESERVE (REMOVE on the
+  wish list), Enter clicks the focused button and Esc drops the focus. Esc
+  with no focus offers to leave. v83 also turns pages with Page Up and Page
+  Down; HC's keys don't reach the shop for those.
 - **Buy Avatar:** with a package on, "The option is not available for that
   package."; otherwise the commodities tried on that the player isn't
   wearing (`0x4696b1`). The first one the character has stops the checks:
