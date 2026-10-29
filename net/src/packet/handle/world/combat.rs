@@ -15,7 +15,8 @@ use crate::packet::build::world::{buff, effect, field, inventory};
 use crate::skills;
 use game::buff::BuffStat;
 use game::dojo;
-use game::{Buff, Disease, InventoryType, MobStat, Player, ShownBuff};
+use game::{Buff, Disease, InventoryChange, InventoryType, MobStat, Player, ShownBuff};
+use game_data::mobs::LoseItem;
 use game_data::server_content::keys;
 use game_data::FIELD_LIMIT_NO_EXP_LOSS;
 use packet::{io::read::PktRead, Packet};
@@ -603,6 +604,19 @@ impl WorldHandler for TakeDamageHandler {
                 damage: reflected.into(),
             }));
         }
+        // Some mobs' hits knock items out of the bag, unless a barrier keeps
+        // them in (`loseItem`, Cosmic's TakeDamageHandler).
+        if damage > 0 && !player.buffs.has(BuffStat::Barrier) {
+            let roll = |prop| rand::random::<f64>() * 100.0 < f64::from(prop);
+            let (changes, shed) = knocked_out(player, &mob.lose_items, roll);
+            if !changes.is_empty() {
+                actions =
+                    actions.with_reply(inventory::build_inventory_operation(false, &changes)?);
+            }
+            for (item_id, count) in shed {
+                actions = actions.with(WorldAction::Field(FieldRequest::Shed { item_id, count }));
+            }
+        }
         if dojo::in_dojo(player.stats.map_id) {
             actions = fill_dojo_energy(player, dojo::HIT_ENERGY, actions)?;
         }
@@ -627,6 +641,31 @@ impl WorldHandler for TakeDamageHandler {
         }
         Ok(actions)
     }
+}
+
+/// What a mob's hit knocks out of `player`'s bag (`lose`): for each item,
+/// one for each of its rolls that comes up, but no more than they hold.
+/// Returns the changes, and each item knocked out with how many.
+fn knocked_out(
+    player: &mut Player,
+    lose: &[LoseItem],
+    mut roll: impl FnMut(i32) -> bool,
+) -> (Vec<InventoryChange>, Vec<(i32, i16)>) {
+    let mut changes = Vec::new();
+    let mut shed = Vec::new();
+    for item in lose {
+        let rolled = (0..item.rolls).filter(|_| roll(item.prop)).count();
+        let held = player.inventory.count(item.item_id);
+        let count = i16::try_from(held.min(rolled as i32)).unwrap_or(0);
+        if count <= 0 {
+            continue;
+        }
+        if let Ok(taken) = player.inventory_mut().remove(item.item_id, count) {
+            changes.extend(taken);
+            shed.push((item.item_id, count));
+        }
+    }
+    (changes, shed)
 }
 
 /// What a v83 client sends after a mob's hit (0x9594d0): the Power Guard
@@ -1046,6 +1085,33 @@ mod tests {
     use super::*;
     use crate::packet::op::RecvOpcode;
     use packet::io::write::PktWrite;
+
+    #[test]
+    fn a_hit_knocks_out_what_its_rolls_bring_but_no_more_than_is_held() {
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4031868, 3));
+        let jewels = LoseItem {
+            item_id: 4031868,
+            prop: 40,
+            rolls: 5,
+        };
+        // Two of five rolls come up.
+        let mut rolls = [true, false, true, false, false].into_iter();
+        let (changes, shed) = knocked_out(&mut player, &[jewels], |prop| {
+            assert_eq!(prop, 40);
+            rolls.next().unwrap()
+        });
+        assert_eq!(shed, [(4031868, 2)]);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(player.inventory.count(4031868), 1);
+        // All five, with one held.
+        let (_, shed) = knocked_out(&mut player, &[jewels], |_| true);
+        assert_eq!(shed, [(4031868, 1)]);
+        let (changes, shed) = knocked_out(&mut player, &[jewels], |_| true);
+        assert!(changes.is_empty() && shed.is_empty());
+    }
 
     #[test]
     fn assassinate_strikes_from_dark_sight_then_once_more_on_its_mob() {

@@ -64,6 +64,10 @@ pub struct ItemInfo {
     /// What a summoning sack (210xxxx) brings out (`mob`): each mob and its
     /// percent chance, rolled for each.
     pub sack: Vec<(i32, i32)>,
+    /// The only maps it may be used in (`info/reqMap`, the maps' ids as
+    /// its children's names), or empty for any: the Ariant Coliseum's Bomb
+    /// works only in the three battle maps.
+    pub req_map: Vec<i32>,
     /// What a catch item (227xxxx) catches.
     pub catch: Option<CatchInfo>,
     pub equip: Option<EquipInfo>,
@@ -334,7 +338,7 @@ impl ConsumeSpec {
 }
 
 /// The `spec` keys of the stats a consumable raises.
-const SPEC_STATS: [(&str, BuffStat); 12] = [
+const SPEC_STATS: [(&str, BuffStat); 13] = [
     ("pad", BuffStat::Pad),
     ("pdd", BuffStat::Pdd),
     ("mad", BuffStat::Mad),
@@ -347,6 +351,7 @@ const SPEC_STATS: [(&str, BuffStat); 12] = [
     ("expBuff", BuffStat::ExpBuff),
     ("morph", BuffStat::Morph),
     ("ghost", BuffStat::Ghost),
+    ("barrier", BuffStat::Barrier),
 ];
 
 /// The `spec` keys of the diseases a consumable cures.
@@ -682,6 +687,18 @@ impl ItemData {
                 }
             }
         }
+        if let Some(maps) = nx
+            .child_by_name(node, "info")?
+            .map(|meta| nx.child_by_name(meta, "reqMap"))
+            .transpose()?
+            .flatten()
+        {
+            for map in nx.child_indices(maps)? {
+                if let Ok(map_id) = nx.node_name(map)?.parse() {
+                    info.req_map.push(map_id);
+                }
+            }
+        }
         if let Some(meta) = nx.child_by_name(node, "info")? {
             if let Some(record) = nx.int_child(meta, "questId")? {
                 let mut feed = Vec::new();
@@ -842,6 +859,7 @@ impl ItemData {
             book: None,
             scroll: None,
             sack: Vec::new(),
+            req_map: Vec::new(),
             catch: None,
             equip: Some(equip),
             pet_commands: Vec::new(),
@@ -1179,6 +1197,19 @@ mod tests {
             (16, (100100, 100), (1210102, 50))
         );
         assert!(data.info(2000000).unwrap().unwrap().sack.is_empty());
+    }
+
+    #[test]
+    fn reads_the_maps_an_item_works_in() {
+        let Some(data) = data() else {
+            return;
+        };
+        let bomb = data.info(2100067).unwrap().unwrap();
+        assert_eq!(bomb.req_map, [980010101, 980010201, 980010301]);
+        assert!(data.info(2100000).unwrap().unwrap().req_map.is_empty());
+        let barrier = data.info(2022269).unwrap().unwrap().spec.unwrap();
+        assert_eq!(barrier.stats, [(BuffStat::Barrier, 1)]);
+        assert!(barrier.consume_on_pickup);
     }
 
     #[test]

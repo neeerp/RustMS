@@ -98,6 +98,18 @@ pub struct MobInfo {
     /// The Carnival Points its killer gets in the Monster Carnival
     /// (`getCP`), or 0.
     pub cp: i32,
+    /// What its hits knock out of a player's bag (`loseItem`), as the
+    /// Ariant Coliseum's Bomb knocks out Spirit Jewels.
+    pub lose_items: Vec<LoseItem>,
+}
+
+/// An item a mob's hits knock out of a player's bag (`loseItem/<n>`): each
+/// hit rolls `rolls` times (`x`) at `prop` percent, one item each.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LoseItem {
+    pub item_id: i32,
+    pub prop: i32,
+    pub rolls: i32,
 }
 
 /// How a mob destroys itself (`selfDestruction`).
@@ -276,6 +288,7 @@ impl MobData {
             cool_damage_prob: int("coolDamageProb")?,
             remove_on_miss: int("removeOnMiss")? != 0,
             cp: int("getCP")?,
+            lose_items: self.lose_items(info)?,
         }))
     }
 
@@ -300,6 +313,21 @@ impl MobData {
             }
         }
         Ok(skills)
+    }
+
+    fn lose_items(&self, info: u32) -> Result<Vec<LoseItem>, GameDataError> {
+        let nx = &self.nx;
+        let mut items = Vec::new();
+        if let Some(list) = nx.child_by_name(info, "loseItem")? {
+            for entry in nx.child_indices(list)? {
+                items.push(LoseItem {
+                    item_id: nx.int_child(entry, "id")?.unwrap_or(0),
+                    prop: nx.int_child(entry, "prop")?.unwrap_or(0),
+                    rolls: nx.int_child(entry, "x")?.unwrap_or(0),
+                });
+            }
+        }
+        Ok(items)
     }
 
     fn revive(&self, info: u32) -> Result<Vec<i32>, GameDataError> {
@@ -582,6 +610,22 @@ mod tests {
         assert_eq!((bomb.action, bomb.hp, bomb.remove_after), (4, -1, 0));
         assert!(mob(8500003).self_destruct.unwrap().bombs());
         assert_eq!(mob(100100).self_destruct, None);
+    }
+
+    #[test]
+    fn reads_what_mobs_knock_out_of_bags() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        let jewels = LoseItem {
+            item_id: 4031868,
+            prop: 40,
+            rolls: 5,
+        };
+        assert_eq!(mob(9300166).lose_items, [jewels]);
+        assert!(mob(100100).lose_items.is_empty());
     }
 
     #[test]

@@ -563,7 +563,10 @@ A summoning sack (210xxxx) is opened from the USE tab with USE_SUMMON_BAG
 of its mobs at its percent chance, below the player. Where the map's
 fieldLimit has 0x4 and its `allowedItem` doesn't list the sack, the client
 shows "You can't use it here in this map." itself, unless the player is
-a GM (v83 FUN_00a0977b). A sack the server refuses for the map gets
+a GM (v83 FUN_00a0977b). The server also keeps a sack with `info/reqMap`
+to the maps it names (their ids are the children's names): the Ariant
+Coliseum's Bomb 2100067 opens only in 980010101, 980010201 and 980010301.
+A sack the server refuses for the map gets
 SUMMON_ITEM_INAVAILABLE (0x89) with a 0, which the client shows in the
 same OK box (FUN_00532fcf), and then the unlock.
 

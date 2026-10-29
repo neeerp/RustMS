@@ -1950,6 +1950,16 @@ client sends USE_DEATHITEM (0x35: the wheel's id and the tombstone's position),
 which the server ignores. YES sets the wheel byte. The SET_FIELD that follows
 carries the new HP, which brings the player back up.
 
+Some mobs' hits knock items out of the bag (`loseItem/<n>`: `id`, `prop`,
+`x`; `game_data::mobs::LoseItem`), as the Ariant Coliseum's bomb 9300166
+knocks out Spirit Jewels (4031868). Each hit that does damage rolls `x`
+times at `prop` percent. As many as come up, but no more than are held,
+leave the bag (`knocked_out`). They fall one at a time from the player
+(`FieldRequest::Shed`), for anyone, as Cosmic's TakeDamageHandler drops
+them: the first at the player's feet, then 37, -25, 62, -50, ... pixels
+out, on the ground below. A Barrier (bit 50, the `barrier` of 2022269,
+which works when picked up) keeps them all in.
+
 ## Keys
 
 New characters get v83's default keymap (`game/src/keymap.rs`), with actions as
@@ -1981,6 +1991,8 @@ two players report their distance from a firstAttack mob in Crimsonwood Keep
 (610030011) and checks control follows the closer one until a hit;
 `damage_reductions` (integration) has Magic Guard pay 80% of a touch in MP
 and Power Guard send back a boss's share of one;
+`ariant_bomb` (integration) opens the Coliseum's Bomb only in its battle
+map, and has its bomb knock Spirit Jewels out until a Barrier keeps them in;
 `reactors` (integration) breaks two of Amherst's boxes, before and during
 Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso

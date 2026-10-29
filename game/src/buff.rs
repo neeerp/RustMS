@@ -100,6 +100,10 @@ pub enum BuffStat {
     /// head's items, and lets it neither attack nor use skills (a ghost
     /// item's `ghost`; report c039).
     Ghost = 49,
+    /// The client's Barrier: mobs that would take items from the player
+    /// take none (a `barrier` item, the Ariant Coliseum's 2022269, as
+    /// Cosmic's AURA has it).
+    Barrier = 50,
     /// The arrow keys are swapped (the client's ReverseInput).
     Confuse = 51,
     /// The Dojo's Power Explosion (1011): the client's weapon hits are

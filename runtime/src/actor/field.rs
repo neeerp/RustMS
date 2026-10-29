@@ -210,6 +210,16 @@ const ITEM_TAKEN_AFTER: Duration = Duration::from_secs(5);
 /// The item a drop is, if a reactor may take it: one a player dropped, or
 /// one a mob or reactor dropped for anyone, as Cosmic's `spawnDrop` also
 /// sets off the reactors it lands on; never a quest drop.
+/// How far from a player's feet the `n`th item (from 1) knocked out of
+/// their bag lands: 0, then 37, -25, 62, -50, ... as Cosmic works it out.
+fn shed_offset(n: i16) -> i16 {
+    if n % 2 == 0 {
+        25 * (n + 1) / 2
+    } else {
+        -(25 * (n / 2))
+    }
+}
+
 fn reactor_item(loot: &Loot) -> Option<(i32, i16)> {
     match loot {
         Loot::Dropped(item) => Some((item.item_id, item.quantity)),
@@ -1168,6 +1178,7 @@ impl FieldActor {
                     needs,
                 } => self.handle_pickup(from, object_id, x, y, &needs),
                 FieldRequest::Throw { loot, vanish } => self.handle_throw(from, loot, vanish),
+                FieldRequest::Shed { item_id, count } => self.handle_shed(from, item_id, count),
                 FieldRequest::HitReactor {
                     object_id,
                     flags,
@@ -1849,6 +1860,34 @@ impl FieldActor {
         };
         if let Ok(packet) = build_drop(&drop.view(now), appearance) {
             self.show_drop(&drop, packet);
+        }
+    }
+
+    /// Items a mob's hit knocked out of `from`'s bag fall one by one from
+    /// them, for anyone at once: the `n`th (from 1) lands `shed_offset(n)`
+    /// from their feet, on the ground below (Cosmic's TakeDamageHandler).
+    fn handle_shed(&mut self, from: ClientId, item_id: i32, count: i16) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let (x, y) = (occupant.avatar.x, occupant.avatar.y);
+        let now = Instant::now();
+        for n in 1..=count {
+            let at = x.saturating_add(shed_offset(n));
+            let ground = self.drops.ground_below(at, y.saturating_sub(1));
+            let loot = Loot::Dropped(game::Item::stack(item_id, 1));
+            let drop = self
+                .drops
+                .throw(loot, from, at, ground.unwrap_or(y), now)
+                .clone();
+            self.put_on_reactor(&drop, now);
+            let falling = DropAppearance::Falling {
+                from: (x, y),
+                delay: 0,
+            };
+            if let Ok(packet) = build_drop(&drop.view(now), falling) {
+                self.show_drop(&drop, packet);
+            }
         }
     }
 
@@ -6159,6 +6198,12 @@ mod tests {
     use std::collections::BTreeMap;
     use tokio::time::timeout;
     use tokio_util::sync::CancellationToken;
+
+    #[test]
+    fn items_knocked_out_of_a_bag_land_on_either_side_in_turn() {
+        let offsets: Vec<i16> = (1..=6).map(shed_offset).collect();
+        assert_eq!(offsets, [0, 37, -25, 62, -50, 87]);
+    }
 
     #[test]
     fn summons_land_somewhere_in_their_skills_area() {
