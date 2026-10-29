@@ -31,10 +31,38 @@ widens a bag outside the Cash Shop, as the first job advancement does.
 demand. Stacks default to
 100 when `slotMax` is absent. `net::items` loads it once
 (`RUSTMS_ITEM_NX_PATH`, `RUSTMS_CHARACTER_NX_PATH`), creates items with their
-base stats (`create`), and checks wear requirements (`can_wear`: level,
-stats, and the `reqJob` branch bits; 0 means anyone). New characters' starting
+base stats (`create`), and checks wear requirements (`can_wear`, below).
+New characters' starting
 equipment gets its base stats at creation (the login server reads the same
 assets).
+
+## Equipment requirements
+
+v83 rebuilds the list of equipment that counts on every stat change
+(FUN_0077e227, report b341): what its wearer doesn't meet stays worn but adds
+nothing to any stat, and a weapon that doesn't count can't attack.
+`game::requirements::counted` (and HeavenClient's `equip_count::counted`)
+follow it:
+- An item is checked for level, `reqJob` (branch bits; 0 is anyone, -1
+  beginners), STR, DEX, INT, LUK and fame (`reqPOP`). GMs (job digit 8 or 9)
+  meet anything.
+- Its STR to LUK are the character's own, raised by Maple Warrior's percent,
+  plus every other counted item's, never its own. Pet equipment isn't checked
+  and adds nothing, but the first pet's clothes (slot 14) add.
+- Slots go in order, a cash item after its slot's normal item, the dragon's
+  last. The first to fail stops counting, its stats come off, and the check
+  starts over until a whole pass drops none.
+- A cash weapon counts only over a counted weapon, and a cash shield only over
+  a counted shield.
+
+`Player::worn_equips` gives only what counts, so damage, max HP and MP and the
+skills' stat checks leave the rest out. The lookup lives in `net::items`
+(`requirements`, cached), which the world registers at start
+(`game::requirements::register`); without it everything counts. Equipping
+(`can_wear`, HeavenClient's `Inventory::would_count`) tries the item on in
+place of what it replaces, as v83's tooltips do (0x4f1782), so gloves' STR can
+let a weapon on but the weapon being replaced can't. HeavenClient also checks
+gender. It doesn't draw v83's red mark on worn items that don't count.
 
 ## Expiry
 

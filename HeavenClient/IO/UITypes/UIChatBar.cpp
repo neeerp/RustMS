@@ -1043,10 +1043,13 @@ namespace ms
 		{
 			// v83 says a skill is still cooling down on every try, with no
 			// throttle (FUN_00966f7a).
-			if (message_cooldowns[line] > 0)
+			// The two weapon refusals share one 2 s timer (0x95b85a).
+			Messages::Type timer = line == Messages::ATTACK_UNMET ? Messages::ATTACK_NOWEAPON : line;
+
+			if (message_cooldowns[timer] > 0)
 				return;
 
-			message_cooldowns[line] = line == Messages::ATTACK_NOWEAPON ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+			message_cooldowns[timer] = timer == Messages::ATTACK_NOWEAPON ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
 		}
 
 		std::string message = Messages::messages[line];

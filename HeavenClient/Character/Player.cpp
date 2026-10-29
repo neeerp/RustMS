@@ -245,6 +245,21 @@ namespace ms
 			send_action(action, false);
 	}
 
+	equip_count::Wearer Player::get_wearer() const
+	{
+		// What counts is what the character meets the requirements of with
+		// their own stats, Maple Warrior's and the other counted equips'.
+		equip_count::Wearer wearer;
+		wearer.level = stats.get_stat(MapleStat::Id::LEVEL);
+		wearer.job = stats.get_job().get_id();
+		wearer.fame = static_cast<int16_t>(stats.get_stat(MapleStat::Id::FAME));
+		wearer.stats = { stats.get_stat(MapleStat::Id::STR), stats.get_stat(MapleStat::Id::DEX),
+						 stats.get_stat(MapleStat::Id::INT), stats.get_stat(MapleStat::Id::LUK) };
+		wearer.percent = get_buff_value(Buffstat::Id::MAPLE_WARRIOR);
+
+		return wearer;
+	}
+
 	void Player::recalc_stats()
 	{
 		Weapon::Type weapontype = get_weapontype();
@@ -253,7 +268,7 @@ namespace ms
 		stats.init_totalstats();
 
 		// The ammo is picked again too, as a level up may allow more.
-		inventory.recalc_stats(weapontype, stats.get_stat(MapleStat::Id::LEVEL));
+		inventory.recalc_stats(weapontype, stats.get_stat(MapleStat::Id::LEVEL), get_wearer());
 
 		for (auto stat : EquipStat::values)
 		{

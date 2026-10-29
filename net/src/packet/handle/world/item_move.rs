@@ -197,7 +197,7 @@ fn move_item(
         let allowed = match equip_slot::pet_slots(item_id) {
             // Cash items are worn 100 below their slot.
             Some(_) => pet_can_wear(player, &template, to % 100),
-            None => items::can_wear(&template, player),
+            None => items::can_wear(player, item, to),
         };
         if !allowed {
             return Err("requirements not met".into());

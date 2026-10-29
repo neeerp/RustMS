@@ -332,6 +332,22 @@ pub async fn stow_equip(
     .await
 }
 
+/// Give the equip in slot `slot` of the logged-out character
+/// `character_id`'s Equip tab `str` STR.
+pub async fn set_equip_str(character_id: i32, slot: i16, str: i16) -> Result<(), HarnessError> {
+    change_one_row("set equip str", move |conn| {
+        diesel::sql_query(
+            "UPDATE equipment_stats SET stre = $3 WHERE item_row_id = \
+             (SELECT id FROM inventory_items WHERE character_id = $1 AND inventory_type = 1 AND slot = $2)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(slot)
+        .bind::<SmallInt, _>(str)
+        .execute(conn)
+    })
+    .await
+}
+
 /// The upgrade slots left, scrolls passed (level) and hammers of the equip in
 /// slot `slot` of character `character_id`'s Equip tab.
 pub async fn equip_upgrades(

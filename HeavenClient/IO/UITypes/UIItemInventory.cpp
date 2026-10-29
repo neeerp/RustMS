@@ -1845,6 +1845,21 @@ namespace ms
 		return true;
 	}
 
+	// Whether the equipment is for the character's gender. GMs wear anything
+	// (job digit 8 or 9).
+	static bool fits_gender(const CharStats &stats, const EquipData &equipdata)
+	{
+		int32_t branch = stats.get_job().get_id() % 1000 / 100;
+
+		if (branch == 8 || branch == 9)
+			return true;
+
+		const int8_t reqGender = equipdata.get_itemdata().get_gender();
+		const bool female = stats.get_female();
+
+		return !((reqGender == 0 && female) || (reqGender == 1 && !female));
+	}
+
 	// Whether `stats` meet the equipment's requirements (FUN_004f2cee).
 	static bool meets_equip_reqs(const CharStats &stats, const EquipData &equipdata)
 	{
@@ -1854,11 +1869,7 @@ namespace ms
 		if (branch == 8 || branch == 9)
 			return true;
 
-		const ItemData &itemdata = equipdata.get_itemdata();
-		const int8_t reqGender = itemdata.get_gender();
-		const bool female = stats.get_female();
-
-		if ((reqGender == 0 && female) || (reqGender == 1 && !female))
+		if (!fits_gender(stats, equipdata))
 			return false;
 
 		// reqJob has a bit per branch from warriors on; 0 is anyone and -1
@@ -1969,7 +1980,10 @@ namespace ms
 				return false;
 		}
 
-		if (!meets_equip_reqs(stats, equipdata))
+		// The rest is checked with the item tried on and the one it
+		// replaces off (0x4f1782), as the equipment that counts is.
+		if (!fits_gender(stats, equipdata)
+			|| !inventory.would_count(slot, inventory.equip_position(slot, part), player.get_wearer()))
 		{
 			// v83 (FUN_004f1c2d) has one text for every unmet requirement.
 			UI::get().emplace<UIOk>("Your stats are too low to equip this item.", [](bool)

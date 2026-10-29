@@ -533,6 +533,14 @@ namespace ms
 					return false;
 				}
 
+				// Nor with a weapon that doesn't count, or a cash weapon
+				// over none that does.
+				if (move.is_attack() && !player.get_inventory().counts(EquipSlot::Id::WEAPON))
+				{
+					InChatMessage(Messages::ATTACK_UNMET).drop();
+					return false;
+				}
+
 				break;
 			default:
 				break;

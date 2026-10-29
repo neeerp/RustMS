@@ -103,6 +103,9 @@ namespace ms
 		// Recalculates the total stats from base stats, inventories and skills.
 		void recalc_stats();
 
+		// The character, as equipment requirements see them.
+		equip_count::Wearer get_wearer() const;
+
 		// Change the equipment at the specified slot and recalculate stats.
 		void change_equip(int16_t slot);
 
