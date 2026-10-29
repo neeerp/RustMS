@@ -174,6 +174,8 @@ impl ClientActor {
         }
         if npc_id == net::npc_scripts::SPIEGELMANN
             && player.stats.map_id == net::carnival::CARNIVAL_LOBBY
+            || npc_id == net::npc_scripts::CARNIVAL2_HOST
+                && player.stats.map_id == net::carnival::CARNIVAL2_LOBBY
         {
             return self.talk_to_spiegelmann().await;
         }

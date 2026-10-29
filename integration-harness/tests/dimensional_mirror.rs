@@ -1,10 +1,11 @@
 //! The Dimensional Mirror (9010022): a slide menu (NPC dialog type 14) of
 //! the places open at the player's level. Picking one keeps the town for
-//! the way back.
+//! the way back; the Monster Carnival's two fields share their way back.
 
 use game_data::server_content::keys;
 use integration_harness::events::{talk, told, waiting_in};
 use integration_harness::quests::answer;
+use net::carnival::CARNIVAL2_LOBBY;
 use net::npc_scripts::DIMENSIONAL_MIRROR;
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
@@ -45,6 +46,27 @@ async fn the_mirror_slides_to_the_pyramid_and_the_way_out_comes_back() {
     let went = told(&mut player, answer(14, 1, Some(5))).await;
     assert!(
         matches!(went.arrivals[..], [(PYRAMID_LOBBY, 4, _)]),
+        "{went:?}"
+    );
+    let back = told(&mut player, enter("out00")).await;
+    assert!(matches!(back.arrivals[..], [(HENESYS, _, _)]), "{back:?}");
+}
+
+#[tokio::test]
+async fn from_level_51_the_mirror_slides_to_carnival_field_2_and_back() {
+    let mut player = waiting_in(HENESYS, 60, &[]).await;
+    let menu = told(&mut player, talk(HENESYS, DIMENSIONAL_MIRROR)).await;
+    let expected = format!(
+        "#1#{}#3#{}#5#{}",
+        text(keys::MIRROR_DOJO),
+        text(keys::MIRROR_CARNIVAL2),
+        text(keys::MIRROR_PYRAMID)
+    );
+    assert_eq!(menu.prompt_texts, [expected]);
+
+    let went = told(&mut player, answer(14, 1, Some(3))).await;
+    assert!(
+        matches!(went.arrivals[..], [(CARNIVAL2_LOBBY, 3, _)]),
         "{went:?}"
     );
     let back = told(&mut player, enter("out00")).await;

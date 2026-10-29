@@ -5,7 +5,8 @@ Carnival Field. Two parties, Maple Red and Maple Blue, hunt the monsters
 the other side summons, and earn Carnival Points (CP) to spend on more. The
 RE is in v83ref `reports/b163-carnival-client.md` (the v83 client's fields
 and packets) and `reports/b165-carnival-server.md` (the rules, after
-Cosmic's `MonsterCarnival.java` and `MonsterCarnivalParty.java`).
+Cosmic's `MonsterCarnival.java` and `MonsterCarnivalParty.java`); Carnival
+Field 2's is `reports/b323-carnival2.md`.
 
 Status: the field data, the Carnival Field and Spiegelmann, the waiting
 rooms and their challenges, two parties on a room's battle field with its
@@ -40,6 +41,36 @@ CP window for spending CP, with its side panel counting the mobs summoned
   be hurt by its own side's mobs, and draws them half see-through; the
   server doesn't check.
 - A mob's `info/getCP` (`MobInfo::cp`) is what killing it earns.
+
+## Carnival Field 2
+
+The second Monster Carnival, for levels 51 to 70, is played the same way
+off Carnival Field 2, 980030000 (`CARNIVAL2_LOBBY`), as rooms 7 to 9 of
+`EventKind::Carnival` (`CARNIVAL2_ROOMS`; `second`, `lobby`, `exit` and
+`levels` tell a room's field). Spiegelmann gives their numbers as 1 to 3
+(`number`); `rooms_off` lists a field's rooms.
+
+- Spiegelmann there (2042005, `CARNIVAL2_HOST`) goes straight to its rooms,
+  with no About. Spiegelmann in town takes one of 51 to 70 there instead
+  of to the first field, and the Dimensional Mirror's entry 3 lands on its
+  `st00` (portal 3); its `mc_out` leads back by `CARNIVAL_RETURN` too.
+- Room r (7 to 9) is 98003k000 for its k (1 to 3), whose parts go up by
+  100: the battle field 98003k100 (field type 15), the revive room k200
+  (type 11, whose `pt00` runs `MC2revive`, back to the battle field of the
+  room it is in), the winners' k300 and the losers' k400. Rooms 7 and 8
+  take two to four a side and room 9 three to six, as quest 1302's text
+  says.
+- In a waiting room (field type 16) 2042007 (`CARNIVAL2_GUIDE`) tells the
+  party to wait and 2042008 (`CARNIVAL2_ROOM_EXIT`) takes a member back.
+  The challenge is still put by 2042001's face. 2042007 also stands in the
+  exit room, 980030010 (`CARNIVAL2_EXIT`), and grades the result rooms.
+- The battle fields' rules come from their own `monsterCarnival` nodes:
+  mobs 9300315 to 9300324, ten of a side's summons out at once and eight
+  guardians. The fields' own mobs have no team, so either side may hunt
+  them (Cosmic gives them one by their node's parity).
+- The EXP is Cosmic's: a win 875000, 700000, 555000 or 100000, a loss
+  35000, 25000, 12500 or 3500. Its record is 1302, whose necklace is
+  1122058; Cosmic's Shiny Maple Coin exchange isn't in.
 
 ## The battle (`net::events`, `EventKind::Carnival`)
 

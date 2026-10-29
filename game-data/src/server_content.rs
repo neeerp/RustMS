@@ -2798,6 +2798,7 @@ pub mod keys {
     pub const MIRROR_ARIANT: &str = "mirror.ariant";
     pub const MIRROR_DOJO: &str = "mirror.dojo";
     pub const MIRROR_CARNIVAL: &str = "mirror.carnival";
+    pub const MIRROR_CARNIVAL2: &str = "mirror.carnival2";
     pub const MIRROR_PYRAMID: &str = "mirror.pyramid";
     pub const MIRROR_SUBWAY: &str = "mirror.subway";
     pub const MIRROR_NOWHERE: &str = "mirror.nowhere";
@@ -2980,6 +2981,7 @@ pub mod keys {
     pub const TREASURE_TUNNEL_OPEN: &str = "treasure.charles.tunnel_open";
     pub const TREASURE_TUNNEL_BLOCKED: &str = "treasure.tunnel_blocked";
     pub const CARNIVAL_SPIEGELMANN_GO: &str = "carnival.spiegelmann.go";
+    pub const CARNIVAL_SPIEGELMANN_GO2: &str = "carnival.spiegelmann.go2";
     pub const CARNIVAL_GUIDE_BACK: &str = "carnival.guide.back";
     pub const CARNIVAL_SPIEGELMANN_WAITING: &str = "carnival.spiegelmann.waiting";
     pub const CARNIVAL_SPIEGELMANN_TAKEN: &str = "carnival.spiegelmann.taken";
@@ -4569,6 +4571,7 @@ mod tests {
                 keys::MIRROR_ARIANT,
                 keys::MIRROR_DOJO,
                 keys::MIRROR_CARNIVAL,
+                keys::MIRROR_CARNIVAL2,
                 keys::MIRROR_PYRAMID,
                 keys::MIRROR_SUBWAY,
                 keys::MIRROR_NOWHERE,
@@ -4749,6 +4752,7 @@ mod tests {
                 keys::TREASURE_TUNNEL_OPEN,
                 keys::TREASURE_TUNNEL_BLOCKED,
                 keys::CARNIVAL_SPIEGELMANN_GO,
+                keys::CARNIVAL_SPIEGELMANN_GO2,
                 keys::CARNIVAL_GUIDE_BACK,
                 keys::CARNIVAL_SPIEGELMANN_WAITING,
                 keys::CARNIVAL_SPIEGELMANN_TAKEN,

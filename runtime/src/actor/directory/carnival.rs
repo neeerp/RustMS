@@ -9,7 +9,7 @@ use super::WorldDirectory;
 use crate::actor::event::EventJoiner;
 use crate::message::{CarnivalPick, ServerMessage};
 use game_data::server_content::keys;
-use net::carnival::{room_map, Challenger, Refusal, Room, CARNIVAL_ROOMS, CHALLENGE};
+use net::carnival::{room_map, Challenger, Refusal, Room, ALL_ROOMS, CHALLENGE};
 use net::events::{Entry, EventKind};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::ClientId;
@@ -42,12 +42,13 @@ impl CarnivalRoom {
 }
 
 impl WorldDirectory {
-    /// What Spiegelmann shows `from` of their channel's rooms, 1 to 6.
+    /// What Spiegelmann shows `from` of their channel's rooms, 1 to 9:
+    /// the Carnival Field's and Carnival Field 2's.
     pub(super) fn carnival_rooms(&self, from: ClientId) -> Vec<Room> {
         let Some(channel_id) = self.clients.get(&from).map(|entry| entry.channel_id) else {
             return Vec::new();
         };
-        (1..=CARNIVAL_ROOMS)
+        ALL_ROOMS
             .map(|room| {
                 let key = (channel_id, room);
                 let Some(taken) = self.carnival_rooms.get(&key) else {
@@ -102,7 +103,7 @@ impl WorldDirectory {
         let Some(channel_id) = self.clients.get(&from).map(|entry| entry.channel_id) else {
             return CarnivalPick::Refused(Refusal::NoParty);
         };
-        if !(1..=CARNIVAL_ROOMS).contains(&room) {
+        if !ALL_ROOMS.contains(&room) {
             return CarnivalPick::Refused(Refusal::Full);
         }
         let kind = EventKind::Carnival(room);

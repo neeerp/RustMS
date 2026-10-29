@@ -1032,6 +1032,7 @@ pub const DIMENSIONAL_MIRROR: i32 = 9010022;
 /// Where the Mirror sets each down (Cosmic's portals).
 const MIRROR_DOJO_PORTAL: u8 = 0;
 const MIRROR_CARNIVAL_PORTAL: u8 = 3;
+const MIRROR_CARNIVAL2_PORTAL: u8 = 3;
 const MIRROR_PYRAMID_PORTAL: u8 = 4;
 /// Spiegelmann again, in the Monster Carnival's exit room.
 pub const CARNIVAL_GUIDE: i32 = 2042002;
@@ -1040,6 +1041,14 @@ pub const CARNIVAL_GUIDE: i32 = 2042002;
 pub const CARNIVAL_ROOM_NPC: i32 = 2042001;
 /// The waiting room's way back to the Carnival Field.
 pub const CARNIVAL_ROOM_EXIT: i32 = 2042003;
+/// Spiegelmann on Carnival Field 2, who gives out its rooms (Cosmic
+/// `2042005`).
+pub const CARNIVAL2_HOST: i32 = 2042005;
+/// Spiegelmann in Carnival Field 2's exit room and result rooms, and
+/// standing by in its waiting rooms (Cosmic `2042007`).
+pub const CARNIVAL2_GUIDE: i32 = 2042007;
+/// Carnival Field 2's waiting rooms' way back to it (Cosmic `2042008`).
+pub const CARNIVAL2_ROOM_EXIT: i32 = 2042008;
 /// Wu Yang, Guon's son, freed on the Pirate Ship's last stage and met
 /// again in its clear room.
 pub const WU_YANG: i32 = 2094001;
@@ -2247,8 +2256,14 @@ impl NpcScript {
             let back = carnival::CARNIVAL_LOBBY;
             return Some(ask_warp(CARNIVAL_GUIDE, keys::CARNIVAL_GUIDE_BACK, back));
         }
-        if npc_id == CARNIVAL_GUIDE && carnival::result_room(player.stats.map_id).is_some() {
-            return Some(carnival_grade(player));
+        if npc_id == CARNIVAL2_GUIDE && player.stats.map_id == carnival::CARNIVAL2_EXIT {
+            let back = carnival::CARNIVAL2_LOBBY;
+            return Some(ask_warp(CARNIVAL2_GUIDE, keys::CARNIVAL_GUIDE_BACK, back));
+        }
+        if let Some(room) = carnival::result_room(player.stats.map_id) {
+            if npc_id == carnival_guide(room) {
+                return Some(carnival_grade(room, player));
+            }
         }
         if player.stats.map_id == ariant::KINGS_ROOM {
             match npc_id {
@@ -2257,22 +2272,20 @@ impl NpcScript {
                 _ => {}
             }
         }
-        if carnival::waiting_room(player.stats.map_id).is_some() {
+        if let Some(room) = carnival::waiting_room(player.stats.map_id) {
             // The leader's leaving gives the room up (`EventActor`).
-            let back = carnival::CARNIVAL_LOBBY;
-            match npc_id {
-                CARNIVAL_ROOM_NPC => {
-                    let page = Page::Say(text(keys::CARNIVAL_ROOM_WAIT));
-                    return Some(NpcScript::new(CARNIVAL_ROOM_NPC, vec![page]));
-                }
-                CARNIVAL_ROOM_EXIT => {
-                    return Some(ask_warp(
-                        CARNIVAL_ROOM_EXIT,
-                        keys::CARNIVAL_ROOM_LEAVE,
-                        back,
-                    ));
-                }
-                _ => {}
+            let back = carnival::lobby(room);
+            let (host, exit) = if carnival::second(room) {
+                (CARNIVAL2_GUIDE, CARNIVAL2_ROOM_EXIT)
+            } else {
+                (CARNIVAL_ROOM_NPC, CARNIVAL_ROOM_EXIT)
+            };
+            if npc_id == host {
+                let page = Page::Say(text(keys::CARNIVAL_ROOM_WAIT));
+                return Some(NpcScript::new(host, vec![page]));
+            }
+            if npc_id == exit {
+                return Some(ask_warp(exit, keys::CARNIVAL_ROOM_LEAVE, back));
             }
         }
         if let Some(script) = gm_event_exit(npc_id, player) {
@@ -11840,14 +11853,26 @@ fn insignificant_being(player: &Player) -> NpcScript {
 
 /// `npc` asks `key`, and a yes takes the player to `to`'s first spawn point
 /// (Cosmic `1092008`, `1095000`, and `2095000` past Save Delli!).
-/// 2042002 in a Monster Carnival result room (Cosmic `2042002`): the
-/// battle just fought, graded by the player's side's CP in all, and its
-/// EXP on the way back to the Carnival Field. With no battle to grade, as
-/// after a reconnect, the player just goes back.
-fn carnival_grade(player: &Player) -> NpcScript {
-    let back = Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0);
+/// Who grades the battles of room `room` in its result rooms: 2042002,
+/// or 2042007 on Carnival Field 2.
+fn carnival_guide(room: u8) -> i32 {
+    if carnival::second(room) {
+        CARNIVAL2_GUIDE
+    } else {
+        CARNIVAL_GUIDE
+    }
+}
+
+/// 2042002 in a Monster Carnival result room of room `room` (Cosmic
+/// `2042002`, or `2042007` on Carnival Field 2): the battle just fought,
+/// graded by the player's side's CP in all, and its EXP on the way back to
+/// the room's field. With no battle to grade, as after a reconnect, the
+/// player just goes back.
+fn carnival_grade(room: u8, player: &Player) -> NpcScript {
+    let guide = carnival_guide(room);
+    let back = Effect::WarpToPortal(carnival::lobby(room), 0);
     let Some((won, points)) = player.carnival_result else {
-        return NpcScript::new(CARNIVAL_GUIDE, vec![Page::Done(vec![back])]);
+        return NpcScript::new(guide, vec![Page::Done(vec![back])]);
     };
     let grade = carnival::grade(points);
     let key = if won {
@@ -11857,10 +11882,11 @@ fn carnival_grade(player: &Player) -> NpcScript {
     };
     let letter = carnival::grade_letter(grade).to_string();
     let said = content::text().get(key, &[("grade", &letter)]);
-    let mut script = NpcScript::new(CARNIVAL_GUIDE, vec![Page::Say(said)]);
-    script
-        .on_end
-        .extend([Effect::GainExp(carnival::result_exp(won, grade)), back]);
+    let mut script = NpcScript::new(guide, vec![Page::Say(said)]);
+    script.on_end.extend([
+        Effect::GainExp(carnival::result_exp(room, won, grade)),
+        back,
+    ]);
     script
 }
 
@@ -12847,7 +12873,8 @@ fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
 /// Spiegelmann on the Carnival Field (Cosmic `2042000`): what the Monster
 /// Carnival is, and for a party's leader of the right level, its rooms,
 /// each with how many it takes. Picking one the party may take sends it
-/// in. Cosmic's Carnival 2 and Maple Coin trades aren't in.
+/// in. On Carnival Field 2 (Cosmic `2042005`) he goes straight to its
+/// rooms. Cosmic's Maple Coin trades aren't in.
 fn spiegelmann(
     entries: &[(EventKind, Entry)],
     rooms: &[carnival::Room],
@@ -12871,7 +12898,7 @@ fn spiegelmann(
                 Page::Say(event_terms(kind.event(), keys::CARNIVAL_SPIEGELMANN_TERMS))
             }
         };
-        let number = room.to_string();
+        let number = carnival::number(room).to_string();
         let view = rooms.get(usize::from(room) - 1);
         let label = match view.copied().unwrap_or(carnival::Room::Free) {
             carnival::Room::Free => content::text().get(
@@ -12896,19 +12923,25 @@ fn spiegelmann(
         };
         (label, vec![page])
     };
-    let first = entry(EventKind::Carnival(1));
-    let enter = match first {
-        _ if !carnival::CARNIVAL_LEVELS.contains(&player.stats.level) => Page::Say(event_terms(
-            &events::CARNIVAL[0],
-            keys::CARNIVAL_SPIEGELMANN_LEVELS,
-        )),
+    let here = carnival::rooms_off(player.stats.map_id);
+    let first = *here.start();
+    let event = EventKind::Carnival(first).event();
+    let enter = match entry(EventKind::Carnival(first)) {
+        _ if !event.levels.contains(&player.stats.level) => {
+            Page::Say(event_terms(event, keys::CARNIVAL_SPIEGELMANN_LEVELS))
+        }
         Entry::NoParty => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NO_PARTY)),
         Entry::NotLeader => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NOT_LEADER)),
         _ => Page::Menu {
             text: text(keys::CARNIVAL_SPIEGELMANN_ROOMS),
-            choices: (1..=carnival::CARNIVAL_ROOMS).map(room).collect(),
+            choices: here.map(room).collect(),
         },
     };
+    if carnival::second(first) {
+        let mut script = NpcScript::new(CARNIVAL2_HOST, vec![enter]);
+        script.refused = Some(text(keys::CARNIVAL_SPIEGELMANN_BUSY));
+        return script;
+    }
     let mut script = NpcScript::new(
         SPIEGELMANN,
         vec![Page::Menu {
@@ -13215,14 +13248,23 @@ fn ariant_king(player: &Player) -> NpcScript {
 }
 
 /// Spiegelmann in town (Cosmic `2042000`): he takes a player of levels 30
-/// to 50 to the Carnival Field, keeping where they were for its way out.
+/// to 50 to the Carnival Field, and one of 51 to 70 to Carnival Field 2,
+/// keeping where they were for its way out.
 fn spiegelmann_away(player: &Player) -> NpcScript {
-    let page = if carnival::CARNIVAL_LEVELS.contains(&player.stats.level) {
+    let level = player.stats.level;
+    let field = if carnival::CARNIVAL_LEVELS.contains(&level) {
+        Some((keys::CARNIVAL_SPIEGELMANN_GO, carnival::CARNIVAL_LOBBY))
+    } else if carnival::CARNIVAL2_LEVELS.contains(&level) {
+        Some((keys::CARNIVAL_SPIEGELMANN_GO2, carnival::CARNIVAL2_LOBBY))
+    } else {
+        None
+    };
+    let page = if let Some((key, lobby)) = field {
         Page::Ask {
-            text: text(keys::CARNIVAL_SPIEGELMANN_GO),
+            text: text(key),
             on_yes: vec![
                 Effect::SaveLocation(CARNIVAL_RETURN, Some(player.stats.map_id)),
-                Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0),
+                Effect::WarpToPortal(lobby, 0),
             ],
             on_no: None,
         }
@@ -13821,9 +13863,8 @@ fn dojo_board(player: &Player) -> NpcScript {
 
 /// The Dimensional Mirror (Cosmic `9010022`): a slide menu of the places
 /// open at the player's level, each saving the town for the way back
-/// before going. Cosmic's second Carnival (3) has no event here, so it
-/// isn't offered; its Pyramid (5) and Construction Site (6), stubbed
-/// there, are.
+/// before going. Cosmic's Pyramid (5) and Construction Site (6), stubbed
+/// there, are offered too.
 fn dimensional_mirror(player: &Player) -> NpcScript {
     let level = player.stats.level;
     let here = player.stats.map_id;
@@ -13854,6 +13895,16 @@ fn dimensional_mirror(player: &Player) -> NpcScript {
                 CARNIVAL_RETURN,
                 carnival::CARNIVAL_LOBBY,
                 MIRROR_CARNIVAL_PORTAL,
+            ),
+        ),
+        (
+            3,
+            carnival::CARNIVAL2_LEVELS.contains(&level),
+            keys::MIRROR_CARNIVAL2,
+            go(
+                CARNIVAL_RETURN,
+                carnival::CARNIVAL2_LOBBY,
+                MIRROR_CARNIVAL2_PORTAL,
             ),
         ),
         (
@@ -24181,7 +24232,74 @@ mod tests {
             ]
         );
         let mut script = NpcScript::for_npc(SPIEGELMANN, &at(60, 220000000)).unwrap();
+        assert_eq!(
+            question(&script.begin()),
+            text(keys::CARNIVAL_SPIEGELMANN_GO2)
+        );
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SaveLocation(CARNIVAL_RETURN, Some(220000000)),
+                Effect::WarpToPortal(carnival::CARNIVAL2_LOBBY, 0),
+            ]
+        );
+        let mut script = NpcScript::for_npc(SPIEGELMANN, &at(71, 220000000)).unwrap();
         assert_eq!(page_text(&script.begin()), levels);
+    }
+
+    #[test]
+    fn carnival_field_2s_spiegelmann_gives_out_its_three_rooms() {
+        let entries: Vec<_> = (7..=9)
+            .map(|room| (EventKind::Carnival(room), Entry::Ready))
+            .collect();
+        let mut leader = player(50);
+        leader.stats.level = 60;
+        leader.stats.map_id = carnival::CARNIVAL2_LOBBY;
+        let mut rooms = [carnival::Room::Free; 9];
+        rooms[7] = carnival::Room::Battle;
+        // Straight to the rooms, numbered from 1 again.
+        let mut script = NpcScript::spiegelmann(&entries, &rooms, &leader);
+        let Some(Prompt::Selection { npc_id, text: menu }) = script.begin().prompt else {
+            panic!("room list expected");
+        };
+        assert_eq!(npc_id, CARNIVAL2_HOST);
+        let label = |key, params: &[(&str, &str)]| content::text().get(key, params);
+        let free = [("room", "1"), ("least", "2"), ("most", "4")];
+        assert!(menu.contains(&label(keys::CARNIVAL_SPIEGELMANN_ROOM, &free)));
+        assert!(menu.contains(&label(keys::CARNIVAL_SPIEGELMANN_TAKEN, &[("room", "2")])));
+        let free = [("room", "3"), ("least", "3"), ("most", "6")];
+        assert!(menu.contains(&label(keys::CARNIVAL_SPIEGELMANN_ROOM, &free)));
+        assert_eq!(
+            script.respond(ScriptInput::Select(2)).unwrap().effects,
+            [Effect::CarnivalRoom(9)]
+        );
+        leader.stats.level = 50;
+        let mut script = NpcScript::spiegelmann(&entries, &rooms, &leader);
+        let levels = event_terms(&events::CARNIVAL[6], keys::CARNIVAL_SPIEGELMANN_LEVELS);
+        assert_eq!(page_text(&script.begin()), levels);
+
+        // Its waiting rooms, exit room and result rooms.
+        leader.stats.map_id = carnival::room_map(8);
+        let mut wait = NpcScript::for_npc(CARNIVAL2_GUIDE, &leader).unwrap();
+        assert_eq!(page_text(&wait.begin()), text(keys::CARNIVAL_ROOM_WAIT));
+        let mut leave = NpcScript::for_npc(CARNIVAL2_ROOM_EXIT, &leader).unwrap();
+        assert_eq!(question(&leave.begin()), text(keys::CARNIVAL_ROOM_LEAVE));
+        let back = [Effect::WarpToPortal(carnival::CARNIVAL2_LOBBY, 0)];
+        assert_eq!(leave.respond(ScriptInput::Yes).unwrap().effects, back);
+        assert!(NpcScript::for_npc(CARNIVAL_ROOM_EXIT, &leader).is_none());
+        leader.stats.map_id = carnival::CARNIVAL2_EXIT;
+        let mut out = NpcScript::for_npc(CARNIVAL2_GUIDE, &leader).unwrap();
+        assert_eq!(question(&out.begin()), text(keys::CARNIVAL_GUIDE_BACK));
+        assert_eq!(out.respond(ScriptInput::Yes).unwrap().effects, back);
+        leader.stats.map_id = carnival::win_map(8);
+        leader.carnival_result = Some((true, 120));
+        let mut graded = NpcScript::for_npc(CARNIVAL2_GUIDE, &leader).unwrap();
+        assert!(page_text(&graded.begin()).contains("#rB#k"));
+        assert_eq!(
+            graded.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::GainExp(700_000), back[0].clone()]
+        );
+        assert!(NpcScript::for_npc(CARNIVAL_GUIDE, &leader).is_none());
     }
 
     #[test]
@@ -24932,10 +25050,11 @@ mod tests {
             let mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
             slide(&mirror.begin())
         };
-        let [ariant, dojo, carnival, pyramid, subway] = [
+        let [ariant, dojo, carnival, carnival2, pyramid, subway] = [
             keys::MIRROR_ARIANT,
             keys::MIRROR_DOJO,
             keys::MIRROR_CARNIVAL,
+            keys::MIRROR_CARNIVAL2,
             keys::MIRROR_PYRAMID,
             keys::MIRROR_SUBWAY,
         ]
@@ -24950,7 +25069,8 @@ mod tests {
         );
         assert_eq!(menu(31), format!("#1#{dojo}#2#{carnival}"));
         assert_eq!(menu(40), format!("#1#{dojo}#2#{carnival}#5#{pyramid}"));
-        assert_eq!(menu(51), format!("#1#{dojo}#5#{pyramid}"));
+        assert_eq!(menu(51), format!("#1#{dojo}#3#{carnival2}#5#{pyramid}"));
+        assert_eq!(menu(71), format!("#1#{dojo}#5#{pyramid}"));
     }
 
     #[test]
@@ -24980,7 +25100,15 @@ mod tests {
             assert_eq!(pick(id), None);
         }
         // The Coliseum, to levels 20 to 30, lands by the lobby's way out,
-        // and the Abandoned Subway, to 25 to 30, by the hub's.
+        // and the Abandoned Subway, to 25 to 30, by the hub's; Carnival
+        // Field 2, to 51 to 70, by its `st00`.
+        traveller.stats.level = 60;
+        let mut mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
+        mirror.begin();
+        assert_eq!(
+            mirror.respond(ScriptInput::Select(3)),
+            went(CARNIVAL_RETURN, carnival::CARNIVAL2_LOBBY, 3)
+        );
         traveller.stats.level = 25;
         let mut mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
         mirror.begin();

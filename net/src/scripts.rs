@@ -2519,8 +2519,16 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         script if script.starts_with("MCrevive") => {
             let room = script["MCrevive".len()..].parse::<u8>().ok()?;
             let battle = crate::carnival::battle_map(room);
-            (crate::carnival::battle_room(battle) == Some(room))
+            let first = !crate::carnival::second(room);
+            (first && crate::carnival::battle_room(battle) == Some(room))
                 .then(|| through(Effect::WarpToPortal(battle, 0)))?
+        }
+        // Carnival Field 2's revive rooms share one script, back into the
+        // battle of the room the player is in (Cosmic `MC2revive`).
+        "MC2revive" => {
+            let room = crate::carnival::revive_room(player.stats.map_id)
+                .filter(|&room| crate::carnival::second(room))?;
+            through(Effect::WarpToPortal(crate::carnival::battle_map(room), 0))
         }
         // Out of the Mu Lung Dojo, back to where its notice board was
         // taken from (Cosmic `dojang_exit`).
@@ -6720,6 +6728,12 @@ mod tests {
             [Effect::PortalSound, Effect::WarpToPortal(980000301, 0)]
         );
         assert_eq!(portal("MCrevive7", &player), None);
+        assert_eq!(portal("MC2revive", &player), None);
+        player.stats.map_id = 980032200;
+        assert_eq!(
+            portal("MC2revive", &player).unwrap().effects,
+            [Effect::PortalSound, Effect::WarpToPortal(980032100, 0)]
+        );
     }
 
     #[test]
