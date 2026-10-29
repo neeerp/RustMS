@@ -2042,8 +2042,9 @@ namespace ms
 		}
 	}
 
-	// Too few letters for the rank ask again (FUN_00916e8d), so the prompt
-	// itself takes any.
+	// The prompt keeps too few letters for the rank open itself (the input
+	// dialog's min length, FUN_00916e8d); edit_title still catches a title
+	// too short once trimmed.
 	void UIUserList::prompt_title(int32_t rank)
 	{
 		UI::get().emplace<UIEnterText>(
@@ -2054,7 +2055,8 @@ namespace ms
 						userlist->edit_title(rank, text);
 				},
 				Guild::MAX_TITLE,
-				true
+				true,
+				Guild::min_title(rank)
 		);
 	}
 

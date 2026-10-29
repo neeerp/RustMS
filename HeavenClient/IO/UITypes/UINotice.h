@@ -144,8 +144,14 @@ namespace ms
 	class UIEnterText : public UINotice
 	{
 	public:
+		// The number prompt's slot, not a notice's, so that its own notice
+		// can show over it.
+		static constexpr Type TYPE = UIElement::Type::ENTERNUMBER;
+
+		// Text shorter than min (empty included) says 0x335 and keeps the
+		// prompt open, as v83's input dialog does.
 		UIEnterText(std::string message, std::function<void(const std::string &text)> texthandler, size_t limit,
-					bool allow_empty = false);
+					bool allow_empty = false, size_t min = 0);
 
 		void draw(float alpha) const override;
 
@@ -173,6 +179,7 @@ namespace ms
 		std::function<void(const std::string &text)> texthandler;
 		Textfield textfield;
 		bool allow_empty;
+		size_t min;
 	};
 
 	class UIOk : public UINotice

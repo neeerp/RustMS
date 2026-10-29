@@ -69,8 +69,8 @@ namespace ms
 		constexpr size_t UNION_GUILD_MAX = 14;
 
 		// BtInvite's prompt (0x914cfe, StringPool 0x1165). A name under
-		// 4 letters gets 0x335 and v83's prompt stays open; here it comes
-		// back.
+		// 4 letters gets 0x335 and the prompt stays open; one that is too
+		// short once trimmed asks again.
 		void prompt_union_invite()
 		{
 			UI::get().emplace<UIEnterText>(
@@ -87,7 +87,7 @@ namespace ms
 						else
 							InviteToAlliancePacket(name).dispatch();
 					},
-					UNION_GUILD_MAX, true
+					UNION_GUILD_MAX, true, UNION_GUILD_MIN
 			);
 		}
 
@@ -850,7 +850,8 @@ namespace ms
 						userlist->edit_union_title(rank, text);
 				},
 				Guild::MAX_TITLE,
-				true
+				true,
+				Guild::min_title(rank)
 		);
 	}
 

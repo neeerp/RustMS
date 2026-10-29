@@ -313,8 +313,8 @@ namespace ms
 	}
 
 	UIEnterText::UIEnterText(std::string message, std::function<void(const std::string &)> th, size_t limit,
-							 bool allow_empty)
-			: UINotice(message, NoticeType::ENTERNUMBER), texthandler(th), allow_empty(allow_empty)
+							 bool allow_empty, size_t min)
+			: UINotice(message, NoticeType::ENTERNUMBER), texthandler(th), allow_empty(allow_empty), min(min)
 	{
 		nl::node src = NxFiles::ui_classic["Basic.img"];
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], LEFT_BUTTON_X, buttons_y());
@@ -397,6 +397,19 @@ namespace ms
 	void UIEnterText::submit()
 	{
 		std::string text = textfield.get_text();
+
+		if (text.size() < min)
+		{
+			textfield.set_state(Textfield::State::DISABLED);
+			UI::get().emplace<UIOk>(
+					"Please enter at least " + std::to_string(min) + " characters.",
+					[&](bool)
+					{
+						textfield.set_state(Textfield::State::FOCUSED);
+					}
+			);
+			return;
+		}
 
 		if (text.empty() && !allow_empty)
 			return;
