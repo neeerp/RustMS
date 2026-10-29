@@ -30,6 +30,7 @@ services:
       RUSTMS_DATABASE_URL: postgres://maplestory:pass@db:5432/maplestory_test
       RUSTMS_LOGIN_BIND_ADDR: 0.0.0.0:8484
       RUSTMS_LOGIN_CHANNELS: Scania-1@127.0.0.1:${HARNESS_WORLD_PORT:-18485}@700;Scania-2@127.0.0.1:${HARNESS_WORLD_PORT_2:-18486}@700;Scania-3@127.0.0.1:${HARNESS_WORLD_PORT_3:-18487}@700
+      RUSTMS_LOGIN_WORLD_POPULATED: ${RUSTMS_LOGIN_WORLD_POPULATED:-0}
     volumes:
       - ${HARNESS_ASSETS_DIR:-../assets}:/app/assets:ro
     ports:

@@ -49,6 +49,9 @@ namespace ms
 		const Point<int16_t> SCROLL_POS = Point<int16_t>(158, 79);
 		const Point<int16_t> CHANNEL_BACKGROUND_POS = Point<int16_t>(420, 341);
 		const Point<int16_t> WORLD_NAME_POS = Point<int16_t>(229, 220);
+		// v83 draws the banner at (260, 10) and the name at (33, 0) in the
+		// channel window (FUN_00628c14).
+		const Point<int16_t> POPULATED_POS = WORLD_NAME_POS + Point<int16_t>(227, 10);
 
 		// Channels fill four columns, up to twenty in all.
 		constexpr uint8_t CHANNEL_SLOTS = 20;
@@ -150,6 +153,7 @@ namespace ms
 			scroll_opened.draw(position + SCROLL_POS);
 			channel_background.draw(position + CHANNEL_BACKGROUND_POS);
 			world_name.draw(position + WORLD_NAME_POS);
+			populated.draw(position + POPULATED_POS);
 
 			const World &world = worlds[selected];
 
@@ -491,7 +495,7 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
-	void UIWorldSelect::server_status(uint8_t status)
+	void UIWorldSelect::server_status(uint8_t status, uint8_t populated_level)
 	{
 		// v83 stops waiting before it looks at the status.
 		status_pending = false;
@@ -517,6 +521,7 @@ namespace ms
 
 		const World &world = worlds[selected];
 		world_name = NxFiles::ui_classic["Login.img"]["WorldSelect"]["world"][std::to_string(world.wid)];
+		populated = populated_level ? Texture(NxFiles::ui_classic["Login.img"]["WorldNotice"]["Populated"][std::to_string(populated_level)]) : Texture();
 
 		if (channelid >= world.channelcount)
 			channelid = 0;

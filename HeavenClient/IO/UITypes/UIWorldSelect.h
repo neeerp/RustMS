@@ -65,8 +65,9 @@ namespace ms
 
 		// The answer to the status request a picked world sent: 0 opens its
 		// channels, 1 also warns that it's busy, 2 says it's full and keeps
-		// the list (FUN_006283c1).
-		void server_status(uint8_t status);
+		// the list (FUN_006283c1). `populated_level` picks the banner beside the
+		// world's name, 0 for none.
+		void server_status(uint8_t status, uint8_t populated_level);
 
 		// The v83 art for a world is keyed by the world id itself.
 		std::string get_world_name(uint8_t worldid) const;
@@ -123,6 +124,8 @@ namespace ms
 		Texture scroll_opened;
 		Texture channel_background;
 		Texture world_name;
+		// WorldNotice/Populated/<n>, empty for none.
+		Texture populated;
 		std::vector<Texture> channels;
 		Texture gauge;
 		Animation channel_select;

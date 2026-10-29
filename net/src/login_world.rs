@@ -38,6 +38,22 @@ pub fn load_login_worlds() -> Result<Vec<LoginWorld>, ConfigError> {
     }
 }
 
+/// The banner a world's channel list shows beside its name
+/// (`Login.img/WorldNotice/Populated/<n>`): 0 for none, 1 for a busy world
+/// and 2 for a crowded one. RustMS counts no population, so this comes from
+/// `RUSTMS_LOGIN_WORLD_POPULATED` and is off by default.
+pub fn world_populated() -> Result<u8, ConfigError> {
+    match env::var("RUSTMS_LOGIN_WORLD_POPULATED") {
+        Ok(value) => match parse_u8_env("RUSTMS_LOGIN_WORLD_POPULATED", &value)? {
+            populated @ 0..=2 => Ok(populated),
+            _ => Err(ConfigError::Message(
+                "RUSTMS_LOGIN_WORLD_POPULATED must be 0, 1 or 2".to_string(),
+            )),
+        },
+        Err(_) => Ok(0),
+    }
+}
+
 pub fn resolve_login_channel(world_id: u8, channel_id: u8) -> Result<LoginChannel, ConfigError> {
     let worlds = load_login_worlds()?;
     let world = worlds

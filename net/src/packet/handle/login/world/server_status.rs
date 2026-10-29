@@ -1,5 +1,5 @@
 use crate::handler::{HandlerResult, LoginContext, LoginHandler, LoginResult};
-use crate::login_world::load_login_worlds;
+use crate::login_world::{load_login_worlds, world_populated};
 use crate::packet::build::login::world;
 use packet::Packet;
 
@@ -13,6 +13,9 @@ impl LoginHandler for ServerStatusHandler {
         } else {
             2
         };
-        Ok(HandlerResult::reply(world::build_server_status(status)?))
+        Ok(HandlerResult::reply(world::build_server_status(
+            status,
+            world_populated()?,
+        )?))
     }
 }

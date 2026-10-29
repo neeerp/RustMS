@@ -25,6 +25,11 @@ Dependencies point one way: `game` ← `db` ← `net` ← `runtime` ← `rust-ms
   three channels on `127.0.0.1:8485`, `8486`, `8487`. Ports must be unique: the
   world identifies a connection's channel by the listener that accepted it,
   because a v83 client's `PLAYER_LOGGEDIN` carries only the character id.
+- `RUSTMS_LOGIN_WORLD_POPULATED` (0, 1 or 2; default 0) is the banner the
+  client's channel list shows beside the world's name: 1 is "Highly
+  Populated" and 2 "Over-Populated" (`Login.img/WorldNotice/Populated`). It's
+  the second byte of the answer to a world pick (`SERVERSTATUS`); RustMS
+  counts no population, so it's off unless set.
 
 Both binaries apply pending database migrations at startup (embedded in the
 `db` crate, serialized with a Postgres advisory lock).

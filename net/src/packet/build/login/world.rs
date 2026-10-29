@@ -70,12 +70,17 @@ pub fn build_send_recommended_worlds() -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
-pub fn build_server_status(status: i16) -> Result<Packet, NetworkError> {
+/// The answer to a world pick (v83 FUN_005f92ae): `status` 0 opens the
+/// channel list, 1 opens it after a "many concurrent users" notice and 2
+/// refuses with "reached the max". `populated` picks the banner the list
+/// shows beside the world's name (`WorldNotice/Populated/<n>`), 0 for none.
+pub fn build_server_status(status: u8, populated: u8) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let op = SendOpcode::ServerStatus as i16;
 
     packet.write_short(op)?;
-    packet.write_short(status)?; // Highly populated status!
+    packet.write_byte(status)?;
+    packet.write_byte(populated)?;
 
     Ok(packet)
 }
@@ -179,11 +184,12 @@ mod tests {
     }
 
     #[test]
-    fn server_status_is_a_short() {
-        let packet = build_server_status(1).unwrap();
+    fn server_status_is_the_status_then_the_banner() {
+        let packet = build_server_status(1, 2).unwrap();
         Expect::new(&packet.bytes)
             .short(SendOpcode::ServerStatus as i16)
-            .short(1)
+            .byte(1)
+            .byte(2)
             .end();
     }
 

@@ -140,13 +140,12 @@ namespace ms
 	void ServerStatusHandler::handle(InPacket& recv) const
 	{
 		// 0 normal, 1 busy, 2 full (FUN_005f92ae). The second byte picks a
-		// busy banner (WorldNotice/Populated) for the channel list, which
-		// isn't drawn here.
+		// banner (WorldNotice/Populated) for the channel list.
 		uint8_t status = recv.read_byte();
-		recv.read_byte();
+		uint8_t populated = recv.read_byte();
 
 		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
-			worldselect->server_status(status);
+			worldselect->server_status(status, populated);
 	}
 
 	void ServerlistHandler::handle(InPacket& recv) const
