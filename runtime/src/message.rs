@@ -752,6 +752,10 @@ pub enum FieldMessage {
     MobCount {
         reply: tokio::sync::oneshot::Sender<usize>,
     },
+    /// The form of a Holiday PQ arena's snowman, none (0) until it is out.
+    HolidaySnowman {
+        reply: tokio::sync::oneshot::Sender<u8>,
+    },
     /// How many drops, items or mesos, lie on the map.
     DropCount {
         reply: tokio::sync::oneshot::Sender<usize>,

@@ -220,6 +220,7 @@ impl ClientActor {
                     })
                 }
                 Effect::ClearMobs => to_field.push(FieldRequest::ClearMobs),
+                Effect::BringOutSnowman => to_field.push(FieldRequest::BringOutSnowman),
                 Effect::OpenGuildNamePrompt => {
                     name_guild = true;
                     afterwards.push(guild::build_name_prompt()?);

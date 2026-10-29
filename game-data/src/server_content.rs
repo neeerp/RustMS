@@ -2683,6 +2683,13 @@ pub mod keys {
     pub const HOLIDAY_BUSY: &str = "holiday.busy";
     pub const HOLIDAY_SNOWMAN_HOME: &str = "holiday.snowman.home";
     pub const HOLIDAY_SNOWMAN_LEAVE: &str = "holiday.snowman.leave";
+    pub const HOLIDAY_ARENA_INTRO: &str = "holiday.arena.intro";
+    pub const HOLIDAY_ARENA_LEADER: &str = "holiday.arena.leader";
+    pub const HOLIDAY_ARENA_GROW: &str = "holiday.arena.grow";
+    pub const HOLIDAY_ARENA_GROWN: &str = "holiday.arena.grown";
+    pub const HOLIDAY_SNOWMAN_OUT: &str = "holiday.snowman.out";
+    pub const HOLIDAY_FAKE_VIGOR: &str = "holiday.fake_vigor";
+    pub const HOLIDAY_SNOWMAN_MELTED: &str = "holiday.snowman.melted";
     pub const PIRATE_GUON_DOORS: &str = "pirate.guon.doors";
     pub const PIRATE_GUON_BOSS: &str = "pirate.guon.boss";
     pub const PIRATE_PORTAL_SHUT: &str = "pirate.portal_shut";
@@ -4323,6 +4330,13 @@ mod tests {
                 keys::HOLIDAY_BUSY,
                 keys::HOLIDAY_SNOWMAN_HOME,
                 keys::HOLIDAY_SNOWMAN_LEAVE,
+                keys::HOLIDAY_ARENA_INTRO,
+                keys::HOLIDAY_ARENA_LEADER,
+                keys::HOLIDAY_ARENA_GROW,
+                keys::HOLIDAY_ARENA_GROWN,
+                keys::HOLIDAY_SNOWMAN_OUT,
+                keys::HOLIDAY_FAKE_VIGOR,
+                keys::HOLIDAY_SNOWMAN_MELTED,
                 keys::PIRATE_GUON_DOORS,
                 keys::PIRATE_GUON_BOSS,
                 keys::PIRATE_PORTAL_SHUT,

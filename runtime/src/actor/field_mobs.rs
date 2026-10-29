@@ -1761,6 +1761,16 @@ impl MobSet {
         true
     }
 
+    /// No mobs come until `open` (Cosmic `allowSummonState(false)`).
+    pub fn shut(&mut self) {
+        self.closed = true;
+    }
+
+    /// Mobs come again (Cosmic `allowSummonState(true)`).
+    pub fn open(&mut self) {
+        self.closed = false;
+    }
+
     /// Every mob that isn't friendly goes without a trace, nothing comes
     /// out of those dying, and no more come (Cosmic
     /// `killAllMonstersNotFriendly`, which closes the spawn points). Returns

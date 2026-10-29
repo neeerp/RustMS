@@ -3960,12 +3960,12 @@ const fn holiday(level: u8) -> Event {
         team: 3..=6,
         married: false,
         minutes: 10 + level as u64 * 5,
-        exp_per_stage: &[],
+        exp_per_stage: &HOLIDAY_EXP[level as usize - 1],
         meso_per_stage: &[],
         stride: 1,
-        stage_maps: &[],
+        stage_maps: &HOLIDAY_STAGES[level as usize - 1],
         talk_clears: &[],
-        member_clears: &[],
+        member_clears: &[HOLIDAY_SNOWMAN_STAGE],
         clear_portals: &[],
         stage_copies: &[],
         gated: &[],
@@ -3990,10 +3990,130 @@ const fn holiday(level: u8) -> Event {
 /// The Holiday PQ by difficulty, easy first.
 pub const HOLIDAY: [Event; 3] = [holiday(1), holiday(2), holiday(3)];
 
+/// The EXP of the Holiday PQ's two stages, the snowman whole and Scrooge
+/// beaten, by difficulty, easy first (Cosmic's).
+const HOLIDAY_EXP: [[i32; 2]; 3] = [[210, 620], [500, 1400], [950, 2200]];
+
+/// Both stages of the Holiday PQ are played in its arena.
+const HOLIDAY_STAGES: [[i32; 2]; 3] = [
+    [HOLIDAY_LOBBIES[0] + 1; 2],
+    [HOLIDAY_LOBBIES[1] + 1; 2],
+    [HOLIDAY_LOBBIES[2] + 1; 2],
+];
+
 /// The Holiday PQ's difficulty (1 to 3) whose lobby is `map_id`.
 pub fn holiday_lobby(map_id: i32) -> Option<u8> {
     let index = HOLIDAY_LOBBIES.iter().position(|&lobby| lobby == map_id)?;
     Some(index as u8 + 1)
+}
+
+/// The Holiday PQ's difficulty (1 to 3) whose arena is `map_id`.
+pub fn holiday_arena(map_id: i32) -> Option<u8> {
+    holiday_lobby(map_id - 1)
+}
+
+/// Whether Snow Vigor landing at `(x, y)` in a Holiday PQ arena is where
+/// the snowman eats it: the area of Cosmic's collectors (reactors 9400300
+/// and 9400301 at (-178, 32), from (-220, -24) to (220, 9) around it),
+/// which our Map.nx's arenas lack.
+pub fn holiday_feeds_at((x, y): (i16, i16)) -> bool {
+    (-178 - 220..=-178 + 220).contains(&x) && (32 - 24..=32 + 9).contains(&y)
+}
+/// The Holiday PQ's stage the snowman's last form clears.
+pub const HOLIDAY_SNOWMAN_STAGE: u8 = 1;
+/// Where the snowman comes out in an arena, on the ground below.
+pub const HOLIDAY_SNOWMAN_AT: (i16, i16) = (-180, 15);
+/// The snowman's forms, from the one the Snow Spirit brings out to the
+/// whole one.
+pub const HOLIDAY_FORMS: u8 = 5;
+
+/// The Giant Snowman of difficulty `level` (1 to 3) in its `form` (1 to
+/// 5): 9400322 to 9400326 on easy, the next five on medium, and so on.
+pub const fn holiday_snowman(level: u8, form: u8) -> i32 {
+    9_400_316 + 5 * level as i32 + form as i32
+}
+
+/// What a Holiday arena's snowman made of a Snow Vigor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Feeding {
+    /// It healed this much HP.
+    Healed(i32),
+    /// It grew into this form.
+    Grew(u8),
+}
+
+/// A Holiday arena's snowman: its form, none until the Snow Spirit brings
+/// it out, and how many Snow Vigor it has eaten in that form (Cosmic's
+/// `snowmanLevel` and `snowmanStep`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Snowman {
+    pub form: u8,
+    pub step: u8,
+}
+
+impl Snowman {
+    /// It eats a Snow Vigor in difficulty `level`: it heals 200 HP more
+    /// for each form, and after 2 more than `level` times its form, the
+    /// next one makes it grow. Nothing comes of it before it is out or
+    /// once it is whole.
+    pub fn feed(&mut self, level: u8) -> Option<Feeding> {
+        if self.form == 0 || self.form >= HOLIDAY_FORMS {
+            return None;
+        }
+        if self.step >= 2 + level * self.form {
+            self.step = 0;
+            self.form += 1;
+            return Some(Feeding::Grew(self.form));
+        }
+        self.step += 1;
+        Some(Feeding::Healed(200 + 200 * i32::from(self.form)))
+    }
+
+    /// It eats a Fake Snow Vigor, which takes a step back. Whether it ate
+    /// it: not before it is out or once it is whole.
+    pub fn fake(&mut self) -> bool {
+        if self.form == 0 || self.form >= HOLIDAY_FORMS {
+            return false;
+        }
+        self.step = self.step.saturating_sub(1);
+        true
+    }
+
+    /// It melted under the mobs' blows: the form before comes back, from
+    /// its first step, or none from the first form or the whole one, which
+    /// loses the event (QUESTIONS b297).
+    pub fn melted(&mut self) -> Option<u8> {
+        self.step = 0;
+        if (2..HOLIDAY_FORMS).contains(&self.form) {
+            self.form -= 1;
+            return Some(self.form);
+        }
+        self.form = 0;
+        None
+    }
+}
+
+/// Snow Vigor, which grows the snowman, and its fake.
+pub const SNOW_VIGOR: i32 = HOLIDAY_ITEMS[0];
+pub const FAKE_SNOW_VIGOR: i32 = HOLIDAY_ITEMS[1];
+
+/// What a mob killed in a Holiday arena leaves for the snowman, by two
+/// rolls in 0 to 1, after `misses` kills that left nothing: 42 in a
+/// hundred leave something, and the sixth in a row surely does; of what
+/// is left, 77 in a hundred are Snow Vigor, the rest fake, but a sure one
+/// is always real (Cosmic `monsterKilled`).
+pub fn holiday_token(misses: &mut u8, roll: f64, real: f64) -> Option<i32> {
+    let missed = roll >= 0.42;
+    if missed && *misses < 5 {
+        *misses += 1;
+        return None;
+    }
+    *misses = 0;
+    Some(if missed || real < 0.77 {
+        SNOW_VIGOR
+    } else {
+        FAKE_SNOW_VIGOR
+    })
 }
 
 /// Kerning Square's 7th floor, 103040400, where June (1052125) keeps the
@@ -5908,6 +6028,66 @@ mod tests {
         assert_eq!(holiday_lobby(889100010), Some(2));
         assert_eq!(holiday_lobby(889100011), None);
         assert!(event_map(889100021) && !event_map(889100020) && !event_map(889100022));
+        assert_eq!(holiday_arena(889100021), Some(3));
+        assert_eq!(holiday_arena(889100020), None);
+        assert_eq!((hard.stage_exp(1), hard.stage_exp(2)), (950, 2200));
+        assert_eq!((hard.stage_map(2), hard.last_stage()), (889100021, 2));
+        assert_eq!(EventKind::Holiday(1).event().exp_per_stage, [210, 620]);
+    }
+
+    #[test]
+    fn the_holiday_snowman_grows_on_snow_vigor_and_melts_back() {
+        // It eats what lands on the ground about it.
+        assert!(holiday_feeds_at((-178, 25)));
+        assert!(holiday_feeds_at((-398, 8)) && holiday_feeds_at((42, 41)));
+        assert!(!holiday_feeds_at((43, 25)) && !holiday_feeds_at((-178, 42)));
+        assert_eq!(holiday_snowman(1, 1), 9400322);
+        assert_eq!(holiday_snowman(3, 5), 9400336);
+        // Nothing comes of it before the Snow Spirit brings it out.
+        let mut snowman = Snowman::default();
+        assert_eq!(snowman.feed(1), None);
+        assert!(!snowman.fake());
+        // 22, 32 and 42 to grow it whole, healing more each form.
+        for (level, feeds) in [(1, 22), (2, 32), (3, 42)] {
+            let mut snowman = Snowman { form: 1, step: 0 };
+            let mut grew = Vec::new();
+            let mut n = 0;
+            while snowman.form < HOLIDAY_FORMS {
+                n += 1;
+                match snowman.feed(level).unwrap() {
+                    Feeding::Grew(form) => grew.push(form),
+                    Feeding::Healed(hp) => assert_eq!(hp, 200 + 200 * i32::from(snowman.form)),
+                }
+            }
+            assert_eq!((n, grew), (feeds, vec![2, 3, 4, 5]));
+            assert_eq!(snowman.feed(level), None);
+            assert!(!snowman.fake());
+        }
+        // A fake takes a step back, but no further than the form's first.
+        let mut snowman = Snowman { form: 2, step: 1 };
+        assert!(snowman.fake() && snowman.fake());
+        assert_eq!(snowman, Snowman { form: 2, step: 0 });
+        // Melting brings the form before back from its first step; the
+        // first form and the whole one lose it.
+        let mut snowman = Snowman { form: 3, step: 4 };
+        assert_eq!(snowman.melted(), Some(2));
+        assert_eq!(snowman, Snowman { form: 2, step: 0 });
+        assert_eq!(Snowman { form: 1, step: 2 }.melted(), None);
+        assert_eq!(Snowman { form: 5, step: 0 }.melted(), None);
+    }
+
+    #[test]
+    fn holiday_kills_leave_snow_vigor_now_and_then_and_surely_after_five_misses() {
+        let mut misses = 0;
+        assert_eq!(holiday_token(&mut misses, 0.1, 0.5), Some(SNOW_VIGOR));
+        assert_eq!(holiday_token(&mut misses, 0.41, 0.8), Some(FAKE_SNOW_VIGOR));
+        for n in 1..=5 {
+            assert_eq!(holiday_token(&mut misses, 0.9, 0.0), None);
+            assert_eq!(misses, n);
+        }
+        // The sixth miss in a row leaves a real one, whatever the roll.
+        assert_eq!(holiday_token(&mut misses, 0.9, 0.99), Some(SNOW_VIGOR));
+        assert_eq!(misses, 0);
     }
 
     #[test]

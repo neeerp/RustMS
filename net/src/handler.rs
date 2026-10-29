@@ -1003,6 +1003,9 @@ pub enum FieldRequest {
     /// A script sends away every mob here that isn't friendly
     /// (`scripts::Effect::ClearMobs`).
     ClearMobs,
+    /// The Snow Spirit brings out a Holiday PQ arena's snowman
+    /// (`scripts::Effect::BringOutSnowman`).
+    BringOutSnowman,
     /// The player threw the catch item in USE `slot` at the mob `object_id`:
     /// catch it if it is a `catch.mob` within `catch.area` of them, below
     /// `catch.mob_hp` percent of its HP. Answered with
