@@ -134,6 +134,10 @@ player's `ClientActor` holds the game they're at
 - `Character/MiniRoomBalloon.cpp` draws the balloon: the title wrapped
   once, the game's icon, lock and seats, or the Progress sign while a game
   is on.
+- Hovering someone's balloon shows the game cursor over a game and the
+  house cursor over a shop. If the title was cut short with "..", a tooltip
+  also shows the whole title 20 px below and right of the cursor
+  (FUN_0094cfc3, balloon+0x58).
 
 ## Tests
 

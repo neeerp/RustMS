@@ -124,6 +124,7 @@ namespace ms
 		first = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, box->title.substr(0, fits), 0, false);
 		second = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, box->title.substr(fits), 0, false);
 		string_format::format_with_ellipsis(second, TITLE_WIDTH);
+		cut_title = second.get_text() == box->title.substr(fits) ? "" : box->title;
 	}
 
 	void MiniRoomBalloon::draw(Point<int16_t> feet, int16_t avatar_height) const
@@ -156,7 +157,7 @@ namespace ms
 			Point<int16_t> cursor) const
 	{
 		if (shown && bounds(feet, avatar_height).contains(cursor))
-			return MiniRoomHit{ serial, game, locked };
+			return MiniRoomHit{ serial, game, locked, cut_title };
 
 		return std::nullopt;
 	}

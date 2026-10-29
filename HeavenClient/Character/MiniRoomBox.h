@@ -27,5 +27,7 @@ namespace ms
 		int32_t serial = 0;
 		bool game = false;
 		bool locked = false;
+		// The whole title, if the balloon had to cut it short.
+		std::string cut_title;
 	};
 }

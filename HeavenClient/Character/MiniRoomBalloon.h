@@ -49,5 +49,7 @@ namespace ms
 		Texture max_users;
 		Text first;
 		Text second;
+		// The whole title, if the second line ends in ".." (balloon+0x58).
+		std::string cut_title;
 	};
 }

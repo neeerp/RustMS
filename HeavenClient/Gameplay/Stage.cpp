@@ -1628,15 +1628,26 @@ namespace ms
 									pressed, UI::get().is_cursor_pressed());
 
 		// A shop's balloon shows the house cursor, a game's the game one
-		// (FUN_00531cc7).
+		// (FUN_00531cc7). One whose title was cut short shows it whole
+		// (FUN_0094cfc3).
+		std::string cut_title;
+
 		if (npcstate == Cursor::State::IDLE)
 			if (std::optional<MiniRoomHit> hit = mini_room_at(position))
+			{
 				npcstate = hit->game ? Cursor::State::GAME : Cursor::State::HOUSE;
+				cut_title = hit->cut_title;
+			}
 
 		// Then a kite shows whose it is, with the arrow (FUN_0094cfc3).
 		const MapKites::Kite *flown = npcstate == Cursor::State::IDLE ? kite_at(position) : nullptr;
 
-		if (flown)
+		if (!cut_title.empty())
+		{
+			tooltips.leave();
+			UI::get().show_line(Tooltip::Parent::FIELD, cut_title);
+		}
+		else if (flown)
 		{
 			tooltips.leave();
 			UI::get().show_line(Tooltip::Parent::FIELD, kite::hover_text(flown->name, flown->item_msg));
