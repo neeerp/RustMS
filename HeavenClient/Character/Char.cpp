@@ -69,10 +69,13 @@ namespace ms
 		energy_glow.drawbelow(absp, alpha);
 		berserk_aura.drawbelow(absp, alpha);
 		divine_body.drawbelow(absp, alpha);
-		power_explosion.drawbelow(absp, alpha);
+		if (item_aura_id == 0)
+			power_explosion.drawbelow(absp, alpha);
 
 		if (!look.get_morph())
 			consume_aura.drawbelow(absp, alpha);
+
+		item_aura.drawbelow(absp, alpha);
 
 		if (dashing && phobj.onground)
 			dash_dust.draw(DrawArgument(absp, facing_right), alpha);
@@ -197,10 +200,13 @@ namespace ms
 		energy_glow.drawabove(absp, alpha);
 		berserk_aura.drawabove(absp, alpha);
 		divine_body.drawabove(absp, alpha);
-		power_explosion.drawabove(absp, alpha);
+		if (item_aura_id == 0)
+			power_explosion.drawabove(absp, alpha);
 
 		if (!look.get_morph())
 			consume_aura.drawabove(absp, alpha);
+
+		item_aura.drawabove(absp, alpha);
 
 		for (const RingDisplay &ring : rings)
 		{
@@ -283,6 +289,7 @@ namespace ms
 		divine_body.update();
 		power_explosion.update();
 		consume_aura.update();
+		item_aura.update();
 
 		for (RingDisplay &ring : rings)
 		{
@@ -693,18 +700,36 @@ namespace ms
 							  ["repeat"], DrawArgument(facing_right), 0, 1.0f);
 	}
 
+	namespace
+	{
+		// Loop `Effect/ItemEff.img/<item>` on `layer` at the item's `z`, clamped to -5..20, 5 without one.
+		void loop_item_effect(EffectLayer &layer, int32_t item)
+		{
+			layer.clear();
+
+			if (item == 0)
+				return;
+
+			nl::node src = nl::nx::effect["ItemEff.img"][std::to_string(item)];
+			nl::node z = src["z"];
+			int8_t at = z ? static_cast<int8_t>(std::clamp<int64_t>(z.get_integer(), -5, 20)) : 5;
+
+			layer.add_looping(src, DrawArgument(), at, 1.0f);
+		}
+	}
+
 	void Char::show_consume_effect(int32_t item)
 	{
-		consume_aura.clear();
+		loop_item_effect(consume_aura, item);
+	}
 
-		if (item == 0)
+	void Char::show_item_aura(int32_t item)
+	{
+		if (item == item_aura_id)
 			return;
 
-		nl::node src = nl::nx::effect["ItemEff.img"][std::to_string(item)];
-		nl::node z = src["z"];
-		int8_t layer = z ? static_cast<int8_t>(std::clamp<int64_t>(z.get_integer(), -5, 20)) : 5;
-
-		consume_aura.add_looping(src, DrawArgument(), layer, 1.0f);
+		item_aura_id = item;
+		loop_item_effect(item_aura, item);
 	}
 
 	void Char::show_ring(RingKind kind, const RingEffect &effect)

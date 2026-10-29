@@ -172,6 +172,10 @@ namespace ms
 
 			if (stat == Buffstat::Id::BERSERK_FURY)
 				show_power_explosion(pq_skills::family(job, pq_skills::POWER_EXPLOSION));
+
+			// Its reason is the item, negated.
+			if (stat == Buffstat::Id::ITEM_AURA)
+				show_item_aura(-value);
 		}
 
 		show_diseases();
@@ -224,6 +228,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::BERSERK_FURY)
 				show_power_explosion(0);
+
+			if (stat == Buffstat::Id::ITEM_AURA)
+				show_item_aura(0);
 		}
 
 		show_diseases();

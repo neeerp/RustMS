@@ -102,7 +102,8 @@ mode on a channel, as many as the maps have copies.
   `checkBuffs`). One attack may pass more than one.
   - One with a `buff` gives every living member on the run's maps that
     item's effect, Pharaoh's Blessing 2022585 to 2022588
-    (`ServerMessage::PyramidBlessing`).
+    (`ServerMessage::PyramidBlessing`): Booster and its aura (`combat.md`,
+    "Item auras").
   - One with `skillUse` gives the run a use of Rage of Pharaoh, and the
     members hear `massacre_skill` again.
   - Cosmic writes the counts in code, and never moves past 1500 (it adds a

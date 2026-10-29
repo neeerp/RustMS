@@ -134,6 +134,7 @@ pub(crate) fn write_shown(
             | BuffStat::Seduce
             | BuffStat::Undead
             | BuffStat::Confuse
+            | BuffStat::ItemAura
             | BuffStat::StopPotion
             | BuffStat::StopMotion
             | BuffStat::Fear => {
@@ -550,6 +551,32 @@ mod tests {
         expect.short(SendOpcode::GiveBuff as i16);
         expect.long(1 << 42).long(0);
         expect.short(200).int(-2450000).int(1_800_000);
+        expect.byte(0).byte(0).short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn an_item_aura_sets_bit_73_and_shows_its_item() {
+        let given = [(BuffStat::Booster, -1), (BuffStat::ItemAura, 200)];
+        let packet = build_give_buff(-2022585, 2_400_000, &given).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(1 << 41).long(1 << 43);
+        expect.short(-1).int(-2022585).int(2_400_000);
+        expect.short(200).int(-2022585).int(2_400_000);
+        expect.byte(0).byte(0).short(0);
+        expect.end();
+
+        let shown = [ShownBuff {
+            stat: BuffStat::ItemAura,
+            value: 200,
+            skill_id: -2022585,
+        }];
+        let packet = build_give_foreign_buff(7, &shown).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
+        expect.long(1 << 41).long(0);
+        expect.int(-2022585);
         expect.byte(0).byte(0).short(0);
         expect.end();
     }

@@ -492,7 +492,8 @@ impl ClientActor {
             }
             self.apply(action).await?;
         }
-        Ok(())
+        // Whatever the packet did to the buffs, the aura follows.
+        self.refresh_aura().await
     }
 
     async fn apply(&mut self, action: WorldAction) -> Result<(), RuntimeError> {

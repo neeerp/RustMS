@@ -1368,6 +1368,9 @@ namespace ms
 		if (buff.stat == Buffstat::Id::BERSERK_FURY)
 			show_power_explosion(pq_skills::family(stats.get_stat(MapleStat::Id::JOB), pq_skills::POWER_EXPLOSION));
 
+		if (buff.stat == Buffstat::Id::ITEM_AURA)
+			show_item_aura(-buff.skillid);
+
 		show_diseases();
 	}
 
@@ -1394,6 +1397,9 @@ namespace ms
 
 		if (stat == Buffstat::Id::BERSERK_FURY)
 			show_power_explosion(0);
+
+		if (stat == Buffstat::Id::ITEM_AURA)
+			show_item_aura(0);
 
 		show_diseases();
 	}

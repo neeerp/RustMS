@@ -338,7 +338,7 @@ impl ConsumeSpec {
 }
 
 /// The `spec` keys of the stats a consumable raises.
-const SPEC_STATS: [(&str, BuffStat); 13] = [
+const SPEC_STATS: [(&str, BuffStat); 15] = [
     ("pad", BuffStat::Pad),
     ("pdd", BuffStat::Pdd),
     ("mad", BuffStat::Mad),
@@ -352,6 +352,8 @@ const SPEC_STATS: [(&str, BuffStat); 13] = [
     ("morph", BuffStat::Morph),
     ("ghost", BuffStat::Ghost),
     ("barrier", BuffStat::Barrier),
+    ("berserk", BuffStat::ItemAura),
+    ("booster", BuffStat::Booster),
 ];
 
 /// The `spec` keys of the diseases a consumable cures.
@@ -1210,6 +1212,18 @@ mod tests {
         let barrier = data.info(2022269).unwrap().unwrap().spec.unwrap();
         assert_eq!(barrier.stats, [(BuffStat::Barrier, 1)]);
         assert!(barrier.consume_on_pickup);
+    }
+
+    #[test]
+    fn pharaohs_blessing_gives_its_aura_and_a_booster() {
+        let Some(data) = data() else {
+            return;
+        };
+        let blessing = data.info(2022585).unwrap().unwrap().spec.unwrap();
+        let mut stats = blessing.stats.clone();
+        stats.sort_by_key(|&(stat, _)| stat.bit());
+        assert_eq!(stats, [(BuffStat::Booster, -1), (BuffStat::ItemAura, 200)]);
+        assert_eq!(blessing.time, 2_400_000);
     }
 
     #[test]
