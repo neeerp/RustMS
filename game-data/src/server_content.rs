@@ -2891,6 +2891,17 @@ pub mod keys {
     pub const ARIANT_KING_SHORT: &str = "ariant_arena.king.short";
     pub const ARIANT_KING_INFO: &str = "ariant_arena.king.info";
     pub const ARIANT_CHAIR_FULL: &str = "ariant_arena.king.chair_full";
+    pub const TREASURE_MENU: &str = "treasure.charles.menu";
+    pub const TREASURE_ENTER: &str = "treasure.charles.enter";
+    pub const TREASURE_ABOUT: &str = "treasure.charles.about";
+    pub const TREASURE_INFO: &str = "treasure.charles.info";
+    pub const TREASURE_NO_PARTY: &str = "treasure.no_party";
+    pub const TREASURE_NOT_LEADER: &str = "treasure.not_leader";
+    pub const TREASURE_NOT_ELIGIBLE: &str = "treasure.not_eligible";
+    pub const TREASURE_BUSY: &str = "treasure.busy";
+    pub const TREASURE_MILLA_LOBBY: &str = "treasure.milla.lobby";
+    pub const TREASURE_MILLA_ROOM: &str = "treasure.milla.room";
+    pub const TREASURE_MILLA_LEAVE_ASK: &str = "treasure.milla.leave_ask";
     pub const CARNIVAL_SPIEGELMANN_GO: &str = "carnival.spiegelmann.go";
     pub const CARNIVAL_GUIDE_BACK: &str = "carnival.guide.back";
     pub const CARNIVAL_SPIEGELMANN_WAITING: &str = "carnival.spiegelmann.waiting";
@@ -4590,6 +4601,17 @@ mod tests {
                 keys::ARIANT_KING_SHORT,
                 keys::ARIANT_KING_INFO,
                 keys::ARIANT_CHAIR_FULL,
+                keys::TREASURE_MENU,
+                keys::TREASURE_ENTER,
+                keys::TREASURE_ABOUT,
+                keys::TREASURE_INFO,
+                keys::TREASURE_NO_PARTY,
+                keys::TREASURE_NOT_LEADER,
+                keys::TREASURE_NOT_ELIGIBLE,
+                keys::TREASURE_BUSY,
+                keys::TREASURE_MILLA_LOBBY,
+                keys::TREASURE_MILLA_ROOM,
+                keys::TREASURE_MILLA_LEAVE_ASK,
                 keys::CARNIVAL_SPIEGELMANN_GO,
                 keys::CARNIVAL_GUIDE_BACK,
                 keys::CARNIVAL_SPIEGELMANN_WAITING,

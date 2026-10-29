@@ -135,6 +135,9 @@ pub enum EventKind {
     /// by its host at Cesar (2101014) in the Coliseum's lobby
     /// (`crate::ariant`).
     Ariant(u8),
+    /// MV's Lair (Cosmic `TreasurePQ`), started at Charles (9220018) in
+    /// its lobby off New Leaf City.
+    Treasure,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -1684,6 +1687,60 @@ pub const TYLUS: Event = Event {
     puzzles: 1..=0,
     areas_taken: 0,
     items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+    alone: false,
+};
+
+/// MV's Lair's lobby, reached from New Leaf City, where the party gathers
+/// and everyone who leaves lands; the dungeon of its first stage, where
+/// the Guy Fawkes dolls hold secret letters; the cave of its second, where
+/// MV comes out of the rock; and MV's treasure room, its bonus.
+pub const TREASURE_LOBBY: i32 = 674_030_100;
+pub const TREASURE_DUNGEON: i32 = 674_030_000;
+pub const TREASURE_CAVE: i32 = 674_030_200;
+pub const TREASURE_ROOM: i32 = 674_030_300;
+/// A secret letter, from the dolls, of use only in the event.
+pub const SECRET_LETTER: i32 = 4_032_118;
+
+/// MV's Lair (Cosmic `TreasurePQ`, on what is left of a 2007 Guy Fawkes
+/// event in the client's data): four to six of a party, all of level 140
+/// or more, in the lobby with their leader, have 45 minutes for its two
+/// stages. The numbers are Cosmic's; the data has none
+/// (`v83ref/reports/b300-treasure-elnath-pq.md`).
+pub const TREASURE: Event = Event {
+    lobby: TREASURE_LOBBY,
+    entrances: &[],
+    maps: TREASURE_DUNGEON..=TREASURE_ROOM,
+    entry: TREASURE_DUNGEON,
+    entries: 1,
+    exit: TREASURE_LOBBY,
+    levels: 140..=u8::MAX,
+    spread: None,
+    team: 4..=6,
+    married: false,
+    minutes: 45,
+    exp_per_stage: &[60_000, 100_000],
+    meso_per_stage: &[],
+    stride: 1,
+    stage_maps: &[TREASURE_DUNGEON, TREASURE_CAVE],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[SECRET_LETTER],
     passes: 0,
     hand_ins: &[],
     gates: false,
@@ -4408,7 +4465,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 58] = [
+    pub const ALL: [EventKind; 59] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4467,6 +4524,7 @@ impl EventKind {
         EventKind::Ariant(1),
         EventKind::Ariant(2),
         EventKind::Ariant(3),
+        EventKind::Treasure,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -4528,6 +4586,7 @@ impl EventKind {
             EventKind::PinkBean => &PINK_BEAN,
             EventKind::Holiday(level) => &HOLIDAY[usize::from(level.clamp(1, 3) - 1)],
             EventKind::Ariant(arena) => &ARIANT[usize::from(arena.clamp(1, 3) - 1)],
+            EventKind::Treasure => &TREASURE,
         }
     }
 
@@ -6905,6 +6964,24 @@ mod tests {
         assert_eq!(friendly_drop_period(TYLUS_MOB + 1, 0), None);
         // His going loses nothing.
         assert!(!protected(TYLUS_MOB));
+    }
+
+    #[test]
+    fn mvs_lair_takes_four_to_six_of_140_and_its_lobby_is_not_its_own() {
+        let four: Vec<_> = (1..=4).map(|id| at(id, 140, TREASURE_LOBBY)).collect();
+        assert_eq!(TREASURE.team(1, &four), Some(vec![1, 2, 3, 4]));
+        assert!(TREASURE.team(1, &four[..3]).is_none());
+        let low = [&four[..], &[at(5, 139, TREASURE_LOBBY)]].concat();
+        assert_eq!(TREASURE.team(1, &low), Some(vec![1, 2, 3, 4]));
+        let seven: Vec<_> = (1..=7).map(|id| at(id, 140, TREASURE_LOBBY)).collect();
+        assert!(TREASURE.team(1, &seven).is_none());
+        // The lobby lies among its maps' ids but is the way out.
+        assert!(!TREASURE.holds(TREASURE_LOBBY) && !event_map(TREASURE_LOBBY));
+        for map in [TREASURE_DUNGEON, TREASURE_CAVE, TREASURE_ROOM] {
+            assert!(TREASURE.holds(map) && event_map(map));
+        }
+        assert_eq!(TREASURE.stage_map(2), TREASURE_CAVE);
+        assert_eq!(TREASURE.duration(), scaled(Duration::from_secs(45 * 60)));
     }
 
     #[test]

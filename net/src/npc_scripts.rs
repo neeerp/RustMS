@@ -945,6 +945,10 @@ pub const ROLLY_PRESENT: i32 = 9103002;
 /// Tylus in the Chief's Residence, who takes a party in to protect him on
 /// "Protecting Tylus" (6192), and Tylus past the room, who thanks them.
 pub const TYLUS: i32 = 2020008;
+/// Charles in MV's Lair's lobby, who takes a party in, and Milla, on each
+/// of its maps, who lets a member out.
+pub const CHARLES: i32 = 9220018;
+const MILLA: i32 = 9220019;
 const TYLUS_GRATEFUL: i32 = 2022004;
 /// Ellin in the Deep Fairy Forest, who takes a party into the Forest of
 /// Poison Haze, and Ellin on each of its maps, who lets a member out; the
@@ -1761,6 +1765,12 @@ impl NpcScript {
         blocked_entrance(entry)
     }
 
+    /// Charles in MV's Lair's lobby, for a player whose party may or may
+    /// not go in.
+    pub fn charles(entry: Entry) -> Self {
+        charles(entry)
+    }
+
     /// The Snow Spirit in the lobby of the Holiday PQ's difficulty `level`
     /// (1 to 3), for a player whose party may or may not go in.
     pub fn snow_spirit(level: u8, entry: Entry) -> Self {
@@ -2183,6 +2193,9 @@ impl NpcScript {
         }
         if npc_id == DIMENSIONAL_MIRROR {
             return Some(dimensional_mirror(player));
+        }
+        if npc_id == MILLA {
+            return milla(player.stats.map_id);
         }
         if npc_id == SPIEGELMANN && player.stats.map_id != carnival::CARNIVAL_LOBBY {
             return Some(spiegelmann_away(player));
@@ -11567,6 +11580,56 @@ fn ask_warp(npc: i32, key: &str, to: i32) -> NpcScript {
             on_no: None,
         }],
     )
+}
+
+/// Charles (Cosmic `9220018`) in MV's Lair's lobby: the leader takes the
+/// party in, and anyone may hear what it holds. Cosmic's Party Search line
+/// is left out, as at every party quest's NPC.
+fn charles(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::TREASURE_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::TREASURE_NOT_LEADER)),
+        Entry::NotEligible => {
+            Page::Say(event_terms(&events::TREASURE, keys::TREASURE_NOT_ELIGIBLE))
+        }
+        Entry::Busy => Page::Say(text(keys::TREASURE_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Treasure)]),
+    };
+    let mut script = NpcScript::new(
+        CHARLES,
+        vec![Page::Menu {
+            text: event_terms(&events::TREASURE, keys::TREASURE_MENU),
+            choices: vec![
+                (text(keys::TREASURE_ENTER), vec![enter]),
+                (
+                    text(keys::TREASURE_ABOUT),
+                    vec![Page::Say(text(keys::TREASURE_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Charles checked, or another party went in.
+    script.refused = Some(event_terms(&events::TREASURE, keys::TREASURE_NOT_ELIGIBLE));
+    script
+}
+
+/// Milla (Cosmic `9220019`): a greeting in MV's Lair's lobby, a word on
+/// what to do in the treasure room, and on the stages the way back to the
+/// lobby, asked first. None elsewhere.
+fn milla(map_id: i32) -> Option<NpcScript> {
+    let page = match map_id {
+        events::TREASURE_LOBBY => Page::Say(text(keys::TREASURE_MILLA_LOBBY)),
+        events::TREASURE_ROOM => Page::Say(text(keys::TREASURE_MILLA_ROOM)),
+        events::TREASURE_DUNGEON | events::TREASURE_CAVE => {
+            return Some(ask_warp(
+                MILLA,
+                keys::TREASURE_MILLA_LEAVE_ASK,
+                events::TREASURE_LOBBY,
+            ));
+        }
+        _ => return None,
+    };
+    Some(NpcScript::new(MILLA, vec![page]))
 }
 
 /// Delli (Cosmic `2095000`) where the party gathers: the leader takes the
@@ -24995,6 +25058,57 @@ mod tests {
         assert_eq!((step.effects, step.prompt), (vec![take, on], None));
         let short = ellin.refused().unwrap();
         assert_eq!(page_text(&short), counted(keys::ELLIN_GUIDE_FLOWERS, "20"));
+    }
+
+    #[test]
+    fn charles_takes_the_party_into_mvs_lair_and_milla_lets_a_member_out() {
+        let mut ready = NpcScript::charles(Entry::Ready);
+        let Some(Prompt::Selection { text: menu, .. }) = ready.begin().prompt else {
+            panic!("a menu expected");
+        };
+        assert!(menu.contains("140"), "{menu}");
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Treasure)]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NoParty, keys::TREASURE_NO_PARTY),
+            (Entry::NotLeader, keys::TREASURE_NOT_LEADER),
+            (Entry::Busy, keys::TREASURE_BUSY),
+        ] {
+            let mut charles = NpcScript::charles(entry);
+            charles.begin();
+            let step = charles.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut charles = NpcScript::charles(Entry::Ready);
+        charles.begin();
+        let step = charles.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::TREASURE_INFO));
+
+        let mut member = player(150);
+        for (map, key) in [
+            (events::TREASURE_LOBBY, keys::TREASURE_MILLA_LOBBY),
+            (events::TREASURE_ROOM, keys::TREASURE_MILLA_ROOM),
+        ] {
+            member.stats.map_id = map;
+            let mut milla = NpcScript::for_npc(MILLA, &member).unwrap();
+            assert_eq!(page_text(&milla.begin()), text(key));
+        }
+        for map in [events::TREASURE_DUNGEON, events::TREASURE_CAVE] {
+            member.stats.map_id = map;
+            let mut milla = NpcScript::for_npc(MILLA, &member).unwrap();
+            assert_eq!(
+                question(&milla.begin()),
+                text(keys::TREASURE_MILLA_LEAVE_ASK)
+            );
+            let step = milla.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(
+                step.effects,
+                [Effect::WarpToPortal(events::TREASURE_LOBBY, 0)]
+            );
+        }
+        member.stats.map_id = 600000000;
+        assert!(NpcScript::for_npc(MILLA, &member).is_none());
     }
 
     #[test]

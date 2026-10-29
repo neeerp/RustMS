@@ -19,6 +19,7 @@ use std::time::Duration;
 
 const FREE_MARKET: i32 = 910000000;
 const HENESYS: i32 = 100000000;
+const NEW_LEAF_CITY: i32 = 600000000;
 const LEAFRE_STATION_ENTRANCE: i32 = 240000100;
 /// Corba's dragon flight (report a014): the Mini Draco Transformation
 /// (Morph 16) that Corba casts and the flight's portals take off and put
@@ -2220,6 +2221,10 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 .unwrap_or(crate::events::DOJO_BOARD_MAP);
             go_back(DOJO_RETURN, Effect::Warp(back))
         }
+        // New Leaf City's way to MV's Lair's lobby, and back (Cosmic
+        // `MD_cakeEnter`, `enter_td`). Not a dungeon's, for all its name.
+        "MD_cakeEnter" => through(to(crate::events::TREASURE_LOBBY, Portal::Named("in00"))),
+        "enter_td" => through(to(NEW_LEAF_CITY, Portal::Named("yn00"))),
         script if script.starts_with("MD_") => {
             let dungeon = crate::dungeons::by_script(script)?;
             if player.stats.map_id != dungeon.base {
@@ -5912,7 +5917,24 @@ mod tests {
             outcome.effects,
             [Effect::PortalSound, Effect::WarpToPortal(100020000, 8)]
         );
-        assert_eq!(portal("MD_cakeEnter", &player), None);
+        // MV's Lair's way in shares the dungeons' prefix.
+        assert_eq!(
+            portal("MD_cakeEnter", &player).unwrap().effects,
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    crate::events::TREASURE_LOBBY,
+                    named(crate::events::TREASURE_LOBBY, "in00")
+                )
+            ]
+        );
+        assert_eq!(
+            portal("enter_td", &player).unwrap().effects,
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(NEW_LEAF_CITY, named(NEW_LEAF_CITY, "yn00"))
+            ]
+        );
     }
 
     #[test]

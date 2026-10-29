@@ -2119,6 +2119,17 @@ unsourced = [
     "amoria_pq.glimmer.shard_taken",
     "amoria_pq.gender.women_only",
     "amoria_pq.gender.men_only",
+    "treasure.charles.menu",
+    "treasure.charles.enter",
+    "treasure.charles.about",
+    "treasure.charles.info",
+    "treasure.no_party",
+    "treasure.not_leader",
+    "treasure.not_eligible",
+    "treasure.busy",
+    "treasure.milla.lobby",
+    "treasure.milla.room",
+    "treasure.milla.leave_ask",
 ]
 
 [text."glTutoMsg0.message"]
