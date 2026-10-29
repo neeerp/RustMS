@@ -188,7 +188,10 @@ namespace ms
 		if (find_world(Stage::get().get_mapid()).empty())
 			UI::get().emplace<UIOk>(UNAVAILABLE_HERE, [](bool) {});
 		else if (auto map = UI::get().emplace<UIWorldMap>())
+		{
 			map->target_maps.clear();
+			map->seen_map = -1;
+		}
 	}
 
 	void UIWorldMap::find_npc(int32_t npc)
@@ -221,9 +224,29 @@ namespace ms
 	void UIWorldMap::show_npc(const std::vector<int32_t>& maps, const std::string& world)
 	{
 		makeactive();
-		mapid = Stage::get().get_mapid();
+		mapid = seen_map = Stage::get().get_mapid();
 		target_maps = maps;
 		user_map = world_for_map(mapid);
+		update_world(world);
+	}
+
+	void UIWorldMap::find_map(int32_t map)
+	{
+		std::string world = find_world(map);
+
+		if (world.empty())
+			UI::get().emplace<UIOk>(NPC_UNAVAILABLE, [](bool) {});
+		else if (auto window = UI::get().emplace<UIWorldMap>())
+			window->show_map(map, world);
+	}
+
+	void UIWorldMap::show_map(int32_t map, const std::string& world)
+	{
+		makeactive();
+		seen_map = Stage::get().get_mapid();
+		mapid = map;
+		target_maps.clear();
+		user_map = world;
 		update_world(world);
 	}
 
@@ -231,9 +254,9 @@ namespace ms
 	{
 		int32_t mid = Stage::get().get_mapid();
 
-		if (mid != mapid)
+		if (mid != seen_map)
 		{
-			mapid = mid;
+			mapid = seen_map = mid;
 			auto parent_map = world_for_map(mapid);
 			user_map = parent_map;
 

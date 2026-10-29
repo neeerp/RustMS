@@ -65,9 +65,15 @@ along the bottom depend on the tab:
   are on different continents. Every spot holding one of them gets the
   `npcPos` glow. The button is never disabled. When the NPC has no maps, or
   no world map has them, it says so instead, as v83 does. v83 runs this world
-  map as a modal window; HeavenClient's is not modal. Double-clicking a map
-  or NPC in the quest's details, which also finds it in v83, is not
-  implemented.
+  map as a modal window; HeavenClient's is not modal.
+- On every tab, double-clicking an NPC's or map's name in the quest's text
+  works as v83's `FUN_0087e5d0` does. An NPC's name finds that NPC as above,
+  and the NPC becomes the one FIND NPC and the portrait find until another
+  quest is chosen. A map's name opens that map's world map with the
+  "you are here" marker on the map instead of the player's field
+  (`UIWorldMap::find_map`, v83 `FUN_0087e809`), or says the spot isn't on the
+  World Map. `NpcTextMarkup::expand` reports where each name went, and
+  `Text::index_at` finds the character under the cursor.
 - In Progress has QUEST HELPER (`BtAlert`), which tracks or untracks the
   quest in the Quest Helper, and FORFEIT (`BtGiveup`). FORFEIT asks "Are you
   sure you want to quit?", then untracks the quest and sends the forfeit, as
@@ -94,3 +100,4 @@ won't open the window. Check:
 - scrolling both panels
 - hiding and reopening the details
 - FIND NPC and QUEST HELPER
+- double-clicking an NPC's and a map's name in the text

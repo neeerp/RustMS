@@ -322,7 +322,7 @@ namespace ms
 			for (const auto &box : line_boxes)
 				box_positions[box.first] = Point<int16_t>(line_x + box.second, line_y - boxes[box.first].y());
 
-			lines.push_back({words, {line_x, line_y}});
+			lines.push_back({words, {line_x, line_y}, ax});
 			words.clear();
 			line_boxes.clear();
 		}
@@ -396,6 +396,39 @@ namespace ms
 	Point<int16_t> Text::Layout::box(size_t index) const
 	{
 		return index < boxes.size() ? boxes[index] : Point<int16_t>();
+	}
+
+	size_t Text::Layout::index_at(Point<int16_t> point) const
+	{
+		// Below the baseline, a line keeps the descenders of its letters.
+		constexpr int16_t DESCENT = 4;
+
+		int16_t top = 0;
+
+		for (const Line &line : lines)
+		{
+			int16_t bottom = line.position.y() + DESCENT;
+
+			if (point.y() >= top && point.y() < bottom)
+			{
+				int16_t x = point.x() - line.position.x();
+
+				if (line.words.empty() || x < 0 || x >= line.width)
+					return std::string::npos;
+
+				size_t found = std::string::npos;
+
+				for (size_t pos = line.words.front().first; pos < line.words.back().last; pos++)
+					if (advance(pos) <= x)
+						found = pos;
+
+				return found;
+			}
+
+			top = bottom;
+		}
+
+		return std::string::npos;
 	}
 
 	Text::Layout::iterator Text::Layout::begin() const

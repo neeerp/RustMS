@@ -153,9 +153,13 @@ namespace ms
 		Animation portrait;
 		Text title, jobs, levels, description;
 		QuestTextImages images;
+		// The NPC and map names in `description`.
+		std::vector<NpcTextMarkup::Link> links;
 		std::vector<QuestObjective> shown_goals;
 		bool details_open = false;
 		int16_t selected = -1, list_offset = 0, detail_offset = 0;
+		// The NPC FIND NPC and the portrait find: the quest's, or the last
+		// one double-clicked in its text.
 		int32_t start_npc = 0;
 		Point<int16_t> cursor_relative;
 		uint64_t seen_revision = 0;

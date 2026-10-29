@@ -29,6 +29,21 @@ namespace ms
 			}
 		};
 
+		// The name a #p (NPC) or #m (map) tag became: the characters
+		// [first, last) of the expanded text.
+		struct Link
+		{
+			char tag;
+			int32_t id;
+			size_t first;
+			size_t last;
+
+			bool operator==(const Link& other) const
+			{
+				return tag == other.tag && id == other.id && first == other.first && last == other.last;
+			}
+		};
+
 		struct Lookups
 		{
 			std::function<std::string()> player_name;
@@ -51,9 +66,10 @@ namespace ms
 		}
 
 		// Without `images`, image tags are dropped; with it, each becomes an
-		// IMAGE placeholder and is appended to `images` in order.
+		// IMAGE placeholder and is appended to `images` in order. With `links`,
+		// each NPC and map name is appended to it.
 		inline std::string expand(const std::string& text, const Lookups& lookups,
-								  std::vector<InlineImage>* images = nullptr)
+								  std::vector<InlineImage>* images = nullptr, std::vector<Link>* links = nullptr)
 		{
 			auto image = [&](char tag, const std::string& arg)
 			{
@@ -68,6 +84,15 @@ namespace ms
 
 			std::string out;
 			size_t i = 0;
+
+			// Write an NPC's or map's name, noting where it went.
+			auto name = [&](char tag, int32_t id, const std::string& text)
+			{
+				if (links && !text.empty())
+					links->push_back({ tag, id, out.size(), out.size() + text.size() });
+
+				out += text;
+			};
 
 			while (i < text.size())
 			{
@@ -98,7 +123,7 @@ namespace ms
 						}
 						break;
 					case 'p':
-						if (numeric) { out += lookups.npc_name(id()); i = close + 1; continue; }
+						if (numeric) { name('p', id(), lookups.npc_name(id())); i = close + 1; continue; }
 						break;
 					case 't':
 					case 'z':
@@ -108,7 +133,7 @@ namespace ms
 						if (numeric) { out += lookups.mob_name(id()); i = close + 1; continue; }
 						break;
 					case 'm':
-						if (numeric) { out += lookups.map_name(id()); i = close + 1; continue; }
+						if (numeric) { name('m', id(), lookups.map_name(id())); i = close + 1; continue; }
 						break;
 					case 'v':
 					case 'i':
