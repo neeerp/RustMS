@@ -1,5 +1,7 @@
 #pragma once
 
+#include "UINpcTalk.h"
+
 #include "../UIElement.h"
 
 #include "../../Character/Look/CharLook.h"
@@ -76,6 +78,8 @@ namespace ms
 		Texture shadow;
 		Texture name_tag;
 		Text prompt;
+		// The question's images (#i, #v, #f and #s), laid out as its boxes.
+		std::vector<UINpcTalk::InlineImage> prompt_images;
 		Text name;
 	};
 }

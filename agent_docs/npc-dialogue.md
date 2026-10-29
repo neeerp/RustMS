@@ -307,9 +307,10 @@ styles, TAKE OFF ALL shows the player without equipment and DEFAULT
 SETTINGS brings it back. OK or Enter answers `07 01 u8` (the style's index);
 CANCEL, LEAVE STORE or Escape answers `07 00`. The server sends type 7 for
 the stylists' looks and applies the chosen one with `Effect::SetStyle`
-(a stat change and UPDATE_CHAR_LOOK for others). The window has no scroll
-bar for text taller than its 100 px box, drops the text's images, and does
-not type the text out.
+(a stat change and UPDATE_CHAR_LOOK for others). The text's images (`#i`,
+`#v`, `#s`, `#f`) are drawn as the dialog draws them. The window has no
+scroll bar for text taller than its 100 px box and does not type the text
+out.
 
 Types 9 and 10 are a choice of pets: after the text come `u8 count`, for
 type 10 a flag byte, then that many entries of an 8-byte pet serial and a

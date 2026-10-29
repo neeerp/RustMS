@@ -688,6 +688,35 @@ namespace ms
 		};
 	}
 
+	UINpcTalk::InlineImage UINpcTalk::inline_image(const NpcTextMarkup::InlineImage &tag)
+	{
+		InlineImage image;
+
+		if (tag.tag == 'f' || tag.tag == 'F')
+		{
+			image.texture = path_image(tag.arg);
+			image.size = image.texture.get_dimensions();
+			image.anchor = image.texture.get_origin();
+		} else
+		{
+			// Icons fill a 32x32 slot, their origin at its bottom left.
+			int32_t id = tag.arg.size() <= 9 ? std::stoi(tag.arg) : 0;
+
+			if (tag.tag == 's')
+				image.texture = SkillData::get(id).get_icon(SkillData::Icon::NORMAL);
+			else if (ItemData::get(id).is_valid())
+				image.texture = ItemData::get(id).get_icon(false);
+
+			if (image.texture.is_valid())
+			{
+				image.size = Point<int16_t>(32, 32);
+				image.anchor = Point<int16_t>(0, 32);
+			}
+		}
+
+		return image;
+	}
+
 	// TODO: Move this to GraphicsGL?
 	std::string UINpcTalk::format_text(const std::string &tx, const int32_t &npcid, std::vector<InlineImage> &images)
 	{
@@ -709,33 +738,7 @@ namespace ms
 		formatted_text = NpcTextMarkup::expand(formatted_text, markup_lookups(), &tags);
 
 		for (const auto &tag : tags)
-		{
-			InlineImage image;
-
-			if (tag.tag == 'f' || tag.tag == 'F')
-			{
-				image.texture = path_image(tag.arg);
-				image.size = image.texture.get_dimensions();
-				image.anchor = image.texture.get_origin();
-			} else
-			{
-				// Icons fill a 32x32 slot, their origin at its bottom left.
-				int32_t id = tag.arg.size() <= 9 ? std::stoi(tag.arg) : 0;
-
-				if (tag.tag == 's')
-					image.texture = SkillData::get(id).get_icon(SkillData::Icon::NORMAL);
-				else if (ItemData::get(id).is_valid())
-					image.texture = ItemData::get(id).get_icon(false);
-
-				if (image.texture.is_valid())
-				{
-					image.size = Point<int16_t>(32, 32);
-					image.anchor = Point<int16_t>(0, 32);
-				}
-			}
-
-			images.push_back(image);
-		}
+			images.push_back(inline_image(tag));
 
 		return formatted_text;
 	}
