@@ -324,6 +324,11 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(coconut_tests tests/coconut.cpp Character/Coconut.cpp Net/InPacket.cpp)
     target_include_directories(coconut_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME coconut COMMAND coconut_tests)
+    add_executable(ariant_tests tests/ariant.cpp Character/Ariant.cpp Net/InPacket.cpp)
+    target_include_directories(ariant_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME ariant COMMAND ariant_tests)
+    add_executable(wz_sound_tests tests/wz_sound.cpp Audio/WzSound.cpp)
+    add_test(NAME wz_sound COMMAND wz_sound_tests)
     add_executable(snowball_tests tests/snowball.cpp Character/Snowball.cpp Character/Coconut.cpp Net/InPacket.cpp)
     target_include_directories(snowball_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME snowball COMMAND snowball_tests)
@@ -504,6 +509,8 @@ add_executable(HeavenClient
     Audio/Audio.cpp
     Audio/Audio.h
     Audio/SoundDistance.h
+    Audio/WzSound.cpp
+    Audio/WzSound.h
     Character/Inventory/Equip.cpp
     Character/Inventory/Equip.h
     Character/Inventory/EquipQuality.cpp
@@ -610,6 +617,8 @@ add_executable(HeavenClient
     Character/RpsGame.h
     Character/Carnival.cpp
     Character/Carnival.h
+    Character/Ariant.cpp
+    Character/Ariant.h
     Character/Coconut.cpp
     Character/Coconut.h
     Character/Snowball.cpp
@@ -1084,6 +1093,8 @@ add_executable(HeavenClient
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UIMonsterCarnival.cpp
     IO/UITypes/UIMonsterCarnival.h
+    IO/UITypes/UIAriant.cpp
+    IO/UITypes/UIAriant.h
     IO/UITypes/UICoconut.cpp
     IO/UITypes/UICoconut.h
     IO/UITypes/UISkillBook.cpp
@@ -1200,6 +1211,8 @@ add_executable(HeavenClient
     Net/Handlers/GuildHandlers.h
     Net/Handlers/CarnivalHandlers.cpp
     Net/Handlers/CarnivalHandlers.h
+    Net/Handlers/AriantHandlers.cpp
+    Net/Handlers/AriantHandlers.h
     Net/Handlers/CoconutHandlers.cpp
     Net/Handlers/CoconutHandlers.h
     Net/Handlers/SnowballHandlers.cpp

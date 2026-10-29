@@ -22,6 +22,7 @@
 #include "Handlers/GuildHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/CarnivalHandlers.h"
+#include "Handlers/AriantHandlers.h"
 #include "Handlers/CoconutHandlers.h"
 #include "Handlers/SnowballHandlers.h"
 #include "Handlers/CashShopHandlers.h"
@@ -153,6 +154,7 @@ namespace ms
 		CONTI_STATE = 149,
 		SET_OBJECT_STATE = 153,
 		STOP_CLOCK = 154,
+		ARIANT_RESULT = 155,
 		QUICKSLOT_INIT = 159,
 
 		/// MapObject
@@ -265,6 +267,7 @@ namespace ms
 		MONSTER_CARNIVAL_DIED = 294,
 		MONSTER_CARNIVAL_LEAVE = 295,
 		MONSTER_CARNIVAL_RESULT = 296,
+		ARIANT_ARENA_USER_SCORE = 297,
 		HORNTAIL_CAVE = 302,
 		ZAKUM_SHRINE = 303,
 
@@ -370,6 +373,8 @@ namespace ms
 		emplace<LEFT_KNOCK_BACK, LeftKnockBackHandler>();
 		emplace<COCONUT_HIT, CoconutHitHandler>();
 		emplace<COCONUT_SCORE, CoconutScoreHandler>();
+		emplace<ARIANT_ARENA_USER_SCORE, AriantScoreHandler>();
+		emplace<ARIANT_RESULT, AriantResultHandler>();
 		emplace<MONSTER_CARNIVAL_START, CarnivalStartHandler>();
 		emplace<MONSTER_CARNIVAL_OBTAINED_CP, CarnivalObtainedCpHandler>();
 		emplace<MONSTER_CARNIVAL_PARTY_CP, CarnivalPartyCpHandler>();

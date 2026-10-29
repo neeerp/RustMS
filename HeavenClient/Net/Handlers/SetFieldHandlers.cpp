@@ -28,6 +28,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Character/Carnival.h"
+#include "../../Character/Ariant.h"
 #include "../../Character/Coconut.h"
 #include "../../Configuration.h"
 
@@ -47,6 +48,7 @@
 #include "../../Util/Misc.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
+#include "../../IO/UITypes/UIAriant.h"
 #include "../../IO/UITypes/UICoconut.h"
 #include "../../IO/UITypes/UIDojoHud.h"
 #include "../../IO/UITypes/UIFieldClock.h"
@@ -78,6 +80,8 @@ namespace ms
 		enter_coconut_field(mapid, fieldtype);
 		enter_snowball_field(mapid, fieldtype);
 		UI::get().remove(UIElement::Type::COCONUT);
+		ariant::enter_field(fieldtype);
+		UI::get().remove(UIElement::Type::ARIANT);
 
 		Window::get().fadeout(
 			[mapid, portalid, chase]()
@@ -90,6 +94,8 @@ namespace ms
 				UIDojoHud::show_on(Stage::get().get_mapinfo().get_fieldtype());
 				// And Coconut Season's scoreboard on its own.
 				UICoconut::show_on(Stage::get().get_mapinfo().get_fieldtype());
+				// And the Battle Arena's board.
+				UIAriant::show_on(Stage::get().get_mapinfo().get_fieldtype());
 
 				UI::get().enable();
 				Timer::get().start();

@@ -890,6 +890,7 @@ namespace ms
 					UIElement::Type::DOJOHUD,
 					UIElement::Type::MONSTERCARNIVAL,
 					UIElement::Type::COCONUT,
+					UIElement::Type::ARIANT,
 					UIElement::Type::AVATARMEGAPHONE,
 					UIElement::Type::PARTYSEARCHICON,
 					UIElement::Type::GUILDRANK
