@@ -185,13 +185,9 @@ pub fn check_purchase(
 }
 
 /// Whether `commodity` can be sent as a gift, to anyone; a gift's receiver
-/// is checked once it is found. Packages can't be.
+/// is checked once it is found. A package goes as its items (report b331).
 pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopFailure> {
-    let commodity = check_sale(commodity)?;
-    if package(commodity).is_some() {
-        return Err(CashShopFailure::Unknown);
-    }
-    Ok(commodity)
+    check_sale(commodity)
 }
 
 /// The classes (`item_id / 10_000`) of cash items on sale that do nothing
@@ -531,14 +527,14 @@ mod tests {
     }
 
     #[test]
-    fn packages_are_sold_but_not_gifted() {
+    fn packages_are_sold_and_gifted() {
         if commodities().is_err() {
             return;
         }
         // Package > Pet: the Baby Tiger Package.
         let package = commodity(10002307).unwrap();
         assert_eq!(check_purchase(Some(package), 1), Ok(package));
-        assert_eq!(check_gift(Some(package)), Err(CashShopFailure::Unknown));
+        assert_eq!(check_gift(Some(package)), Ok(package));
         let items: Vec<_> = super::package(package)
             .unwrap()
             .iter()

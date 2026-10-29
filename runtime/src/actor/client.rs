@@ -1312,8 +1312,9 @@ impl ClientActor {
         self.send_all(&mut packets).await
     }
 
-    /// Pay for `commodity` and put it in the Cash Inventory of the account
-    /// of the character named `to`, who sees it on next entering the shop.
+    /// Pay for `commodity` and put it, or a package's items, in the Cash
+    /// Inventory of the account of the character named `to`, who sees it on
+    /// next entering the shop.
     async fn send_gift(
         &mut self,
         account_id: i32,
@@ -1339,17 +1340,25 @@ impl ClientActor {
                 failure.unwrap_or(cs::CashShopFailure::Unknown),
             )?]);
         };
-        let gift = db::cash_shop::NewGift {
-            account_id: receiver.account_id,
-            item_id: commodity.item_id,
-            sn: commodity.sn,
-            quantity: commodity.count,
-            expires_at: expiry(commodity.item_id, commodity.period),
-            gift_from: sender,
-            gift_message: Some(message),
-        };
-        let price = commodity.price;
-        let Some(balance) = spawn_db(move || db::cash_shop::gift(account_id, price, &gift)).await?
+        // A package goes as its items, and only the first carries the
+        // message, so the receiver is told once (report b331).
+        let contents = net::cash_shop::package(&commodity).unwrap_or_else(|| vec![&commodity]);
+        let gifts: Vec<_> = contents
+            .iter()
+            .enumerate()
+            .map(|(i, item)| db::cash_shop::NewGift {
+                account_id: receiver.account_id,
+                item_id: item.item_id,
+                sn: item.sn,
+                quantity: item.count,
+                expires_at: expiry(item.item_id, item.period),
+                gift_from: sender.clone(),
+                gift_message: (i == 0).then(|| message.clone()),
+            })
+            .collect();
+        let (sn, price) = (commodity.sn, commodity.price);
+        let Some(balance) =
+            spawn_db(move || db::cash_shop::gift(account_id, (sn, price), &gifts)).await?
         else {
             return Ok(vec![cs::build_cash_shop_failure(
                 cs::CashShopFailure::NotEnoughCash,

@@ -992,8 +992,9 @@ the screen size.
   page, and runs the gift dialog with the name filled in and fixed: the
   birthday code, NX Prepaid against the price, the message, then "ITEM (PRICE
   NX) Will you buy this item as a gift for 'NAME'?", and Yes sends 0x04. v83
-  sends packages as 0x1F, which the server doesn't take, so they go as 0x04
-  too. The message page of a present or a ring is v83's dialog (7e4cf7) on
+  sends a package as 0x1F after the server's 0x147 (report b331), which the
+  server doesn't send, so packages go as 0x04 too, and the server gifts
+  their items. The message page of a present or a ring is v83's dialog (7e4cf7) on
   `CSNotice/2`, whose art carries "Enter your message here,"; it is covered
   while a field has the keys or the message has text (7e5467). Its OK
   (7e5863) refuses, leaving the dialog open, a name not 4 to 12 characters
