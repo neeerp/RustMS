@@ -157,6 +157,7 @@ namespace ms
 			PYRAMIDRESULT,
 			RAISE,
 			CASHGIFT,
+			GUILDMAKE,
 			NUM_TYPES
 		};
 

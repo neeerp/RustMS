@@ -107,6 +107,12 @@ pub enum ServerMessage {
     /// Someone else changed the player's guild (expelled them); read it
     /// again.
     GuildChanged,
+    /// The party members the player asked all agreed: found guild `name`
+    /// with them.
+    FoundGuild {
+        name: String,
+        cofounders: Vec<ClientId>,
+    },
     /// A GM jailed the player or let them out; read the time again.
     JailChanged,
     /// A GM blocked the player's account from chatting or lifted it; read
@@ -1294,6 +1300,18 @@ pub enum DirectoryMessage {
     GuildAccept {
         from: ClientId,
         guild_id: i32,
+    },
+    /// `from` would found guild `name`: the members of the party they lead
+    /// on their map and in no guild are asked to agree, if there are any.
+    FoundGuild {
+        from: ClientId,
+        name: String,
+        reply: tokio::sync::oneshot::Sender<crate::actor::guild_foundings::Asking>,
+    },
+    /// `from` agrees, or not, to found the guild their party's leader named.
+    GuildAgree {
+        from: ClientId,
+        agree: bool,
     },
     /// `from` turns down `inviter`'s invitation.
     GuildDeny {

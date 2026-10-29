@@ -917,6 +917,9 @@ add_executable(HeavenClient
     IO/UITypes/UINameChange.h
     IO/UITypes/UIGiftNotice.cpp
     IO/UITypes/UIGiftNotice.h
+    IO/UITypes/GuildMakeTimeline.h
+    IO/UITypes/UIGuildMakeAgreement.cpp
+    IO/UITypes/UIGuildMakeAgreement.h
     IO/UITypes/UIInvitation.cpp
     IO/UITypes/UIInvitation.h
     IO/UITypes/UIWeddingRegistry.cpp

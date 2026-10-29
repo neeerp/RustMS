@@ -1,6 +1,7 @@
 #include "../Character/Guild.h"
 #include "../Character/GuildEmblemRules.h"
 #include "../Character/GuildSort.h"
+#include "../IO/UITypes/GuildMakeTimeline.h"
 #include "../IO/UITypes/RankPanelSlide.h"
 #include "../Net/Handlers/Helpers/AllianceNews.h"
 #include "../Net/Handlers/Helpers/GuildParser.h"
@@ -639,6 +640,27 @@ int main()
 
 			slide.drop();
 			require(!slide.alive && !slide.out && slide.x == 0, "dropped with the window");
+		}
+
+		// The guild contract's pace (b337), in the client's 8 ms steps.
+		{
+			GuildMakeTimeline contract;
+			require(!contract.update(8), "nothing yet");
+			while (contract.elapsed < GuildMakeTimeline::UNROLL + 992)
+				contract.update(8);
+			require(!contract.text_shown(), "a second after the scroll unrolls");
+			contract.update(8);
+			require(contract.text_shown() && contract.text_opacity() < 0.01f, "the text starts clear");
+			contract.update(500);
+			require(contract.text_opacity() > 0.49f && contract.text_opacity() < 0.51f, "and fades in over a second");
+			contract.update(500);
+			require(contract.text_opacity() == 1.0f && !contract.buttons_shown(), "no buttons yet");
+			contract.update(1000);
+			require(contract.buttons_shown(), "two seconds after the text");
+			contract.update(27992);
+			require(!contract.timed_out(), "30 s from the text");
+			require(contract.update(8), "then time is up");
+			require(!contract.update(8), "once");
 		}
 
 		std::cout << "Guild passed\n";

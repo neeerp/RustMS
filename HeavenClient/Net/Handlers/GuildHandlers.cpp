@@ -16,6 +16,7 @@
 #include "../../IO/UITypes/UIEnterText.h"
 #include "../../IO/UITypes/UIGuildBBS.h"
 #include "../../IO/UITypes/UIGuildRank.h"
+#include "../../IO/UITypes/UIGuildMakeAgreement.h"
 #include "../../IO/UITypes/UIGuildMarkMaker.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UINpcTalk.h"
@@ -30,18 +31,26 @@ namespace ms
 		enum Operation : uint8_t
 		{
 			NAME_PROMPT = 0x01,
+			// The party's guild contract, or 0xccc for its leader
+			AGREEMENT = 0x03,
 			INVITE = 0x05,
 			// Lea's emblem maker, which only the master's client opens
 			EMBLEM_MAKER = 0x11,
 			INFO = 0x1A,
 			// 0xcce
 			NAME_TAKEN = 0x1C,
+			// 0xcd2: a party member left while the others were asked
+			AGREEMENT_FAILED = 0x1F,
 			// 0xccf for the master, 0x150 for the others
 			CREATED = 0x20,
 			// 0x15c
 			ALREADY_IN_GUILD = 0x21,
 			// 0x15d
 			LEVEL_TOO_LOW = 0x23,
+			// 0xccd
+			DISAGREED = 0x24,
+			// 0xcd3
+			FOUNDING_FAILED = 0x26,
 			// 0x15a for the player, 0x15b for the others
 			JOINED = 0x27,
 			// 0x15c
@@ -284,6 +293,27 @@ namespace ms
 		case Operation::NAME_PROMPT:
 			prompt_name();
 			break;
+		case Operation::AGREEMENT:
+		{
+			// The leader waits; another party's contract isn't the player's.
+			int32_t party_id = recv.read_int();
+			const Party& party = player.get_party();
+
+			if (party_id != 0 && party.is_leader(player.get_oid()))
+			{
+				heracle_says("Now I am asking other guild members for the agreement of forming a guild~  Please hold on~...", nullptr);
+				break;
+			}
+
+			if (party_id != party.get_id())
+				break;
+
+			std::string master = recv.read_string();
+			std::string name = recv.read_string();
+			UI::get().emplace<UIGuildMakeAgreement>(master, name);
+			UI::get().enable();
+			break;
+		}
 		case Operation::EMBLEM_MAKER:
 			// The others' clients ignore it (FUN_00a37490).
 			if (guild.is_master(player.get_oid()))
@@ -400,6 +430,18 @@ namespace ms
 			refresh();
 			break;
 		}
+		case Operation::AGREEMENT_FAILED:
+			heracle_says("The problem has happened during the process of gathering agreement of forming the guild... Plese try again later...",
+						 nullptr);
+			break;
+		case Operation::DISAGREED:
+			heracle_says("Somebody has disagreed to form a guild...  Please come back to me when you meet with the right people...  You can only make a guild after getting agreement from all...",
+						 nullptr);
+			break;
+		case Operation::FOUNDING_FAILED:
+			heracle_says("The problem has happened during the process of forming the guild... Plese try again later...",
+						 nullptr);
+			break;
 		case Operation::DISBAND_FAILED:
 			heracle_says("The problem has happened during the process of disbanding the guild... Plese try again later...",
 						 nullptr);

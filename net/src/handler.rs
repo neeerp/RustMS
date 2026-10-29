@@ -402,6 +402,10 @@ pub enum GuildRequest {
     Chat {
         text: String,
     },
+    /// Agree, or not, to found the guild the party's leader named.
+    Agree {
+        agree: bool,
+    },
     /// Ask the character with this name to join the guild.
     Invite {
         name: String,

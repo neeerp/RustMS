@@ -5,7 +5,8 @@ use crate::schema::{characters, guild_members, guilds};
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use game::guild::{
-    Emblem, Guild, GuildMember, GuildTag, Standing, CAPACITY_STEP, MASTER_RANK, RANKING_SIZE,
+    Emblem, Guild, GuildMember, GuildTag, Standing, CAPACITY_STEP, JR_MASTER_RANK, MASTER_RANK,
+    RANKING_SIZE,
 };
 
 /// Why founding a guild failed.
@@ -55,17 +56,39 @@ fn emblem(background: i16, background_color: i16, mark: i16, mark_color: i16) ->
     }
 }
 
-/// Found a guild named `name` in `world_id` with `master` as its only
-/// member. Returns the new guild's id.
-pub fn create(world_id: u8, name: &str, master: i32) -> crate::Result<Result<i32, CreateError>> {
+diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
+
+/// Whether a guild in `world_id` has the name `name`, ignoring case.
+pub fn name_taken(world_id: u8, name: &str) -> crate::Result<bool> {
+    let mut conn = crate::connection()?;
+    let found = guilds::table
+        .filter(guilds::world_id.eq(i16::from(world_id)))
+        .filter(lower(guilds::name).eq(lower(name)))
+        .select(guilds::id)
+        .first::<i32>(&mut conn)
+        .optional()?;
+    Ok(found.is_some())
+}
+
+/// Found a guild named `name` in `world_id` with `master` and the party
+/// members who agreed to it, `cofounders`, made jr. masters. Returns the
+/// new guild's id.
+pub fn create(
+    world_id: u8,
+    name: &str,
+    master: i32,
+    cofounders: &[i32],
+) -> crate::Result<Result<i32, CreateError>> {
     let mut conn = crate::connection()?;
     let created = conn.transaction(|conn| -> QueryResult<_> {
-        let member = guild_members::table
-            .find(master)
-            .select(guild_members::guild_id)
-            .first::<i32>(conn)
-            .optional()?;
-        if member.is_some() {
+        let ids: Vec<i32> = std::iter::once(master)
+            .chain(cofounders.iter().copied())
+            .collect();
+        let members = guild_members::table
+            .filter(guild_members::character_id.eq_any(&ids))
+            .count()
+            .get_result::<i64>(conn)?;
+        if members > 0 {
             return Ok(Err(CreateError::AlreadyInGuild));
         }
         let id = diesel::insert_into(guilds::table)
@@ -82,6 +105,15 @@ pub fn create(world_id: u8, name: &str, master: i32) -> crate::Result<Result<i32
                 guild_members::rank.eq(i16::from(MASTER_RANK)),
             ))
             .execute(conn)?;
+        for &cofounder in cofounders {
+            diesel::insert_into(guild_members::table)
+                .values((
+                    guild_members::character_id.eq(cofounder),
+                    guild_members::guild_id.eq(id),
+                    guild_members::rank.eq(i16::from(JR_MASTER_RANK)),
+                ))
+                .execute(conn)?;
+        }
         Ok(Ok(id))
     });
     match created {
