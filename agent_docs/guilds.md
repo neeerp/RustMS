@@ -359,8 +359,9 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   emblem sends the alliance 0x1E (the guild). A member who leaves or is
   expelled from an allied guild gets 0x1D, which clears the alliance on
   their client. When an allied guild disbands, the alliance goes with it if
-  that guild was the master's, and otherwise the rest get 0x0F and a pink
-  line.
+  that guild was the master's, and otherwise the rest get 0x10 and a pink
+  line. `db::guild::disband` does this in the guild's transaction, locking
+  the alliance before the guild, as the alliance's own changes do.
 - Alliance chat is `MULTICHAT` mode 3, sent to every other member online,
   like guild chat. `CHAR_INFO` shows the alliance's name.
 
@@ -614,9 +615,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   start at alliance rank 5, even while rank 5 has no title.
 - The deny's reason (invitations switched off, another card showing,
   declined) is not told apart: the inviter hears the same line.
-- An allied guild's disband and the alliance's cleanup are two
-  transactions; a server stopping between them leaves an alliance with no
-  master.
 - The board's page selector art: the labels are drawn as text, 32 px apart,
   with "<" and ">" for other groups of ten. The original's pitch and arrows
   are unknown.

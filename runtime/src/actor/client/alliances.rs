@@ -355,20 +355,21 @@ impl ClientActor {
 
     /// The player's guild, in alliance `alliance_id`, was disbanded; its
     /// members were `members`. Without its master's guild the alliance
-    /// goes too; otherwise the rest see the guild go.
+    /// went too (`gone`); otherwise the rest see the guild go.
     pub(super) async fn allied_guild_disbanded(
         &mut self,
         alliance_id: i32,
         guild_id: i32,
         guild_name: &str,
         members: &[ClientId],
+        gone: Option<GuildGone>,
     ) -> Result<(), RuntimeError> {
         self.send_to_directory(DirectoryMessage::Deliver {
             to: members.to_vec(),
             packet: build_alliance_disbanded(alliance_id)?,
         })
         .await?;
-        match spawn_db(move || db::alliance::guild_gone(alliance_id)).await? {
+        match gone {
             Some(GuildGone::Disbanded(alliance)) => self.alliance_gone(&alliance).await,
             Some(GuildGone::Remains(alliance)) => {
                 let to: Vec<ClientId> = alliance.member_ids().collect();
