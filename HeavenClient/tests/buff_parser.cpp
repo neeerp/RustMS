@@ -105,6 +105,19 @@ int main()
 				"Undead, Stop Potion, Stop Motion and Fear");
 		require(curse.read_short() == 0 && !curse.available(), "and the delay follows");
 
+		// Pharaoh's Blessing's aura, bit 73, shows its item as the reason, before
+		// Stop Potion.
+		BuffParser::Flags blessed{ 0, 0 };
+		blessed.set(73);
+		blessed.set(75);
+		Writer a;
+		a.flags(blessed).put<int32_t>(-2022585).put<int32_t>(133 | 1 << 16).zeros(2).put<int16_t>(0);
+		InPacket bless(a.bytes.data(), a.bytes.size());
+		shown = BuffParser::parse_shown(bless, BuffParser::read_flags(bless));
+		require(shown.size() == 2 && shown[0].first == Buffstat::ITEM_AURA && shown[0].second == -2022585 &&
+				shown[1].first == Buffstat::STOP_POTION, "an item's aura, by its item");
+		require(bless.read_short() == 0 && !bless.available(), "then the delay");
+
 		// GIVE_FOREIGN_BUFF: another character gets on a mount.
 		BuffParser::Flags riding{ 0, 0 };
 		riding.set(BuffParser::RIDING);

@@ -111,6 +111,7 @@ impl ClientActor {
         for action in result.actions {
             self.apply(action).await?;
         }
+        self.refresh_aura().await?;
         // Raised where they fell (Resurrection), they no longer count as
         // fallen in their event.
         if raised {
@@ -294,13 +295,24 @@ impl ClientActor {
         .await
     }
 
-    /// Tell the others which of the buffs they saw ended, and the player
-    /// too if an item buff's aura went with them.
-    async fn hide_buffs(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
-        if let Some(aura) = net::consume_effect::refresh(&mut self.in_game_mut()?.player)? {
+    /// Show the player and the others the aura the player's buffs now
+    /// call for, if it changed: a skill's buff that took over an item buff's
+    /// stats takes its aura away too.
+    pub(super) async fn refresh_aura(&mut self) -> Result<(), RuntimeError> {
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        if let Some(aura) = net::consume_effect::refresh(&mut game.player)? {
             self.send(&mut aura.clone()).await?;
             self.show_buffs(aura).await?;
         }
+        Ok(())
+    }
+
+    /// Tell the others which of the buffs they saw ended, and the player
+    /// too if an item buff's aura went with them.
+    async fn hide_buffs(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
+        self.refresh_aura().await?;
         let unseen: Vec<_> = ended.iter().copied().filter(|stat| stat.shown()).collect();
         if unseen.is_empty() {
             return Ok(());

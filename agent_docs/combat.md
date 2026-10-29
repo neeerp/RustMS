@@ -979,14 +979,17 @@ v83's FUN_00a1dd99) with the same check.
 Some item buffs draw an aura over the player: Horntail and Pink Bean
 Squad Victory, Breath of Nine Spirit, the ARPQ shield,
 Pharaoh's Blessing 1-4 and Power Buff, the flat entries of
-`Effect/ItemEff.img` (report c029 A). v83 shows it through
+`Effect/ItemEff.img` (report c029 A). For the first four v83 shows it through
 SHOW_CONSUME_EFFECT (`0xA6`: character id, item id, 0 for none). The client
 keeps the id (user+0x1f64) and loops the item's frames at their `z` until
 told 0, the owner's own client included; SPAWN_PLAYER doesn't carry it.
 `net::consume_effect` derives the aura from the active buffs (an item buff is
 kept under `-item_id`) and `refresh` sends the 166 to the player and the map
 whenever it changes: when the item is used, and with 0 when its buff is
-cancelled, expires or ends at death. The field sends it after SPAWN_PLAYER to
+cancelled, expires or ends at death. The client actor checks again after
+each packet it handles and each party skill that reaches the player, so a
+skill's buff that takes over all the item buff's stats takes the aura with
+them. The field sends it after SPAWN_PLAYER to
 those who arrive later and when a hidden player shows, and the client actor
 tells the player's own client again on each map join, as v83 makes the user
 anew there. `Player.consume_effect` holds what the others were last shown
@@ -994,12 +997,21 @@ anew there. `Player.consume_effect` holds what the others were last shown
 
 HeavenClient draws it in `Char::show_consume_effect` (layers clamped to -5
 to 20, 5 without a `z`), not while morphed, and `Stage::clear` clears the
-player's own at the map change, before the server's resend. Not done:
-Pharaoh's Blessing and Power Buff themselves, whose `berserk` and
-`booster` specs the server doesn't apply yet; the skills that show an item's
-aura (5110000, 4300000, 5100000); facing (the aura isn't flipped); and a
-skill buff replacing the item buff's stat, which takes the aura away only at
-the next refresh.
+player's own at the map change, before the server's resend.
+
+Pharaoh's Blessing and Power Buff draw theirs through their buff instead
+(report b339), so they aren't in `consume_effect::ITEMS`: their `berserk`
+spec is temporary stat 73 (`BuffStat::ItemAura`) and their `booster` is
+Booster (11), its negative value sent as the item has it. 73's value
+changes nothing; the client only draws the item's `ItemEff.img` frames on
+a layer of their own (user+0x2adc), the item coming as the reason
+(`-item_id`), which GIVE_FOREIGN_BUFF and SPAWN_PLAYER carry for the
+others. While it's on, Power Explosion's loop is hidden. HeavenClient's
+`Char::show_item_aura` draws it. Cosmic gives no damage for
+`berserk` either.
+
+Not done: the skills that show an item's aura (5110000, 4300000, 5100000);
+and facing (the aura isn't flipped).
 
 ## Spending AP and SP
 
@@ -2049,7 +2061,9 @@ it dies.
 `consume_effects` has a player drink Horntail Squad Victory and checks that
 they and a watcher see the aura, that it is shown again to the watcher
 coming back and to the drinker on each new map, and that cancelling the
-buff takes it away for both.
+buff takes it away for both; that a skill's buff taking over its stats
+takes it away; and that Pharaoh's Blessing gives Booster and 73, shows the
+watcher 73 with the item, never a 166, and takes 73 away when cancelled.
 `map_traps` has a player in the Forest of Patience take a thorn's 1 damage,
 which another player sees as DAMAGE_PLAYER -3, and has a hit of 2 refused.
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the

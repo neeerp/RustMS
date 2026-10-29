@@ -79,6 +79,7 @@ namespace ms
 			case 51: return CONFUSE;
 			case 59: return BERSERK_FURY;
 			case 60: return DIVINE_BODY;
+			case 73: return ITEM_AURA;
 			case 74: return EXP_BUFF;
 			case 75: return STOP_POTION;
 			case 76: return STOP_MOTION;

@@ -214,6 +214,9 @@ namespace ms
 		// Loop an item buff's aura, `Effect/ItemEff.img/<item>` above or behind the body by its `z`, until the
 		// item is 0 (FUN_0093abe2). It isn't drawn while the character is morphed.
 		void show_consume_effect(int32_t item);
+		// Loop the aura of the item buff on temporary stat 73 the same way, or take it away with an item of 0
+		// (FUN_009433fb). While it's on, Power Explosion's loop doesn't show (FUN_0093e344).
+		void show_item_aura(int32_t item);
 		// A pair's ring of a kind (reports b059, b061): `Effect/ItemEff.img/<ring>/0` at the feet while the
 		// partner is on the same screen, and `/1` midway between them while they stand close. Each kind has
 		// its own effect; the same effect again goes on.
@@ -472,6 +475,8 @@ namespace ms
 		EffectLayer divine_body;
 		EffectLayer power_explosion;
 		EffectLayer consume_aura;
+		EffectLayer item_aura;
+		int32_t item_aura_id = 0;
 		struct RingDisplay
 		{
 			RingEffect effect;

@@ -1,5 +1,7 @@
 //! The aura some item buffs draw over the player (SHOW_CONSUME_EFFECT, recv
-//! 166, report c029 A): the squad victory potions and Pharaoh's Blessing.
+//! 166, report c029 A): the squad victory potions and the ARPQ shield.
+//! Pharaoh's Blessing and Power Buff draw theirs through their buff
+//! instead (`BuffStat::ItemAura`, report b339).
 //! The v83 client keeps the item id (user+0x1f64) and draws
 //! `Effect/ItemEff.img/<id>` until told 0, the owner's own client included;
 //! nothing in SPAWN_PLAYER carries it, so those who arrive later are told
@@ -13,10 +15,8 @@ use crate::packet::build::world::field::build_show_consume_effect;
 
 /// The items whose buff has an aura: the flat `ItemEff.img` entries of the
 /// timed USE buffs (Horntail Squad Victory, Breath of Nine Spirit, the ARPQ
-/// shield, Pink Bean Squad Victory, Pharaoh's Blessing 1-4, Power Buff).
-pub const ITEMS: [i32; 10] = [
-    2022108, 2022109, 2022269, 2022449, 2022585, 2022586, 2022587, 2022588, 2022616, 2022617,
-];
+/// shield, Pink Bean Squad Victory) whose buff doesn't draw it itself.
+pub const ITEMS: [i32; 4] = [2022108, 2022109, 2022269, 2022449];
 
 /// The item whose aura `player`'s buffs show, or 0. Item buffs are kept
 /// under `-item_id`.

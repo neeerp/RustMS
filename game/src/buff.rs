@@ -113,6 +113,11 @@ pub enum BuffStat {
     /// No mob can hurt the player: the client dodges every hit
     /// (Invincibility, 1010).
     DivineBody = 60,
+    /// An item's `berserk` (Pharaoh's Blessing, Power Buff): the client only
+    /// draws `Effect/ItemEff.img/<item>` about the player, the item coming
+    /// as `-skill_id`, and hides Power Explosion's loop meanwhile (report
+    /// b339). The value changes nothing.
+    ItemAura = 73,
     /// Kills give `value` percent of their EXP: Hunter's Luck (2450000).
     /// The client only shows its icon.
     ExpBuff = 74,
@@ -156,7 +161,7 @@ impl BuffStat {
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 23] = [
+    pub const SHOWN: [BuffStat; 24] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -175,6 +180,7 @@ impl BuffStat {
         BuffStat::ShadowStars,
         BuffStat::Undead,
         BuffStat::Confuse,
+        BuffStat::ItemAura,
         BuffStat::StopPotion,
         BuffStat::StopMotion,
         BuffStat::Fear,

@@ -91,7 +91,9 @@ namespace ms
 			COMBO_BARRIER,
 			BODY_PRESSURE,
 			SMART_KNOCKBACK,
-			PYRAMID_PQ,
+			// An item's aura, Effect/ItemEff.img/<item> with the item as -reason: Pharaoh's Blessing and Power Buff
+			// (report b339).
+			ITEM_AURA,
 			ENERGY_CHARGE,
 			MONSTER_RIDING,
 			HOMING_BEACON,
