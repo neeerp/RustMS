@@ -65,6 +65,19 @@ namespace ms
 			return true;
 		}
 
+		// Letters and digits only, and at least one.
+		inline bool is_key(const std::string& s)
+		{
+			if (s.empty())
+				return false;
+
+			for (char c : s)
+				if (!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z'))
+					return false;
+
+			return true;
+		}
+
 		// Without `images`, image tags are dropped; with it, each becomes an
 		// IMAGE placeholder and is appended to `images` in order. With `links`,
 		// each NPC and map name is appended to it.
@@ -147,6 +160,26 @@ namespace ms
 						if (close != std::string::npos && arg.find('/') != std::string::npos)
 						{
 							out += image(tag, arg);
+							i = close + 1;
+							continue;
+						}
+						break;
+					case 'W':
+						// #W<key>#: UI/UIWindow.img/Quest/<key>, a word-only key
+						// (0x9a16d8); an empty one is left as text.
+						if (close != std::string::npos && is_key(arg))
+						{
+							out += image('f', "UI/UIWindow.img/Quest/" + arg);
+							i = close + 1;
+							continue;
+						}
+						break;
+					case 'L':
+						// A choice's #L<n>#, whole, so its closing '#' starts no
+						// tag ("#L0#Wait").
+						if (numeric)
+						{
+							out.append(text, i, close - i + 1);
 							i = close + 1;
 							continue;
 						}

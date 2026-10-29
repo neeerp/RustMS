@@ -96,23 +96,36 @@ namespace ms
 			return { daily(get).count, static_cast<int32_t>((time_limit / 86400) * 0.9) };
 		}
 
-		// The Unix time a timed title's started record names as its end, the
-		// 14 digits "yyyyMMddHHmmss" in UTC (0x4e6a03), or 2079-01-01 for any
-		// other record.
+		// The Unix time a timed title's started record names as its end,
+		// "yyyyMMddHHmmss" in UTC (0x4e6a03), or 2079-01-01 for any other
+		// record. Any 14 characters are read, each field by atoi into a WORD
+		// (0x7b903d); fields Windows wouldn't take as a date also give 2079.
 		inline int64_t expiry(const std::string& progress)
 		{
 			const int64_t NEVER = 3439756800;
 
-			if (progress.size() != 14 || !std::all_of(progress.begin(), progress.end(), [](char c) { return c >= '0' && c <= '9'; }))
+			if (progress.size() != 14)
 				return NEVER;
 
-			auto part = [&](size_t at, size_t length) { return std::atoi(progress.substr(at, length).c_str()); };
-			int64_t year = part(0, 4) - (part(4, 2) <= 2 ? 1 : 0);
+			auto part = [&](size_t at, size_t length) {
+				return static_cast<int64_t>(static_cast<uint16_t>(std::atoi(progress.substr(at, length).c_str())));
+			};
 			int64_t month = part(4, 2);
+			int64_t day = part(6, 2);
+			int64_t calendar_year = part(0, 4);
+			bool leap = calendar_year % 4 == 0 && (calendar_year % 100 != 0 || calendar_year % 400 == 0);
+			const int64_t LENGTHS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+			if (calendar_year < 1601 || month < 1 || month > 12 || day < 1
+				|| day > LENGTHS[month - 1] + (month == 2 && leap ? 1 : 0)
+				|| part(8, 2) > 23 || part(10, 2) > 59 || part(12, 2) > 59)
+				return NEVER;
+
+			int64_t year = calendar_year - (month <= 2 ? 1 : 0);
 			// Howard Hinnant's days_from_civil.
 			int64_t era = (year >= 0 ? year : year - 399) / 400;
 			int64_t year_of_era = year - era * 400;
-			int64_t day_of_year = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + part(6, 2) - 1;
+			int64_t day_of_year = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
 			int64_t day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
 			int64_t days = era * 146097 + day_of_era - 719468;
 

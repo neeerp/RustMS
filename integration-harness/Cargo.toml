@@ -11,6 +11,7 @@ toml = "0.8"
 crypt = { path = "../crypt" }
 packet = { path = "../packet" }
 net = { path = "../net" }
+game = { path = "../game" }
 game-data = { path = "../game-data" }
 rand = "0.8"
 diesel = { version = "2.3.6", features = ["postgres"] }
