@@ -67,6 +67,30 @@ namespace ms
 		// A guild's name in the invitation prompt.
 		constexpr size_t UNION_GUILD_MIN = 4;
 		constexpr size_t UNION_GUILD_MAX = 14;
+
+		// BtInvite's prompt (0x914cfe, StringPool 0x1165). A name under
+		// 4 letters gets 0x335 and v83's prompt stays open; here it comes
+		// back.
+		void prompt_union_invite()
+		{
+			UI::get().emplace<UIEnterText>(
+					"Please enter the Guild name\\nto send the invitation for the Union.",
+					[](const std::string& text)
+					{
+						std::string name = trim(text);
+
+						if (name.size() < UNION_GUILD_MIN)
+							UI::get().emplace<UIOk>(
+									"Please enter at least " + std::to_string(UNION_GUILD_MIN) + " characters.",
+									[](bool) { prompt_union_invite(); }
+							);
+						else
+							InviteToAlliancePacket(name).dispatch();
+					},
+					UNION_GUILD_MAX, true
+			);
+		}
+
 		// The rank panel (FUN_0091e704), its rows under the guild panel's
 		// first three pieces of art.
 		const std::pair<const char*, Point<int16_t>> UNION_ART[] = {
@@ -556,17 +580,7 @@ namespace ms
 		switch (buttonid)
 		{
 			case Buttons::BT_ALLIANCE_INVITE:
-				UI::get().emplace<UIEnterText>(
-						"Please enter the Guild name\\nto send the invitation for the Union.",
-						[](const std::string& text)
-						{
-							std::string name = trim(text);
-
-							if (name.size() >= UNION_GUILD_MIN)
-								InviteToAlliancePacket(name).dispatch();
-						},
-						UNION_GUILD_MAX
-				);
+				prompt_union_invite();
 				break;
 			case Buttons::BT_ALLIANCE_WITHDRAW:
 				UI::get().emplace<UIYesNo>(

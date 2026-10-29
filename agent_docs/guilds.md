@@ -541,10 +541,11 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     titled rank, and always from 5, as v83 reads; the server refuses
     that); TALK, WHISPER and PARTY INVITE (party leaders) on someone else
     online; NOTICE for ranks 1 and 2.
-  - INVITE asks for a guild's name (4 to 14 letters) and sends op 3; LEAVE
-    and EXPEL ask first and send ops 2 and 6 (guild id, then alliance
-    id); UP and DOWN send op 9 without asking; NOTICE sends op 10 as the
-    guild's does.
+  - INVITE asks for a guild's name (4 to 14 letters) and sends op 3; a
+    shorter one gets "Please enter at least 4 characters." and the prompt
+    comes back, where v83's stays open. LEAVE and EXPEL ask first and
+    send ops 2 and 6 (guild id, then alliance id); UP and DOWN send op 9
+    without asking; NOTICE sends op 10 as the guild's does.
   - INFO opens the rank panel at (311, 85) on `GuildUnion/backgrnd` with
     the guild panel's art and no GP. Only the alliance's master may
     MODIFY and SAVE (op 8); a rank anyone in any of the guilds holds
@@ -574,8 +575,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
 - The Alliance tab's tooltips: the whole notice over its box, the online
   and total counts, "Sort thru" over the column heads, and "Unknown" over a
   level v83 does not know.
-- An alliance invitation to a name under 4 characters is dropped; v83's
-  prompt keeps OK until the name is long enough.
 - A joining guild's members, and new members of an allied guild, always
   start at alliance rank 5, even while rank 5 has no title.
 - The deny's reason (invitations switched off, another card showing,
