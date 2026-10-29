@@ -33,6 +33,7 @@
 #include "BlackoutRules.h"
 #include "TrembleRules.h"
 #include "SightRules.h"
+#include "../Data/CashCatalog.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
@@ -341,8 +342,8 @@ namespace ms
 		bool change_channel(uint8_t channel);
 
 		// Ask to enter the Cash Shop, with the same refusals; GMs too must
-		// catch their breath.
-		void enter_cash_shop();
+		// catch their breath. A present is offered once the shop opens.
+		void enter_cash_shop(std::optional<cash_catalog::Present> present = std::nullopt);
 
 	private:
 		void load_map(int32_t mapid);

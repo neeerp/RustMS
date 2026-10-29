@@ -2132,7 +2132,7 @@ namespace ms
 
 	// v83 FUN_00a04dca: the alert first, and the request gate without its
 	// check that the player is alive. A quiz keeps the player out.
-	void Stage::enter_cash_shop()
+	void Stage::enter_cash_shop(std::optional<cash_catalog::Present> present)
 	{
 		if (player.get_look().get_alerted())
 		{
@@ -2157,6 +2157,8 @@ namespace ms
 			return;
 		}
 
-		player.request(EnterCashShopPacket(), ExclRequest::WAIT, true);
+		// v83 holds the present until the shop opens, and opens it without one otherwise (+0x36e8).
+		if (player.request(EnterCashShopPacket(), ExclRequest::WAIT, true))
+			cash_catalog::pending_present() = std::move(present);
 	}
 }

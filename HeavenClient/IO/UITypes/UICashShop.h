@@ -33,6 +33,7 @@
 
 #include <array>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -144,6 +145,12 @@ namespace ms
 		void buy_with_mesos(const cash_catalog::Commodity& commodity);
 		// Gift a commodity, after asking (v83 46e822).
 		void gift(const cash_catalog::Commodity& commodity);
+		// Offer the present the player came in for (v83 472c67), once the
+		// balance is known.
+		void give(const cash_catalog::Present& present);
+		// Turn the list to the tab, sub-tab and page that hold a commodity
+		// (v83 4725ef).
+		void show(const cash_catalog::Commodity& commodity);
 		// Move an item between the Cash and Item Inventories, unless v83
 		// (472632 and 472820) keeps it where it is.
 		void take_out(const CashItem& item);
@@ -257,6 +264,7 @@ namespace ms
 		bool pending;
 		bool wish_added;
 		int32_t name_change_sn;
+		std::optional<cash_catalog::Present> present;
 		int16_t storage_slots;
 		int16_t character_slots;
 

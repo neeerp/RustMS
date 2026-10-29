@@ -128,6 +128,8 @@ namespace ms
 		constexpr int16_t PANEL_ROWS = 3, PANEL_STEP = 40;
 		const Point<int16_t> PANEL_ICON = { 17, 64 };
 		const Point<int16_t> PANEL_NAME = { 57, 26 };
+		// A wish row's BtPresent, against the panel.
+		const Point<int16_t> PANEL_PRESENT = { 165, 50 };
 		const Point<int16_t> PANEL_REQ = { 57, 53 };
 		const Point<int16_t> PANEL_REQ_LEVEL = { 93, 44 };
 		// The scrollbar (id 0x3e8) is 112 tall from (218, 33).
@@ -212,6 +214,9 @@ namespace ms
 		buttons[Buttons::BT_EXCEPTION] = std::make_unique<MapleButton>(UserInfo["BtExceptionShow"]);
 		buttons[Buttons::BT_PANEL_HIDE] = std::make_unique<MapleButton>(Basic["BtHide"], PANEL + PANEL_HIDE);
 
+		for (int16_t i = 0; i < PANEL_ROWS; i++)
+			buttons[Buttons::BT_PRESENT1 + i] = std::make_unique<MapleButton>(UserInfo["BtPresent"], PANEL + PANEL_PRESENT + Point<int16_t>(0, PANEL_STEP * i));
+
 		for (size_t i = 0; i < MAX_PETS; i++)
 		{
 			nl::node src = UserInfo["BtPet" + std::to_string(i + 1)];
@@ -232,6 +237,7 @@ namespace ms
 		panel_slider = Slider(Slider::Type::CLASSIC, PANEL_SLIDER, PANEL_SLIDER_X, PANEL_ROWS, 0, [&](bool upwards)
 		{
 			panel_offset += upwards ? -1 : 1;
+			show_presents();
 		});
 		medal_slider = Slider(Slider::Type::CLASSIC, MEDAL_SLIDER, MEDAL_SLIDER_X, MEDAL_ROWS, 0, [&](bool upwards)
 		{
@@ -471,6 +477,18 @@ namespace ms
 		case Buttons::BT_PANEL_HIDE:
 			set_panel(Panel::NO_PANEL);
 			break;
+		case Buttons::BT_PRESENT1:
+		case Buttons::BT_PRESENT2:
+		case Buttons::BT_PRESENT3:
+		{
+			// Into the Cash Shop, which offers the wish as a gift to this character once it opens (0x8fe30d).
+			size_t i = static_cast<size_t>(panel_offset + buttonid - Buttons::BT_PRESENT1);
+
+			if (i < wishes.size())
+				Stage::get().enter_cash_shop(cash_catalog::Present{ wishes[i].sn, name.get_text() });
+
+			return Button::State::NORMAL;
+		}
 		case Buttons::BT_FAMILY:
 			// The player's own opens the Family window, another's their tree.
 			if (name.get_text() == Stage::get().get_player().get_stats().get_name())
@@ -710,8 +728,9 @@ namespace ms
 			return;
 
 		wish_rows.clear();
+		wishes = char_info::wishes(sns, commodity);
 
-		for (const char_info::Wish &wish : char_info::wishes(sns, commodity))
+		for (const char_info::Wish &wish : wishes)
 		{
 			const ItemData &item = ItemData::get(wish.item_id);
 			wish_rows.push_back(panel_row(wish.item_id, char_info::wish_name(item.get_name(), wish.count), false));
@@ -977,6 +996,22 @@ namespace ms
 
 		panel_offset = 0;
 		panel_slider.setrows(0, PANEL_ROWS, static_cast<int16_t>(panel_rows().size()));
+		show_presents();
+	}
+
+	void UICharInfo::show_presents()
+	{
+		bool own = cid == Stage::get().get_player().get_oid();
+
+		for (int16_t r = 0; r < PANEL_ROWS; r++)
+		{
+			Button &button = *buttons[Buttons::BT_PRESENT1 + r];
+			size_t i = static_cast<size_t>(panel_offset + r);
+			bool gives = panel_offset + r >= 0 && i < wishes.size() && char_info::giftable(wishes[i].item_id, own);
+
+			button.set_active(panel == Panel::WISHES);
+			button.set_state(gives ? Button::State::NORMAL : Button::State::DISABLED);
+		}
 	}
 
 	const std::vector<UICharInfo::ItemRow> &UICharInfo::panel_rows() const

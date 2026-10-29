@@ -55,7 +55,7 @@ namespace ms
 		const Point<int16_t> CANCEL_FROM_CORNER = Point<int16_t>(73, 31);
 	}
 
-	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), period(commodity.period), credit(0), points(0), prepaid(0)
+	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), period(commodity.period), credit(0), points(0), prepaid(0), preset(false)
 	{
 		background = NxFiles::ui_classic["CashShop.img"]["CSGift"]["backgrnd"];
 
@@ -92,6 +92,15 @@ namespace ms
 		place();
 
 		birthday.set_state(Textfield::State::FOCUSED);
+	}
+
+	UICashGift::UICashGift(const cash_catalog::Commodity& commodity, int32_t prepaid, const std::string& to) : UICashGift(commodity, 0, 0, prepaid)
+	{
+		// The name is shown but can't be changed (v83 7e5c77).
+		preset = true;
+		this->to.change_text(to);
+		this->to.set_shown_disabled();
+		message.set_key_callback(KeyAction::Id::TAB, []() {});
 	}
 
 	void UICashGift::place()
@@ -245,7 +254,7 @@ namespace ms
 		if (asking_birthday)
 		{
 			// v83 (0x470078) checks the price next: NX Credit or NX Prepaid
-			// must cover it.
+			// must cover it. A present has only NX Prepaid (472e6c).
 			if (credit < ring->price && prepaid < ring->price)
 			{
 				close();
@@ -260,7 +269,7 @@ namespace ms
 			background = NxFiles::ui_classic["CashShop.img"]["CSGift"]["backgrnd"];
 			place();
 
-			to.set_state(Textfield::State::FOCUSED);
+			(preset ? message : to).set_state(Textfield::State::FOCUSED);
 
 			return;
 		}
@@ -282,6 +291,24 @@ namespace ms
 		// StringPool 0x200, then the BUY dialog. Opening the question
 		// replaces this dialog, so everything is copied first.
 		cash_catalog::Commodity commodity = *ring;
+
+		if (preset)
+		{
+			std::string question = ItemData::get(commodity.item_id).get_name() + " (" + std::to_string(commodity.price) +
+								   " NX)\\nWill you buy this item as a gift for\\n'" + to.get_text() + "'?";
+			auto send = [code = cash_catalog::birthday_code(birthday.get_text()), sn = commodity.sn, receiver = to.get_text(),
+						 note = CurseData::filter(message.get_text())]()
+			{
+				if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
+					GiftCashItemPacket(code, sn, receiver, note).dispatch();
+			};
+
+			close();
+			UI::get().emplace<UIYesNo>(question, [send](bool yes) { if (yes) send(); });
+
+			return;
+		}
+
 		RingOrder order = { marriage::ring_kind(commodity.item_id) == RingKind::FRIENDSHIP, cash_catalog::birthday_code(birthday.get_text()),
 							CurseData::filter(to.get_text()), CurseData::filter(message.get_text()) };
 		int32_t balances[3] = { credit, points, prepaid };

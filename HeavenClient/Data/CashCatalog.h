@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -533,6 +534,42 @@ namespace ms
 					found.push_back(commodity);
 
 			return found;
+		}
+
+		// A wish given from someone's character info (v83 8fe3bb): its SN and whom it goes to, kept while
+		// the Cash Shop opens.
+		struct Present
+		{
+			int32_t sn;
+			std::string to;
+		};
+
+		// The present the next Cash Shop opens with, if the player went in for one (v83 keeps it at
+		// CWvsContext+0x36ec and +0x36f0).
+		inline std::optional<Present> &pending_present()
+		{
+			static std::optional<Present> present;
+
+			return present;
+		}
+
+		// What a present buys (FUN_00471be9): the commodity sn if it is on sale, else one on sale with the
+		// same item, count and period.
+		inline std::optional<Commodity> on_sale_as(const std::vector<Commodity>& all, int32_t sn)
+		{
+			auto own = std::find_if(all.begin(), all.end(), [sn](const Commodity& c) { return c.sn == sn; });
+
+			if (own == all.end())
+				return std::nullopt;
+
+			if (own->on_sale)
+				return *own;
+
+			for (const Commodity& commodity : all)
+				if (commodity.on_sale && commodity.item_id == own->item_id && commodity.count == own->count && commodity.period == own->period)
+					return commodity;
+
+			return std::nullopt;
 		}
 
 		// A slot extender (555xxxx) keeps an extra equip slot open for its

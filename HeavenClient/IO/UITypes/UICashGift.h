@@ -42,6 +42,9 @@ namespace ms
 		UICashGift(const cash_catalog::Commodity& commodity);
 		// A ring pair for the player and a partner, with the balances.
 		UICashGift(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid);
+		// A present from a character's wish list for `to`, paid with NX
+		// Prepaid (v83 472c67): the birthday code, then a message.
+		UICashGift(const cash_catalog::Commodity& commodity, int32_t prepaid, const std::string& to);
 
 		void draw(float inter) const override;
 
@@ -83,6 +86,8 @@ namespace ms
 		// Days the item lasts, or 0.
 		int32_t period;
 		std::optional<cash_catalog::Commodity> ring;
+		// Whether the receiver came with the dialog: a present.
+		bool preset;
 		int32_t credit;
 		int32_t points;
 		int32_t prepaid;

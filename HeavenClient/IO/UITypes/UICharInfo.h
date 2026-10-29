@@ -23,6 +23,7 @@
 
 #include "../Components/Slider.h"
 
+#include "../../Character/CharInfoLists.h"
 #include "../../Character/Look/CharLook.h"
 #include "../../Character/Look/PetLook.h"
 #include "../../Graphics/Text.h"
@@ -155,7 +156,10 @@ namespace ms
 			BT_PANEL_HIDE,
 			BT_PET1,
 			BT_PET2,
-			BT_PET3
+			BT_PET3,
+			BT_PRESENT1,
+			BT_PRESENT2,
+			BT_PRESENT3
 		};
 
 		// What the pet box shows of a pet.
@@ -198,6 +202,8 @@ namespace ms
 		void show_medals();
 		// The equipment the character wears now, for the item panel (FUN_00903e24).
 		void list_worn();
+		// Enable each wish row's BtPresent that may give its wish (FUN_008fe3fb).
+		void show_presents();
 		static ItemRow panel_row(int32_t itemid, const std::string &name, bool equip);
 
 		// Whether the window can show the mount: not when the saddle worn doesn't fit it (FUN_00903e24).
@@ -256,6 +262,7 @@ namespace ms
 		// The item and wish panels' rows, three at a time.
 		std::vector<ItemRow> worn_rows;
 		std::vector<ItemRow> wish_rows;
+		std::vector<char_info::Wish> wishes;
 		int16_t panel_offset = 0;
 		Slider panel_slider;
 

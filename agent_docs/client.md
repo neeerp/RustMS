@@ -364,8 +364,11 @@ from `UI.nx`. Moved so far:
   item panel lists the equipment the character wears, from the look they came
   with (one's own from the equipment), cash items before what they cover
   (`char_info::worn_items`, v83 FUN_00903e24). The wish panel lists the wish
-  list from CHAR_INFO, last first, as Commodity.img sells it; its BtPresent
-  gift buttons are not drawn yet.
+  list from CHAR_INFO, last first, as Commodity.img sells it. Each row's GIFT
+  (`UserInfo/BtPresent`) is enabled only on someone else's list and not for
+  911xxxx, 5430xxx or slot extenders (`char_info::giftable`, v83
+  FUN_008fe3fb); it enters the Cash Shop to give that wish (see "Presents"
+  below).
   Excluded items are disabled. Family opens the player's own Family
   window or someone else's Family Tree (`agent_docs/families.md`). REQ PARTY, greyed in the
   player's own window, invites the character when the player leads a party,
@@ -981,6 +984,17 @@ the screen size.
   shows "The note has successfully been sent"; Esc sends nothing. The next
   gift follows either way. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
+- **Presents:** a wish's GIFT in the character info window enters the Cash
+  Shop with its SN and the character's name (v83 0x472c67). When the balance
+  (0x144) first comes, the shop finds the commodity, or an on-sale one with the
+  same item, count and period (`cash_catalog::on_sale_as`, 471be9), or says
+  "The item is not on sale now."; then it opens the commodity's tab, subtab and
+  page, and runs the gift dialog with the name filled in and fixed: the
+  birthday code, NX Prepaid against the price, the message, then "ITEM (PRICE
+  NX) Will you buy this item as a gift for 'NAME'?", and Yes sends 0x04. v83
+  sends packages as 0x1F, which the server doesn't take, so they go as 0x04
+  too. As in the other gift dialogs here, an empty message only puts the
+  cursor back rather than v83's "Please enter the message.".
 - **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
   "Are you sure you want to leave the Cash Shop?", as v83 does
   (`FUN_004bcc86`).
@@ -1007,7 +1021,6 @@ What is left that is larger:
 | --- | --- | --- |
 | MTS | Nothing, client or server | L |
 | Cash shop | CHARGE does nothing | S |
-| Character info | The wish panel's BtPresent (gift from the Cash Shop) | S |
 
 ## Protocol deviations fixed
 
