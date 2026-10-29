@@ -3,7 +3,7 @@
 //! them on arrival or on entering the game.
 
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::{grant_stack, set_meso};
+use integration_harness::database::{grant_stack, set_gm_level, set_meso};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{send, stat, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -23,7 +23,9 @@ const OPEN: u8 = 0x08;
 const NO_MESOS: u8 = 0x0a;
 const NO_RECEIVER: u8 = 0x0c;
 const SAME_ACCOUNT: u8 = 0x0d;
+const INCORRECT: u8 = 0x0b;
 const INBOX_FULL: u8 = 0x0e;
+const LOW_LEVEL_LIMIT: u8 = 0x11;
 const SENT: u8 = 0x12;
 const UNKNOWN: u8 = 0x13;
 const REMOVED: u8 = 0x17;
@@ -366,4 +368,53 @@ async fn ten_parcels_fill_a_characters_inbox() {
     assert_eq!(warp(r, HENESYS, "", &mut seen).await, HENESYS);
     let (listed, _) = open(r, &mut seen).await;
     assert_eq!(listed.len(), 10);
+}
+
+#[tokio::test]
+async fn a_low_level_sends_a_million_mesos_a_day_and_a_lesser_gm_none() {
+    let receiver_config = load_harness_config_or_fail().await;
+    let receiver = login_to_world_session(&receiver_config)
+        .await
+        .expect("receiver login failed");
+    let receiver_name = receiver.character_name.clone();
+    drop(receiver);
+    let sender_config = load_harness_config_or_fail().await;
+    let sender_id = login_to_world_session(&sender_config)
+        .await
+        .expect("sender login failed")
+        .character_id;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_meso(sender_id, 2_000_000).await.expect("give mesos");
+
+    // A new character is of level 1: 600,000 and then 400,000 make the
+    // day's million, and 500,000 between them would pass it.
+    let mut sender = relogin(&sender_config).await;
+    let s = &mut sender.connection;
+    let mut seen = Trace::default();
+    assert_eq!(warp(s, HENESYS, "", &mut seen).await, HENESYS);
+    open(s, &mut seen).await;
+    let t = step(s, "duey-day-1", normal(0, 0, 0, 600_000, &receiver_name)).await;
+    assert_eq!(t.parcels, [[SENT]]);
+    assert_eq!(t.stat(stat::MESO), Some(2_000_000 - 600_000 - 9_800));
+    let t = step(s, "duey-day-over", normal(0, 0, 0, 500_000, &receiver_name)).await;
+    assert_eq!(t.parcels, [[LOW_LEVEL_LIMIT]]);
+    assert!(t.stat(stat::MESO).is_none());
+    let t = step(s, "duey-day-2", normal(0, 0, 0, 400_000, &receiver_name)).await;
+    assert_eq!(t.parcels, [[SENT]]);
+    let t = step(s, "duey-day-more", normal(0, 0, 0, 1, &receiver_name)).await;
+    assert_eq!(t.parcels, [[LOW_LEVEL_LIMIT]]);
+    drop(sender);
+
+    // A GM below the admins may send nothing, and is told why.
+    set_gm_level(&sender_config.username, 2)
+        .await
+        .expect("make a GM");
+    let mut sender = relogin(&sender_config).await;
+    let s = &mut sender.connection;
+    let mut seen = Trace::default();
+    assert_eq!(warp(s, HENESYS, "", &mut seen).await, HENESYS);
+    open(s, &mut seen).await;
+    let t = step(s, "duey-gm", normal(0, 0, 0, 1000, &receiver_name)).await;
+    assert_eq!(t.parcels, [[INCORRECT]]);
+    assert_eq!(t.broadcasts.len(), 1, "{:?}", t.broadcasts);
 }

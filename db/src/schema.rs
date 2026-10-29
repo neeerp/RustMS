@@ -713,6 +713,7 @@ diesel::table! {
         opened_at -> Nullable<Timestamp>,
         closed_at -> Nullable<Timestamp>,
         meso -> Int4,
+        blacklist -> Array<Text>,
     }
 }
 diesel::joinable!(hired_merchants -> characters (owner_id));
@@ -820,6 +821,14 @@ diesel::table! {
     }
 }
 diesel::joinable!(ariant_records -> characters (character_id));
+diesel::table! {
+    parcel_mesos_sent (character_id) {
+        character_id -> Int4,
+        day -> Date,
+        mesos -> Int4,
+    }
+}
+diesel::joinable!(parcel_mesos_sent -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -879,5 +888,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     reports,
     dojo_records,
     ariant_records,
+    parcel_mesos_sent,
     votes,
 );

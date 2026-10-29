@@ -29,6 +29,7 @@ struct MerchantRow {
     opened_at: Option<SystemTime>,
     closed_at: Option<SystemTime>,
     meso: i32,
+    blacklist: Vec<String>,
 }
 
 #[derive(Insertable)]
@@ -136,12 +137,15 @@ pub fn load(owner: i32) -> crate::Result<Option<HiredMerchant>> {
         .filter(hired_merchants::owner_id.eq(owner))
         .select((hired_merchants::all_columns, characters::name))
         .load(&mut conn)?;
-    Ok(assemble(&mut conn, rows)?.pop())
+    Ok(assemble(&mut conn, rows)?
+        .pop()
+        .map(|(merchant, _)| merchant))
 }
 
-/// The open merchants on `map_id` in channel `channel_id`. A world server
-/// serves one world, and its fields are keyed by channel alone.
-pub fn load_map(channel_id: u8, map_id: i32) -> crate::Result<Vec<HiredMerchant>> {
+/// The open merchants on `map_id` in channel `channel_id`, each with the
+/// names it keeps out. A world server serves one world, and its fields are
+/// keyed by channel alone.
+pub fn load_map(channel_id: u8, map_id: i32) -> crate::Result<Vec<(HiredMerchant, Vec<String>)>> {
     let mut conn = crate::connection()?;
     let rows: Vec<(MerchantRow, String)> = hired_merchants::table
         .inner_join(characters::table)
@@ -155,11 +159,11 @@ pub fn load_map(channel_id: u8, map_id: i32) -> crate::Result<Vec<HiredMerchant>
 }
 
 /// Merchants with their stock in the order listed and their sales in the
-/// order made.
+/// order made, each with its blacklist.
 fn assemble(
     conn: &mut PgConnection,
     rows: Vec<(MerchantRow, String)>,
-) -> QueryResult<Vec<HiredMerchant>> {
+) -> QueryResult<Vec<(HiredMerchant, Vec<String>)>> {
     let owners: Vec<i32> = rows.iter().map(|(row, _)| row.owner_id).collect();
     let items: Vec<(ItemRow, Option<MerchantEquipmentStatsRow>)> = hired_merchant_items::table
         .left_join(hired_merchant_equipment_stats::table)
@@ -170,30 +174,33 @@ fn assemble(
         .filter(hired_merchant_sales::owner_id.eq_any(&owners))
         .order(hired_merchant_sales::id.asc())
         .load(conn)?;
-    let mut merchants: Vec<HiredMerchant> = rows
+    let mut merchants: Vec<(HiredMerchant, Vec<String>)> = rows
         .into_iter()
-        .map(|(row, owner_name)| HiredMerchant {
-            owner_id: row.owner_id,
-            owner_name,
-            stand: Stand {
-                channel_id: row.channel_id as u8,
-                map_id: row.map_id,
-                x: row.x,
-                y: row.y,
-                foothold: row.foothold,
-            },
-            item_id: row.item_id,
-            title: row.title,
-            state: MerchantState::from_i16(row.state).unwrap_or(MerchantState::Closed),
-            opened_at: row.opened_at,
-            closed_at: row.closed_at,
-            meso: row.meso,
-            stock: vec![],
-            sales: vec![],
+        .map(|(row, owner_name)| {
+            let merchant = HiredMerchant {
+                owner_id: row.owner_id,
+                owner_name,
+                stand: Stand {
+                    channel_id: row.channel_id as u8,
+                    map_id: row.map_id,
+                    x: row.x,
+                    y: row.y,
+                    foothold: row.foothold,
+                },
+                item_id: row.item_id,
+                title: row.title,
+                state: MerchantState::from_i16(row.state).unwrap_or(MerchantState::Closed),
+                opened_at: row.opened_at,
+                closed_at: row.closed_at,
+                meso: row.meso,
+                stock: vec![],
+                sales: vec![],
+            };
+            (merchant, row.blacklist)
         })
         .collect();
     for (row, equip) in items {
-        if let Some(merchant) = merchants.iter_mut().find(|m| m.owner_id == row.owner_id) {
+        if let Some((merchant, _)) = merchants.iter_mut().find(|m| m.0.owner_id == row.owner_id) {
             merchant.stock.push(Stock {
                 id: row.id,
                 listing: Listing {
@@ -214,7 +221,7 @@ fn assemble(
         }
     }
     for row in sales {
-        if let Some(merchant) = merchants.iter_mut().find(|m| m.owner_id == row.owner_id) {
+        if let Some((merchant, _)) = merchants.iter_mut().find(|m| m.0.owner_id == row.owner_id) {
             merchant.sales.push(Sale {
                 item_id: row.item_id,
                 quantity: row.quantity,
@@ -296,9 +303,9 @@ pub fn take_back(player: &Player, stock: i64, bundles: i16) -> crate::Result<boo
     })?)
 }
 
-/// Open `player`'s merchant at `now` and save them, in one transaction.
-/// Whether it was being set up.
-pub fn open(player: &Player, now: SystemTime) -> crate::Result<bool> {
+/// Open `player`'s merchant at `now`, keeping out `blacklist`, and save
+/// them, in one transaction. Whether it was being set up.
+pub fn open(player: &Player, now: SystemTime, blacklist: &[String]) -> crate::Result<bool> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> QueryResult<_> {
         let opened = diesel::update(
@@ -309,6 +316,7 @@ pub fn open(player: &Player, now: SystemTime) -> crate::Result<bool> {
         .set((
             hired_merchants::state.eq(MerchantState::Open as i16),
             hired_merchants::opened_at.eq(now),
+            hired_merchants::blacklist.eq(blacklist),
         ))
         .execute(conn)?;
         if opened == 0 {
@@ -317,6 +325,14 @@ pub fn open(player: &Player, now: SystemTime) -> crate::Result<bool> {
         write_player(conn, player)?;
         Ok(true)
     })?)
+}
+
+/// The names `owner`'s merchant keeps out are now `blacklist`.
+pub fn set_blacklist(owner: i32, blacklist: &[String]) -> crate::Result<()> {
+    diesel::update(hired_merchants::table.find(owner))
+        .set(hired_merchants::blacklist.eq(blacklist))
+        .execute(&mut crate::connection()?)?;
+    Ok(())
 }
 
 /// A purchase from a merchant: `bundles` of row `stock`, which come to

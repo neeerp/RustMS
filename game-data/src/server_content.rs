@@ -139,6 +139,7 @@ pub mod keys {
     pub const ALLIANCE_MASTER: &str = "alliance.master";
     /// `{name}` and their new `{title}`.
     pub const ALLIANCE_RANK: &str = "alliance.rank";
+    pub const DUEY_GM_REFUSED: &str = "duey.gm_refused";
 
     /// The continent ships' station staff: the booths that sell tickets
     /// (Joel, Agatha), the ushers that take them aboard (Cherry, Rini), and
@@ -3458,6 +3459,7 @@ mod tests {
             keys::ALLIANCE_EXPELLED,
             keys::ALLIANCE_MASTER,
             keys::ALLIANCE_RANK,
+            keys::DUEY_GM_REFUSED,
             keys::SHIPS_SELL_ASK,
             keys::SHIPS_SELL_DECLINE,
             keys::SHIPS_SELL_SHORT,
