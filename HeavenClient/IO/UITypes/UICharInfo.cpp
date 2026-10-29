@@ -19,7 +19,9 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Character/CharInfoLists.h"
 #include "../../Character/Job.h"
+#include "../../Character/MedalTagLayout.h"
 #include "../../Character/MountRules.h"
 #include "../../Character/Look/TamingMob.h"
 #include "../../Data/EquipData.h"
@@ -35,6 +37,10 @@
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
+
+#include <algorithm>
+#include <map>
+#include <optional>
 
 namespace ms
 {
@@ -117,6 +123,60 @@ namespace ms
 		const Point<int16_t> PANEL = { 270, 0 };
 		const Point<int16_t> PANEL_HIDE = { 220, 6 };
 		const Point<int16_t> PANEL_SIZE = { 240, 162 };
+		// The panels' rows (FUN_008fd4c0, FUN_008fde08), against the panel:
+		// the icon, the name, and for equipment the ReqLv art and the level.
+		constexpr int16_t PANEL_ROWS = 3, PANEL_STEP = 40;
+		const Point<int16_t> PANEL_ICON = { 17, 64 };
+		const Point<int16_t> PANEL_NAME = { 57, 26 };
+		const Point<int16_t> PANEL_REQ = { 57, 53 };
+		const Point<int16_t> PANEL_REQ_LEVEL = { 93, 44 };
+		// The scrollbar (id 0x3e8) is 112 tall from (218, 33).
+		constexpr int16_t PANEL_SLIDER_X = 218;
+		constexpr Range<int16_t> PANEL_SLIDER = Range<int16_t>(33, 33 + 112 - 13);
+
+		// The collection page (0x902ae0): the book's level and its icon,
+		// the cover's mob, the cards, the medal worn and the titles earned,
+		// four at a time. Text goes 6 above v83's y, as for the boxes.
+		const Point<int16_t> LEVEL_ICON = { 14, 182 };
+		const Point<int16_t> BOOK_LEVEL = { 101, 175 };
+		const Point<int16_t> COVER_NAME = { 101, 193 };
+		const Point<int16_t> BOOK_TOTAL = { 101, 211 };
+		const Point<int16_t> BOOK_NORMAL = { 168, 211 };
+		const Point<int16_t> BOOK_SPECIAL = { 236, 211 };
+		const Point<int16_t> MEDAL_ICON = { 8, 278 };
+		const Point<int16_t> MEDAL_NAME = { 101, 241 };
+		const Point<int16_t> MEDAL_COUNT = { 101, 259 };
+		const Point<int16_t> MEDAL_ROW = { 52, 295 };
+		constexpr int16_t MEDAL_ROWS = 4, MEDAL_STEP = 18;
+		// The scrollbar (id 0x7e1) is 73 tall from (252, 298).
+		constexpr int16_t MEDAL_SLIDER_X = 252;
+		constexpr Range<int16_t> MEDAL_SLIDER = Range<int16_t>(298, 298 + 73 - 13);
+
+		// A wish's item and count, from Etc.nx Commodity.img by its SN.
+		std::optional<char_info::Wish> commodity(int32_t sn)
+		{
+			static const std::map<int32_t, char_info::Wish> all = []()
+			{
+				std::map<int32_t, char_info::Wish> found;
+
+				for (nl::node item : nl::nx::etc["Commodity.img"])
+				{
+					auto id = static_cast<int32_t>(item["SN"].get_integer());
+					found[id] = { id, static_cast<int32_t>(item["ItemId"].get_integer()),
+								  static_cast<int16_t>(item["Count"].get_integer(1)) };
+				}
+
+				return found;
+			}();
+
+			auto found = all.find(sn);
+
+			if (found == all.end())
+				return std::nullopt;
+
+			return found->second;
+		}
+
 		// The exception window opens under the window's right edge, lower
 		// beside a box (FUN_009009bf).
 		const Point<int16_t> EXCEPTIONS = { 270, 34 };
@@ -169,6 +229,23 @@ namespace ms
 			item_offset += upwards ? -1 : 1;
 		});
 		taming_slider = Slider(Slider::Type::CLASSIC, TAMING_SLIDER, ITEM_SLIDER_X, ITEM_ROWS, 0, [](bool) {});
+		panel_slider = Slider(Slider::Type::CLASSIC, PANEL_SLIDER, PANEL_SLIDER_X, PANEL_ROWS, 0, [&](bool upwards)
+		{
+			panel_offset += upwards ? -1 : 1;
+		});
+		medal_slider = Slider(Slider::Type::CLASSIC, MEDAL_SLIDER, MEDAL_SLIDER_X, MEDAL_ROWS, 0, [&](bool upwards)
+		{
+			medal_offset += upwards ? -1 : 1;
+			show_medals();
+		});
+
+		nl::node icons = NxFiles::ui_classic["UIWindow.img"]["MonsterBook"]["icon"];
+
+		for (size_t i = 0; i < icons.size(); i++)
+			level_icons.emplace_back(icons[std::to_string(i)]);
+
+		for (Text *text : { &book_level, &cover_name, &book_total, &book_normal, &book_special, &medal_name, &medal_count })
+			*text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
 		// The pet and taming boxes open once CHAR_INFO says there are pets
 		// or a mount. BtFamily is always on (report b045).
@@ -213,6 +290,7 @@ namespace ms
 
 		riding = false;
 
+		list_worn();
 		set_mode(Mode::MAIN);
 		set_panel(Panel::NO_PANEL);
 	}
@@ -228,6 +306,11 @@ namespace ms
 			item_list.draw(position + PANEL);
 		else if (panel == Panel::WISHES)
 			wish_list.draw(position + PANEL);
+
+		draw_panel();
+
+		if (mode == Mode::COLLECTION)
+			draw_collection();
 
 		if (known)
 			look.draw(position + PORTRAIT, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
@@ -296,6 +379,55 @@ namespace ms
 			if (row.equip)
 				row.level.draw(position + (taming ? TAMING_REQ_LEVEL : ITEM_REQ_LEVEL) + step);
 		}
+	}
+
+	void UICharInfo::draw_panel() const
+	{
+		if (panel == Panel::NO_PANEL)
+			return;
+
+		const std::vector<ItemRow> &rows = panel_rows();
+		Point<int16_t> at = position + PANEL;
+
+		for (int16_t r = 0; r < PANEL_ROWS; r++)
+		{
+			size_t i = static_cast<size_t>(panel_offset + r);
+
+			if (panel_offset + r < 0 || i >= rows.size())
+				break;
+
+			const ItemRow &row = rows[i];
+			Point<int16_t> step = Point<int16_t>(0, PANEL_STEP * r);
+
+			row.icon.draw(at + PANEL_ICON + step);
+			row.name.draw(at + PANEL_NAME + step);
+
+			if (row.equip)
+			{
+				req_level.draw(at + PANEL_REQ + step);
+				row.level.draw(at + PANEL_REQ_LEVEL + step);
+			}
+		}
+
+		panel_slider.draw(at);
+	}
+
+	void UICharInfo::draw_collection() const
+	{
+		level_icon.draw(position + LEVEL_ICON);
+		book_level.draw(position + BOOK_LEVEL);
+		cover_name.draw(position + COVER_NAME);
+		book_total.draw(position + BOOK_TOTAL);
+		book_normal.draw(position + BOOK_NORMAL);
+		book_special.draw(position + BOOK_SPECIAL);
+		medal_icon.draw(position + MEDAL_ICON);
+		medal_name.draw(position + MEDAL_NAME);
+		medal_count.draw(position + MEDAL_COUNT);
+
+		for (size_t i = 0; i < medal_titles.size(); i++)
+			medal_titles[i].draw(position + MEDAL_ROW + Point<int16_t>(0, static_cast<int16_t>(MEDAL_STEP * i)));
+
+		medal_slider.draw(position);
 	}
 
 	void UICharInfo::update()
@@ -421,9 +553,22 @@ namespace ms
 			exceptions->remove_cursor();
 		}
 
-		if (mode == Mode::PET)
+		if (on_panel(cursorpos))
 		{
-			Cursor::State state = item_slider.send_cursor(cursorpos - position, clicked);
+			Cursor::State state = panel_slider.send_cursor(cursorpos - position - PANEL, clicked);
+
+			if (state != Cursor::State::IDLE)
+				return state;
+		}
+		else
+		{
+			panel_slider.remove_cursor();
+		}
+
+		if (mode == Mode::PET || mode == Mode::COLLECTION)
+		{
+			Slider &slider = mode == Mode::PET ? item_slider : medal_slider;
+			Cursor::State state = slider.send_cursor(cursorpos - position, clicked);
 
 			if (state != Cursor::State::IDLE)
 				return state;
@@ -437,6 +582,8 @@ namespace ms
 		UIDragElement::remove_cursor();
 
 		item_slider.remove_cursor();
+		panel_slider.remove_cursor();
+		medal_slider.remove_cursor();
 
 		if (exceptions)
 			exceptions->remove_cursor();
@@ -446,8 +593,12 @@ namespace ms
 	{
 		if (on_exceptions(cursor))
 			exceptions->send_scroll(yoffset);
+		else if (on_panel(cursor))
+			panel_slider.send_scroll(yoffset);
 		else if (mode == Mode::PET)
 			item_slider.send_scroll(yoffset);
+		else if (mode == Mode::COLLECTION)
+			medal_slider.send_scroll(yoffset);
 	}
 
 	void UICharInfo::send_key(int32_t, bool pressed, bool escape)
@@ -551,6 +702,97 @@ namespace ms
 		buttons[Buttons::BT_PET_SHOW]->set_state(Button::State::NORMAL);
 		select_pet(0);
 		set_mode(Mode::PET);
+	}
+
+	void UICharInfo::update_wishes(int32_t character_id, const std::vector<int32_t> &sns)
+	{
+		if (character_id != cid)
+			return;
+
+		wish_rows.clear();
+
+		for (const char_info::Wish &wish : char_info::wishes(sns, commodity))
+		{
+			const ItemData &item = ItemData::get(wish.item_id);
+			wish_rows.push_back(panel_row(wish.item_id, char_info::wish_name(item.get_name(), wish.count), false));
+		}
+
+		// v83 lists the equipment again on each CHAR_INFO.
+		list_worn();
+		set_panel(panel);
+	}
+
+	void UICharInfo::list_worn()
+	{
+		std::vector<int32_t> items;
+		Player &player = Stage::get().get_player();
+
+		// One's own from the equipment worn, another's from the look they came with.
+		if (cid == player.get_oid())
+		{
+			LookEntry entry = player.look_entry();
+			items = char_info::worn_items(entry.equips, entry.maskedequips);
+		}
+		else if (auto character = Stage::get().get_character(cid))
+		{
+			items = character->get_look().get_info_items();
+		}
+
+		worn_rows.clear();
+
+		for (int32_t itemid : items)
+			worn_rows.push_back(panel_row(itemid, ItemData::get(itemid).get_name(), true));
+	}
+
+	UICharInfo::ItemRow UICharInfo::panel_row(int32_t itemid, const std::string &itemname, bool equip)
+	{
+		ItemRow row;
+		row.icon = ItemData::get(itemid).get_icon(false);
+		row.name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, itemname);
+		row.equip = equip;
+
+		if (equip)
+			row.level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+							 std::to_string(EquipData::get(itemid).get_reqstat(MapleStat::Id::LEVEL)));
+
+		return row;
+	}
+
+	void UICharInfo::update_collection(int32_t character_id, const Book &book, int32_t medal, const std::vector<int16_t> &quests)
+	{
+		if (character_id != cid)
+			return;
+
+		auto icon = char_info::level_icon(book.level, level_icons.size());
+		level_icon = icon ? level_icons[*icon] : Texture();
+		book_level.change_text(std::to_string(book.level));
+		cover_name.change_text(book.cover != 0 ? std::string(nl::nx::string["Mob.img"][std::to_string(book.cover)]["name"]) : "");
+		book_total.change_text(std::to_string(book.total));
+		book_normal.change_text(std::to_string(book.normal));
+		book_special.change_text(std::to_string(book.special));
+
+		medal_icon = medal != 0 ? ItemData::get(medal).get_icon(false) : Texture();
+		medal_name.change_text(medal != 0 ? ItemData::get(medal).get_name() : "");
+		medal_count.change_text(std::to_string(quests.size()));
+
+		medal_quests = quests;
+		medal_offset = 0;
+		medal_slider.setrows(0, MEDAL_ROWS, static_cast<int16_t>(medal_quests.size()));
+		show_medals();
+	}
+
+	void UICharInfo::show_medals()
+	{
+		auto medal = [](int16_t quest)
+		{
+			return static_cast<int32_t>(nl::nx::quest["QuestInfo.img"][std::to_string(quest)]["viewMedalItem"].get_integer());
+		};
+
+		medal_titles.clear();
+
+		for (int32_t item : char_info::medal_rows(medal_quests, static_cast<size_t>(std::max<int16_t>(medal_offset, 0)), medal))
+			medal_titles.emplace_back(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+									  MedalTagLayout::text(ItemData::get(item).get_name()));
 	}
 
 	void UICharInfo::select_pet(size_t index)
@@ -732,5 +974,21 @@ namespace ms
 	{
 		panel = p;
 		buttons[Buttons::BT_PANEL_HIDE]->set_active(panel != Panel::NO_PANEL);
+
+		panel_offset = 0;
+		panel_slider.setrows(0, PANEL_ROWS, static_cast<int16_t>(panel_rows().size()));
+	}
+
+	const std::vector<UICharInfo::ItemRow> &UICharInfo::panel_rows() const
+	{
+		return panel == Panel::WISHES ? wish_rows : worn_rows;
+	}
+
+	bool UICharInfo::on_panel(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> panelpos = position + PANEL;
+
+		return panel != Panel::NO_PANEL && !Rectangle<int16_t>(position, position + dimension).contains(cursorpos)
+			   && Rectangle<int16_t>(panelpos, panelpos + PANEL_SIZE).contains(cursorpos);
 	}
 }

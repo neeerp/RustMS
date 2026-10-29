@@ -20,6 +20,7 @@
 #include <array>
 #include <map>
 #include <string>
+#include <vector>
 
 #include <cstddef>
 
@@ -77,6 +78,9 @@ namespace ms
 
 		// The pet equipment worn, by body part.
 		const std::map<int16_t, int32_t> &get_pet_parts() const;
+
+		// The equipment the character info window's item panel lists, of the look this was made from.
+		const std::vector<int32_t> &get_info_items() const;
 
 		void attack(bool degenerate);
 
@@ -266,6 +270,7 @@ namespace ms
 		std::map<int16_t, int32_t> rings;
 		std::array<int32_t, 3> pet_wear = {};
 		std::map<int16_t, int32_t> pet_parts;
+		std::vector<int32_t> info_items;
 		int32_t vehicle = 0;
 		bool tired = false;
 		int32_t morph = 0;

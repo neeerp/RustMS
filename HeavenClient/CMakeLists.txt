@@ -82,6 +82,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_record_ex COMMAND quest_record_ex_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
+    add_executable(char_info_lists_tests tests/char_info_lists.cpp)
+    add_test(NAME char_info_lists COMMAND char_info_lists_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
     add_test(NAME cash_catalog COMMAND cash_catalog_tests)
     add_executable(hat_slots_tests tests/hat_slots.cpp)
@@ -607,6 +609,7 @@ add_executable(HeavenClient
     Character/QuestRequirements.h
     Character/MapleStat.cpp
     Character/MapleStat.h
+    Character/CharInfoLists.h
     Character/MonsterBook.cpp
     Character/MonsterBook.h
     Character/MorphRules.h

@@ -19,6 +19,7 @@
 
 #include "AttackStances.h"
 
+#include "../CharInfoLists.h"
 #include "../MorphRules.h"
 #include "../MountRules.h"
 #include "../Pets.h"
@@ -51,6 +52,8 @@ namespace ms
 
 		if (auto cash = entry.maskedequips.find(-111); cash != entry.maskedequips.end())
 			set_cash_weapon(cash->second);
+
+		info_items = char_info::worn_items(entry.equips, entry.maskedequips);
 	}
 
 	CharLook::CharLook()
@@ -974,6 +977,11 @@ namespace ms
 	const std::map<int16_t, int32_t> &CharLook::get_pet_parts() const
 	{
 		return pet_parts;
+	}
+
+	const std::vector<int32_t> &CharLook::get_info_items() const
+	{
+		return info_items;
 	}
 
 	const CharEquips &CharLook::get_equips() const
