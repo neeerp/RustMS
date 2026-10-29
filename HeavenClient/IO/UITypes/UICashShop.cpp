@@ -172,6 +172,7 @@ namespace ms
 			tab_bars[i] = CSTab["Tab"][std::to_string(i + 1)];
 
 		item_base = CSList["Base"];
+		item_selected = CSList["ItemIcon"];
 		how_to[0] = PicturePlate["HowTo"];
 		how_to[1] = PicturePlate["HowToGift"];
 		sold_out = PicturePlate["NoItem"];
@@ -332,6 +333,10 @@ namespace ms
 		const Player& player = Stage::get().get_player();
 		preview_look.draw(position + AVATAR_POS, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
 
+		// A pet tried on stands 80 to the right (7036bc).
+		if (tried_pet.item_id)
+			preview_pet.draw_standing(position + AVATAR_POS + Point<int16_t>(80, 0), inter);
+
 		Text nametag(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, player.get_stats().get_name());
 		nametag.draw(position + AVATAR_POS + Point<int16_t>(0, 4));
 
@@ -371,6 +376,11 @@ namespace ms
 				const Commodity& commodity = listed[index];
 
 				item_base.draw(cell);
+
+				// The selected row's frame, not while a request is out (4b7b98).
+				if (static_cast<int16_t>(i) == selected_row && !pending)
+					item_selected.draw(cell + Point<int16_t>(4, 4));
+
 				ItemData::get(commodity.item_id).get_icon(false).draw(DrawArgument(cell + Point<int16_t>(5, 69), 2.0f, 2.0f));
 
 				if (commodity.label != cash_catalog::NONE)
@@ -473,6 +483,154 @@ namespace ms
 
 		for (Animation& label : labels)
 			label.update();
+
+		if (tried_pet.item_id)
+			preview_pet.update_standing();
+
+		// The keys moved the selection: its tooltip shows as if the cursor
+		// were on the lower part of its icon (4b7a91).
+		if (std::exchange(show_selected, false) && selected_row >= 0 && selected_row < rows_shown())
+		{
+			Point<int16_t> cell = LIST_POS
+				+ Point<int16_t>(CELL_STEP.x() * (selected_row % LIST_COLUMNS), CELL_STEP.y() * (selected_row / LIST_COLUMNS));
+
+			show_commodity_tooltip(selected_row, position + cell + Point<int16_t>(55, 55));
+		}
+	}
+
+	bool UICashShop::list_key(int32_t action, bool pressed, bool escape)
+	{
+		int16_t count = rows_shown();
+
+		if (!pressed || pending || count == 0)
+			return false;
+
+		if (focused_button < 0)
+		{
+			int16_t row = std::max<int16_t>(selected_row, 0);
+
+			switch (action)
+			{
+			case KeyAction::Id::RETURN:
+				// Try the row on, with the key focus on its BUY.
+				if (selected_row >= 0 && selected_row < count)
+				{
+					focused_button = 0;
+					focus_button(selected_row, 0);
+					try_on(listed[page * PAGE_SIZE + selected_row]);
+				}
+
+				return true;
+			case KeyAction::Id::LEFT:
+				row = row % 2 == 0 ? row + 1 : row - 1;
+
+				if (row >= count)
+					row = count - 1;
+
+				break;
+			case KeyAction::Id::RIGHT:
+				row = selected_row;
+
+				if (row == count - 1)
+					row = row / 2 * 2;
+				else if (row % 2 == 1)
+					row--;
+				else
+					row++;
+
+				break;
+			case KeyAction::Id::UP:
+				if (row > 1)
+				{
+					row -= 2;
+				}
+				else
+				{
+					row += count / 2 * 2;
+
+					if (row >= count)
+						row -= 2;
+				}
+
+				break;
+			case KeyAction::Id::DOWN:
+				row = count - row < 3 ? row % 2 : row + 2;
+				break;
+			default:
+				return false;
+			}
+
+			selected_row = row;
+			show_selected = true;
+
+			return true;
+		}
+
+		if (escape)
+		{
+			focused_button = -1;
+			focus_button(-1, -1);
+			show_selected = true;
+
+			return true;
+		}
+
+		switch (action)
+		{
+		case KeyAction::Id::RETURN:
+			if (selected_row >= 0 && selected_row < count)
+			{
+				uint16_t id = list_button(selected_row, focused_button);
+				Button& button = *buttons[id];
+
+				if (button.is_active() && button.get_state() != Button::State::DISABLED)
+				{
+					Sound(Sound::Name::BUTTONCLICK).play();
+					button.set_state(button_pressed(id));
+				}
+			}
+
+			return true;
+		case KeyAction::Id::LEFT:
+			focused_button = focused_button == 0 ? 2 : focused_button - 1;
+			focus_button(selected_row, focused_button);
+
+			return true;
+		case KeyAction::Id::RIGHT:
+			focused_button = focused_button == 2 ? 0 : focused_button + 1;
+			focus_button(selected_row, focused_button);
+
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	int16_t UICashShop::rows_shown() const
+	{
+		size_t first = page * PAGE_SIZE;
+
+		if (tab == MAIN || first >= listed.size())
+			return 0;
+
+		return static_cast<int16_t>(std::min(PAGE_SIZE, listed.size() - first));
+	}
+
+	uint16_t UICashShop::list_button(int16_t row, int16_t n) const
+	{
+		if (n == 2 && tab == WISH_LIST)
+			return static_cast<uint16_t>(Buttons::BT_LIST + 3 * PAGE_SIZE + row);
+
+		return static_cast<uint16_t>(Buttons::BT_LIST + 3 * row + n);
+	}
+
+	void UICashShop::focus_button(int16_t row, int16_t n)
+	{
+		for (size_t i = 0; i < 4 * PAGE_SIZE; i++)
+			buttons[Buttons::BT_LIST + i]->set_focused(false);
+
+		if (row >= 0 && n >= 0)
+			buttons[list_button(row, n)]->set_focused(true);
 	}
 
 	Button::State UICashShop::button_pressed(uint16_t buttonid)
@@ -693,46 +851,7 @@ namespace ms
 				if (hovered == static_cast<int16_t>(i))
 					return;
 
-				// FUN_004baf1a: only cash items, packages and the 911, 5430 and 8xxxxxxx specials.
-				const Commodity& commodity = listed[page * PAGE_SIZE + i];
-				int32_t item_id = commodity.item_id;
-				bool special = item_id / 10000 == 910 || item_id / 10000 == 911 || item_id / 1000 == 5430
-					|| commodity.sn / 10000000 == 8;
-
-				if (!special && !ItemData::get(item_id).is_cashitem())
-				{
-					clear_tooltip();
-					return;
-				}
-
-				tooltip_pos = cursorpos + TOOLTIP_RIGHT;
-
-				if (item_id / 1000000 == 1)
-				{
-					eqtooltip.set_commodity(item_id, commodity.period);
-					tooltip = &eqtooltip;
-				}
-				else if (item_id / 10000 == 910)
-				{
-					packagetooltip.set_package(item_id, catalog);
-					tooltip = &packagetooltip;
-					tooltip_pos = cursorpos + PACKAGE_TOOLTIP;
-				}
-				else if (is_character_slot(item_id))
-				{
-					// StringPool 0x245 (FUN_008f19a8).
-					ittooltip.set_commodity(item_id, commodity.period, "Add a character slot (Current : " +
-						std::to_string(character_slots) + " slots)\\nYou may have up to " +
-						std::to_string(MAX_CHARACTER_SLOTS) + " slots.");
-					tooltip = &ittooltip;
-				}
-				else
-				{
-					ittooltip.set_commodity(item_id, commodity.period);
-					tooltip = &ittooltip;
-				}
-				hovered = static_cast<int16_t>(i);
-				hovered_cash = 0;
+				show_commodity_tooltip(i, cursorpos);
 
 				return;
 			}
@@ -819,6 +938,51 @@ namespace ms
 		clear_tooltip();
 	}
 
+	void UICashShop::show_commodity_tooltip(size_t i, Point<int16_t> anchor)
+	{
+		// FUN_004baf1a: only cash items, packages and the 911, 5430 and 8xxxxxxx specials.
+		const Commodity& commodity = listed[page * PAGE_SIZE + i];
+		int32_t item_id = commodity.item_id;
+		bool special = item_id / 10000 == 910 || item_id / 10000 == 911 || item_id / 1000 == 5430
+			|| commodity.sn / 10000000 == 8;
+
+		if (!special && !ItemData::get(item_id).is_cashitem())
+		{
+			clear_tooltip();
+			return;
+		}
+
+		tooltip_pos = anchor + TOOLTIP_RIGHT;
+
+		if (item_id / 1000000 == 1)
+		{
+			eqtooltip.set_commodity(item_id, commodity.period);
+			tooltip = &eqtooltip;
+		}
+		else if (item_id / 10000 == 910)
+		{
+			packagetooltip.set_package(item_id, catalog);
+			tooltip = &packagetooltip;
+			tooltip_pos = anchor + PACKAGE_TOOLTIP;
+		}
+		else if (is_character_slot(item_id))
+		{
+			// StringPool 0x245 (FUN_008f19a8).
+			ittooltip.set_commodity(item_id, commodity.period, "Add a character slot (Current : " +
+				std::to_string(character_slots) + " slots)\\nYou may have up to " +
+				std::to_string(MAX_CHARACTER_SLOTS) + " slots.");
+			tooltip = &ittooltip;
+		}
+		else
+		{
+			ittooltip.set_commodity(item_id, commodity.period);
+			tooltip = &ittooltip;
+		}
+
+		hovered = static_cast<int16_t>(i);
+		hovered_cash = 0;
+	}
+
 	void UICashShop::clear_tooltip()
 	{
 		tooltip = nullptr;
@@ -864,7 +1028,10 @@ namespace ms
 
 			if (in_icon.x() >= 0 && in_icon.y() >= 0 && in_icon.x() < LIST_ICON_SIZE && in_icon.y() < LIST_ICON_SIZE)
 			{
+				// And selects its row (4b70ce).
+				clear_tooltip();
 				try_on(listed[page * PAGE_SIZE + i]);
+				selected_row = static_cast<int16_t>(i);
 
 				return;
 			}
@@ -1017,6 +1184,24 @@ namespace ms
 
 	bool UICashShop::try_on_item(int32_t item_id, int32_t sn, bool packaged)
 	{
+		// A pet stands beside the mannequin; the same one again goes away,
+		// unless a package puts it on (4acd22).
+		if (item_id / 10000 == 500)
+		{
+			if (tried_pet.item_id != item_id)
+			{
+				tried_pet = { item_id, sn };
+				preview_pet = PetLook(PetEntry{ item_id, "", 0, Point<int16_t>(), 0, 0 }, false);
+			}
+			else if (!packaged)
+			{
+				tried_pet = { 0, 0 };
+				preview_pet = PetLook();
+			}
+
+			return true;
+		}
+
 		if (!fits_mannequin(item_id, female))
 			return false;
 
@@ -1122,6 +1307,8 @@ namespace ms
 	{
 		preview_look = mannequin();
 		tried.clear();
+		tried_pet = { 0, 0 };
+		preview_pet = PetLook();
 		package_on = false;
 		buttons[Buttons::BT_BUY_AVATAR]->set_state(Button::State::NORMAL);
 	}
@@ -1133,6 +1320,8 @@ namespace ms
 
 		preview_look.set_cash_weapon(0);
 		tried.clear();
+		tried_pet = { 0, 0 };
+		preview_pet = PetLook();
 		package_on = false;
 		buttons[Buttons::BT_BUY_AVATAR]->set_state(Button::State::NORMAL);
 	}
@@ -1168,6 +1357,13 @@ namespace ms
 			if (item.sn != 0 && !worn)
 				sns.push_back(item.sn);
 		}
+
+		// The pet, unless it's the kind of the character's first pet out
+		// (4acda4).
+		auto own_pet = Stage::get().get_player().get_pet(0);
+
+		if (tried_pet.sn != 0 && !(own_pet && own_pet->get_itemid() == tried_pet.item_id))
+			sns.push_back(tried_pet.sn);
 
 		if (sns.empty())
 			return;
@@ -1673,8 +1869,12 @@ namespace ms
 
 	void UICashShop::update_page()
 	{
-		// Another page, sub-tab, tab or wish list.
+		// Another page, sub-tab, tab or wish list: the first row is
+		// selected and no button has the key focus (4b988a).
 		clear_tooltip();
+		selected_row = 0;
+		focused_button = -1;
+		show_selected = false;
 
 		page_texts.clear();
 
@@ -1712,6 +1912,8 @@ namespace ms
 
 			string_format::format_with_ellipsis(cells[i].name, 114);
 		}
+
+		focus_button(-1, -1);
 	}
 
 	void UICashShop::update_cash_slider()

@@ -26,6 +26,7 @@
 
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../Character/Look/CharLook.h"
+#include "../../Character/Look/PetLook.h"
 #include "../../Data/CashCatalog.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Geometry.h"
@@ -75,6 +76,11 @@ namespace ms
 		void remove_cursor() override;
 
 		UIElement::Type get_type() const override;
+
+		// The list's keys (v83 4b7417): the arrows move the selected row,
+		// Enter tries it on and puts the key focus on its BUY, then the
+		// arrows move the focus and Enter clicks. Whether it took the key.
+		bool list_key(int32_t action, bool pressed, bool escape);
 
 		void exit_cashshop();
 		// Esc asks first (v83 FUN_004bcc86, StringPool 0x250); the Exit
@@ -177,7 +183,17 @@ namespace ms
 
 		// The tooltip of the commodity, Cash Inventory item or cash item under the cursor (report 202).
 		void update_tooltip(Point<int16_t> cursor, Point<int16_t> cursorpos);
+		// The tooltip of the commodity on row `i` of the page, as if the
+		// cursor were at `anchor` (FUN_004baf1a).
+		void show_commodity_tooltip(size_t i, Point<int16_t> anchor);
 		void clear_tooltip();
+
+		// The rows on the page, and a row's BUY, GIFT and RESERVE (or
+		// REMOVE on the wish list).
+		int16_t rows_shown() const;
+		uint16_t list_button(int16_t row, int16_t n) const;
+		// Put the key focus on one of a row's buttons, or none (4baeb2).
+		void focus_button(int16_t row, int16_t n);
 
 		// The cell of a grid under the cursor, or -1.
 		int16_t grid_cell(Point<int16_t> cursor, Point<int16_t> grid, size_t columns, size_t rows) const;
@@ -237,6 +253,7 @@ namespace ms
 		Texture preview_frame;
 		Texture tab_bars[cash_catalog::NUM_TABS];
 		Texture item_base;
+		Texture item_selected;
 		Texture how_to[2];
 		Texture sold_out;
 		Texture item_tab_labels[2][ITEM_TABS];
@@ -286,6 +303,12 @@ namespace ms
 		Point<int16_t> tooltip_pos;
 		// The commodity on the page whose tooltip is shown, kept while the cursor stays on it.
 		int16_t hovered = -1;
+		// The row the keys select (v83 +0x170), the button of it with the
+		// key focus (+0x174, -1 for none), and whether the selected row's
+		// tooltip shows on the next update (+0x790).
+		int16_t selected_row = -1;
+		int16_t focused_button = -1;
+		bool show_selected = false;
 		// The commodity the shop was opened at, shown on the first update.
 		int32_t opening = 0;
 		// The Cash Inventory item whose tooltip is shown.
@@ -301,6 +324,9 @@ namespace ms
 		};
 		CharLook preview_look;
 		std::map<int16_t, Tried> tried;
+		// A pet tried on stands beside it (v83 +0x3fc, +0x400; 4acd22).
+		Tried tried_pet = { 0, 0 };
+		PetLook preview_pet;
 		bool package_on = false;
 
 		// Buy Avatar's commodities, those bought (as indices), how many are

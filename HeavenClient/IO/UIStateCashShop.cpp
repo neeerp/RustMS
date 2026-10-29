@@ -81,12 +81,19 @@ namespace ms
 
 	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
-		// Only a dialog over the shop takes keys, but Esc offers to leave.
+		// A dialog over the shop takes the keys; otherwise the list's keys
+		// move its selection, and Esc offers to leave.
 		dispatch_focused_key(dialog(), action, pressed, escape, [&]
 		{
-			if (escape && pressed)
-				if (auto shop = static_cast<UICashShop*>(get(UIElement::Type::CASHSHOP)))
-					shop->confirm_exit();
+			auto shop = static_cast<UICashShop*>(get(UIElement::Type::CASHSHOP));
+
+			if (!shop)
+				return;
+
+			bool listed = shop->list_key(type == KeyType::Id::ACTION ? action : -1, pressed, escape);
+
+			if (!listed && escape && pressed)
+				shop->confirm_exit();
 		});
 	}
 
@@ -162,7 +169,8 @@ namespace ms
 
 	UIElement* UIStateCashShop::dialog()
 	{
-		if (auto element = get(focused); element && element->is_active())
+		// The shop is focused as it opens, but isn't a dialog.
+		if (auto element = get(focused); element && element->is_active() && focused != UIElement::Type::CASHSHOP)
 			return element;
 
 		// Once a notice over the name or gift dialog closes, that dialog has
