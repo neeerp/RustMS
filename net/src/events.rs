@@ -3936,7 +3936,8 @@ pub const MONSTER_RIDING: Event = Event {
     member_clears: &[],
     items: &[PHEROMONE, KENTAS_REPORT],
     clear_map: Some(HOG_ROOM_EXIT),
-    until_empty: false,
+    // Leaving a party inside changes nothing (Cosmic's `leftParty`).
+    until_empty: true,
     survive: Some(WATCH_HOG),
     runs: 7,
     ..DOJO
@@ -6595,6 +6596,7 @@ mod tests {
     #[test]
     fn the_watch_hogs_room_is_taken_alone_for_five_minutes_and_keeps_the_hog() {
         assert!(MONSTER_RIDING.solo() && MONSTER_RIDING.runs == 7);
+        assert!(MONSTER_RIDING.lasts_until_empty());
         assert_eq!(
             MONSTER_RIDING.duration(),
             scaled(Duration::from_secs(5 * 60))
