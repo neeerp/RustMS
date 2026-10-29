@@ -19,6 +19,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -37,6 +38,8 @@
 #include "../../Character/Party.h"
 
 #include "../../Graphics/Geometry.h"
+
+#include "RankPanelSlide.h"
 
 namespace ms
 {
@@ -292,10 +295,16 @@ namespace ms
 		// The same, if online.
 		const GuildMember* picked_online_member() const;
 
+		// send_cursor for all but the panels' buttons under the window.
+		Cursor::State list_cursor(bool clicked, Point<int16_t> cursorpos);
+
 		// The rank panel (UserList/Guild/GuildGrade), which the Info button
-		// slides out to the window's right.
+		// slides out to the window's right from behind it (RankPanelSlide).
 		void open_grade();
+		// Slides it back.
 		void close_grade();
+		// Where it is now, from the window's left.
+		Point<int16_t> grade_panel() const;
 		void rebuild_grade();
 		void draw_grade() const;
 		// Asks the master for rank `rank`'s new title, then checks it.
@@ -324,6 +333,12 @@ namespace ms
 		// opens at the window's right, with the guild panel's art.
 		void open_union();
 		void close_union();
+		Point<int16_t> union_panel() const;
+		// Drops both rank panels at once, as the window closes.
+		void drop_panels();
+		// Moves the panels' buttons along with them, and takes them away
+		// with the panels.
+		void place_panel_buttons();
 		void rebuild_union();
 		void draw_union() const;
 		void prompt_union_title(int32_t rank);
@@ -401,7 +416,7 @@ namespace ms
 
 		Texture grade_background;
 		std::array<Texture, 5> grade_art;
-		bool grade_shown = false;
+		RankPanelSlide grade_slide;
 		// The titles as the master edits them, until saved, and the rank
 		// picked, 0 for none.
 		std::array<std::string, 5> grade_titles;
@@ -427,7 +442,9 @@ namespace ms
 
 		Texture union_background;
 		std::array<Texture, 3> union_art;
-		bool union_shown = false;
+		RankPanelSlide union_slide;
+		// The panels' buttons where the panels are out.
+		std::map<uint16_t, Point<int16_t>> panel_button_home;
 		std::array<std::string, 5> union_titles;
 		int32_t union_picked = 0;
 		std::array<Text, 5> union_ranks, union_title_texts, union_labels;
