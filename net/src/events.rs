@@ -69,6 +69,10 @@ pub enum EventKind {
     /// with that mode's gem at Duarte in the lobby or straight from its
     /// room in the Shades after a run.
     PyramidTomb(PyramidMode),
+    /// The Abandoned Subway's Dusty Platform, a Massacre run like Nett's
+    /// Pyramid's, started by a party's leader at Mr. Lim (1052115) on its
+    /// platform.
+    Subway,
     /// Jr. Balrog's room before Tristan's Tomb (2245), taken alone from
     /// Mu Young (1061014) in the Sleepywood dungeon.
     Tristan,
@@ -3813,6 +3817,42 @@ pub const PYRAMID_TOMB_RUNS: [Event; 4] = [
     pyramid_tomb(PyramidMode::Hell, &[PYRAMID_SHADES + 3]),
 ];
 
+/// The Abandoned Subway's Dusty Platform, where Mr. Lim (1052115) stands;
+/// the construction site's `subway00` and the Dimensional Mirror bring
+/// the player to its `out00`, portal 2 (Cosmic `met_in`'s commented line,
+/// `9010022`).
+pub const SUBWAY_LOBBY: i32 = 910320000;
+pub const SUBWAY_ARRIVAL_PORTAL: u8 = 2;
+/// The Dusty Platform's result map (field type 24), which its runs end on.
+pub const SUBWAY_RESULT: i32 = 910320001;
+/// How many stages a run has (Map.nx: 910320100, 200 and 300, each with
+/// copies the server doesn't need).
+pub const SUBWAY_STAGES: u8 = 3;
+/// The levels it is open to (Mr. Lim, Cosmic `1052115`; quest 2264; the
+/// platform's own warning, `Direction2.img/metro/Im`).
+pub const SUBWAY_LEVELS: RangeInclusive<u8> = 25..=30;
+
+/// A run on the Dusty Platform: a party of one to six at levels 25 to 30,
+/// its leader's choice, on three stages played as Nett's Pyramid's are,
+/// each for 3 minutes, then the result map (Cosmic `1052115` checks only
+/// the leader; the party's size, its levels and the 3 minutes are guesses,
+/// QUESTIONS b319). Five may run at once on a channel, as the stage maps
+/// have that many copies (Map.nx).
+pub const SUBWAY: Event = Event {
+    lobby: SUBWAY_LOBBY,
+    maps: SUBWAY_LOBBY + 100..=SUBWAY_LOBBY + SUBWAY_STAGES as i32 * 100,
+    entry: SUBWAY_LOBBY + 100,
+    exit: SUBWAY_RESULT,
+    levels: SUBWAY_LEVELS,
+    team: 1..=6,
+    minutes: 3,
+    exp_per_stage: &[0; SUBWAY_STAGES as usize],
+    meso_per_stage: &[],
+    member_clears: &[],
+    runs: 5,
+    ..DOJO
+};
+
 /// The room before Tristan's Tomb, 910520000, where the unknown Jr. Balrog
 /// waits (Map.nx `life`, spawned once).
 pub const TRISTAN_ROOM: i32 = 910520000;
@@ -4560,6 +4600,12 @@ pub fn pyramid_stage(map_id: i32) -> Option<(EventKind, u8)> {
     pyramid_kinds().find_map(|kind| Some((kind, kind.event().stage_on(map_id)?)))
 }
 
+/// Whether `map_id` is a stage of a Massacre run, the Pyramid's or the
+/// Dusty Platform's, whose kills, cool kills and misses its run counts.
+pub fn massacre_stage(map_id: i32) -> bool {
+    pyramid_stage(map_id).is_some() || SUBWAY.stage_on(map_id).is_some()
+}
+
 /// Whether Dojo floor `floor` is a rest floor, with no boss: every sixth.
 pub fn rest_floor(floor: u8) -> bool {
     floor % 6 == 0
@@ -4637,7 +4683,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 71] = [
+    pub const ALL: [EventKind; 72] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4667,6 +4713,7 @@ impl EventKind {
         EventKind::PyramidTomb(PyramidMode::Normal),
         EventKind::PyramidTomb(PyramidMode::Hard),
         EventKind::PyramidTomb(PyramidMode::Hell),
+        EventKind::Subway,
         EventKind::Carnival(1),
         EventKind::Carnival(2),
         EventKind::Carnival(3),
@@ -4767,6 +4814,7 @@ impl EventKind {
             EventKind::Pyramid(mode) => &PYRAMID[mode as usize],
             EventKind::PyramidParty(mode) => &PYRAMID_PARTY[mode as usize],
             EventKind::PyramidTomb(mode) => &PYRAMID_TOMB_RUNS[mode as usize],
+            EventKind::Subway => &SUBWAY,
             EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
@@ -4799,6 +4847,13 @@ impl EventKind {
             EventKind::Pyramid(mode) | EventKind::PyramidParty(mode) => Some(mode),
             _ => None,
         }
+    }
+
+    /// Whether it is a Massacre run, on stages of field type 23 with a
+    /// gauge, a tally and a score: Nett's Pyramid's, alone or with a party,
+    /// or the Dusty Platform's.
+    pub fn massacre(self) -> bool {
+        self.pyramid_mode().is_some() || self == EventKind::Subway
     }
 }
 
@@ -6246,6 +6301,33 @@ mod tests {
         assert_eq!(ropes.try_platforms(&right, other), RopesTalk::Right);
         // Stage 2's ropes are their own.
         assert_eq!(ropes.try_heads([5, 0, 0], || [5, 0, 0]), RopesTalk::Right);
+    }
+
+    #[test]
+    fn the_dusty_platform_is_a_massacre_run_of_three_stages_for_25_to_30() {
+        let subway = EventKind::Subway.event();
+        assert_eq!(subway.entry, 910320100);
+        assert_eq!(subway.stage_map(3), 910320300);
+        assert_eq!(subway.last_stage(), SUBWAY_STAGES);
+        assert_eq!(subway.exit, SUBWAY_RESULT);
+        assert!(EventKind::Subway.massacre());
+        assert!(!EventKind::Dojo.massacre());
+        for stage in [910320100, 910320200, 910320300] {
+            assert!(massacre_stage(stage) && event_map(stage), "{stage}");
+        }
+        // The hub, the result map and the bonus room are none of the run's.
+        for map in [SUBWAY_LOBBY, SUBWAY_RESULT, 910320010] {
+            assert!(!massacre_stage(map) && !event_map(map), "{map}");
+        }
+        assert!(massacre_stage(926011100));
+        assert_eq!(subway.minutes, 3);
+        assert!(subway.lasts_until_empty() && !subway.solo());
+        let hub = SUBWAY_LOBBY;
+        assert_eq!(subway.team(1, &[at(1, 25, hub)]), Some(vec![1]));
+        assert_eq!(subway.team(1, &[at(1, 31, hub)]), None);
+        // Those of other levels stay behind.
+        let team = subway.team(1, &[at(1, 30, hub), at(2, 24, hub)]);
+        assert_eq!(team, Some(vec![1]));
     }
 
     #[test]

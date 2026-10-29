@@ -262,7 +262,10 @@ nothing. A script returns effects that the client actor sends:
 | `find_james` | The Central Castle Tower's (`106021201`): until James's Whereabouts (1) (2325) is completed, James calls out under the `mushroomcastle/chatBalloon2` effect; else nothing. After Kinoko |
 | `TD_MC_Egate` | Portal sound, warp to `106021300` portal `right00` |
 | `subway_in2` | Kerning City's ticketing booth (`103000100` `in00`) into the tunnels: portal sound, warp to `103000101` portal `out00` |
-| `met_in` | The construction site's tunnel (`102040000` `subway00`): portal sound, warp to `103000103` portal 1, as in Cosmic (the original's Abandoned Subway Station needs Mr. Lim's instances) |
+| `met_in` | The construction site's tunnel (`102040000` `subway00`): portal sound, warp to the Abandoned Subway Station (`910320000`) portal 2 (Cosmic's commented line; `agent_docs/pyramid.md`) |
+| `met_out` | The station's `out00`: forget `DOJO_RETURN`, portal sound, warp to the town it saved, or else to `102040000` portal 12 |
+| `metro_in00` | The station's `metro00`: opens Mr. Lim (1052115) |
+| `metro_Chat00` | The station's `chat00`: the `Direction2.img/metro/Im` effect (`Effect::ScenePart`), which Cosmic lacks |
 | `inERShip` | Ellinia's (`101000000` `in04`) way down to its Sky Ferry dock: portal sound, warp to `101000400` portal `out00` |
 | `enterPort` | Rien's pier (`140020200` `east00`) onto the dock: portal sound, warp to `140020300` portal `west00`. Cosmic's Aran-quest fight here isn't in |
 | `rankRoom` | A job hall's (or Ereve's, or the Dangerous Forest's) way into its room: portal sound, warp to the room's portal back (`RANK_ROOMS`) |

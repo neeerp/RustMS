@@ -176,6 +176,7 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
     (6410, 6411),
     (3507, 7081),
     (29932, 7760),
+    (29931, 7662),
     (20706, 20731),
     (20718, 20732),
     (21728, 21761),
@@ -1581,6 +1582,23 @@ mod tests {
             [InfoCheck {
                 cond: 1,
                 value: "50000".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn honorary_subway_worker_ends_on_10000_dusty_platform_kills() {
+        let Some(path) = crate::test_assets::path("Quest.nx") else {
+            return;
+        };
+        let catalog = QuestCatalog::load_from_nx(path).unwrap();
+        let worker = catalog.quest(29931).unwrap();
+        assert_eq!(worker.end_info_record, Some(7662));
+        assert_eq!(
+            worker.end_info,
+            [InfoCheck {
+                cond: 1,
+                value: "10000".into()
             }]
         );
     }

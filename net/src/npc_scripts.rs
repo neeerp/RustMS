@@ -1005,6 +1005,9 @@ pub const DOJO_BOARD: i32 = 2091006;
 /// Duarte, who takes players into Nett's Pyramid from its lobby and
 /// stands on each of its stages, its result maps and the Shades.
 pub const DUARTE: i32 = 2103013;
+/// Mr. Lim, who takes a party onto the Abandoned Subway's Dusty Platform
+/// from its hub, and stands on each of its stages and its result map.
+pub const MR_LIM: i32 = 1052115;
 /// Spiegelmann, who sends players to the Monster Carnival's Carnival
 /// Field from Kerning City, Ludibrium and Orbis, and there gives out its
 /// rooms.
@@ -1023,7 +1026,8 @@ const PIETRA: i32 = 9000010;
 /// Harry, on the Coconut Season fields (`Event09`).
 const HARRY: i32 = 9000012;
 /// The Dimensional Mirror, in twenty towns, which sends players to the
-/// Mu Lung Dojo, the Carnival Field and Nett's Pyramid (Cosmic `9010022`).
+/// Mu Lung Dojo, the Carnival Field, Nett's Pyramid and the Abandoned
+/// Subway (Cosmic `9010022`).
 pub const DIMENSIONAL_MIRROR: i32 = 9010022;
 /// Where the Mirror sets each down (Cosmic's portals).
 const MIRROR_DOJO_PORTAL: u8 = 0;
@@ -1858,6 +1862,12 @@ impl NpcScript {
         duarte(entries, player)
     }
 
+    /// Mr. Lim on the Dusty Platform's hub, for a player whose party may
+    /// or may not go onto it.
+    pub fn mr_lim(entry: Entry, player: &Player) -> Self {
+        mr_lim(entry, player)
+    }
+
     /// An Event Assistant (`EVENT_ASSISTANTS`), while a GM's event is
     /// `open` on the player's channel or not.
     pub fn event_assistant(npc_id: i32, open: bool) -> Self {
@@ -2039,6 +2049,11 @@ impl NpcScript {
             DUARTE if events::pyramid_stage(player.stats.map_id).is_some() => {
                 Some(duarte_forfeit())
             }
+            MR_LIM if events::SUBWAY.stage_on(player.stats.map_id).is_some() => Some(ask_warp(
+                MR_LIM,
+                keys::SUBWAY_LIM_LEAVE_ASK,
+                events::SUBWAY_LOBBY,
+            )),
             WU_YANG if !won && player.stats.map_id == events::PIRATE_STAGES[5] => {
                 Some(wu_yang_freed(leader))
             }
@@ -2267,6 +2282,11 @@ impl NpcScript {
             if let Some(script) = duarte_after(player) {
                 return Some(script);
             }
+        }
+        // Back from the result map to the hub, at once (Cosmic `1052115`).
+        if npc_id == MR_LIM && player.stats.map_id == events::SUBWAY_RESULT {
+            let back = Effect::WarpToPortal(events::SUBWAY_LOBBY, 0);
+            return Some(NpcScript::new(MR_LIM, vec![Page::Done(vec![back])]));
         }
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -13277,6 +13297,71 @@ fn duarte_medal(player: &Player) -> Page {
     }
 }
 
+/// Mr. Lim on the Dusty Platform's hub (Cosmic `1052115`): a party's
+/// leader of levels 25 to 30 may take it onto the platform, and one with
+/// 10,000 kills there may have the <Honorary Employee> medal. Cosmic's
+/// Train 999, for a Boarding Pass, isn't in.
+fn mr_lim(entry: Entry, player: &Player) -> NpcScript {
+    let event = &events::SUBWAY;
+    let page = match entry {
+        _ if !event.levels.contains(&player.stats.level) => {
+            Page::Say(event_terms(event, keys::SUBWAY_LIM_TERMS))
+        }
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Subway)]),
+        Entry::NoParty | Entry::NotLeader => Page::Say(event_terms(event, keys::SUBWAY_LIM_TERMS)),
+        Entry::NotEligible => Page::Say(event_terms(event, keys::SUBWAY_LIM_PARTY_TERMS)),
+        Entry::Busy => Page::Say(text(keys::SUBWAY_LIM_FULL)),
+    };
+    let mut script = NpcScript::new(
+        MR_LIM,
+        vec![Page::Menu {
+            text: text(keys::SUBWAY_LIM_MENU),
+            choices: vec![
+                (text(keys::SUBWAY_LIM_ENTER), vec![page]),
+                (text(keys::SUBWAY_LIM_MEDAL), vec![mr_lim_medal(player)]),
+            ],
+        }],
+    );
+    // Someone left or moved since he checked, or the last copy went.
+    script.refused = Some(text(keys::SUBWAY_LIM_FULL));
+    script
+}
+
+/// Mr. Lim's medal, for 10,000 kills on the Dusty Platform's stages: he
+/// gives it and ends Honorary Subway Worker, starting it first for one who
+/// hasn't taken it from Dalair (Cosmic `1052115`).
+fn mr_lim_medal(player: &Player) -> Page {
+    use crate::pyramid::{honorary_kills, HONORARY_MEDAL, HONORARY_NEEDED, HONORARY_QUEST};
+    let kills = honorary_kills(player);
+    let held = player.inventory.count(HONORARY_MEDAL) > 0
+        || (player.inventory.items(InventoryType::Equipped))
+            .any(|(_, item)| item.item_id == HONORARY_MEDAL);
+    if held {
+        return Page::Say(text(keys::SUBWAY_LIM_MEDAL_HAVE));
+    }
+    if kills < HONORARY_NEEDED {
+        let (kills, left) = (kills.to_string(), (HONORARY_NEEDED - kills).to_string());
+        let params = [("kills", kills.as_str()), ("left", left.as_str())];
+        return Page::Say(content::text().get(keys::SUBWAY_LIM_MEDAL_MORE, &params));
+    }
+    if player.inventory.free(InventoryType::Equip) == 0 {
+        return Page::Say(text(keys::SUBWAY_LIM_MEDAL_ROOM));
+    }
+    let mut effects = vec![Effect::GiveItem {
+        item_id: HONORARY_MEDAL,
+        quantity: 1,
+    }];
+    match player.quests.state(HONORARY_QUEST) {
+        QuestState::NotStarted => effects.push(Effect::FinishQuest(HONORARY_QUEST)),
+        QuestState::Started => effects.push(Effect::CompleteQuest(HONORARY_QUEST)),
+        _ => {}
+    }
+    Page::Act {
+        text: text(keys::SUBWAY_LIM_MEDAL_GIVEN),
+        effects,
+    }
+}
+
 /// Duarte on a Pyramid stage: the player may give the run up and go back
 /// to the lobby (Cosmic `2103013`).
 fn duarte_forfeit() -> NpcScript {
@@ -13674,9 +13759,9 @@ fn dojo_board(player: &Player) -> NpcScript {
 
 /// The Dimensional Mirror (Cosmic `9010022`): a slide menu of the places
 /// open at the player's level, each saving the town for the way back
-/// before going. Cosmic's second Carnival (3) and Construction Site (6)
-/// have no event here, so they aren't offered; its Pyramid (5), stubbed
-/// there, is.
+/// before going. Cosmic's second Carnival (3) has no event here, so it
+/// isn't offered; its Pyramid (5) and Construction Site (6), stubbed
+/// there, are.
 fn dimensional_mirror(player: &Player) -> NpcScript {
     let level = player.stats.level;
     let here = player.stats.map_id;
@@ -13714,6 +13799,16 @@ fn dimensional_mirror(player: &Player) -> NpcScript {
             level >= 40,
             keys::MIRROR_PYRAMID,
             go(PYRAMID_RETURN, events::PYRAMID_LOBBY, MIRROR_PYRAMID_PORTAL),
+        ),
+        (
+            6,
+            events::SUBWAY_LEVELS.contains(&level),
+            keys::MIRROR_SUBWAY,
+            go(
+                DOJO_RETURN,
+                events::SUBWAY_LOBBY,
+                events::SUBWAY_ARRIVAL_PORTAL,
+            ),
         ),
     ];
     let mut choices: Vec<_> = places
@@ -24183,6 +24278,114 @@ mod tests {
     }
 
     #[test]
+    fn mr_lim_takes_a_party_leader_of_25_to_30_onto_the_dusty_platform() {
+        let at = |level| {
+            let mut player = player(50);
+            player.stats.level = level;
+            player.stats.map_id = events::SUBWAY_LOBBY;
+            player
+        };
+        let enter = |entry, level| {
+            let mut lim = NpcScript::mr_lim(entry, &at(level));
+            assert_eq!(kind(&lim.begin()), Some(4));
+            lim.respond(ScriptInput::Select(0)).unwrap()
+        };
+        assert_eq!(
+            enter(Entry::Ready, 25).effects,
+            [Effect::StartEvent(EventKind::Subway)]
+        );
+        let terms = content::text().get(keys::SUBWAY_LIM_TERMS, &[("low", "25"), ("high", "30")]);
+        for (entry, level) in [
+            (Entry::Ready, 24),
+            (Entry::Ready, 31),
+            (Entry::NoParty, 30),
+            (Entry::NotLeader, 30),
+        ] {
+            assert_eq!(page_text(&enter(entry, level)), terms, "{entry:?} {level}");
+        }
+        let party = [("least", "1"), ("most", "6"), ("low", "25"), ("high", "30")];
+        assert_eq!(
+            page_text(&enter(Entry::NotEligible, 27)),
+            content::text().get(keys::SUBWAY_LIM_PARTY_TERMS, &party)
+        );
+        assert_eq!(
+            page_text(&enter(Entry::Busy, 27)),
+            text(keys::SUBWAY_LIM_FULL)
+        );
+        // On a stage he lets one leave for the hub, and on the result map
+        // sends them there at once.
+        let mut lost = at(27);
+        lost.stats.map_id = events::SUBWAY.stage_map(2);
+        let mut lim = NpcScript::in_event(MR_LIM, &lost, false, false).unwrap();
+        assert_eq!(question(&lim.begin()), text(keys::SUBWAY_LIM_LEAVE_ASK));
+        let step = lim.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            step.effects,
+            [Effect::WarpToPortal(events::SUBWAY_LOBBY, 0)]
+        );
+        lost.stats.map_id = events::SUBWAY_RESULT;
+        let mut lim = NpcScript::for_npc(MR_LIM, &lost).unwrap();
+        assert_eq!(
+            lim.begin().effects,
+            [Effect::WarpToPortal(events::SUBWAY_LOBBY, 0)]
+        );
+    }
+
+    #[test]
+    fn mr_lim_gives_the_honorary_employee_medal_for_10000_kills() {
+        use crate::pyramid::{HONORARY_KILLS, HONORARY_MEDAL, HONORARY_QUEST};
+        let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
+        let medal = |player: &Player| {
+            let mut lim = NpcScript::mr_lim(Entry::Ready, player);
+            lim.begin();
+            lim.respond(ScriptInput::Select(1)).unwrap()
+        };
+        let mut worker = player(50);
+        worker.stats.level = 30;
+        worker.stats.map_id = events::SUBWAY_LOBBY;
+        worker.quests.set_record(HONORARY_KILLS, "9999");
+        let more = [("kills", "9999"), ("left", "1")];
+        assert_eq!(
+            page_text(&medal(&worker)),
+            content::text().get(keys::SUBWAY_LIM_MEDAL_MORE, &more)
+        );
+        worker.quests.set_record(HONORARY_KILLS, "10000");
+        let mut full = worker.clone();
+        let room = full.inventory.free(InventoryType::Equip);
+        for slot in 1..=(room as i16 + 1) {
+            full.inventory
+                .insert(InventoryType::Equip, slot, equip(1_002_000));
+        }
+        assert_eq!(page_text(&medal(&full)), text(keys::SUBWAY_LIM_MEDAL_ROOM));
+        // He starts and ends the quest with it, as Cosmic does.
+        let step = medal(&worker);
+        assert_eq!(page_text(&step), text(keys::SUBWAY_LIM_MEDAL_GIVEN));
+        let give = Effect::GiveItem {
+            item_id: HONORARY_MEDAL,
+            quantity: 1,
+        };
+        assert_eq!(
+            step.effects,
+            [give.clone(), Effect::FinishQuest(HONORARY_QUEST)]
+        );
+        // A medal lost after the quest comes back alone.
+        worker.quests.upsert(game::QuestRecord {
+            quest_id: HONORARY_QUEST,
+            status: game::QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        assert_eq!(medal(&worker).effects, [give]);
+        worker
+            .inventory
+            .insert(InventoryType::Equip, 1, equip(HONORARY_MEDAL));
+        assert_eq!(
+            page_text(&medal(&worker)),
+            text(keys::SUBWAY_LIM_MEDAL_HAVE)
+        );
+    }
+
+    #[test]
     fn duarte_gives_the_protector_of_pharaoh_medal_for_50000_pyramid_kills() {
         use crate::pyramid::{PROTECTOR_KILLS, PROTECTOR_MEDAL, PROTECTOR_QUEST};
         let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
@@ -24604,18 +24807,22 @@ mod tests {
             let mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
             slide(&mirror.begin())
         };
-        let [ariant, dojo, carnival, pyramid] = [
+        let [ariant, dojo, carnival, pyramid, subway] = [
             keys::MIRROR_ARIANT,
             keys::MIRROR_DOJO,
             keys::MIRROR_CARNIVAL,
             keys::MIRROR_PYRAMID,
+            keys::MIRROR_SUBWAY,
         ]
         .map(text);
         let nowhere = format!("#-1#{}", text(keys::MIRROR_NOWHERE));
         assert_eq!(menu(19), nowhere);
         assert_eq!(menu(24), format!("#0#{ariant}"));
-        assert_eq!(menu(25), format!("#0#{ariant}#1#{dojo}"));
-        assert_eq!(menu(30), format!("#0#{ariant}#1#{dojo}#2#{carnival}"));
+        assert_eq!(menu(25), format!("#0#{ariant}#1#{dojo}#6#{subway}"));
+        assert_eq!(
+            menu(30),
+            format!("#0#{ariant}#1#{dojo}#2#{carnival}#6#{subway}")
+        );
         assert_eq!(menu(31), format!("#1#{dojo}#2#{carnival}"));
         assert_eq!(menu(40), format!("#1#{dojo}#2#{carnival}#5#{pyramid}"));
         assert_eq!(menu(51), format!("#1#{dojo}#5#{pyramid}"));
@@ -24647,13 +24854,20 @@ mod tests {
         for id in [-1, 0, 3, 6] {
             assert_eq!(pick(id), None);
         }
-        // The Coliseum, to levels 20 to 30, lands by the lobby's way out.
+        // The Coliseum, to levels 20 to 30, lands by the lobby's way out,
+        // and the Abandoned Subway, to 25 to 30, by the hub's.
         traveller.stats.level = 25;
         let mut mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
         mirror.begin();
         assert_eq!(
             mirror.respond(ScriptInput::Select(0)),
             went(DOJO_RETURN, ariant::ARIANT_LOBBY, 3)
+        );
+        let mut mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
+        mirror.begin();
+        assert_eq!(
+            mirror.respond(ScriptInput::Select(6)),
+            went(DOJO_RETURN, events::SUBWAY_LOBBY, 2)
         );
         let prompt = Prompt::Slide {
             npc_id: DIMENSIONAL_MIRROR,

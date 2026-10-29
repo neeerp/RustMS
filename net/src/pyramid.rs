@@ -2,6 +2,7 @@
 //! gauge they keep up on each stage (`agent_docs/pyramid.md`; Cosmic
 //! `Pyramid.java`).
 
+use crate::events::EventKind;
 use game::Player;
 use game_data::mobs::MobInfo;
 use game_data::{CountEffect, Massacre};
@@ -25,7 +26,42 @@ pub const PROTECTOR_MEDAL: i32 = 1142142;
 
 /// The player's kills counted toward Protector of Pharaoh.
 pub fn protector_kills(player: &Player) -> i32 {
-    (player.quests.info(PROTECTOR_KILLS)).map_or(0, |count| count.parse().unwrap_or(0))
+    kills_in(player, PROTECTOR_KILLS)
+}
+
+/// Honorary Subway Worker (29931): Mr. Lim's medal quest for 10,000 kills
+/// on the Dusty Platform's stages. Record 7662 counts them (`Check/1
+/// infoNumber`, Cosmic `1052115`), and Mr. Lim gives the medal and starts
+/// and ends the quest. The quest's text shows record 7762 instead, so the
+/// count is kept there too (QUESTIONS b319).
+pub const HONORARY_QUEST: i16 = 29931;
+pub const HONORARY_KILLS: i16 = 7662;
+pub const HONORARY_KILLS_SHOWN: i16 = 7762;
+pub const HONORARY_NEEDED: i32 = 10_000;
+pub const HONORARY_MEDAL: i32 = 1142141;
+
+/// The player's kills counted toward Honorary Subway Worker.
+pub fn honorary_kills(player: &Player) -> i32 {
+    kills_in(player, HONORARY_KILLS)
+}
+
+/// The records a Massacre stage on `map_id` counts its player's kills in:
+/// the Dusty Platform's for Honorary Subway Worker, or the Pyramid's for
+/// Protector of Pharaoh. None off a stage, as for a kill heard after the
+/// run moved its player on.
+pub fn kill_records(map_id: i32) -> &'static [i16] {
+    if crate::events::SUBWAY.stage_on(map_id).is_some() {
+        &[HONORARY_KILLS, HONORARY_KILLS_SHOWN]
+    } else if crate::events::pyramid_stage(map_id).is_some() {
+        &[PROTECTOR_KILLS]
+    } else {
+        &[]
+    }
+}
+
+/// The kills record `record` holds.
+pub fn kills_in(player: &Player, record: i16) -> i32 {
+    (player.quests.info(record)).map_or(0, |count| count.parse().unwrap_or(0))
 }
 
 /// What one attack did to a stage's mobs.
@@ -146,33 +182,57 @@ impl Tally {
     }
 }
 
+/// How a Massacre run's kills and cool kills rank it: the fewest for S, A,
+/// B and C, and the EXP each of them gives before the kills' own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ranks {
+    pub least: [i32; 4],
+    pub exp: [i32; 4],
+}
+
+/// Nett's Pyramid's ranks in the mode of index `mode` (Cosmic `sendScore`).
+pub const fn pyramid_ranks(mode: i32) -> Ranks {
+    Ranks {
+        least: [3000, 2000, 1500, 500],
+        exp: [
+            60_500 + 5_500 * mode,
+            55_000 + 5_000 * mode,
+            46_750 + 4_250 * mode,
+            22_000 + 2_000 * mode,
+        ],
+    }
+}
+
+/// The Dusty Platform's ranks, which no source gives (QUESTIONS b319):
+/// the Pyramid's kills for its 14 minutes scaled to the platform's 9, and
+/// for each rank a share of a level 25's EXP (a half for S down to a
+/// tenth for C).
+pub const SUBWAY_RANKS: Ranks = Ranks {
+    least: [1930, 1290, 964, 321],
+    exp: [13_500, 9_500, 5_400, 2_700],
+};
+
+/// The ranks of the Massacre run `kind`, if it is one.
+pub fn ranks(kind: EventKind) -> Option<Ranks> {
+    match kind {
+        EventKind::Subway => Some(SUBWAY_RANKS),
+        _ => Some(pyramid_ranks(kind.pyramid_mode()?.index())),
+    }
+}
+
 /// A run's rank, 0 for S to 4 for D, and the EXP it gives, by its kills and
-/// cool kills and its mode's index (Cosmic `sendScore`). A run that
-/// `finished`, outlasting the last stage's clock, ranks from S at 3000 down;
-/// one whose gauge ran out gets C at 2000 or D.
-pub fn score(tally: &Tally, mode: i32, finished: bool) -> (u8, i32) {
+/// cool kills and its `ranks` (Cosmic `sendScore`). A run that `finished`,
+/// outlasting the last stage's clock, ranks from S down; one whose gauge
+/// ran out gets C at A's kills, or D.
+pub fn score(tally: &Tally, ranks: &Ranks, finished: bool) -> (u8, i32) {
     let kills = tally.hit + tally.cool;
-    let rank = match kills {
-        _ if !finished => {
-            if kills >= 2000 {
-                3
-            } else {
-                4
-            }
-        }
-        3000.. => 0,
-        2000.. => 1,
-        1500.. => 2,
-        500.. => 3,
-        _ => 4,
+    let rank = match ranks.least.iter().position(|&least| kills >= least) {
+        _ if !finished && kills >= ranks.least[1] => 3,
+        _ if !finished => 4,
+        Some(rank) => rank as u8,
+        None => 4,
     };
-    let base = match rank {
-        0 => 60_500 + 5_500 * mode,
-        1 => 55_000 + 5_000 * mode,
-        2 => 46_750 + 4_250 * mode,
-        3 => 22_000 + 2_000 * mode,
-        _ => 0,
-    };
+    let base = ranks.exp.get(usize::from(rank)).copied().unwrap_or(0);
     (rank, base + tally.hit * 2 + tally.cool * 10)
 }
 
@@ -181,23 +241,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn each_massacre_stage_counts_kills_toward_its_medal() {
+        assert_eq!(kill_records(910320200), [7662, 7762]);
+        assert_eq!(kill_records(926021300), [7760]);
+        for off in [910320001, 926010001, 100000000] {
+            assert!(kill_records(off).is_empty(), "{off}");
+        }
+    }
+
+    #[test]
     fn the_score_ranks_the_runs_kills_and_gives_its_modes_exp() {
         let tally = |hit, cool| Tally {
             hit,
             cool,
             ..Tally::default()
         };
+        let mode = pyramid_ranks;
         assert_eq!(
-            score(&tally(2900, 100), 0, true),
+            score(&tally(2900, 100), &mode(0), true),
             (0, 60_500 + 5_800 + 1_000)
         );
-        assert_eq!(score(&tally(2000, 0), 3, true), (1, 70_000 + 4_000));
-        assert_eq!(score(&tally(1499, 1), 1, true), (2, 51_000 + 2_998 + 10));
-        assert_eq!(score(&tally(500, 0), 2, true), (3, 26_000 + 1_000));
-        assert_eq!(score(&tally(499, 0), 3, true), (4, 998));
+        assert_eq!(score(&tally(2000, 0), &mode(3), true), (1, 70_000 + 4_000));
+        assert_eq!(
+            score(&tally(1499, 1), &mode(1), true),
+            (2, 51_000 + 2_998 + 10)
+        );
+        assert_eq!(score(&tally(500, 0), &mode(2), true), (3, 26_000 + 1_000));
+        assert_eq!(score(&tally(499, 0), &mode(3), true), (4, 998));
         // A gauge that ran out gives C at most.
-        assert_eq!(score(&tally(3000, 0), 0, false), (3, 22_000 + 6_000));
-        assert_eq!(score(&tally(1, 0), 3, false), (4, 2));
+        assert_eq!(score(&tally(3000, 0), &mode(0), false), (3, 22_000 + 6_000));
+        assert_eq!(score(&tally(1, 0), &mode(3), false), (4, 2));
+    }
+
+    #[test]
+    fn the_dusty_platforms_runs_rank_on_fewer_kills_for_less_exp() {
+        let tally = |hit| Tally {
+            hit,
+            ..Tally::default()
+        };
+        let subway = ranks(EventKind::Subway).unwrap();
+        assert_eq!(score(&tally(1930), &subway, true), (0, 13_500 + 3_860));
+        assert_eq!(score(&tally(1929), &subway, true), (1, 9_500 + 3_858));
+        assert_eq!(score(&tally(321), &subway, true), (3, 2_700 + 642));
+        assert_eq!(score(&tally(320), &subway, true), (4, 640));
+        assert_eq!(score(&tally(1290), &subway, false), (3, 2_700 + 2_580));
+        assert_eq!(score(&tally(1289), &subway, false), (4, 2_578));
+        // The Pyramid's, by mode; nothing else is a Massacre run.
+        let hell = EventKind::PyramidParty(crate::events::PyramidMode::Hell);
+        assert_eq!(ranks(hell), Some(pyramid_ranks(3)));
+        assert_eq!(ranks(EventKind::Dojo), None);
     }
 
     fn solo_normal() -> Massacre {

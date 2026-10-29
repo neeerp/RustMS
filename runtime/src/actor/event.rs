@@ -1073,7 +1073,7 @@ impl EventActor {
                 member.send(ServerMessage::EventStarted(ticket));
             }
         }
-        if self.kind.pyramid_mode().is_some() {
+        if self.kind.massacre() {
             self.start_pyramid_stage();
         }
         if self.kind == EventKind::Cwk {
@@ -2058,7 +2058,7 @@ impl EventActor {
                 self.cleared.escort_failed.store(true, Ordering::Release);
             }
             EventCommand::EscortFailed => debug!(client_id, "Escort outside Magatia"),
-            EventCommand::Massacre(hits) if self.kind.pyramid_mode().is_some() => {
+            EventCommand::Massacre(hits) if self.kind.massacre() => {
                 let seconds = self.stage_seconds();
                 let mut reached = Vec::new();
                 if let Some(gauge) = &self.gauge {
@@ -2891,11 +2891,11 @@ impl EventActor {
                 self.win();
                 false
             }
-            _ if self.kind.pyramid_mode().is_some() && self.pyramid_stage < event.last_stage() => {
+            _ if self.kind.massacre() && self.pyramid_stage < event.last_stage() => {
                 self.next_pyramid_stage();
                 false
             }
-            _ if self.kind.pyramid_mode().is_some() => {
+            _ if self.kind.massacre() => {
                 self.pyramid_end = Some(true);
                 true
             }
@@ -2904,8 +2904,9 @@ impl EventActor {
     }
 
     /// A Nett's Pyramid stage's time ran out: the team goes on to the next
-    /// stage, whose clock gives 3 minutes (Cosmic `Pyramid.timer`). The
-    /// last stage's ends the run, which sends everyone to its result map.
+    /// stage, whose clock gives 3 minutes (Cosmic `Pyramid.timer`), as the
+    /// Dusty Platform's do. The last stage's ends the run, which sends
+    /// everyone to its result map.
     fn next_pyramid_stage(&mut self) {
         self.pyramid_stage += 1;
         let ends = Instant::now() + net::events::scaled(net::events::PYRAMID_STAGE_TIME);
@@ -3000,8 +3001,8 @@ impl EventActor {
     /// Its result map, rank and EXP.
     fn pyramid_score(&self) -> Option<(i32, u8, i32, bool)> {
         let finished = self.pyramid_end?;
-        let mode = self.kind.pyramid_mode()?;
-        let (rank, exp) = net::pyramid::score(&self.tally, mode.index(), finished);
+        let ranks = net::pyramid::ranks(self.kind)?;
+        let (rank, exp) = net::pyramid::score(&self.tally, &ranks, finished);
         info!(kind = ?self.kind, id = self.id, rank, exp, "Pyramid score");
         Some((self.kind.event().exit, rank, exp, finished))
     }

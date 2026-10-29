@@ -2797,6 +2797,7 @@ pub mod keys {
     pub const MIRROR_DOJO: &str = "mirror.dojo";
     pub const MIRROR_CARNIVAL: &str = "mirror.carnival";
     pub const MIRROR_PYRAMID: &str = "mirror.pyramid";
+    pub const MIRROR_SUBWAY: &str = "mirror.subway";
     pub const MIRROR_NOWHERE: &str = "mirror.nowhere";
     /// One line each for NPCs that have nothing else to say: no speech in
     /// String.nx and no script of their own.
@@ -2871,6 +2872,17 @@ pub mod keys {
     pub const PYRAMID_DUARTE_MEDAL: &str = "pyramid.duarte.medal";
     pub const PYRAMID_DUARTE_MEDAL_HAVE: &str = "pyramid.duarte.medal_have";
     pub const PYRAMID_DUARTE_MEDAL_MORE: &str = "pyramid.duarte.medal_more";
+    pub const SUBWAY_LIM_MENU: &str = "subway.lim.menu";
+    pub const SUBWAY_LIM_ENTER: &str = "subway.lim.enter";
+    pub const SUBWAY_LIM_MEDAL: &str = "subway.lim.medal";
+    pub const SUBWAY_LIM_TERMS: &str = "subway.lim.terms";
+    pub const SUBWAY_LIM_PARTY_TERMS: &str = "subway.lim.party_terms";
+    pub const SUBWAY_LIM_FULL: &str = "subway.lim.full";
+    pub const SUBWAY_LIM_LEAVE_ASK: &str = "subway.lim.leave_ask";
+    pub const SUBWAY_LIM_MEDAL_HAVE: &str = "subway.lim.medal_have";
+    pub const SUBWAY_LIM_MEDAL_MORE: &str = "subway.lim.medal_more";
+    pub const SUBWAY_LIM_MEDAL_ROOM: &str = "subway.lim.medal_room";
+    pub const SUBWAY_LIM_MEDAL_GIVEN: &str = "subway.lim.medal_given";
     pub const PYRAMID_DUARTE_MEDAL_ROOM: &str = "pyramid.duarte.medal_room";
     pub const PYRAMID_DUARTE_MEDAL_GIVEN: &str = "pyramid.duarte.medal_given";
     pub const PYRAMID_DUARTE_TOMB: &str = "pyramid.duarte.tomb";
@@ -4546,6 +4558,7 @@ mod tests {
                 keys::MIRROR_DOJO,
                 keys::MIRROR_CARNIVAL,
                 keys::MIRROR_PYRAMID,
+                keys::MIRROR_SUBWAY,
                 keys::MIRROR_NOWHERE,
                 keys::LINE_RYKO,
                 keys::LINE_ADONIS,
@@ -4618,6 +4631,17 @@ mod tests {
                 keys::PYRAMID_DUARTE_MEDAL,
                 keys::PYRAMID_DUARTE_MEDAL_HAVE,
                 keys::PYRAMID_DUARTE_MEDAL_MORE,
+                keys::SUBWAY_LIM_MENU,
+                keys::SUBWAY_LIM_ENTER,
+                keys::SUBWAY_LIM_MEDAL,
+                keys::SUBWAY_LIM_TERMS,
+                keys::SUBWAY_LIM_PARTY_TERMS,
+                keys::SUBWAY_LIM_FULL,
+                keys::SUBWAY_LIM_LEAVE_ASK,
+                keys::SUBWAY_LIM_MEDAL_HAVE,
+                keys::SUBWAY_LIM_MEDAL_MORE,
+                keys::SUBWAY_LIM_MEDAL_ROOM,
+                keys::SUBWAY_LIM_MEDAL_GIVEN,
                 keys::PYRAMID_DUARTE_MEDAL_ROOM,
                 keys::PYRAMID_DUARTE_MEDAL_GIVEN,
                 keys::PYRAMID_DUARTE_TOMB,
