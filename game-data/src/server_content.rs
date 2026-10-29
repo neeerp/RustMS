@@ -2902,6 +2902,11 @@ pub mod keys {
     pub const TREASURE_MILLA_LOBBY: &str = "treasure.milla.lobby";
     pub const TREASURE_MILLA_ROOM: &str = "treasure.milla.room";
     pub const TREASURE_MILLA_LEAVE_ASK: &str = "treasure.milla.leave_ask";
+    pub const TREASURE_LETTERS_WANTED: &str = "treasure.charles.letters_wanted";
+    pub const TREASURE_LETTERS_LEADER: &str = "treasure.charles.letters_leader";
+    pub const TREASURE_LETTERS_TAKEN: &str = "treasure.charles.letters_taken";
+    pub const TREASURE_TUNNEL_OPEN: &str = "treasure.charles.tunnel_open";
+    pub const TREASURE_TUNNEL_BLOCKED: &str = "treasure.tunnel_blocked";
     pub const CARNIVAL_SPIEGELMANN_GO: &str = "carnival.spiegelmann.go";
     pub const CARNIVAL_GUIDE_BACK: &str = "carnival.guide.back";
     pub const CARNIVAL_SPIEGELMANN_WAITING: &str = "carnival.spiegelmann.waiting";
@@ -4612,6 +4617,11 @@ mod tests {
                 keys::TREASURE_MILLA_LOBBY,
                 keys::TREASURE_MILLA_ROOM,
                 keys::TREASURE_MILLA_LEAVE_ASK,
+                keys::TREASURE_LETTERS_WANTED,
+                keys::TREASURE_LETTERS_LEADER,
+                keys::TREASURE_LETTERS_TAKEN,
+                keys::TREASURE_TUNNEL_OPEN,
+                keys::TREASURE_TUNNEL_BLOCKED,
                 keys::CARNIVAL_SPIEGELMANN_GO,
                 keys::CARNIVAL_GUIDE_BACK,
                 keys::CARNIVAL_SPIEGELMANN_WAITING,

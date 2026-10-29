@@ -2296,3 +2296,8 @@
 "treasure.milla.lobby" = "[placeholder] Hello there, I'm Milla."
 "treasure.milla.room" = "[placeholder] This is MV's treasure room. Spend your time here as you like, there is a lot to find. The portal leads back to the entrance."
 "treasure.milla.leave_ask" = "[placeholder] Go back now and leave your party behind?"
+"treasure.charles.letters_wanted" = "[placeholder] Bring me {n} secret letters."
+"treasure.charles.letters_leader" = "[placeholder] Your party leader should talk to me about the next step."
+"treasure.charles.letters_taken" = "[placeholder] These are the letters, well done! The tunnel now leads to the room where MV waits. Be ready."
+"treasure.charles.tunnel_open" = "[placeholder] The boss fight is through this tunnel."
+"treasure.tunnel_blocked" = "[placeholder] Something blocks the tunnel."

@@ -1711,11 +1711,16 @@ pub const TREASURE_CAVE: i32 = 674_030_200;
 pub const TREASURE_ROOM: i32 = 674_030_300;
 /// A secret letter, from the dolls, of use only in the event.
 pub const SECRET_LETTER: i32 = 4_032_118;
+/// Charles at the dungeon's far upper left, who takes the letters, and how
+/// many he takes to open the tunnel to the cave (Cosmic `9220020`).
+pub const TREASURE_CHARLES: i32 = 9_220_020;
+pub const SECRET_LETTERS_WANTED: i16 = 15;
 
 /// MV's Lair (Cosmic `TreasurePQ`, on what is left of a 2007 Guy Fawkes
 /// event in the client's data): four to six of a party, all of level 140
 /// or more, in the lobby with their leader, have 45 minutes for its two
-/// stages. The numbers are Cosmic's; the data has none
+/// stages. The leader hands Charles the letters to clear the first, which
+/// opens the tunnel on. The numbers are Cosmic's; the data has none
 /// (`v83ref/reports/b300-treasure-elnath-pq.md`).
 pub const TREASURE: Event = Event {
     lobby: TREASURE_LOBBY,
@@ -1742,7 +1747,14 @@ pub const TREASURE: Event = Event {
     areas_taken: 0,
     items: &[SECRET_LETTER],
     passes: 0,
-    hand_ins: &[],
+    hand_ins: &[HandIn {
+        stage: 1,
+        npc: TREASURE_CHARLES,
+        item: SECRET_LETTER,
+        count: SECRET_LETTERS_WANTED,
+        prize: None,
+        intro: false,
+    }],
     gates: false,
     clear_map: None,
     bonus: None,

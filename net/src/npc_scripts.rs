@@ -8426,6 +8426,9 @@ fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
     if hand_in.npc == AMOS_TRIALS {
         return amos_hand_in(hand_in, view, player);
     }
+    if hand_in.npc == events::TREASURE_CHARLES {
+        return treasure_hand_in(hand_in, view, player);
+    }
     let item = hand_in.item.to_string();
     let n = hand_in.count.to_string();
     let get = |key| content::text().get(key, &[("item", &item), ("n", &n)]);
@@ -8451,6 +8454,36 @@ fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
     let mut script = NpcScript::new(hand_in.npc, vec![page]);
     // The items dropped since the page opened.
     script.refused = Some(short);
+    script
+}
+
+/// Charles in MV's Lair's dungeon (Cosmic `9220020`): the leader hands him
+/// the secret letters, which clears the stage and opens the tunnel to the
+/// cave. Cosmic sends anyone but the leader off first, even once it is
+/// open; here all hear the tunnel is open.
+fn treasure_hand_in(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
+    let n = hand_in.count.to_string();
+    let wanted = content::text().get(keys::TREASURE_LETTERS_WANTED, &[("n", &n)]);
+    let page = match view {
+        Balloon::Cleared => Page::Say(text(keys::TREASURE_TUNNEL_OPEN)),
+        Balloon::NotLeader => Page::Say(text(keys::TREASURE_LETTERS_LEADER)),
+        Balloon::Ready if player.inventory.count(hand_in.item) >= i32::from(hand_in.count) => {
+            Page::Act {
+                text: text(keys::TREASURE_LETTERS_TAKEN),
+                effects: vec![
+                    Effect::TakeItem {
+                        item_id: hand_in.item,
+                        quantity: hand_in.count,
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(hand_in.stage)),
+                ],
+            }
+        }
+        Balloon::Intro | Balloon::Ready | Balloon::Answer { .. } => Page::Say(wanted.clone()),
+    };
+    let mut script = NpcScript::new(hand_in.npc, vec![page]);
+    // The letters dropped since the page opened.
+    script.refused = Some(wanted);
     script
 }
 
@@ -19442,6 +19475,41 @@ mod tests {
             NpcScript::for_npc(ANDERSON, &rider(100, 0, 221024500)),
             None
         );
+    }
+
+    #[test]
+    fn charles_takes_fifteen_letters_from_the_leader_to_open_the_tunnel() {
+        let hand_in =
+            events::TREASURE.hand_in_on(events::TREASURE_DUNGEON, events::TREASURE_CHARLES);
+        let hand_in = hand_in.unwrap();
+        let holding = |quantity| hunter(&[(events::SECRET_LETTER, quantity)], &[]);
+        let says = |view, letters| {
+            let page = NpcScript::balloon(hand_in, view, &holding(letters)).begin();
+            (page_text(&page), page.effects)
+        };
+        let wanted = content::text().get(keys::TREASURE_LETTERS_WANTED, &[("n", "15")]);
+        for (view, said) in [
+            (Balloon::Cleared, text(keys::TREASURE_TUNNEL_OPEN)),
+            (Balloon::NotLeader, text(keys::TREASURE_LETTERS_LEADER)),
+            (Balloon::Ready, wanted),
+        ] {
+            assert_eq!(says(view, 14), (said, vec![]));
+        }
+        let (said, effects) = says(Balloon::Ready, 15);
+        assert_eq!(said, text(keys::TREASURE_LETTERS_TAKEN));
+        assert_eq!(
+            effects,
+            [
+                Effect::TakeItem {
+                    item_id: events::SECRET_LETTER,
+                    quantity: 15
+                },
+                Effect::EventCommand(EventCommand::ClearStage(1))
+            ]
+        );
+        assert!(NpcScript::balloon(hand_in, Balloon::Ready, &holding(15))
+            .refused()
+            .is_some());
     }
 
     #[test]

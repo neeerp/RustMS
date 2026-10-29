@@ -744,11 +744,12 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 /// hub, where the experiment files are (`MagatiaPQ`'s `shuffleReactors`
 /// of `2518000` to `2612004`, so not their ways back: `shuffles`), and the
 /// Amorian Challenge's two bonus maps' boxes and crates (`AmoriaPQ`), and
-/// Crimsonwood Keep's pirates' room's chests (CWKPQ).
+/// Crimsonwood Keep's pirates' room's chests (CWKPQ), and MV's Lair's
+/// dungeon's dolls, the letters' and the empty ones (`TreasurePQ`).
 pub fn shuffled(map_id: i32) -> bool {
     use crate::events::{
         MagatiaSide, AMORIA_BONUS, AMORIA_COUPLES_BONUS, DOLLHOUSE_ROOM, ELLIN_STAGES, MAZE_GOAL,
-        MAZE_ROOM, PARTS_ROOM, PIRATE_STAGES,
+        MAZE_ROOM, PARTS_ROOM, PIRATE_STAGES, TREASURE_DUNGEON,
     };
     let magatia = MagatiaSide::ALL
         .iter()
@@ -756,7 +757,7 @@ pub fn shuffled(map_id: i32) -> bool {
         .any(|(_, room, _)| room == map_id);
     matches!(
         map_id,
-        BERSERK_ROOM | BART_ROOM | DOLLHOUSE_ROOM | PARTS_ROOM
+        BERSERK_ROOM | BART_ROOM | DOLLHOUSE_ROOM | PARTS_ROOM | TREASURE_DUNGEON
     ) || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
         || map_id == ELLIN_STAGES[4]
         || [PIRATE_STAGES[0], PIRATE_STAGES[2], PIRATE_STAGES[3]].contains(&map_id)
@@ -1278,6 +1279,15 @@ mod tests {
         assert_eq!(warp.to(), (105090200, 0));
         assert_eq!(trap.to(), (LPQ_TRAP_ROOM, 0));
         assert!(shuffled(BERSERK_ROOM) && !shuffled(HITMAN_HIDEOUT));
+    }
+
+    #[test]
+    fn mvs_lair_s_dolls_change_places_and_the_letter_ones_drop() {
+        use crate::events::{TREASURE_CAVE, TREASURE_DUNGEON};
+        assert!(shuffled(TREASURE_DUNGEON) && !shuffled(TREASURE_CAVE));
+        assert!(shuffles(6741015) && shuffles(6741016));
+        assert_eq!(action(6741015), Action::Drops);
+        assert_eq!(action(6741016), Action::Drops);
     }
 
     #[test]

@@ -1799,9 +1799,20 @@ the lobby is not, so going back there leaves the event, which ends it by
 `Team::leave` (the leader, or too few left). The Secret Letter (4032118)
 is taken from whoever leaves. Milla (9220019) says a line in the lobby and
 the treasure room, and offers a member the way back to the lobby from the
-dungeon and the cave. The stages, MV and the treasure room's chest come in
-later slices, so for now the party only walks the dungeon. The lines are
-placeholders.
+dungeon and the cave.
+
+In the dungeon, seven Guy Fawkes dolls (6741015) each drop a secret
+letter when broken (`reward_overrides.toml`), and ten look-alikes
+(6741016) drop nothing. The seventeen trade places in each copy
+(`reactors::shuffled`), and each comes back after its 120-second
+`reactorTime`. The Beef Eaters (9400704) are the map's own spawns, which
+can't be hurt. The leader hands the dungeon's Charles (`TREASURE_CHARLES`,
+9220020, at the far upper left) fifteen letters (a `HandIn`, no intro).
+That clears stage 1: the clear effect and 60,000 EXP for everyone in the
+event. Anyone else is told to send the leader. The tunnel (`out00`,
+`guyfawkes0_esc`) is blocked until then, with a pink line, and afterwards
+leads to the cave's portal 0. MV and the treasure room's chest come in
+later slices. The lines are placeholders.
 
 ## Jr. Balrog's room
 
