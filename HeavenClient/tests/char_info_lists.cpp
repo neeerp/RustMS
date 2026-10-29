@@ -52,6 +52,10 @@ int main()
 		require(level_icon(1, 8) == 0 && level_icon(8, 8) == 7, "level N shows icon N - 1");
 		require(!level_icon(9, 8) && !level_icon(0, 8), "no icon past the last");
 
+		require(giftable(1702026, false) && giftable(5240001, false), "another's wish is a present");
+		require(!giftable(1702026, true), "not one's own");
+		require(!giftable(9110000, false) && !giftable(5430000, false) && !giftable(5550000, false), "911, 5430 and 555 are not");
+
 		std::cout << "Char info lists passed\n";
 		return 0;
 	}

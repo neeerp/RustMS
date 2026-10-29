@@ -198,6 +198,13 @@ int main()
 		std::vector<Commodity> sold = on_sale(img);
 		require(sold.size() == 2 && sold[0].sn == 50200004 && sold[1].sn == 50200172, "on sale, in order");
 
+		Commodity twin = { 50200009, 5076000, 300, 1, 2, NONE, 0 };
+		img.push_back(twin);
+		require(on_sale_as(img, 50200172) && on_sale_as(img, 50200172)->sn == 50200172, "a present on sale is its own");
+		require(on_sale_as(img, 50200003) && on_sale_as(img, 50200003)->sn == 50200009, "an off-sale one has an on-sale twin");
+		img.back().count = 2;
+		require(!on_sale_as(img, 50200003) && !on_sale_as(img, 12345678), "no twin and no SN: not on sale");
+
 		require(is_slot_extender(5550000) && is_slot_extender(5559999) && !is_slot_extender(5430000), "555xxxx");
 		require(slot_extender_question("Extra Pendant Slot", 2000, 30) ==
 			"If you purchase a Extra Pendant Slot(2000cash), you can equip \\n the item for 30 additional days. \\n "

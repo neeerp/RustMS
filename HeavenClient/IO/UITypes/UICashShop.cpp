@@ -44,6 +44,7 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <utility>
 
 namespace ms
 {
@@ -135,7 +136,7 @@ namespace ms
 		}
 	}
 
-	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), wish_added(false), name_change_sn(0), storage_slots(0), character_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
+	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), wish_added(false), name_change_sn(0), present(std::exchange(cash_catalog::pending_present(), std::nullopt)), storage_slots(0), character_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
 	{
 		nl::node CashShop = NxFiles::ui_classic["CashShop.img"];
 		nl::node Base = CashShop["Base"];
@@ -1334,6 +1335,15 @@ namespace ms
 			string_format::split_number(text);
 			balance_labels[i].change_text(text);
 		}
+
+		// The first balance after entering for a present offers it, once
+		// (v83 478f81).
+		if (present)
+		{
+			cash_catalog::Present given = *present;
+			present.reset();
+			give(given);
+		}
 	}
 
 	void UICashShop::set_cash_items(const std::vector<CashItem>& items)
@@ -1464,6 +1474,46 @@ namespace ms
 					UI::get().emplace<UICashGift>(commodity);
 			}
 		);
+	}
+
+	void UICashShop::give(const cash_catalog::Present& given)
+	{
+		std::optional<Commodity> commodity = on_sale_as(catalog, given.sn);
+
+		// StringPool 0x24f.
+		if (!commodity)
+		{
+			UI::get().emplace<UIOk>("The item is not on sale now.", [](bool) {});
+			return;
+		}
+
+		show(*commodity);
+
+		// The birthday code first, then NX Prepaid must cover the price,
+		// then a message for the character it goes to.
+		UI::get().emplace<UICashGift>(*commodity, prepaid, given.to);
+	}
+
+	void UICashShop::show(const Commodity& commodity)
+	{
+		int32_t cat = category(commodity.sn);
+
+		if (cat <= MAIN || cat >= WISH_LIST)
+			return;
+
+		Tab target = static_cast<Tab>(cat);
+		size_t sub = static_cast<size_t>(subcategory(commodity.sn));
+
+		if (sub >= subtab_names[target].size())
+			return;
+
+		change_tab(target);
+		change_subtab(sub);
+
+		auto at = std::find_if(listed.begin(), listed.end(), [&commodity](const Commodity& c) { return c.sn == commodity.sn; });
+
+		if (at != listed.end())
+			change_page(static_cast<size_t>(at - listed.begin()) / PAGE_SIZE);
 	}
 
 	void UICashShop::take_out(const CashItem& item)

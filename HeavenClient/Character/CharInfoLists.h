@@ -73,6 +73,13 @@ namespace ms
 			return count > 1 ? name + " (" + std::to_string(count) + ")" : name;
 		}
 
+		// Whether a wish's row offers it as a present (FUN_008fe3fb): only on someone else's list, and not
+		// for 911xxxx, 5430xxx or slot extenders (555xxxx).
+		inline bool giftable(int32_t item_id, bool own)
+		{
+			return !own && item_id / 10000 != 911 && item_id / 1000 != 5430 && item_id / 10000 != 555;
+		}
+
 		// The rows of a list that can scroll, which shows `rows` at a time: the first can be from 0 to this.
 		inline int16_t last_top(size_t count, int16_t rows)
 		{
