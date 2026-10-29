@@ -45,11 +45,17 @@ namespace ms
 		constexpr uint16_t PROMPT_WIDTH = 280 - 2 * PROMPT_INSET_X;
 		// v83 draws a line's cap top about 3 below where it is drawn, we 9, so text goes up by the difference.
 		constexpr int16_t TEXT_RAISE = 6;
+		// A question taller than the box starts 6 higher and 2 further left, with a scroll bar (skin 3, VScr4)
+		// 280 - 3 right of that, 2 below its top and 103 tall (FUN_009acc20, 0x9a63f2). It has one step more
+		// than the eighths of the overflow, two at least, and each step moves the text 8 up (0x9ac4e2).
+		constexpr int16_t SCROLL_RISE = 6, SCROLL_SHIFT = 2, SCROLL_STEP = 8;
+		constexpr int16_t SLIDER_X = PROMPT_X - SCROLL_SHIFT + 280 - 3, SLIDER_Y = PROMPT_TOP - SCROLL_RISE + 2;
+		constexpr int16_t SLIDER_HEIGHT = PROMPT_ROWS + 3, SLIDER_ARROW = 13;
 	}
 
 	UIAvatarSelect::UIAvatarSelect(int32_t npcid, int8_t mt, const std::string &text, std::vector<int32_t> s)
 			: UIElement(Point<int16_t>(), Point<int16_t>(WIDTH, HEIGHT)), msgtype(mt), styles(std::move(s)),
-			  shown(0), bare(false)
+			  shown(0), bare(false), scrolls(false), scroll(0)
 	{
 		switch (styles.front() / 10000)
 		{
@@ -96,6 +102,17 @@ namespace ms
 
 		prompt = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted, PROMPT_WIDTH);
 		prompt.set_boxes(boxes);
+
+		if (int16_t overflow = prompt.height() - PROMPT_ROWS; overflow > 0)
+		{
+			int16_t steps = overflow / SCROLL_STEP;
+
+			scrolls = true;
+			slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(SLIDER_Y, SLIDER_Y + SLIDER_HEIGHT - SLIDER_ARROW),
+							SLIDER_X, 1, steps + (steps < 1 ? 2 : 1),
+							[this](bool upwards) { scroll += upwards ? -1 : 1; });
+		}
+
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 
 		show(0);
@@ -108,15 +125,28 @@ namespace ms
 
 		speaker.draw(position + Point<int16_t>(SPEAKER_X, SPEAKER_Y + speaker.height() / 2));
 
-		int16_t height = prompt.height();
-		int16_t top = height <= PROMPT_ROWS ? PROMPT_TOP + (PROMPT_ROWS - height - 6) / 2 : PROMPT_TOP - 6;
+		int16_t top = scrolls ? PROMPT_TOP - SCROLL_RISE : PROMPT_TOP + (PROMPT_ROWS - prompt.height() - 6) / 2;
+		int16_t left = scrolls ? PROMPT_X - SCROLL_SHIFT : PROMPT_X;
 
-		Point<int16_t> origin = position + Point<int16_t>(PROMPT_X + PROMPT_INSET_X, top + PROMPT_INSET_Y - TEXT_RAISE);
+		Point<int16_t> origin = position + Point<int16_t>(left + PROMPT_INSET_X,
+														  top + PROMPT_INSET_Y - TEXT_RAISE - scroll * SCROLL_STEP);
+		// A scrolling question shows only what is in its box.
+		Range<int16_t> clip = scrolls ? Range<int16_t>(position.y() + top, position.y() + top + PROMPT_ROWS + SCROLL_RISE)
+									  : Range<int16_t>(0, 0);
 
 		for (const auto &image : prompt_images)
-			image.texture.draw(origin + prompt.box_position(image.box) + image.anchor);
+		{
+			Point<int16_t> box = origin + prompt.box_position(image.box);
 
-		prompt.draw(origin);
+			if (!scrolls || (box.y() >= clip.first() && box.y() + image.size.y() <= clip.second()))
+				image.texture.draw(box + image.anchor);
+		}
+
+		prompt.draw(origin, clip);
+
+		if (scrolls)
+			slider.draw(position);
+
 		shadow.draw(position + SHADOW_AT);
 		look.draw(DrawArgument(position + FEET), alpha);
 
@@ -155,6 +185,29 @@ namespace ms
 			answer(false);
 		else if (keycode == KeyAction::Id::RETURN)
 			answer(true);
+	}
+
+	Cursor::State UIAvatarSelect::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		if (scrolls && slider.isenabled())
+			if (Cursor::State state = slider.send_cursor(cursorpos - position, clicked))
+				return state;
+
+		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIAvatarSelect::send_scroll(double yoffset)
+	{
+		if (scrolls && slider.isenabled())
+			slider.send_scroll(yoffset);
+	}
+
+	void UIAvatarSelect::remove_cursor()
+	{
+		UIElement::remove_cursor();
+
+		if (scrolls)
+			slider.remove_cursor();
 	}
 
 	UIElement::Type UIAvatarSelect::get_type() const
