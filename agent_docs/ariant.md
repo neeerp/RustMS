@@ -83,8 +83,45 @@ The rules are in `net::ariant`, the rosters in
     they have and need.
   - About: what the points are.
 
-All the lines are placeholders (`ariant_arena.*`). Not done yet: the HUD for
-the scoreboard and the results banner in HeavenClient.
+All the lines are placeholders (`ariant_arena.*`).
+
+## The client
+
+HeavenClient draws the battle as v83's arena field (fieldType 13) does
+(`Character/Ariant`, `AriantHandlers`, `UIAriant`):
+
+- **The board.** ARIANT_ARENA_USER_SCORE (0x129) is a count, then each
+  name and its total of jewels. The client keeps a row per name:
+  - a negative score takes that name's rows off;
+  - an empty name is skipped, and a GM (a job of group 8 or 9) keeps only
+    their own row;
+  - scores are capped at 9999;
+  - a new name goes at the end, with the icon `characterIcon/<n>`, where n
+    is the number of rows already there.
+
+  The rows are sorted by score, highest first, and ties keep their order.
+  They are drawn at the top left of the screen from (0, 30), 17 px apart:
+  - the icon at x 5;
+  - the name at x 21;
+  - the score as `%4d` at x 106.
+
+  The text is bold, 12 point and blue. There is no frame. The board shows
+  nothing until the first 0x129 and goes on a change of map.
+- **The results.** ARIANT_RESULT (0x9B) has no body:
+  - the board goes;
+  - `UIWindow.img/AriantMatch/Result` unrolls once at (400, 100) of the
+    screen (14 frames of 100 ms), with `Sound/UI.img/ScrollOpen`.
+
+  Once it is open, every row is written on it and fades in over a second.
+  The text is 12 point and black, the rows 26 px apart from y 104:
+  - the place from x 63, as "1st" to "6th" or a number past those;
+  - the name centred on x 140;
+  - the score centred on x 235.
+
+  The x values are measured from the scroll's left edge, 160 px left of
+  its anchor. Players with the same score share the lowest of their places:
+  10, 5, 5 and 1 are 1st, 3rd, 3rd and 4th. The scroll stays until the
+  player leaves the field. The art and icons are in `UIClassic.nx`.
 
 ## Deviations from Cosmic
 

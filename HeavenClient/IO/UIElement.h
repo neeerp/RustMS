@@ -152,6 +152,7 @@ namespace ms
 			DOJOHUD,
 			MONSTERCARNIVAL,
 			COCONUT,
+			ARIANT,
 			RAISE,
 			NUM_TYPES
 		};

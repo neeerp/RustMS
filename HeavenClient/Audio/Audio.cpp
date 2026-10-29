@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Audio.h"
 #include "SoundDistance.h"
+#include "WzSound.h"
 
 #include "../Configuration.h"
 #include "../Gameplay/FieldEffectRules.h"
@@ -271,7 +272,20 @@ namespace ms
 
 			// A field effect loads its sound each time it plays.
 			if (!Music::audiodb.count(id_s))
-				Music::audiodb[id_s] = new membuf(data + 82, ad.length() - 82);
+			{
+				std::vector<char> wave = wzsound::wave_file(data, ad.length());
+
+				if (wave.empty())
+				{
+					Music::audiodb[id_s] = new membuf(data + 82, ad.length() - 82);
+				}
+				else
+				{
+					// The buffer outlives the stream reading it.
+					auto kept = new std::vector<char>(std::move(wave));
+					Music::audiodb[id_s] = new membuf(kept->data(), kept->size());
+				}
+			}
 
 			return id;
 		} else
