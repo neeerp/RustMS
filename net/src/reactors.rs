@@ -417,6 +417,8 @@ pub fn action(reactor_id: i32) -> Action {
             count: crate::guild_quest::JR_GARGOYLES,
             at: crate::guild_quest::JR_GARGOYLES_AT,
         },
+        // MV's Lair's rock in the cave (`guyfawkesRock`): MV comes out.
+        crate::events::TREASURE_ROCK => Action::BringOut(crate::events::TREASURE_MV, 1),
         // Ludibrium's stage 3 boxes (`ludiMob1`): three Bloctopuses come out.
         2201001 => Action::BringOut(LPQ_BLOCTOPUS, 3),
         // Stage 7's (`ludiMob2`), which take the other pass, and the
@@ -1282,12 +1284,14 @@ mod tests {
     }
 
     #[test]
-    fn mvs_lair_s_dolls_change_places_and_the_letter_ones_drop() {
+    fn mvs_lair_s_dolls_change_places_its_letter_ones_drop_and_its_rock_holds_mv() {
         use crate::events::{TREASURE_CAVE, TREASURE_DUNGEON};
         assert!(shuffled(TREASURE_DUNGEON) && !shuffled(TREASURE_CAVE));
         assert!(shuffles(6741015) && shuffles(6741016));
         assert_eq!(action(6741015), Action::Drops);
         assert_eq!(action(6741016), Action::Drops);
+        use crate::events::{TREASURE_MV, TREASURE_ROCK};
+        assert_eq!(action(TREASURE_ROCK), Action::BringOut(TREASURE_MV, 1));
     }
 
     #[test]

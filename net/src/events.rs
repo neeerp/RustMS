@@ -448,6 +448,8 @@ pub struct Bonus {
     /// Whether the win itself takes the team there, rather than the leader
     /// later.
     pub on_win: bool,
+    /// How many seconds after the win it does so.
+    pub after: u64,
     /// A map a team of couples (each member's partner on it) plays first,
     /// and for how many seconds; the leader takes it on to `map` from
     /// there, and once its time is up everyone goes on to `exit`.
@@ -610,6 +612,7 @@ pub const HPQ: Event = Event {
         exit: 910_010_400,
         seconds: 5 * 60,
         on_win: false,
+        after: 0,
         couples: None,
     }),
     blessings: &[],
@@ -680,6 +683,7 @@ pub const LPQ: Event = Event {
         exit: 922_011_100,
         seconds: 60,
         on_win: true,
+        after: 0,
         couples: None,
     }),
     blessings: &[],
@@ -1229,6 +1233,7 @@ pub const GUILD_QUEST: Event = Event {
         exit: crate::guild_quest::RETURNING_PATH,
         seconds: 30,
         on_win: true,
+        after: 0,
         couples: None,
     }),
     blessings: &[],
@@ -1715,12 +1720,18 @@ pub const SECRET_LETTER: i32 = 4_032_118;
 /// many he takes to open the tunnel to the cave (Cosmic `9220020`).
 pub const TREASURE_CHARLES: i32 = 9_220_020;
 pub const SECRET_LETTERS_WANTED: i16 = 15;
+/// The rock in the cave the team breaks to bring out MV, whose fall wins
+/// the run (Cosmic reactor `6741001`, `monsterKilled`).
+pub const TREASURE_ROCK: i32 = 6_741_001;
+pub const TREASURE_MV: i32 = 9_400_589;
 
 /// MV's Lair (Cosmic `TreasurePQ`, on what is left of a 2007 Guy Fawkes
 /// event in the client's data): four to six of a party, all of level 140
 /// or more, in the lobby with their leader, have 45 minutes for its two
 /// stages. The leader hands Charles the letters to clear the first, which
-/// opens the tunnel on. The numbers are Cosmic's; the data has none
+/// opens the tunnel on; MV's fall in the cave wins it, and ten seconds
+/// later the team goes on to the treasure room for ten minutes. The
+/// numbers are Cosmic's; the data has none
 /// (`v83ref/reports/b300-treasure-elnath-pq.md`).
 pub const TREASURE: Event = Event {
     lobby: TREASURE_LOBBY,
@@ -1739,7 +1750,7 @@ pub const TREASURE: Event = Event {
     stride: 1,
     stage_maps: &[TREASURE_DUNGEON, TREASURE_CAVE],
     talk_clears: &[],
-    member_clears: &[],
+    member_clears: &[2],
     clear_portals: &[],
     stage_copies: &[],
     gated: &[],
@@ -1757,7 +1768,14 @@ pub const TREASURE: Event = Event {
     }],
     gates: false,
     clear_map: None,
-    bonus: None,
+    bonus: Some(Bonus {
+        map: TREASURE_ROOM,
+        exit: TREASURE_LOBBY,
+        seconds: 10 * 60,
+        on_win: true,
+        after: 10,
+        couples: None,
+    }),
     blessings: &[],
     squad: false,
     gate: &[],
@@ -1878,6 +1896,9 @@ pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
     }
     if holiday_arena(map_id).is_some_and(|level| holiday_scrooge(level) == mob_id) {
         return Some(HOLIDAY_SCROOGE_STAGE);
+    }
+    if map_id == TREASURE_CAVE && mob_id == TREASURE_MV {
+        return Some(2);
     }
     (map_id == ELLIN_STAGES[5] && mob_id == ELLIN_GOLEM_LAST).then_some(6)
 }
@@ -2407,6 +2428,7 @@ pub const AMORIA: Event = Event {
         exit: AMORIA_EXIT,
         seconds: 60,
         on_win: false,
+        after: 0,
         couples: Some((AMORIA_COUPLES_BONUS, 2 * 60)),
     }),
     blessings: &[],
@@ -6994,6 +7016,23 @@ mod tests {
         }
         assert_eq!(TREASURE.stage_map(2), TREASURE_CAVE);
         assert_eq!(TREASURE.duration(), scaled(Duration::from_secs(45 * 60)));
+        // MV's fall in the cave wins it, whoever sees it, and ten seconds
+        // on the team goes to the treasure room for ten minutes.
+        assert_eq!(cleared_by_boss(TREASURE_CAVE, TREASURE_MV), Some(2));
+        assert_eq!(cleared_by_boss(TREASURE_ROOM, TREASURE_MV), None);
+        assert_eq!(TREASURE.last_stage(), 2);
+        assert!(TREASURE.member_clears.contains(&2));
+        let bonus = TREASURE.bonus.as_ref().unwrap();
+        assert_eq!(
+            (
+                bonus.map,
+                bonus.exit,
+                bonus.seconds,
+                bonus.on_win,
+                bonus.after
+            ),
+            (TREASURE_ROOM, TREASURE_LOBBY, 600, true, 10)
+        );
     }
 
     #[test]
