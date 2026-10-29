@@ -164,7 +164,8 @@ namespace ms
 									  std::tuple(Buttons::BT_UNION_SAVE, "BtSave", GRADE_SAVE) })
 		{
 			nl::node button = GuildGrade[name];
-			buttons[id] = std::make_unique<MapleButton>(button, UNION + pos + Texture(button["normal"]["0"]).get_origin());
+			panel_button_home[id] = UNION + pos + Texture(button["normal"]["0"]).get_origin();
+			buttons[id] = std::make_unique<MapleButton>(button, panel_button_home[id]);
 			buttons[id]->set_active(false);
 		}
 	}
@@ -230,7 +231,7 @@ namespace ms
 
 		scroll_alliance(alliance_scroll);
 
-		if (union_shown)
+		if (union_slide.alive)
 			rebuild_union();
 	}
 
@@ -527,10 +528,10 @@ namespace ms
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
 
-		if (union_shown && clicked)
+		if (union_slide.alive && clicked && cursor_relative.x() >= dimension.x())
 		{
 			// Anyone may pick a rank (0x9181b2); a miss keeps the pick.
-			Point<int16_t> in_panel = cursor_relative - UNION;
+			Point<int16_t> in_panel = cursor_relative - union_panel();
 			int16_t x = in_panel.x() - GRADE_ROW_LEFT;
 			int16_t y = in_panel.y() - UNION_ROWS;
 			int16_t rows = static_cast<int16_t>(union_titles.size());
@@ -690,7 +691,7 @@ namespace ms
 
 				break;
 			case Buttons::BT_ALLIANCE_INFO:
-				if (union_shown)
+				if (union_slide.out)
 					close_union();
 				else
 					open_union();
@@ -774,26 +775,27 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
-	// Each opening starts over from the alliance's titles.
+	// Each opening builds the panel anew from the alliance's titles, even
+	// one still sliding back (FUN_0091e66f).
 	void UIUserList::open_union()
 	{
-		union_shown = true;
+		union_slide.open(false);
 		union_titles = alliance.get_data().titles;
 		union_picked = 0;
 
-		buttons[Buttons::BT_UNION_MODIFY]->set_active(true);
-		buttons[Buttons::BT_UNION_SAVE]->set_active(true);
-
+		place_panel_buttons();
 		rebuild_union();
 		update_buttons();
 	}
 
 	void UIUserList::close_union()
 	{
-		union_shown = false;
+		union_slide.close();
+	}
 
-		buttons[Buttons::BT_UNION_MODIFY]->set_active(false);
-		buttons[Buttons::BT_UNION_SAVE]->set_active(false);
+	Point<int16_t> UIUserList::union_panel() const
+	{
+		return UNION + Point<int16_t>(union_slide.x - RankPanelSlide::TRAVEL, 0);
 	}
 
 	void UIUserList::rebuild_union()
@@ -811,7 +813,7 @@ namespace ms
 
 	void UIUserList::draw_union() const
 	{
-		Point<int16_t> panel = position + UNION;
+		Point<int16_t> panel = position + union_panel();
 
 		union_background.draw(panel);
 

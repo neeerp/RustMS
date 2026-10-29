@@ -1,6 +1,7 @@
 #include "../Character/Guild.h"
 #include "../Character/GuildEmblemRules.h"
 #include "../Character/GuildSort.h"
+#include "../IO/UITypes/RankPanelSlide.h"
 #include "../Net/Handlers/Helpers/AllianceNews.h"
 #include "../Net/Handlers/Helpers/GuildParser.h"
 #include <array>
@@ -592,6 +593,52 @@ int main()
 			require(names({ JOB, true }, false) == "alpha charlie delta Bravo ", "jobs by id");
 			require(names({ TITLE, true }, false) == "Bravo alpha charlie delta ", "titles by rank");
 			require(names({ TITLE, true }, true) == "charlie delta alpha Bravo ", "the alliance's by its rank");
+		}
+
+		// The rank panels' slide (b333), in the client's 8 ms steps.
+		{
+			auto run = [](RankPanelSlide& slide, int steps) {
+				for (int i = 0; i < steps; i++)
+					slide.update(8);
+			};
+
+			RankPanelSlide slide;
+			slide.close();
+			require(!slide.alive, "nothing to slide back");
+			require(slide.open(true), "the first opening builds the panel");
+			require(slide.alive && slide.out && slide.x == 0, "it starts under the window");
+			run(slide, 19);
+			require(slide.x == 152, "a pixel a millisecond");
+			run(slide, 20);
+			require(slide.x == RankPanelSlide::TRAVEL, "311 out, and no further");
+			run(slide, 100);
+			require(slide.alive && slide.x == RankPanelSlide::TRAVEL, "an open panel stays");
+
+			// Back from 311: 9330 down 320 a step goes below 0 in the 30th,
+			// at 240 ms, once the window hides it.
+			slide.close();
+			run(slide, 29);
+			require(slide.alive && slide.x == 79 && !slide.out, "sliding back");
+			run(slide, 1);
+			require(!slide.alive, "dropped once hidden");
+
+			// Caught on its way back, the same panel turns about.
+			slide.open(true);
+			run(slide, 39);
+			slide.close();
+			run(slide, 10);
+			require(slide.x == 231, "80 back");
+			require(!slide.open(true), "the guild's is the same panel");
+			require(slide.x == 231 && slide.out, "from where it was");
+			run(slide, 10);
+			require(slide.x == 311 && slide.alive, "80 out again, and it stays");
+
+			slide.close();
+			run(slide, 5);
+			require(slide.open(false) && slide.x == 0, "the alliance's is built anew");
+
+			slide.drop();
+			require(!slide.alive && !slide.out && slide.x == 0, "dropped with the window");
 		}
 
 		std::cout << "Guild passed\n";

@@ -282,7 +282,8 @@ namespace ms
 									  std::tuple(Buttons::BT_GRADE_SAVE, "BtSave", GRADE_SAVE) })
 		{
 			nl::node button = GuildGrade[name];
-			buttons[id] = std::make_unique<MapleButton>(button, GRADE + pos + Texture(button["normal"]["0"]).get_origin());
+			panel_button_home[id] = GRADE + pos + Texture(button["normal"]["0"]).get_origin();
+			buttons[id] = std::make_unique<MapleButton>(button, panel_button_home[id]);
 			buttons[id]->set_active(false);
 		}
 
@@ -302,8 +303,19 @@ namespace ms
 		change_tab(tab);
 	}
 
-	void UIUserList::draw(float alpha) const
+	void UIUserList::draw(float) const
 	{
+		// The rank panels are under the window, which hides them until they
+		// slide out of its right side (b333).
+		if (grade_slide.alive)
+			draw_grade();
+
+		if (union_slide.alive)
+			draw_union();
+
+		for (auto& [id, home] : panel_button_home)
+			buttons.at(id)->draw(position);
+
 		if (tab == Tab::FRIEND)
 			friend_background.draw(position);
 		else if (tab == Tab::GUILD || tab == Tab::ALLIANCE)
@@ -325,28 +337,24 @@ namespace ms
 		else if (tab == Tab::GUILD)
 		{
 			draw_guild();
-
-			if (grade_shown)
-				draw_grade();
 		}
 		else if (tab == Tab::ALLIANCE)
 		{
 			draw_alliance();
-
-			if (union_shown)
-				draw_union();
 		}
 		else if (tab == Tab::BLACKLIST)
 		{
 			draw_blacklist();
 		}
 
-		UIElement::draw_buttons(alpha);
+		for (auto& [id, button] : buttons)
+			if (!panel_button_home.count(id))
+				button->draw(position);
 	}
 
 	void UIUserList::draw_grade() const
 	{
-		Point<int16_t> panel = position + GRADE;
+		Point<int16_t> panel = position + grade_panel();
 
 		grade_background.draw(panel);
 
@@ -664,6 +672,10 @@ namespace ms
 					union_ticker_x = UNION_TICKER_START;
 		}
 
+		grade_slide.update(Constants::TIMESTEP);
+		union_slide.update(Constants::TIMESTEP);
+		place_panel_buttons();
+
 		update_buttons();
 	}
 
@@ -671,8 +683,7 @@ namespace ms
 	{
 		if (active)
 		{
-			close_grade();
-			close_union();
+			drop_panels();
 			UIGuildBBS::dismiss();
 		}
 
@@ -681,13 +692,13 @@ namespace ms
 
 	bool UIUserList::is_in_range(Point<int16_t> cursorpos) const
 	{
-		Point<int16_t> panel = position + GRADE;
-		Point<int16_t> union_panel = position + UNION;
+		Point<int16_t> grade = position + grade_panel();
+		Point<int16_t> unions = position + union_panel();
 
 		return UIElement::is_in_range(cursorpos) ||
-			   (grade_shown && Rectangle<int16_t>(panel, panel + grade_background.get_dimensions()).contains(cursorpos)) ||
-			   (union_shown &&
-				Rectangle<int16_t>(union_panel, union_panel + union_background.get_dimensions()).contains(cursorpos));
+			   (grade_slide.alive && Rectangle<int16_t>(grade, grade + grade_background.get_dimensions()).contains(cursorpos)) ||
+			   (union_slide.alive &&
+				Rectangle<int16_t>(unions, unions + union_background.get_dimensions()).contains(cursorpos));
 	}
 
 	void UIUserList::remove_cursor()
@@ -698,6 +709,29 @@ namespace ms
 	}
 
 	Cursor::State UIUserList::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		// The window hides what of the panels is still under it, buttons and
+		// all.
+		bool covered = UIElement::is_in_range(cursorpos);
+
+		if (covered)
+			for (auto& [id, home] : panel_button_home)
+			{
+				buttons[id]->set_active(false);
+
+				if (buttons[id]->get_state() == Button::State::MOUSEOVER)
+					buttons[id]->set_state(Button::State::NORMAL);
+			}
+
+		Cursor::State state = list_cursor(clicked, cursorpos);
+
+		if (covered)
+			place_panel_buttons();
+
+		return state;
+	}
+
+	Cursor::State UIUserList::list_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
 
@@ -715,10 +749,11 @@ namespace ms
 
 		Point<int16_t> cursor_relative = cursorpos - position;
 
-		if (tab == Tab::GUILD && grade_shown && clicked)
+		// Only the part of a panel out of the window's side is there to click.
+		if (tab == Tab::GUILD && grade_slide.alive && clicked && cursor_relative.x() >= dimension.x())
 		{
 			// Anyone may pick a rank (FUN_009172aa); a miss keeps the pick.
-			Point<int16_t> in_panel = cursor_relative - GRADE;
+			Point<int16_t> in_panel = cursor_relative - grade_panel();
 			int16_t x = in_panel.x() - GRADE_ROW_LEFT;
 			int16_t y = in_panel.y() - GRADE_ROWS;
 			int16_t rows = static_cast<int16_t>(grade_titles.size());
@@ -915,8 +950,7 @@ namespace ms
 		{
 			if (escape)
 			{
-				close_grade();
-				close_union();
+				drop_panels();
 				UIGuildBBS::dismiss();
 				deactivate();
 			}
@@ -1009,8 +1043,7 @@ namespace ms
 		switch (buttonid)
 		{
 			case Buttons::BT_CLOSE:
-				close_grade();
-				close_union();
+				drop_panels();
 				UIGuildBBS::dismiss();
 				deactivate();
 				break;
@@ -1213,8 +1246,9 @@ namespace ms
 			case Buttons::BT_GUILD_BBS:
 				UIGuildBBS::open();
 				break;
+			// The button goes by where the panel is headed (FUN_0091d170).
 			case Buttons::BT_GUILD_INFO:
-				if (grade_shown)
+				if (grade_slide.out)
 					close_grade();
 				else
 					open_grade();
@@ -1827,7 +1861,7 @@ namespace ms
 
 		scroll_guild(guild_scroll);
 
-		if (grade_shown)
+		if (grade_slide.alive)
 			rebuild_grade();
 	}
 
@@ -1949,26 +1983,48 @@ namespace ms
 		return member && member->online ? member : nullptr;
 	}
 
-	// Each opening starts over from the guild's titles (FUN_00916569).
+	// A new panel starts over from the guild's titles (FUN_00916569); one
+	// caught sliding back keeps its edits.
 	void UIUserList::open_grade()
 	{
-		grade_shown = true;
-		grade_titles = guild.get_data().titles;
-		grade_picked = 0;
+		if (grade_slide.open(true))
+		{
+			grade_titles = guild.get_data().titles;
+			grade_picked = 0;
+		}
 
-		buttons[Buttons::BT_GRADE_MODIFY]->set_active(true);
-		buttons[Buttons::BT_GRADE_SAVE]->set_active(true);
-
+		place_panel_buttons();
 		rebuild_grade();
 		update_buttons();
 	}
 
 	void UIUserList::close_grade()
 	{
-		grade_shown = false;
+		grade_slide.close();
+	}
 
-		buttons[Buttons::BT_GRADE_MODIFY]->set_active(false);
-		buttons[Buttons::BT_GRADE_SAVE]->set_active(false);
+	Point<int16_t> UIUserList::grade_panel() const
+	{
+		return GRADE + Point<int16_t>(grade_slide.x - RankPanelSlide::TRAVEL, 0);
+	}
+
+	void UIUserList::drop_panels()
+	{
+		grade_slide.drop();
+		union_slide.drop();
+		place_panel_buttons();
+	}
+
+	void UIUserList::place_panel_buttons()
+	{
+		for (auto [id, home] : panel_button_home)
+		{
+			bool grade = id == Buttons::BT_GRADE_MODIFY || id == Buttons::BT_GRADE_SAVE;
+			const RankPanelSlide& slide = grade ? grade_slide : union_slide;
+
+			buttons[id]->set_position(home + Point<int16_t>(slide.x - RankPanelSlide::TRAVEL, 0));
+			buttons[id]->set_active(slide.alive);
+		}
 	}
 
 	void UIUserList::rebuild_grade()

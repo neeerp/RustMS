@@ -506,6 +506,17 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     titles taken when it opens; it closes with the window, on Esc, or on
     another tab. Leaving the guild leaves it open with only its
     background.
+  - The panel slides (`IO/UITypes/RankPanelSlide.h`, report b333): it is
+    made at the window's left edge, behind the window, and its x runs to
+    311 at a pixel a millisecond, with no easing, then back the same way.
+    INFO goes by where it is headed, so a click mid-slide turns it about
+    from where it is. Sliding back, it is dropped after three quarters
+    of a millisecond for each pixel it had to go (v83 counts the distance
+    down by 40 a 30 ms tick): about 240 ms from 311, as the window hides
+    it. Opened before then it is the same panel, edits
+    kept. Another tab slides it back; the window's closing or Esc takes
+    it at once. Its buttons ride with it, and only what is out of the
+    window's side takes clicks.
   - Clicking a column heading of a folded-out section sorts that section
     (`Character/GuildSort.h`, v83's FUN_00911701 and FUN_00911fb6): the
     first click sorts up by it, the next down, and the heading lights up
@@ -556,7 +567,9 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     send ops 2 and 6 (guild id, then alliance id); UP and DOWN send op 9
     without asking; NOTICE sends op 10 as the guild's does.
   - INFO opens the rank panel at (311, 85) on `GuildUnion/backgrnd` with
-    the guild panel's art and no GP. Only the alliance's master may
+    the guild panel's art and no GP. It slides as the guild's does, but
+    every opening builds it anew, edits lost, as v83's FUN_0091e66f
+    does. Only the alliance's master may
     MODIFY and SAVE (op 8); a rank anyone in any of the guilds holds
     keeps its title, and SAVE compares the titles matching case.
 - 0x49 opens the ranking (`UIGuildRank`, v83's FUN_005958c0, report b181)
@@ -576,11 +589,8 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
 
 ## Not implemented
 
-- The rank panel's slide in and out. v83 keeps the panel's edits if it is
-  opened again while sliding back; this one always starts over. A title
-  too short closes the prompt, says so and asks again, where v83's prompt
+- A title too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- The alliance's rank panel slides no more than the guild's.
 - A joining guild's members, and new members of an allied guild, always
   start at alliance rank 5, even while rank 5 has no title.
 - The deny's reason (invitations switched off, another card showing,
