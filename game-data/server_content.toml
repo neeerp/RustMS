@@ -126,6 +126,7 @@ unsourced = [
     "alliance.expelled",
     "alliance.master",
     "alliance.rank",
+    "duey.gm_refused",
     "ships.sell.ask",
     "ships.sell.decline",
     "ships.sell.short",

@@ -29,7 +29,7 @@ pub const BASE_FEE: i32 = 5000;
 pub const INBOX_LIMIT: usize = 10;
 /// The longest message a quick send carries, as the client's edit allows.
 pub const MESSAGE_LIMIT: usize = 100;
-/// Up to this level a character may send at most `LOW_LEVEL_MESOS`.
+/// Up to this level a character may send at most `LOW_LEVEL_MESOS` a day.
 pub const LOW_LEVEL: u8 = 15;
 pub const LOW_LEVEL_MESOS: i32 = 1_000_000;
 
@@ -103,6 +103,11 @@ pub fn tax(mesos: i32) -> i32 {
     (i64::from(mesos) * per_mille / 1000) as i32
 }
 
+/// The most mesos `player` may send in a day, if there is a most.
+pub fn daily_mesos(player: &Player) -> Option<i32> {
+    (player.stats.level <= LOW_LEVEL).then_some(LOW_LEVEL_MESOS)
+}
+
 /// What sending `mesos` costs on top of them.
 pub fn fee(mesos: i32, quick: bool) -> i32 {
     tax(mesos) + if quick { 0 } else { BASE_FEE }
@@ -168,7 +173,7 @@ pub fn send(
     if item.is_none() && mesos == 0 {
         return Ok(Err(result::INCORRECT));
     }
-    if player.stats.level <= LOW_LEVEL && mesos > LOW_LEVEL_MESOS {
+    if daily_mesos(player).is_some_and(|most| mesos > most) {
         return Ok(Err(result::LOW_LEVEL_LIMIT));
     }
     let cost = i64::from(mesos) + i64::from(fee(mesos, quick));
@@ -345,6 +350,12 @@ mod tests {
         );
         assert!(send(&mut low, 0, 0, 0, 1_000_000, false).unwrap().is_ok());
         assert_eq!(low.meso, 3_000_000 - 1_000_000 - 18_000 - 5_000);
+    }
+
+    #[test]
+    fn only_low_levels_have_a_most_a_day() {
+        assert_eq!(daily_mesos(&player(0, LOW_LEVEL)), Some(LOW_LEVEL_MESOS));
+        assert_eq!(daily_mesos(&player(0, LOW_LEVEL + 1)), None);
     }
 
     #[test]

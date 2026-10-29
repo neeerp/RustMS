@@ -1377,12 +1377,18 @@ DUEY_ACTION (`0x41`) starts with an op byte:
   below 100,000, then 0.8% rising to 6%). A quick send uses up a Quick
   Delivery Coupon (5330000) found in the Cash bag instead of the 5000. Its
   message is at most 100 characters. Refusals:
+  - a GM below the admins (`gm_level` 1 or 2, `policy::may_send_parcels`)
+    gets `0x0b` and a pink line, as Cosmic refuses GMs below its
+    `MINIMUM_GM_LEVEL_TO_USE_DUEY`, so what GMs make stays with them;
   - an unknown receiver gets `0x0c`, and the sender or another character
     of the same account `0x0d`;
   - a receiver with 10 parcels waiting gets `0x0e`, and one with the same
     one-of-a-kind item waiting `0x10`;
-  - at level 15 or below, more than 1,000,000 mesos in one send gets
-    `0x11`;
+  - at level 15 or below, more than 1,000,000 mesos in a day gets `0x11`,
+    the client's "may only trade 1 million mesos per day" (the client only
+    checks one send). Such a character's mesos sent today, by the
+    database's date, are kept in `parcel_mesos_sent` and counted in the
+    send's transaction;
   - too few mesos gets `0x0a`;
   - anything else wrong (bad slot or quantity, an item that can't go,
     nothing chosen, no coupon) gets `0x0b`.
@@ -1410,8 +1416,7 @@ any parcel hasn't been announced, and they are then all marked announced.
 An online receiver is told at once through the directory, and the parcel is
 marked announced. They get `0x18`, then `0x19`, which shows the notifier or
 brings an open window to the front. Expired parcels are deleted, not
-returned to their sender. Not done: the GM refusal and a per-day limit for
-low levels.
+returned to their sender.
 
 The client's window is `UIDuey`, from v83's CParcelDlg (layout in `v83ref`
 reports b028 and b030). PARCEL is handled by `ParcelHandler`, and
@@ -1891,8 +1896,10 @@ While the player is in alert stance, `0x11` says to catch their breath.
 
 Permits and controllers are sold in the Cash Shop.
 
-Not done yet: the blacklist's storage (it lasts as long as the merchant
-stays in memory).
+The blacklist is kept with the merchant (`hired_merchants.blacklist`): it
+is written as the merchant opens, and again when the owner leaves a
+maintenance in which they changed it. A field that starts reads it back
+with its merchants.
 
 With a cash item listed, the client asks for the birthday (SP `0x33a`)
 and opens with `{0xe, 0xb, room type, birthday}` in place of `{0xb, 1}`,

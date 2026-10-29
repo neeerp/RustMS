@@ -47,6 +47,21 @@ const CHAT_KEPT: usize = 50;
 const VISITS_KEPT: usize = 50;
 /// The most names a blacklist holds (0x519611).
 const BLACKLIST_MAX: usize = 20;
+
+/// The blacklist `names` make: each name once, ignoring case, and no more
+/// than it holds. The database keeps no NULs in text.
+pub fn blacklist_of(names: Vec<String>) -> Vec<String> {
+    let mut blacklist: Vec<String> = Vec::new();
+    for name in names {
+        if blacklist.len() < BLACKLIST_MAX
+            && !name.contains('\0')
+            && !blacklist.iter().any(|b| b.eq_ignore_ascii_case(&name))
+        {
+            blacklist.push(name);
+        }
+    }
+    blacklist
+}
 /// How close to another merchant or a personal shop a merchant may be
 /// set up: a server rule, as the client doesn't check (report 165 §5).
 pub const SPACING: i32 = 150;
@@ -195,6 +210,8 @@ struct Merchant {
     rereading: u32,
     chat: Vec<(String, u8)>,
     blacklist: Vec<String>,
+    /// Whether the owner changed the blacklist in this maintenance.
+    blacklist_changed: bool,
     visits: Vec<(String, Duration)>,
 }
 
@@ -209,6 +226,7 @@ impl Merchant {
             rereading: 0,
             chat: Vec::new(),
             blacklist,
+            blacklist_changed: false,
             visits: Vec::new(),
         }
     }
@@ -298,6 +316,7 @@ pub struct Merchants {
     next_reservation: u64,
     shown: Vec<Shown>,
     rereads: Vec<i32>,
+    blacklists: Vec<(i32, Vec<String>)>,
     /// The spots kept for players setting up a merchant, which stands
     /// nowhere yet.
     held_stands: HashMap<ClientId, (i16, i16)>,
@@ -337,6 +356,12 @@ impl Merchants {
     /// What everyone on the field must see change, since last asked.
     pub fn take_shown(&mut self) -> Vec<Shown> {
         std::mem::take(&mut self.shown)
+    }
+
+    /// The blacklists changed in maintenance, by owner, to save, since last
+    /// asked.
+    pub fn take_blacklists(&mut self) -> Vec<(i32, Vec<String>)> {
+        std::mem::take(&mut self.blacklists)
     }
 
     /// The merchants to read from the database again, since last asked;
@@ -443,12 +468,12 @@ impl Merchants {
 
     /// The merchants read from the database when the field started. One
     /// already here, as when its owner placed it meanwhile, stays.
-    pub fn load(&mut self, merchants: Vec<HiredMerchant>) {
-        for data in merchants {
+    pub fn load(&mut self, merchants: Vec<(HiredMerchant, Vec<String>)>) {
+        for (data, blacklist) in merchants {
             let owner = data.owner_id;
             if !self.merchants.contains_key(&owner) {
                 self.merchants
-                    .insert(owner, Merchant::new(data, Vec::new()));
+                    .insert(owner, Merchant::new(data, blacklist_of(blacklist)));
                 self.shown.push(Shown::Spawn(owner));
             }
         }
@@ -461,16 +486,8 @@ impl Merchants {
         if self.merchants.contains_key(&owner) {
             return;
         }
-        let mut blacklist: Vec<String> = Vec::new();
-        for name in names {
-            if blacklist.len() < BLACKLIST_MAX
-                && !blacklist.iter().any(|b| b.eq_ignore_ascii_case(&name))
-            {
-                blacklist.push(name);
-            }
-        }
         self.merchants
-            .insert(owner, Merchant::new(merchant, blacklist));
+            .insert(owner, Merchant::new(merchant, blacklist_of(names)));
         self.shown.push(Shown::Spawn(owner));
     }
 
@@ -799,19 +816,28 @@ impl Merchants {
         out
     }
 
+    /// The owner bars `name`. The blacklist is saved once maintenance is
+    /// over.
     pub fn blacklist_add(&mut self, from: ClientId, name: String) {
         if let Some(merchant) = self.maintained(from) {
-            if !merchant.barred(&name) && merchant.blacklist.len() < BLACKLIST_MAX {
+            if !merchant.barred(&name)
+                && merchant.blacklist.len() < BLACKLIST_MAX
+                && !name.contains('\0')
+            {
                 merchant.blacklist.push(name);
+                merchant.blacklist_changed = true;
             }
         }
     }
 
+    /// The owner lets `name` in again; as `blacklist_add`.
     pub fn blacklist_remove(&mut self, from: ClientId, name: &str) {
         if let Some(merchant) = self.maintained(from) {
+            let before = merchant.blacklist.len();
             merchant
                 .blacklist
                 .retain(|barred| !barred.eq_ignore_ascii_case(name));
+            merchant.blacklist_changed |= merchant.blacklist.len() != before;
         }
     }
 
@@ -826,6 +852,9 @@ impl Merchants {
         };
         merchant.owner = None;
         merchant.waiting = None;
+        if std::mem::take(&mut merchant.blacklist_changed) {
+            self.blacklists.push((owner, merchant.blacklist.clone()));
+        }
         self.shown.push(Shown::Balloon(owner));
     }
 
@@ -1157,6 +1186,34 @@ mod tests {
     }
 
     #[test]
+    fn a_loaded_merchant_keeps_its_saved_blacklist() {
+        let mut merchants = Merchants::default();
+        let saved = ["Mallory", "mallory", "Nul\0"].map(String::from).to_vec();
+        merchants.load(vec![(merchant(SystemTime::now()), saved)]);
+        assert_eq!(merchants.merchants[&OWNER].blacklist, ["Mallory"]);
+        assert_eq!(merchants.go_result(sn(OWNER), "MALLORY"), go_result::BARRED);
+    }
+
+    #[test]
+    fn a_blacklist_changed_in_maintenance_is_saved_after() {
+        let mut merchants = placed();
+        visit(&mut merchants, ALICE, OWNER, "Owner");
+        merchants.leave(ALICE, Instant::now());
+        assert!(merchants.take_blacklists().is_empty(), "unchanged");
+
+        visit(&mut merchants, ALICE, OWNER, "Owner");
+        merchants.blacklist_add(ALICE, "Eve".into());
+        merchants.blacklist_remove(ALICE, "mallory");
+        assert!(merchants.take_blacklists().is_empty(), "still inside");
+        merchants.leave(ALICE, Instant::now());
+        assert_eq!(
+            merchants.take_blacklists(),
+            vec![(OWNER, vec!["Eve".to_string()])]
+        );
+        assert_eq!(merchants.go_result(sn(OWNER), "Eve"), go_result::BARRED);
+    }
+
+    #[test]
     fn a_purchase_is_held_then_credited_net_of_tax() {
         let mut merchants = placed();
         visit(&mut merchants, BOB, 2, "Bob");
@@ -1356,7 +1413,7 @@ mod tests {
     fn a_merchant_whose_time_is_up_goes() {
         let mut merchants = Merchants::default();
         let opened = SystemTime::now() - game::hired_merchant::LIFETIME;
-        merchants.load(vec![merchant(opened)]);
+        merchants.load(vec![(merchant(opened), Vec::new())]);
         visit(&mut merchants, BOB, 2, "Bob");
         merchants.take_shown();
         let (out, due) = merchants.expire(SystemTime::now());

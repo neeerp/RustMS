@@ -3,7 +3,8 @@
 //! it was sent; the receiver's next look at their parcels removes it.
 
 use crate::player::{equipment_stats_row, write_player};
-use crate::schema::{characters, parcel_equipment_stats, parcels};
+use crate::schema::{characters, parcel_equipment_stats, parcel_mesos_sent, parcels};
+use diesel::dsl::sql;
 use diesel::prelude::*;
 use game::{EquipStats, Item, Player};
 use std::time::{Duration, SystemTime};
@@ -175,21 +176,68 @@ pub enum Sent {
     InboxFull,
     /// A parcel waiting for the receiver has this one-of-a-kind item.
     OnlyOneWaiting,
+    /// The sender may send no more mesos today.
+    DailyLimit,
 }
 
 /// Leave `new` for its receiver and save `sender` (who paid for it and
 /// gave up its item) in one transaction, unless the receiver already has
 /// `limit` parcels waiting, or the item is one of a kind (`only`) and a
-/// waiting parcel has one.
-pub fn send(new: &NewParcel, only: bool, limit: i64, sender: &Player) -> crate::Result<Sent> {
+/// waiting parcel has one. With a `daily` cap, the sender's mesos sent today
+/// may not pass it, and count these.
+pub fn send(
+    new: &NewParcel,
+    only: bool,
+    limit: i64,
+    daily: Option<i32>,
+    sender: &Player,
+) -> crate::Result<Sent> {
     let mut conn = crate::connection()?;
+    let daily = daily.filter(|_| new.mesos > 0);
     Ok(conn.transaction(|conn| -> QueryResult<_> {
+        if let Some(cap) = daily {
+            let today = sent_today(conn, sender.id())?;
+            if i64::from(today) + i64::from(new.mesos) > i64::from(cap) {
+                return Ok(Sent::DailyLimit);
+            }
+        }
         let sent = insert(conn, new, only, limit)?;
         if let Sent::Sent(_) = sent {
             write_player(conn, sender)?;
+            if daily.is_some() {
+                count_sent(conn, sender.id(), new.mesos)?;
+            }
         }
         Ok(sent)
     })?)
+}
+
+/// The mesos `character` has sent today.
+fn sent_today(conn: &mut PgConnection, character: i32) -> QueryResult<i32> {
+    Ok(parcel_mesos_sent::table
+        .find(character)
+        .filter(parcel_mesos_sent::day.eq(sql::<diesel::sql_types::Date>("CURRENT_DATE")))
+        .select(parcel_mesos_sent::mesos)
+        .first(conn)
+        .optional()?
+        .unwrap_or(0))
+}
+
+/// Add `mesos` to what `character` has sent today, starting over on a new
+/// day.
+fn count_sent(conn: &mut PgConnection, character: i32, mesos: i32) -> QueryResult<()> {
+    diesel::sql_query(
+        "INSERT INTO parcel_mesos_sent (character_id, day, mesos) \
+         VALUES ($1, CURRENT_DATE, $2) \
+         ON CONFLICT (character_id) DO UPDATE SET \
+         mesos = CASE WHEN parcel_mesos_sent.day = CURRENT_DATE \
+         THEN parcel_mesos_sent.mesos ELSE 0 END + EXCLUDED.mesos, \
+         day = CURRENT_DATE",
+    )
+    .bind::<diesel::sql_types::Integer, _>(character)
+    .bind::<diesel::sql_types::Integer, _>(mesos)
+    .execute(conn)?;
+    Ok(())
 }
 
 /// Leave `new` for its receiver from no one's inventory, as a server's

@@ -84,8 +84,9 @@ use tracing::{debug, info, warn};
 
 /// Hired merchants read from the database for the field.
 enum Loaded {
-    /// The merchants open here, as the field starts.
-    All(Vec<HiredMerchant>),
+    /// The merchants open here, as the field starts, with their
+    /// blacklists.
+    All(Vec<(HiredMerchant, Vec<String>)>),
     /// One merchant read again.
     One(i32, Option<HiredMerchant>),
 }
@@ -195,7 +196,8 @@ fn diseased_most(stat: BuffStat, count: i32) -> usize {
 /// the database failed.
 const MERCHANT_RETRY: Duration = Duration::from_secs(5);
 /// How often an expired merchant's closing is tried before giving up; the
-/// next start of the field closes it then.
+/// next start of the field closes it then. A blacklist's save is tried as
+/// often.
 const EXPIRE_TRIES: u32 = 12;
 
 /// The Moon Bunny's guards are told it is being hurt on every sixth hit
@@ -1634,6 +1636,18 @@ impl FieldActor {
     fn show_merchants(&mut self) {
         for owner in self.merchants.take_rereads() {
             self.reload_merchant(owner);
+        }
+        for (owner, blacklist) in self.merchants.take_blacklists() {
+            tokio::spawn(async move {
+                for _ in 0..EXPIRE_TRIES {
+                    let names = blacklist.clone();
+                    match spawn_db(move || db::merchant::set_blacklist(owner, &names)).await {
+                        Ok(()) => return,
+                        Err(error) => warn!(owner, %error, "Failed to save a merchant's blacklist"),
+                    }
+                    tokio::time::sleep(MERCHANT_RETRY).await;
+                }
+            });
         }
         for shown in self.merchants.take_shown() {
             match self.merchants.show(shown) {

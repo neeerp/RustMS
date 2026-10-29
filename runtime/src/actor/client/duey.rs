@@ -1,7 +1,8 @@
 use super::ClientActor;
 use crate::{db::spawn_db, error::RuntimeError, message::DirectoryMessage};
 use db::parcel::{NewParcel, Parcel, Sent};
-use net::duey::{result, DueyRequest, DUEY, INBOX_LIMIT, MESSAGE_LIMIT};
+use game_data::server_content::keys;
+use net::duey::{daily_mesos, result, DueyRequest, DUEY, INBOX_LIMIT, MESSAGE_LIMIT};
 use net::packet::build::world::parcel::{
     build_parcel_added, build_parcel_arrived, build_parcel_removed, build_parcel_result,
     build_parcel_window, build_parcels_waiting, build_quick_send_window, DELETED,
@@ -158,6 +159,12 @@ impl ClientActor {
                 .send(&mut build_parcel_result(result::INCORRECT)?)
                 .await;
         }
+        if !net::policy::may_send_parcels(self.in_game()?.player.gm_level) {
+            self.pink(keys::DUEY_GM_REFUSED, &[]).await?;
+            return self
+                .send(&mut build_parcel_result(result::INCORRECT)?)
+                .await;
+        }
         let receiver = match to.contains('\0') {
             true => Ok(None),
             false => spawn_db(move || db::parcel::recipient(&to)).await,
@@ -191,6 +198,7 @@ impl ClientActor {
             }
         };
         let (snapshot, sender) = (player.clone(), player.stats.name.clone());
+        let daily = daily_mesos(player);
         let mut parcel = Parcel {
             id: 0,
             sender,
@@ -211,7 +219,7 @@ impl ClientActor {
                 sent_at: new.sent_at,
                 item: new.item.as_ref(),
             };
-            db::parcel::send(&parcel, only, INBOX_LIMIT as i64, &snapshot)
+            db::parcel::send(&parcel, only, INBOX_LIMIT as i64, daily, &snapshot)
         })
         .await;
         let client_id = self.client_id;
@@ -223,6 +231,7 @@ impl ClientActor {
             }
             Ok(Sent::InboxFull) => result::INBOX_FULL,
             Ok(Sent::OnlyOneWaiting) => result::ONLY_ONE_WAITING,
+            Ok(Sent::DailyLimit) => result::LOW_LEVEL_LIMIT,
             Err(error) => {
                 warn!(client_id, %error, "Couldn't send a parcel");
                 result::UNKNOWN

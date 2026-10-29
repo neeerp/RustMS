@@ -565,9 +565,11 @@ impl ClientActor {
         else {
             unreachable!("matched above");
         };
+        let blacklist = field_merchants::blacklist_of(blacklist);
         let now = SystemTime::now();
         let snapshot = self.in_game()?.player.clone();
-        match spawn_db(move || db::merchant::open(&snapshot, now)).await {
+        let names = blacklist.clone();
+        match spawn_db(move || db::merchant::open(&snapshot, now, &names)).await {
             Ok(true) => {}
             Ok(false) => {
                 warn!(self.client_id, "Merchant gone before it opened");
@@ -809,6 +811,12 @@ impl ClientActor {
         let Some(MerchantRoom::Maintenance(merchant)) = self.hired_merchant.take() else {
             return Ok(());
         };
+        // Changes made in this maintenance are saved as it ends, which a
+        // close never reached.
+        let (owner, names) = (merchant.owner_id, blacklist.clone());
+        if let Err(error) = spawn_db(move || db::merchant::set_blacklist(owner, &names)).await {
+            warn!(self.client_id, %error, "Failed to save a merchant's blacklist");
+        }
         self.to_merchant(MerchantRequest::Place {
             merchant,
             blacklist,
