@@ -118,6 +118,19 @@ namespace ms
 		// What the text markup names: the player, NPCs, items, mobs and maps.
 		static NpcTextMarkup::Lookups markup_lookups();
 
+		// An image in the text (#f, #i, #s, #v): its box in the layout, and
+		// where the texture's origin goes from the box's top-left corner.
+		struct InlineImage
+		{
+			Texture texture;
+			Point<int16_t> size;
+			Point<int16_t> anchor;
+			size_t box = 0;
+		};
+
+		// The image a tag names, sized for the layout.
+		static InlineImage inline_image(const NpcTextMarkup::InlineImage &tag);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -160,16 +173,6 @@ namespace ms
 		// Answers a prompt with what was typed, or says what is wrong with
 		// it and stays open.
 		void submit_field();
-
-		// An image in the text (#f, #i, #s, #v): its box in the layout, and
-		// where the texture's origin goes from the box's top-left corner.
-		struct InlineImage
-		{
-			Texture texture;
-			Point<int16_t> size;
-			Point<int16_t> anchor;
-			size_t box = 0;
-		};
 
 		// Expands the markup, leaving a Text::BOX for each image in `images`.
 		std::string format_text(const std::string &tx, const int32_t &npcid, std::vector<InlineImage> &images);

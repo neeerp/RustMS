@@ -81,9 +81,21 @@ namespace ms
 		buttons[Buttons::ON] = std::make_unique<MapleButton>(avatar["BtOn"], OFF_AT);
 		buttons[Buttons::ON]->set_active(false);
 
-		// The question's images are left out for now.
-		std::string formatted = NpcTextMarkup::expand(text, UINpcTalk::markup_lookups());
+		// The question is drawn as the dialogue's is, its images too
+		// (FUN_009a3e9f).
+		std::vector<NpcTextMarkup::InlineImage> tags;
+		std::string formatted = NpcTextMarkup::expand(text, UINpcTalk::markup_lookups(), &tags);
+		std::vector<Point<int16_t>> boxes;
+
+		for (const auto &tag : tags)
+		{
+			prompt_images.push_back(UINpcTalk::inline_image(tag));
+			prompt_images.back().box = boxes.size();
+			boxes.push_back(prompt_images.back().size);
+		}
+
 		prompt = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted, PROMPT_WIDTH);
+		prompt.set_boxes(boxes);
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 
 		show(0);
@@ -99,7 +111,12 @@ namespace ms
 		int16_t height = prompt.height();
 		int16_t top = height <= PROMPT_ROWS ? PROMPT_TOP + (PROMPT_ROWS - height - 6) / 2 : PROMPT_TOP - 6;
 
-		prompt.draw(position + Point<int16_t>(PROMPT_X + PROMPT_INSET_X, top + PROMPT_INSET_Y - TEXT_RAISE));
+		Point<int16_t> origin = position + Point<int16_t>(PROMPT_X + PROMPT_INSET_X, top + PROMPT_INSET_Y - TEXT_RAISE);
+
+		for (const auto &image : prompt_images)
+			image.texture.draw(origin + prompt.box_position(image.box) + image.anchor);
+
+		prompt.draw(origin);
 		shadow.draw(position + SHADOW_AT);
 		look.draw(DrawArgument(position + FEET), alpha);
 
