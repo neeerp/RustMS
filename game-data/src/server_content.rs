@@ -508,6 +508,7 @@ pub mod keys {
     pub const MC_OBSTACLE_BLOCKED: &str = "portal.mc_obstacle.blocked";
     pub const MC_OBSTACLE_USED: &str = "portal.mc_obstacle.used";
     pub const MC_CASTLE_BLOCKED: &str = "portal.mc_castle.blocked";
+    pub const MC_WATCH_SPOTTED: &str = "portal.mc_watch.spotted";
     /// Told (in pink) as the Killer Mushroom Spore (2430014) opens the
     /// `obstacle` portal's way, and as the Thorn Remover (2430015) clears
     /// the way to the castle.
@@ -3682,6 +3683,7 @@ mod tests {
             keys::MC_OBSTACLE_BLOCKED,
             keys::MC_OBSTACLE_USED,
             keys::MC_CASTLE_BLOCKED,
+            keys::MC_WATCH_SPOTTED,
             keys::MC_SPORE_USED,
             keys::MC_THORNS_REMOVED,
             keys::JAMES_SCARED,

@@ -475,6 +475,7 @@ unsourced = [
     "portal.mc_obstacle.blocked",
     "portal.mc_obstacle.used",
     "portal.mc_castle.blocked",
+    "portal.mc_watch.spotted",
     "item.mc_spore.used",
     "item.mc_thorns.removed",
     "mc_james.scared",

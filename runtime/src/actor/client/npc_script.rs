@@ -192,6 +192,7 @@ impl ClientActor {
                     changed = true;
                 }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
+                Effect::ScenePart(path) => afterwards.push(effect::build_scene_part(path)?),
                 Effect::Scene { parts, exit } => {
                     afterwards.push(effect::build_lock_ui(true)?);
                     for part in parts {
@@ -681,6 +682,9 @@ impl ClientActor {
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::FinishQuest(id) => change = Some(QuestChange::Finish(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some((*map_id, None)),
+                Effect::WarpAfter { map_id, after } => {
+                    self.warp_after(next.stats.map_id, *map_id, *after)
+                }
                 Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),
                 Effect::EnterDungeon {
                     first,

@@ -310,6 +310,7 @@
 "portal.mc_obstacle.blocked" = "[placeholder] Poisonous mushrooms block the way."
 "portal.mc_obstacle.used" = "[placeholder] The Poison Spore clears the way."
 "portal.mc_castle.blocked" = "[placeholder] Thorny vines block the way to the castle."
+"portal.mc_watch.spotted" = "[placeholder] A guard has seen you, and you are thrown down the cliff."
 "mc_james.scared" = "[placeholder] James is frightened and begs for help."
 "mc_james.sent_by_brother" = "[placeholder] Don't be afraid: #b#p1300005##k sent me."
 "mc_james.safe" = "[placeholder] James is relieved that his brother sent help."
