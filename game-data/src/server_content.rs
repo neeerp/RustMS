@@ -3151,6 +3151,9 @@ pub struct RewardEntry {
     /// Cash-shop "premium" drops, which v83 did not have.
     #[serde(default)]
     pub premium: Option<i32>,
+    /// Minutes the item lasts from when it drops.
+    #[serde(default)]
+    pub period: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -3250,6 +3253,7 @@ impl RewardTable {
                         max: None,
                         quest: Some(quest),
                         premium: None,
+                        period: None,
                     });
                 }
             }
@@ -4980,6 +4984,7 @@ mod tests {
                 max: None,
                 quest: Some(1035),
                 premium: None,
+                period: None,
             }]
         );
         assert!(table.drops(100100).is_empty());
@@ -5192,6 +5197,7 @@ mod tests {
             max: None,
             quest: Some(quest),
             premium: None,
+            period: None,
         }
     }
 

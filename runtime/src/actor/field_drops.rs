@@ -74,6 +74,10 @@ impl Drop {
             y: self.y,
             dropper: self.dropper,
             player_drop: self.player_drop,
+            expiration: match self.loot {
+                Loot::Dropped(ref item) => item.expiration,
+                Loot::Item { .. } | Loot::Mesos(_) => None,
+            },
         }
     }
 

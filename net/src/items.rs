@@ -187,12 +187,22 @@ pub fn give_dropped(
     quantity: i16,
     rng: &mut impl Rng,
 ) -> Result<Vec<InventoryChange>, InventoryError> {
-    let mut item = create(item_id, quantity).ok_or(InventoryError::UnknownItem)?;
-    let Some(stats) = item.equip.as_mut() else {
-        return inventory.add(item, slot_max(item_id));
+    let item = dropped(item_id, quantity, rng).ok_or(InventoryError::UnknownItem)?;
+    let slot_max = if item.equip.is_some() {
+        1
+    } else {
+        slot_max(item_id)
     };
-    vary(stats, rng);
-    inventory.add(item, 1)
+    inventory.add(item, slot_max)
+}
+
+/// A dropped item as it is picked up: equipment with its stats varied.
+pub fn dropped(item_id: i32, quantity: i16, rng: &mut impl Rng) -> Option<Item> {
+    let mut item = create(item_id, quantity)?;
+    if let Some(stats) = item.equip.as_mut() {
+        vary(stats, rng);
+    }
+    Some(item)
 }
 
 /// Vary each stat a piece of equipment has by up to a tenth of it either

@@ -7,7 +7,7 @@ use game_data::server_content::RewardEntry;
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Loot {
@@ -196,6 +196,18 @@ fn loot_of(
     let quantity = rng
         .gen_range(min.min(max), max.max(min) + 1)
         .clamp(1, i32::from(i16::MAX)) as i16;
+    // An item that lasts a while is made as it drops, its clock running
+    // from then (the pack's `period`, in minutes; Item.nx marks such items
+    // `timeLimited`).
+    if let Some(minutes) = entry.period.filter(|&minutes| minutes > 0) {
+        if quest.is_none() {
+            let mut item = crate::items::dropped(item_id, quantity, rng)?;
+            item.expiration = Some(
+                SystemTime::now() + Duration::from_secs(u64::from(minutes.unsigned_abs()) * 60),
+            );
+            return Some(Loot::Dropped(item));
+        }
+    }
     Some(Loot::Item {
         item_id,
         quantity,
@@ -342,6 +354,7 @@ mod tests {
             max: None,
             quest,
             premium: None,
+            period: None,
         }
     }
 
@@ -364,6 +377,33 @@ mod tests {
         assert_eq!(mesos.count(), 14);
         let many = vec![item; 20];
         assert_eq!(spray(many, 15, (30, 60), rng).len(), 21);
+    }
+
+    #[test]
+    fn an_item_with_a_period_drops_made_and_expiring() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let chest = RewardEntry {
+            period: Some(4320),
+            ..entry(Some(4031423), None, 1.0, None)
+        };
+        let before = SystemTime::now();
+        let [Loot::Dropped(item)] = &friendly_from(&[chest], &mut rng)[..] else {
+            panic!("no chest");
+        };
+        let three_days = Duration::from_secs(4320 * 60);
+        let expiration = item.expiration.unwrap();
+        assert_eq!((item.item_id, item.quantity), (4031423, 1));
+        assert!(expiration >= before + three_days);
+        assert!(expiration <= SystemTime::now() + three_days);
+        // Equipment gets its stats as it drops.
+        let earring = RewardEntry {
+            period: Some(120),
+            ..entry(Some(1032033), None, 1.0, None)
+        };
+        let [Loot::Dropped(item)] = &friendly_from(&[earring], &mut rng)[..] else {
+            panic!("no earring");
+        };
+        assert!(item.equip.is_some() && item.expiration.is_some());
     }
 
     #[test]
