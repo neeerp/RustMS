@@ -81,6 +81,7 @@ impl ClientActor {
             EventKind::LudiMaze => NpcScript::rolly(entry),
             EventKind::Tylus => NpcScript::tylus(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
+            EventKind::Treasure => NpcScript::charles(entry),
             EventKind::Pirate => NpcScript::guon(entry),
             EventKind::Holiday(level) => NpcScript::snow_spirit(level, entry),
             EventKind::PrimeMinister => NpcScript::blocked_entrance(entry),

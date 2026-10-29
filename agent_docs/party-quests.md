@@ -1783,6 +1783,26 @@ lobby, and in an arena the way out to the exit map, which leaves the
 event (`NpcScript::snowman`). The exit map's portal `st01`
 (`08_xmas_out`) leads back to the lobby.
 
+## MV's Lair
+
+MV's Lair (`EventKind::Treasure`, `events::TREASURE`; Cosmic's custom
+`TreasurePQ` on the 2007 Guy Fawkes maps, `v83ref/reports/b300-treasure-elnath-pq.md`
+section 1; picks in `v83ref/lanes/QUESTIONS.md` b306) is entered from New
+Leaf City (600000000): its portal `MD_cakeEnter` leads to the lobby
+(674030100) by its portal `in00`, whose script `enter_td` leads back
+(to `yn00`). There
+Charles (`CHARLES`, 9220018) offers a menu: to go in, or to hear what the
+party must do (`treasure.*`). Its leader takes a party of four to six, all
+there at level 140 and up, into the dungeon (674030000) for 45 minutes.
+The cave (674030200) and the treasure room (674030300) are its maps too;
+the lobby is not, so going back there leaves the event, which ends it by
+`Team::leave` (the leader, or too few left). The Secret Letter (4032118)
+is taken from whoever leaves. Milla (9220019) says a line in the lobby and
+the treasure room, and offers a member the way back to the lobby from the
+dungeon and the cave. The stages, MV and the treasure room's chest come in
+later slices, so for now the party only walks the dungeon. The lines are
+placeholders.
+
 ## Jr. Balrog's room
 
 For "To Tristan's Tomb" (2245; Cosmic `BalrogQuest`). Mu Young's start
