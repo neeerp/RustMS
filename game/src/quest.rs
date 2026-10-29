@@ -13,7 +13,7 @@ pub const SCRIPT_MARKERS: i16 = 32000;
 /// given value (`Check/1/infoex`). Only quests whose strings the server's
 /// scripts can set are listed, as others could never be completed.
 pub const INFO_QUESTS: &[i16] = &[
-    2166, 2236, 3114, 3311, 3345, 3360, 3421, 3900, 3926, 3927, 3929,
+    2166, 2236, 3114, 3311, 3345, 3360, 3367, 3421, 3900, 3926, 3927, 3929,
 ];
 
 /// Records that are no quest (Quest.nx has no such id) but that another

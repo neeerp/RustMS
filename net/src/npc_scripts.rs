@@ -7650,6 +7650,93 @@ pub fn shaman_rock(npc_id: i32, nth: u8, player: &Player) -> Option<NpcScript> {
     ))
 }
 
+/// Organizing the Lab Report (3367): the files lying about Yulete's Lab 2,
+/// thirty of one NPC.
+pub const ORGANIZING_THE_LAB_REPORT: i16 = 3367;
+const YULETE_FILE: i32 = 2_112_016;
+pub const YULETES_REPORT: i32 = 4_031_797;
+const YULETE_FILES: usize = 30;
+/// The first files of the map's thirty hold a report; the rest are only
+/// put in order (Cosmic's `q3367npc` gives one for twenty of them).
+const YULETE_REPORT_FILES: usize = 20;
+
+/// Each of Lab 2's files' character of 3367's string: `b'1'` once put in
+/// order.
+fn yulete_files(player: &Player) -> [u8; YULETE_FILES] {
+    let mut files = [b'0'; YULETE_FILES];
+    let info = player.quests.info(ORGANIZING_THE_LAB_REPORT).unwrap_or("");
+    for (file, mark) in files.iter_mut().zip(info.bytes()) {
+        if mark == b'1' {
+            *file = b'1';
+        }
+    }
+    files
+}
+
+/// How many reports the player has found in Lab 2's files.
+pub fn yulete_reports_found(player: &Player) -> usize {
+    let files = yulete_files(player);
+    files[..YULETE_REPORT_FILES]
+        .iter()
+        .filter(|&&mark| mark == b'1')
+        .count()
+}
+
+/// One of Lab 2's files (`nth` of the map's thirty), while Organizing the
+/// Lab Report is under way: put in order, it marks its character of the
+/// quest's string, and the first twenty also give a Yulete's Report. With
+/// no room for the report the file is left as it was. Once all thirty are
+/// done, any of them sends the player to Yulete; one already done says
+/// nothing of its own (Cosmic `q3367npc`).
+pub fn yulete_file(npc_id: i32, nth: u8, player: &Player) -> Option<NpcScript> {
+    let slot = usize::from(nth);
+    if npc_id != YULETE_FILE
+        || slot >= YULETE_FILES
+        || player.quests.state(ORGANIZING_THE_LAB_REPORT) != QuestState::Started
+        || player.quests.info(ORGANIZING_THE_LAB_REPORT).is_none()
+    {
+        return None;
+    }
+    let mut files = yulete_files(player);
+    let left = files.iter().filter(|&&mark| mark == b'0').count();
+    if left == 0 {
+        let done = Page::Reply(text(keys::YULETE_FILES_DONE));
+        return Some(NpcScript::new(npc_id, vec![done]));
+    }
+    if files[slot] == b'1' {
+        return None;
+    }
+    let mut effects = Vec::new();
+    if slot < YULETE_REPORT_FILES {
+        if !items::fits_until(&player.inventory, YULETES_REPORT, 1, None) {
+            let full = Page::Say(text(keys::YULETE_FILE_NO_ROOM));
+            return Some(NpcScript::new(npc_id, vec![full]));
+        }
+        effects.push(give_one(YULETES_REPORT));
+    }
+    files[slot] = b'1';
+    let value = files.iter().map(|&mark| char::from(mark)).collect();
+    effects.insert(
+        0,
+        Effect::SetQuestInfo {
+            quest: ORGANIZING_THE_LAB_REPORT,
+            value,
+        },
+    );
+    let left = (left - 1).to_string();
+    let line = content::text().get(keys::YULETE_FILE_LEFT, &[("left", &left)]);
+    // The count is the player's own thought (Cosmic's speaker 2).
+    let mut script = NpcScript::new(
+        npc_id,
+        vec![Page::Act {
+            text: line,
+            effects,
+        }],
+    );
+    script.player_speaks = true;
+    Some(script)
+}
+
 /// A meteorite gives its sample without a word while the quest is under
 /// way, if its slot still reads '0', or again once every slot reads '1'
 /// and the player holds fewer than six.
@@ -22959,6 +23046,67 @@ mod tests {
             &shaman_rock(1063012, 0, &elsewhere).unwrap().begin().effects[0],
             Effect::SetQuestChar { slot: 0, .. }
         ));
+    }
+
+    #[test]
+    fn lab_twos_files_mark_3367_and_twenty_of_them_hold_a_report() {
+        let organizing = |info: &str| {
+            let mut player = crate::codec::stats::sample_player();
+            player.quests.upsert(game::QuestRecord {
+                quest_id: ORGANIZING_THE_LAB_REPORT,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: Some(info.into()),
+                },
+            });
+            player
+        };
+        let fresh = organizing("");
+        // The first file of a fresh string holds a report.
+        let step = yulete_file(YULETE_FILE, 0, &fresh).unwrap().begin();
+        let left = content::text().get(keys::YULETE_FILE_LEFT, &[("left", "29")]);
+        assert_eq!(page_text(&step), left);
+        let mut first = "1".to_owned();
+        first.push_str(&"0".repeat(29));
+        assert_eq!(
+            step.effects,
+            [
+                Effect::SetQuestInfo {
+                    quest: ORGANIZING_THE_LAB_REPORT,
+                    value: first.clone()
+                },
+                give_one(YULETES_REPORT)
+            ]
+        );
+        assert_eq!(yulete_reports_found(&organizing(&first)), 1);
+        assert!(yulete_file(YULETE_FILE, 0, &fresh).unwrap().player_speaks);
+        // The twentieth file is the last to hold one, and there are thirty.
+        let step = yulete_file(YULETE_FILE, 19, &fresh).unwrap().begin();
+        assert_eq!(step.effects.len(), 2);
+        let step = yulete_file(YULETE_FILE, 20, &fresh).unwrap().begin();
+        assert!(matches!(step.effects[..], [Effect::SetQuestInfo { .. }]));
+        assert!(yulete_file(YULETE_FILE, 30, &fresh).is_none());
+        // The last ten only mark the string; one already done says nothing.
+        let step = yulete_file(YULETE_FILE, 25, &organizing(&first))
+            .unwrap()
+            .begin();
+        assert!(matches!(step.effects[..], [Effect::SetQuestInfo { .. }]));
+        assert!(yulete_file(YULETE_FILE, 0, &organizing(&first)).is_none());
+        // All thirty done sends the player to Yulete.
+        let done = organizing(&"1".repeat(30));
+        let step = yulete_file(YULETE_FILE, 3, &done).unwrap().begin();
+        assert_eq!(page_text(&step), text(keys::YULETE_FILES_DONE));
+        assert!(step.effects.is_empty());
+        // A full Etc tab leaves a report's file as it was.
+        let mut full = organizing("");
+        full.inventory.set_slot_limit(game::InventoryType::Etc, 0);
+        let step = yulete_file(YULETE_FILE, 1, &full).unwrap().begin();
+        assert_eq!(page_text(&step), text(keys::YULETE_FILE_NO_ROOM));
+        assert!(step.effects.is_empty());
+        // Nobody else, and no other NPC.
+        let player = crate::codec::stats::sample_player();
+        assert!(yulete_file(YULETE_FILE, 0, &player).is_none());
+        assert!(yulete_file(1063013, 0, &fresh).is_none());
     }
 
     #[test]

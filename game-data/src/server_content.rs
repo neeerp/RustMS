@@ -999,6 +999,15 @@ pub mod keys {
     pub const KENTA_HOG_BACK: &str = "kenta.hog.back";
     pub const KENTA_HOG_PROTECT: &str = "kenta.hog.protect";
 
+    /// Yulete's Lab: its Lab Entrance's rooms for one not on their quest,
+    /// or with no room for the reports they lost, and Lab 2's files
+    /// (`q3367npc`) as they are put in order.
+    pub const YULETE_LAB_NO_PERMISSION: &str = "yulete_lab.no_permission";
+    pub const YULETE_LAB_FULL: &str = "yulete_lab.full";
+    pub const YULETE_FILE_LEFT: &str = "yulete_lab.file_left";
+    pub const YULETE_FILE_NO_ROOM: &str = "yulete_lab.file_no_room";
+    pub const YULETE_FILES_DONE: &str = "yulete_lab.files_done";
+
     /// King Pepe's room in the Mushroom Castle: the tower's way in
     /// (`TD_MC_enterboss1`) while another player is in it, and its way out
     /// (`out_pepeking`) giving the Wedding Hall key once the three Yeti
@@ -4056,6 +4065,11 @@ mod tests {
                 keys::KENTA_HOG_LEAVE,
                 keys::KENTA_HOG_BACK,
                 keys::KENTA_HOG_PROTECT,
+                keys::YULETE_LAB_NO_PERMISSION,
+                keys::YULETE_LAB_FULL,
+                keys::YULETE_FILE_LEFT,
+                keys::YULETE_FILE_NO_ROOM,
+                keys::YULETE_FILES_DONE,
                 keys::KING_PEPE_BUSY,
                 keys::KING_PEPE_KEY,
                 keys::KING_PEPE_KEY_NO_ROOM,
