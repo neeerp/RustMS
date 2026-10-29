@@ -22,6 +22,8 @@ namespace ms
 		// From the window's top left (0x81a999; the egg's 0x81aae6, whose operand order was not proven). The icon's
 		// origin is its bottom left.
 		constexpr Point<int16_t> ICON = Point<int16_t>(74, 118);
+		// Where the egg's tooltip shows (0x81ad9a).
+		constexpr Rectangle<int16_t> ICON_HOVER = Rectangle<int16_t>(75, 102, 100, 127);
 		// As the Item Guard's: not checked against v83.
 		constexpr int16_t DRAG_HEIGHT = 25;
 
@@ -69,6 +71,7 @@ namespace ms
 		UIElement::remove_cursor();
 
 		dragged = false;
+		clear_tooltip();
 	}
 
 	Cursor::State UIIncubator::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -86,6 +89,22 @@ namespace ms
 		}
 
 		Point<int16_t> cursor = cursorpos - position;
+
+		// 0x81ad9a: whatever is in the egg's place, while the cursor is over it.
+		const Inventory &inventory = Stage::get().get_player().get_inventory();
+		int32_t id = egg();
+
+		if (id && ICON_HOVER.contains(cursor))
+		{
+			if (auto item = inventory.get_item(egg_tab, egg_slot))
+				UI::get().show_item(Tooltip::Parent::INCUBATOR, id, item->get_expiration(), item->get_flags(), true, 0,
+									item->get_owner());
+		}
+		else
+		{
+			clear_tooltip();
+		}
+
 		Cursor::State ret = UIElement::send_cursor(clicked, cursorpos);
 
 		if (clicked && cursor.y() >= 0 && cursor.y() < DRAG_HEIGHT && !is_holding_button())
@@ -199,6 +218,12 @@ namespace ms
 
 	void UIIncubator::close()
 	{
+		clear_tooltip();
 		deactivate();
+	}
+
+	void UIIncubator::clear_tooltip()
+	{
+		UI::get().clear_tooltip(Tooltip::Parent::INCUBATOR);
 	}
 }
