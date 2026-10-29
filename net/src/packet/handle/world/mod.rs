@@ -17,6 +17,7 @@ mod claim;
 mod coconut;
 mod combat;
 mod conti;
+mod death_item;
 mod door;
 mod duey;
 mod emote;
@@ -27,7 +28,6 @@ mod guild_bbs;
 mod hammer;
 mod hired_merchant;
 mod incubator;
-mod death_item;
 mod item_effect;
 mod item_guard;
 mod item_move;
@@ -114,6 +114,7 @@ pub use self::combat::{
     MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
 };
 pub use self::conti::ContiStateRequestHandler;
+pub use self::death_item::UseDeathItemHandler;
 pub use self::door::UseDoorHandler;
 pub use self::duey::DueyActionHandler;
 pub use self::emote::FaceExpressionHandler;
@@ -129,7 +130,6 @@ pub use self::hammer::UseHammerHandler;
 pub use self::hired_merchant::{
     EntrustedShopRequestHandler, RemoteShopRequestHandler, StoreBankRequestHandler,
 };
-pub use self::death_item::UseDeathItemHandler;
 pub use self::item_effect::UseItemEffectHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
