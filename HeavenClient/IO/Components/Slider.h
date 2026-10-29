@@ -103,6 +103,9 @@ namespace ms
 		};
 
 		Point<int16_t> getthumbpos() const;
+		// How far the thumb's top moves from the first row to the last, for a
+		// slider with more rows than its track has pixels.
+		int16_t travel() const;
 		Part part_at(Point<int16_t> cursor) const;
 		void press(Part part, Point<int16_t> cursor);
 		void step(Part part);

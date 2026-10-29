@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Slider.h"
 
+#include "SliderSteps.h"
+
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -147,7 +149,7 @@ namespace ms
 
 		if (enabled)
 		{
-			if (rowheight > 0)
+			if (rowmax > 0)
 			{
 				prev.draw(position);
 				next.draw(position);
@@ -180,11 +182,18 @@ namespace ms
 	Point<int16_t> Slider::getthumbpos() const
 	{
 		int16_t y =
+				rowheight == 0 ?
+				vertical.first() + buttonheight + slider_steps::thumb_x(row, rowmax, travel()) :
 				row < rowmax ?
 				vertical.first() + row * rowheight + buttonheight :
 				vertical.second() - buttonheight * 2 - 2;
 
 		return Point<int16_t>(x, y);
+	}
+
+	int16_t Slider::travel() const
+	{
+		return vertical.length() - buttonheight * 3 - 2;
 	}
 
 	Cursor::State Slider::send_cursor(Point<int16_t> cursor, bool pressed)
@@ -193,7 +202,26 @@ namespace ms
 
 		if (scrolling)
 		{
-			if (pressed)
+			if (pressed && rowheight == 0)
+			{
+				// More rows than pixels: the thumb follows the cursor, a row
+				// at a time.
+				int16_t target = slider_steps::nearest(relative.y() - buttonheight * 2, rowmax, travel());
+
+				while (row < target)
+				{
+					row++;
+					onmoved(false);
+				}
+
+				while (row > target)
+				{
+					row--;
+					onmoved(true);
+				}
+
+				return Cursor::State::VSCROLLIDLE;
+			} else if (pressed)
 			{
 				int16_t thumby = row * rowheight + buttonheight * 2;
 				int16_t delta = relative.y() - thumby;
