@@ -1028,7 +1028,10 @@ come from the content pack's table plus the committed v83 overrides
 (`game-data/reward_overrides.toml`): each entry rolls its `prob`, mesos
 take 4/5 of the table amount plus up to 2/5 more (OrionAlpha's
 `Reward.create`, about ±20%), items take `min`..`max` (see "Rates and rate cards" for
-what scales them). A mob worth no EXP still drops and
+what scales them). An entry with a `period` (minutes) is made as it drops,
+expiring that long after, and the drop packet carries the time
+(`net::items::dropped`; the wedding's Heart Keys and onyx chests, for
+example). A mob worth no EXP still drops and
 counts for quests. Quest drops are the entries
 the overrides tag with a quest, and quest items (`info/quest`) that only one
 quest's completion check (`Check.img/<quest>/1/item`) asks for, unless an

@@ -709,8 +709,8 @@ For crush and friendship rings:
 
 - The rest of the wedding: the onyx chests 4031423/4 that Pila 9201014
   opens (report b082), and the Giant Cake's drops (the content pack
-  has none). The content pack gives the keys and the
-  chests a `period`, which RustMS ignores: the chests it grants don't
-  expire (review b083). QUESTIONS b314 asks for the prize tables.
+  has none). The keys and chests drop with the pack's `period` (20
+  minutes and 3 days) and expire then. QUESTIONS b314 asks for the prize
+  tables.
 
 Report b052 §7 lists them.

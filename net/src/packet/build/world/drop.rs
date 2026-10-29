@@ -1,6 +1,7 @@
 use crate::codec::time::expiration;
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
+use std::time::SystemTime;
 
 /// How a drop appears.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,6 +31,8 @@ pub struct DropView {
     pub dropper: i32,
     /// A player threw it away; pets leave it alone.
     pub player_drop: bool,
+    /// When the item expires, if it does.
+    pub expiration: Option<SystemTime>,
 }
 
 /// DROP_ITEM_FROM_MAPOBJECT (`dropItemFromMapObject`).
@@ -60,7 +63,7 @@ pub fn build_drop(drop: &DropView, appearance: DropAppearance) -> Result<Packet,
         p.write_short(delay)?;
     }
     if !drop.meso {
-        p.write_long(expiration(None))?;
+        p.write_long(expiration(drop.expiration))?;
     }
     p.write_byte(u8::from(!drop.player_drop))?;
     Ok(p)
@@ -144,6 +147,7 @@ mod tests {
             y: -25,
             dropper: 2_000_000_001,
             player_drop: false,
+            expiration: None,
         }
     }
 
@@ -167,6 +171,29 @@ mod tests {
         expect.short(150).short(-25).int(2_000_000_001);
         expect.short(140).short(-25).short(300);
         expect.long(expiration(None)).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn an_expiring_item_says_when() {
+        let when = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_800_000_000);
+        let chest = DropView {
+            expiration: Some(when),
+            ..shell()
+        };
+        let packet = build_drop(&chest, DropAppearance::Lying).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::DropItemFromMapObject as i16)
+            .byte(2);
+        expect
+            .int(chest.object_id)
+            .byte(0)
+            .int(4000019)
+            .int(7)
+            .byte(0);
+        expect.short(150).short(-25).int(2_000_000_001);
+        expect.long(expiration(Some(when))).byte(1);
         expect.end();
     }
 
