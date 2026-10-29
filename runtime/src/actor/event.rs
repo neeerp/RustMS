@@ -2877,7 +2877,13 @@ impl EventActor {
                 info!(kind = ?self.kind, id = self.id, "Bonus over");
                 false
             }
-            _ if event.survive.is_some() && !self.cleared.has(event.last_stage()) => {
+            // The Watch Hog's room is won only at Kenta's double; its time
+            // running out loses it (Cosmic `3rdJob_mount`'s
+            // `scheduledTimeout`).
+            _ if event.survive.is_some()
+                && self.kind != EventKind::MonsterRiding
+                && !self.cleared.has(event.last_stage()) =>
+            {
                 self.clear_mobs(event.stage_map(event.last_stage()));
                 self.win();
                 false

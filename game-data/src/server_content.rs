@@ -991,6 +991,13 @@ pub mod keys {
     pub const MECHANICAL_PARTS_DONE: &str = "mechanical_parts.done";
     pub const MECHANICAL_PARTS_NO_ROOM: &str = "mechanical_parts.no_room";
     pub const MECHANICAL_PARTS_LEAVE: &str = "mechanical_parts.leave";
+    pub const KENTA_THANKS: &str = "kenta.thanks";
+    pub const KENTA_FEW: &str = "kenta.few";
+    pub const KENTA_BUSY: &str = "kenta.busy";
+    pub const KENTA_HOG_DONE: &str = "kenta.hog.done";
+    pub const KENTA_HOG_LEAVE: &str = "kenta.hog.leave";
+    pub const KENTA_HOG_BACK: &str = "kenta.hog.back";
+    pub const KENTA_HOG_PROTECT: &str = "kenta.hog.protect";
 
     /// King Pepe's room in the Mushroom Castle: the tower's way in
     /// (`TD_MC_enterboss1`) while another player is in it, and its way out
@@ -4042,6 +4049,13 @@ mod tests {
                 keys::MECHANICAL_PARTS_DONE,
                 keys::MECHANICAL_PARTS_NO_ROOM,
                 keys::MECHANICAL_PARTS_LEAVE,
+                keys::KENTA_THANKS,
+                keys::KENTA_FEW,
+                keys::KENTA_BUSY,
+                keys::KENTA_HOG_DONE,
+                keys::KENTA_HOG_LEAVE,
+                keys::KENTA_HOG_BACK,
+                keys::KENTA_HOG_PROTECT,
                 keys::KING_PEPE_BUSY,
                 keys::KING_PEPE_KEY,
                 keys::KING_PEPE_KEY_NO_ROOM,

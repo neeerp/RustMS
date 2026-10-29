@@ -1958,6 +1958,35 @@ up). Only one may be in it on a channel at a time; another is told so
   left (`items`). The passage's way out (`ludi021`) takes any still held
   and leads to 220020600. The lines are placeholders (`mechanical_parts.*`).
 
+## The Watch Hog's room
+
+For "Monster Riding" (6002; Cosmic `3rdJob_mount` and Kenta's script).
+Kenta (2060005, in the Aquarium's zoo, 230000003) takes a player on 6002
+alone into their own copy of 923010000 for five minutes
+(`events::MONSTER_RIDING`, `EventKind::MonsterRiding`, levels 70 and up).
+Seven may go at once on a channel (`runs: 7`); an eighth is told to wait
+(`kenta.busy`). One holding the five Pheromones and five Kenta's Reports the
+quest asks for is thanked (`kenta.thanks`), as is one who has completed it;
+others get `kenta.few`.
+
+- The Watch Hog (9300102) is a friendly mob that the room's Grays attack.
+  It drops a Pheromone (4031507) every 30 seconds, and each of the four
+  boxes (reactor 2302005) a Kenta's Report (4031508), for those on 6002
+  (`reward_overrides.toml`, at Cosmic's certainty rather than the pack's).
+  Whenever it loses over 1,000 HP in 10 seconds the room says so
+  (`kenta.hog.protect`), as Cosmic's `monsterDamaged` does.
+- Its death fails the run (`survive`), and unlike Tylus's, running out of
+  time loses too (Cosmic's `scheduledTimeout`). Either way the player is
+  put out to 923010100 without the items (`items`).
+- Kenta's double (9060000, in the room) clears the run for one holding
+  five of each (`kenta.hog.done`), and they keep them. Anyone else may give
+  up and go out (`kenta.hog.leave`). Either way it ends with
+  `kenta.hog.back`, then the warp to 923010100.
+- 923010100's way out (`tamepig_out2`) leads back to the zoo, keeping five
+  of each for one on 6002 who holds that many and taking any others. Kenta
+  then completes the quest through the quest window. The lines are
+  placeholders (`kenta.*`).
+
 ## Kerning Square's Spirit of Rock
 
 For Blake's requests (2286-2288) and "Admission to the VIP Zone" (2291;
