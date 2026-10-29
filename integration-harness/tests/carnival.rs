@@ -12,6 +12,8 @@
 //! the end the side with more CP is shown the win and the other the loss;
 //! a tie plays two more minutes, and a second tie is a draw. At the end
 //! each side goes to its result room, where the guide grades them.
+//! Carnival Field 2's three rooms, for levels 51 to 70, play the same way,
+//! its Spiegelmann going straight to them.
 
 use integration_harness::events::{armed_in, party_of_one, talk, told};
 use integration_harness::hunting::{attack, hit_reactor, walk_to};
@@ -20,9 +22,11 @@ use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use net::carnival::{
     battle_map, grade, grade_letter, lose_map, result_exp, revive_map, room_map, win_map,
-    CARNIVAL_EXIT, CARNIVAL_LOBBY,
+    CARNIVAL2_LOBBY, CARNIVAL_EXIT, CARNIVAL_LOBBY,
 };
-use net::npc_scripts::{CARNIVAL_GUIDE, CARNIVAL_ROOM_NPC, SPIEGELMANN};
+use net::npc_scripts::{
+    CARNIVAL2_GUIDE, CARNIVAL2_HOST, CARNIVAL_GUIDE, CARNIVAL_ROOM_NPC, SPIEGELMANN,
+};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -433,7 +437,7 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
         t.warps.contains(&CARNIVAL_LOBBY)
     })
     .await;
-    let exp = result_exp(true, grade(i32::from(total)));
+    let exp = result_exp(1, true, grade(i32::from(total)));
     assert!(back.gains.contains(&exp), "{:?}", back.gains);
 }
 
@@ -674,4 +678,77 @@ async fn a_death_costs_cp_and_the_revive_room_leads_back() {
     .await;
     let start = &carnival(&seen, SendOpcode::CarnivalStart)[starts];
     assert_eq!(start[..5], [vec![0], rest].concat()[..]);
+}
+
+/// A party of one's leader on Carnival Field 2.
+async fn leader2() -> WorldSession {
+    let mut player = armed_in(CARNIVAL2_LOBBY, 60).await;
+    party_of_one(&mut player).await;
+    player
+}
+
+/// `player` picks Carnival Field 2's third room, the ninth, from its
+/// Spiegelmann, who lists the field's rooms at once; the trace from the
+/// pick on.
+async fn pick_ninth(player: &mut WorldSession) -> Trace {
+    let rooms = told(player, talk(CARNIVAL2_LOBBY, CARNIVAL2_HOST)).await;
+    assert_eq!(rooms.prompts, [(CARNIVAL2_HOST, 4)], "{rooms:?}");
+    let mut seen = Trace::default();
+    send(&mut player.connection, answer(4, 1, Some(2))).await;
+    until(&mut player.connection, &mut seen, |t| {
+        !t.prompts.is_empty() || !t.warps.is_empty()
+    })
+    .await;
+    seen
+}
+
+#[tokio::test]
+async fn carnival_field_2s_rooms_battle_and_grade_on_their_own_field() {
+    let red = &mut leader2().await;
+    let blue = &mut leader2().await;
+    let mut seen = pick_ninth(red).await;
+    until(&mut red.connection, &mut seen, |t| {
+        t.warps.contains(&room_map(9))
+    })
+    .await;
+    let put = pick_ninth(blue).await;
+    assert!(
+        put.prompt_texts
+            .contains(&text("carnival.spiegelmann.sent")),
+        "{put:?}"
+    );
+    let mut asked = Trace::default();
+    until(&mut red.connection, &mut asked, |t| {
+        t.prompts.iter().any(|&(npc, _)| npc == CARNIVAL_ROOM_NPC)
+    })
+    .await;
+
+    // Accepted, both go to its battle field; with no CP on either side it
+    // ties twice and both sides go to the losers' room.
+    send(&mut red.connection, answer(1, 1, None)).await;
+    for side in [&mut *red, &mut *blue] {
+        let mut drawn = Trace::default();
+        until(&mut side.connection, &mut drawn, |t| {
+            t.warps.contains(&battle_map(9)) && t.warps.contains(&lose_map(9))
+        })
+        .await;
+        assert_eq!(carnival(&drawn, SendOpcode::CarnivalResult), [vec![10]]);
+    }
+
+    // Its guide grades Red D, pays the 2nd field's EXP and sends Red back.
+    let graded = told(red, talk(lose_map(9), CARNIVAL2_GUIDE)).await;
+    assert!(
+        graded
+            .prompt_texts
+            .iter()
+            .any(|said| said.contains("#rD#k")),
+        "{graded:?}"
+    );
+    let mut back = Trace::default();
+    send(&mut red.connection, answer(0, 1, None)).await;
+    until(&mut red.connection, &mut back, |t| {
+        t.warps.contains(&CARNIVAL2_LOBBY)
+    })
+    .await;
+    assert!(back.gains.contains(&result_exp(9, false, 3)), "{back:?}");
 }

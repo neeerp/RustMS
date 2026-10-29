@@ -1242,7 +1242,7 @@ impl EventActor {
                 info!(id = self.id, room, "Carnival room not challenged");
                 // Free before they arrive, so they may take it again.
                 free_lobby(&self.directory, None, self.channel_id, self.kind, self.id);
-                self.move_team(None, net::carnival::CARNIVAL_LOBBY, None);
+                self.move_team(None, self.kind.event().lobby, None);
                 true
             }
             Stage::Ready => {
@@ -1402,7 +1402,7 @@ impl EventActor {
         let members = self.team.members();
         match self.carnival_stage {
             Stage::Waiting if member == self.team.leader() => {
-                self.move_team(None, net::carnival::CARNIVAL_LOBBY, None);
+                self.move_team(None, self.kind.event().lobby, None);
                 Some(true)
             }
             Stage::Waiting | Stage::Over => None,

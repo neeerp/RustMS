@@ -2,7 +2,7 @@
 //! who may start one, where it is played, and when it ends. Pure rules;
 //! the runtime's event actor keeps the time and moves the players.
 
-use crate::carnival::{CARNIVAL_LOBBY, CARNIVAL_ROOMS};
+use crate::carnival::{CARNIVAL2_LOBBY, CARNIVAL_LOBBY};
 use crate::ClientId;
 use game::{InventoryChange, Player};
 use game_data::Area;
@@ -3630,29 +3630,37 @@ pub const DOJO: Event = Event {
     alone: false,
 };
 
-/// The Monster Carnival's rooms, 1 to 6 (Cosmic `2042000`,
-/// `MonsterCarnival`): a party goes from the Carnival Field straight to
-/// the room's battle field, which lasts as long as its `timeDefault` says
+/// The Monster Carnival's rooms, 1 to 6 off the Carnival Field and 7 to 9
+/// off Carnival Field 2 (Cosmic `2042000`, `2042005`, `MonsterCarnival`):
+/// a party goes from its field straight to the room's battle field, which
+/// lasts as long as its `timeDefault` says
 /// (`crate::carnival::battle_length`), and then to the exit room. Rooms 1
-/// to 4 take two to four, 5 and 6 three to six.
-pub const CARNIVAL: [Event; CARNIVAL_ROOMS as usize] = [
+/// to 4, 7 and 8 take two to four, 5, 6 and 9 three to six.
+pub const CARNIVAL: [Event; 9] = [
     carnival(1),
     carnival(2),
     carnival(3),
     carnival(4),
     carnival(5),
     carnival(6),
+    carnival(7),
+    carnival(8),
+    carnival(9),
 ];
 
 const fn carnival(room: u8) -> Event {
     let waiting = crate::carnival::room_map(room);
     Event {
-        lobby: CARNIVAL_LOBBY,
-        maps: waiting..=waiting + 4,
+        lobby: crate::carnival::lobby(room),
+        maps: waiting..=crate::carnival::lose_map(room),
         entry: waiting,
-        exit: crate::carnival::CARNIVAL_EXIT,
-        levels: crate::carnival::CARNIVAL_LEVELS,
-        team: if room <= 4 { 2..=4 } else { 3..=6 },
+        exit: crate::carnival::exit(room),
+        levels: crate::carnival::levels(room),
+        team: if matches!(room, 5 | 6 | 9) {
+            3..=6
+        } else {
+            2..=4
+        },
         minutes: 0,
         exp_per_stage: &[0],
         meso_per_stage: &[],
@@ -4773,7 +4781,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 74] = [
+    pub const ALL: [EventKind; 77] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4812,6 +4820,9 @@ impl EventKind {
         EventKind::Carnival(4),
         EventKind::Carnival(5),
         EventKind::Carnival(6),
+        EventKind::Carnival(7),
+        EventKind::Carnival(8),
+        EventKind::Carnival(9),
         EventKind::Magatia(MagatiaSide::Zenumist),
         EventKind::Magatia(MagatiaSide::Alcadno),
         EventKind::Tristan,
@@ -4863,6 +4874,9 @@ impl EventKind {
             EventKind::Pirate => Some((1204, &[1_002_571, 1_002_572, 1_002_573, 1_002_574])),
             EventKind::Magatia(_) => Some((1205, &[1_122_010])),
             EventKind::Ellin => Some((1206, &[1_032_060, 1_032_061])),
+            EventKind::Carnival(room) if crate::carnival::second(room) => {
+                Some((1302, &[1_122_058]))
+            }
             EventKind::Carnival(_) => Some((1301, &[1_122_007])),
             _ => None,
         }
@@ -4909,7 +4923,7 @@ impl EventKind {
             EventKind::Subway => &SUBWAY,
             EventKind::SubwayTrain => &SUBWAY_TRAIN,
             EventKind::NineSpirit => &NINE_SPIRIT,
-            EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
+            EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, 9) - 1)],
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
             EventKind::Dollhouse => &DOLLHOUSE,
@@ -5001,7 +5015,7 @@ impl Event {
                 .filter(|least| *least >= 1)
         };
         let solo = || std::env::var("RUSTMS_CARNIVAL_SOLO").is_ok_and(|solo| solo == "1");
-        if self.lobby == CARNIVAL_LOBBY && solo() {
+        if (self.lobby == CARNIVAL_LOBBY || self.lobby == CARNIVAL2_LOBBY) && solo() {
             return 1;
         }
         (self.squad || self.lobby == crate::guild_quest::CAMP)
@@ -7167,6 +7181,27 @@ mod tests {
         );
         assert_eq!(player.inventory.count(4000000), 3);
         assert!(KPQ.take_items(&mut player).0.is_empty());
+    }
+
+    #[test]
+    fn carnival_field_2s_rooms_are_events_of_their_own_field_and_record() {
+        let room = EventKind::Carnival(8).event();
+        assert_eq!(room.lobby, CARNIVAL2_LOBBY);
+        assert_eq!(room.entry, 980032000);
+        assert_eq!(room.exit, crate::carnival::CARNIVAL2_EXIT);
+        assert_eq!(room.levels, 51..=70);
+        assert_eq!(room.team, 2..=4);
+        assert_eq!(EventKind::Carnival(9).event().team, 3..=6);
+        assert!(room.maps.contains(&980032100) && event_map(980031400));
+        assert!(!event_map(CARNIVAL2_LOBBY) && !event_map(room.exit));
+        assert_eq!(
+            EventKind::Carnival(7).record_quest(),
+            Some((1302, &[1_122_058][..]))
+        );
+        assert_eq!(
+            EventKind::Carnival(6).record_quest(),
+            Some((1301, &[1_122_007][..]))
+        );
     }
 
     #[test]

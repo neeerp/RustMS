@@ -1,6 +1,7 @@
-//! The Monster Carnival: Spiegelmann's six rooms off the Carnival Field,
-//! where parties race for Carnival Points (CP) by hunting each other's
-//! monsters (`agent_docs/carnival.md`; Cosmic `MonsterCarnival.java`).
+//! The Monster Carnival: Spiegelmann's six rooms off the Carnival Field
+//! and three off Carnival Field 2, where parties race for Carnival Points
+//! (CP) by hunting each other's monsters (`agent_docs/carnival.md`; Cosmic
+//! `MonsterCarnival.java`).
 //! Pure rules; the event actor keeps a battle's score.
 
 use crate::ClientId;
@@ -14,10 +15,23 @@ use std::time::Duration;
 pub const CARNIVAL_LOBBY: i32 = 980000000;
 /// The room everyone goes to once a battle is over, with 2042002.
 pub const CARNIVAL_EXIT: i32 = 980000010;
-/// The rooms, 1 to 4 for two to four a side, 5 and 6 for three to six.
+/// The Carnival Field's rooms, 1 to 4 for two to four a side, 5 and 6 for
+/// three to six.
 pub const CARNIVAL_ROOMS: u8 = 6;
 /// Who may go to the Carnival Field and play.
 pub const CARNIVAL_LEVELS: RangeInclusive<u8> = 30..=50;
+/// Carnival Field 2, the 2nd Monster Carnival's, where Spiegelmann
+/// (2042005) gives out its three rooms. Its `out00` is `mc_out` too.
+pub const CARNIVAL2_LOBBY: i32 = 980030000;
+/// Its exit room, with 2042007.
+pub const CARNIVAL2_EXIT: i32 = 980030010;
+/// Carnival Field 2's rooms, numbered on from the Carnival Field's: 7 and
+/// 8 for two to four a side, 9 for three to six (quest 1302's text).
+pub const CARNIVAL2_ROOMS: RangeInclusive<u8> = 7..=9;
+/// Who may play on Carnival Field 2.
+pub const CARNIVAL2_LEVELS: RangeInclusive<u8> = 51..=70;
+/// Every room of both fields.
+pub const ALL_ROOMS: RangeInclusive<u8> = 1..=9;
 /// Where `mc_out` goes when no way back was saved (Kerning City).
 pub const CARNIVAL_FALLBACK: i32 = 102000000;
 /// A battle's length when its field's data has none (`timeDefault`).
@@ -35,53 +49,120 @@ pub const READY: Duration = Duration::from_secs(10);
 /// How long a challenge waits for the waiting leader's answer.
 pub const CHALLENGE: Duration = Duration::from_secs(30);
 
-/// Room `room`'s waiting room (980000n00). The battle is the next map,
-/// then the revive room, the winners' room and the losers'.
-pub const fn room_map(room: u8) -> i32 {
-    CARNIVAL_LOBBY + room as i32 * 100
+/// Whether `room` is one of Carnival Field 2's.
+pub const fn second(room: u8) -> bool {
+    room > CARNIVAL_ROOMS
 }
 
-/// Room `room`'s battle field (980000n01).
+/// The field room `room` is off: the Carnival Field or Carnival Field 2.
+pub const fn lobby(room: u8) -> i32 {
+    if second(room) {
+        CARNIVAL2_LOBBY
+    } else {
+        CARNIVAL_LOBBY
+    }
+}
+
+/// Where room `room`'s battles end early.
+pub const fn exit(room: u8) -> i32 {
+    if second(room) {
+        CARNIVAL2_EXIT
+    } else {
+        CARNIVAL_EXIT
+    }
+}
+
+/// Who may play in room `room`.
+pub const fn levels(room: u8) -> RangeInclusive<u8> {
+    if second(room) {
+        CARNIVAL2_LEVELS
+    } else {
+        CARNIVAL_LEVELS
+    }
+}
+
+/// The rooms off the field whose lobby is `lobby`.
+pub fn rooms_off(lobby: i32) -> RangeInclusive<u8> {
+    if lobby == CARNIVAL2_LOBBY {
+        CARNIVAL2_ROOMS
+    } else {
+        1..=CARNIVAL_ROOMS
+    }
+}
+
+/// Room `room`'s number on its own field, as Spiegelmann gives it.
+pub const fn number(room: u8) -> u8 {
+    if second(room) {
+        room - CARNIVAL_ROOMS
+    } else {
+        room
+    }
+}
+
+/// Room `room`'s waiting room: 980000n00 on the Carnival Field, 980031000
+/// on for each of Carnival Field 2's. The battle is the next map, then the
+/// revive room, the winners' room and the losers'.
+pub const fn room_map(room: u8) -> i32 {
+    if second(room) {
+        CARNIVAL2_LOBBY + 1000 * number(room) as i32
+    } else {
+        CARNIVAL_LOBBY + room as i32 * 100
+    }
+}
+
+/// The `n`th map of room `room` after its waiting room: 980000n0n, or
+/// 98003r(n)00 on Carnival Field 2.
+const fn room_part(room: u8, n: i32) -> i32 {
+    room_map(room) + n * if second(room) { 100 } else { 1 }
+}
+
+/// Room `room`'s battle field (980000n01, 98003r100).
 pub const fn battle_map(room: u8) -> i32 {
-    room_map(room) + 1
+    room_part(room, 1)
 }
 
 /// The room whose waiting room `map_id` is.
 pub fn waiting_room(map_id: i32) -> Option<u8> {
-    (1..=CARNIVAL_ROOMS).find(|&room| room_map(room) == map_id)
+    ALL_ROOMS.into_iter().find(|&room| room_map(room) == map_id)
 }
 
 /// The room whose battle field `map_id` is.
 pub fn battle_room(map_id: i32) -> Option<u8> {
-    (1..=CARNIVAL_ROOMS).find(|&room| battle_map(room) == map_id)
+    ALL_ROOMS
+        .into_iter()
+        .find(|&room| battle_map(room) == map_id)
 }
 
 /// Room `room`'s revive room, where its battle field's dead go back to
 /// life (the field's `returnMap`, fieldType 11).
 pub const fn revive_map(room: u8) -> i32 {
-    room_map(room) + 2
+    room_part(room, 2)
 }
 
 /// The room whose revive room `map_id` is.
 pub fn revive_room(map_id: i32) -> Option<u8> {
-    (1..=CARNIVAL_ROOMS).find(|&room| revive_map(room) == map_id)
+    ALL_ROOMS
+        .into_iter()
+        .find(|&room| revive_map(room) == map_id)
 }
 
-/// Room `room`'s winners' room (980000n03, its battle field's
-/// `rewardMapWin`), where 2042002 grades them.
+/// Room `room`'s winners' room (980000n03, 98003r300, its battle field's
+/// `rewardMapWin`), where 2042002 or 2042007 grades them.
 pub const fn win_map(room: u8) -> i32 {
-    room_map(room) + 3
+    room_part(room, 3)
 }
 
-/// Room `room`'s losers' room (980000n04, `rewardMapLose`), where a draw
-/// sends both sides too.
+/// Room `room`'s losers' room (980000n04, 98003r400, `rewardMapLose`),
+/// where a draw sends both sides too.
 pub const fn lose_map(room: u8) -> i32 {
-    room_map(room) + 4
+    room_part(room, 4)
 }
 
 /// The room whose winners' or losers' room `map_id` is.
 pub fn result_room(map_id: i32) -> Option<u8> {
-    (1..=CARNIVAL_ROOMS).find(|&room| win_map(room) == map_id || lose_map(room) == map_id)
+    ALL_ROOMS
+        .into_iter()
+        .find(|&room| win_map(room) == map_id || lose_map(room) == map_id)
 }
 
 fn rules(room: u8) -> Option<&'static game_data::Carnival> {
@@ -199,13 +280,16 @@ pub fn grade_letter(grade: u8) -> char {
     char::from(b'A' + grade.min(3))
 }
 
-/// The EXP 2042002 pays for `grade`, won or not (Cosmic `2042002`; the
-/// losers' B there is 1200, below C's 5000, taken for 12000).
-pub fn result_exp(won: bool, grade: u8) -> i32 {
-    let table = if won {
-        [50_000, 25_500, 21_000, 19_505]
-    } else {
-        [17_500, 12_000, 5_000, 2_500]
+/// The EXP 2042002 pays for `grade` after a battle in room `room`, won
+/// or not (Cosmic `2042002`; the losers' B there is 1200, below C's 5000,
+/// taken for 12000), and 2042007 after one on Carnival Field 2 (Cosmic
+/// `2042007`).
+pub fn result_exp(room: u8, won: bool, grade: u8) -> i32 {
+    let table = match (second(room), won) {
+        (false, true) => [50_000, 25_500, 21_000, 19_505],
+        (false, false) => [17_500, 12_000, 5_000, 2_500],
+        (true, true) => [875_000, 700_000, 555_000, 100_000],
+        (true, false) => [35_000, 25_000, 12_500, 3_500],
     };
     table[usize::from(grade.min(3))]
 }
@@ -603,8 +687,60 @@ mod tests {
         let grades: Vec<u8> = [300, 299, 100, 50, 49, 0].map(grade).to_vec();
         assert_eq!(grades, [0, 1, 1, 2, 3, 3]);
         assert_eq!(grade_letter(2), 'C');
-        assert_eq!(result_exp(true, 0), 50_000);
-        assert_eq!(result_exp(false, 3), 2_500);
+        assert_eq!(result_exp(3, true, 0), 50_000);
+        assert_eq!(result_exp(3, false, 3), 2_500);
+        assert_eq!(result_exp(8, true, 0), 875_000);
+        assert_eq!(result_exp(8, false, 1), 25_000);
+    }
+
+    #[test]
+    fn carnival_field_2s_three_rooms_follow_on_from_the_first_fields_six() {
+        assert_eq!(rooms_off(CARNIVAL_LOBBY), 1..=6);
+        assert_eq!(rooms_off(CARNIVAL2_LOBBY), 7..=9);
+        let maps = |room| {
+            [
+                room_map(room),
+                battle_map(room),
+                revive_map(room),
+                win_map(room),
+                lose_map(room),
+            ]
+        };
+        assert_eq!(
+            maps(6),
+            [980000600, 980000601, 980000602, 980000603, 980000604]
+        );
+        assert_eq!(
+            maps(7),
+            [980031000, 980031100, 980031200, 980031300, 980031400]
+        );
+        assert_eq!(
+            maps(9),
+            [980033000, 980033100, 980033200, 980033300, 980033400]
+        );
+        assert_eq!((number(6), number(7), number(9)), (6, 1, 3));
+        assert_eq!(waiting_room(980032000), Some(8));
+        assert_eq!(battle_room(980032100), Some(8));
+        assert_eq!(revive_room(980032200), Some(8));
+        assert_eq!(result_room(980032400), Some(8));
+        assert_eq!(battle_room(980032101), None);
+        // Each battle field's own rules: ten mobs out a side, the 2nd
+        // field's mobs, and its results by `rewardMapWin`/`Lose`.
+        for room in CARNIVAL2_ROOMS {
+            assert_eq!(death_cp(room), 10);
+            assert_eq!(summon(room, 0).map(|s| (s.0, s.2)), Some((9300315, 10)));
+            let rules = rules(room).unwrap();
+            assert_eq!(rules.reward_map_win, win_map(room));
+            assert_eq!(rules.reward_map_lose, lose_map(room));
+        }
+        assert_eq!(
+            (lobby(8), exit(8), levels(8)),
+            (CARNIVAL2_LOBBY, CARNIVAL2_EXIT, 51..=70)
+        );
+        assert_eq!(
+            (lobby(1), exit(1), levels(1)),
+            (CARNIVAL_LOBBY, CARNIVAL_EXIT, 30..=50)
+        );
     }
 
     #[test]

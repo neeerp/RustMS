@@ -1123,8 +1123,8 @@ Explorer's `LT`, `DONE`, `PT` and `CNT` (above), nothing writes these
 titles' records yet: the original server's timing is unknown
 (Cosmic has none), and 29500-29503 wait on their start scripts.
 
-So far only the party quests keep records, on their info quests 1200-1206
-and 1301. The client lists these under "Party Quest" and never offers them
+So far only the party quests keep records, on their info quests 1200-1206,
+1301 and 1302. The client lists these under "Party Quest" and never offers them
 (`quest-window.md`), and nothing completes them, so they stay out of the
 supported list: the server starts each, with no string, as a record of its
 own (`game::quest::RECORDS`) along with the first record beside it, and it

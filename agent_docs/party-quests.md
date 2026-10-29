@@ -294,7 +294,8 @@ Each party quest with an info quest keeps the member's record on it
 (`EventKind::record_quest`; see "Records beside the quest log" in
 `quests.md`): Henesys's 1200, Kerning City's 1201, Ludibrium's 1202,
 Orbis's 1203, the Pirate Ship's 1204, Romeo and Juliet's 1205, the Forest
-of Poison Haze's 1206 and the Monster Carnival's 1301
+of Poison Haze's 1206 and the Monster Carnival's 1301 (1302 on Carnival
+Field 2)
 (`game::quest_ex::record_party_quest`):
 
 - Entering counts a try and starts the info quest if it isn't

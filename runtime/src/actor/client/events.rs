@@ -160,11 +160,12 @@ impl ClientActor {
         self.start_script(script).await
     }
 
-    /// Spiegelmann on the Carnival Field tells the player which of the
-    /// Monster Carnival's rooms their party may take.
+    /// Spiegelmann on the Carnival Field or Carnival Field 2 tells the
+    /// player which of its rooms their party may take.
     pub(super) async fn talk_to_spiegelmann(&mut self) -> Result<(), RuntimeError> {
         let mut entries = Vec::new();
-        for room in 1..=net::carnival::CARNIVAL_ROOMS {
+        let lobby = self.in_game()?.player.stats.map_id;
+        for room in net::carnival::rooms_off(lobby) {
             let kind = EventKind::Carnival(room);
             let Some(entry) = self.event_entry(kind).await? else {
                 return Ok(());
