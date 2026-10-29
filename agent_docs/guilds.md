@@ -501,6 +501,12 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     titles taken when it opens; it closes with the window, on Esc, or on
     another tab. Leaving the guild leaves it open with only its
     background.
+  - Clicking a column heading of a folded-out section sorts that section
+    (`Character/GuildSort.h`, v83's FUN_00911701 and FUN_00911fb6): the
+    first click sorts up by it, the next down, and the heading lights up
+    (`guildinfo7`). Names ignore case and turn about whole; job, level and
+    title (by rank) keep equal values in name order either way. Each
+    section keeps its own order across updates.
   - Clicking a tab, even the one shown, drops the guild pick.
   - MAP (BtWhere), with someone else picked who is online, sends the same
     find as `/find` (WHISPER 0x05 and the name, FUN_00911c5c); the answer
@@ -518,7 +524,8 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   - A section per guild, the player's own first: its mark or the empty
     frame, its name, "[online/total]", and its members online only, five
     a page, with the guild tab's fold and page buttons. Titles are the
-    alliance's ranks. The list scrolls 33 px a step over 18 px a shown
+    alliance's ranks. The column headings sort a section as the guild
+    tab's do, with the title by alliance rank (FUN_00915456). The list scrolls 33 px a step over 18 px a shown
     row plus 572, as v83 counts it, so it runs on past the last section.
   - Any click on the window that misses the buttons picks the row under
     it, or no one. The rules (`Alliance::tab_buttons`): INVITE for the
@@ -581,7 +588,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   until the next request.
 - Nothing closes the board on a map change or when the player leaves the
   guild; the server then ignores its requests.
-- Sorting by column.
 
 ## Inferred or unverified
 

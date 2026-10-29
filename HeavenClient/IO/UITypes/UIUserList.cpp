@@ -252,6 +252,7 @@ namespace ms
 		guild_online.header = GuildInfo["guildinfo0"];
 		guild_offline.header = GuildInfo["guildinfo1"];
 		guild_columns = GuildInfo["guildinfo2"];
+		guild_sorted = GuildInfo["guildinfo7"];
 		guild_row = GuildInfo["guildinfo3"];
 		guild_end = GuildInfo["guildinfo4"];
 		notice_box = GuildInfo["guildinfo6"];
@@ -445,6 +446,20 @@ namespace ms
 				continue;
 
 			art(guild_columns, section->first - COLUMNS);
+
+			// The sort's heading shows lit, a slice of the lit headings
+			// (0x90fb89).
+			if (guild_sort::Column column = section->order.column)
+			{
+				int16_t top = section->first - COLUMNS + guild_sort::TOP;
+				int16_t from = std::max<int16_t>(0, view_top - top);
+				int16_t to = std::min<int16_t>(guild_sort::BOTTOM - guild_sort::TOP, view_bottom - top);
+				int16_t left = guild_sort::EDGES[column - 1];
+
+				if (from < to)
+					guild_sorted.draw(list + Point<int16_t>(1, top),
+									  Rectangle<int16_t>(left - 1, guild_sort::EDGES[column] - 1, from, to));
+			}
 
 			if (section->rows.empty())
 			{
@@ -732,6 +747,21 @@ namespace ms
 				in_view.y() < GUILD_VIEW)
 			{
 				int16_t y = in_view.y() + guild_scroll * GUILD_STEP;
+
+				// A click on a section's headings sorts it (0x911701).
+				for (GuildSection* section : { &guild_online, &guild_offline })
+				{
+					if (!section->expanded)
+						continue;
+
+					if (guild_sort::Column column = guild_sort::column_at(in_view.x(), y - (section->first - COLUMNS)))
+					{
+						section->order.click(column);
+						rebuild_guild();
+
+						return Cursor::State::IDLE;
+					}
+				}
 
 				for (const GuildSection* section : { &guild_online, &guild_offline })
 				{
@@ -1726,6 +1756,9 @@ namespace ms
 
 		for (const GuildMember& member : shown_guild.members)
 			(member.online ? online_members : offline_members).push_back(&member);
+
+		guild_sort::sort(online_members, guild_online.order, false);
+		guild_sort::sort(offline_members, guild_offline.order, false);
 
 		size_t total = shown_guild.members.size();
 		guild_online.count.change_text(fraction(online_members.size(), total));
