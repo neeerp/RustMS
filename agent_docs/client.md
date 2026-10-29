@@ -941,7 +941,9 @@ the screen size.
   server answers with the list it kept (0x55). As in v83 (FUN_00470d7d,
   FUN_00479844), RESERVE says "Your wish list is full." or "You already have
   this item on your wish list." without sending, and only an added wish is
-  announced when the list comes back.
+  announced when the list comes back. A wish counts as listed when the list
+  holds the same item, count and period under any SN (FUN_004729fd), and a
+  free commodity's wish is dropped without a word (`cash_catalog::wish_sent`).
 - **Taking out and putting back:** double-clicking a Cash Inventory item
   sends 0x0D with its serial, bag and the bag's first free slot; the server
   answers with the slot and the item (0x68), or 0xBB if the bag is full.

@@ -252,16 +252,39 @@ namespace ms
 		}
 
 		// Why v83 (FUN_00470d7d) won't add sn to the wish list, or nullptr when it will: a full list
-		// first, then one that has it already.
-		inline const char* wish_refusal(const std::vector<int32_t>& sns, int32_t sn)
+		// first, then one that holds the same item, count and period under any SN (FUN_004729fd).
+		inline const char* wish_refusal(const std::vector<Commodity>& all, const std::vector<int32_t>& sns, int32_t sn)
 		{
 			if (std::count_if(sns.begin(), sns.end(), [](int32_t w) { return w != 0; }) >= WISH_LIST_SIZE)
 				return "Your wish list is full.";
 
-			if (std::find(sns.begin(), sns.end(), sn) != sns.end())
-				return "You already have this item on your wish list.";
+			auto wished = std::find_if(all.begin(), all.end(), [sn](const Commodity& c) { return c.sn == sn; });
+
+			for (int32_t listed : sns)
+			{
+				if (listed == 0)
+					continue;
+
+				if (listed == sn)
+					return "You already have this item on your wish list.";
+
+				auto other = std::find_if(all.begin(), all.end(), [listed](const Commodity& c) { return c.sn == listed; });
+
+				if (wished != all.end() && other != all.end() && other->item_id == wished->item_id
+					&& other->count == wished->count && other->period == wished->period)
+					return "You already have this item on your wish list.";
+			}
 
 			return nullptr;
+		}
+
+		// Whether v83 sends a wish it doesn't refuse: not for an SN missing from the catalog
+		// (FUN_00471be9), nor for a free one.
+		inline bool wish_sent(const std::vector<Commodity>& all, int32_t sn)
+		{
+			auto wished = std::find_if(all.begin(), all.end(), [sn](const Commodity& c) { return c.sn == sn; });
+
+			return wished != all.end() && wished->price != 0;
 		}
 
 		// The wish list without sn.

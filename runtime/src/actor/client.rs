@@ -1633,7 +1633,9 @@ impl ClientActor {
             _ => None,
         };
         let player = &mut self.in_game_mut()?.player;
-        // The client refuses a second one-of-a-kind item itself (0xb94).
+        // The client refuses only a free item the character already has
+        // (0xb95); a second one-of-a-kind item stays out of the bags here,
+        // as it does everywhere else.
         if net::items::refuses_only(&player.inventory, item.item_id, item.quantity.into()) {
             return Ok(vec![cs::build_cash_shop_failure(
                 cs::CashShopFailure::InventoryFull,
