@@ -187,7 +187,8 @@ namespace ms
 	};
 
 	// A value kept for the session, by key: of these the client keeps only
-	// the Mu Lung Dojo's `energy` (0xa12bd6)
+	// the Mu Lung Dojo's `energy` and the Pyramid's `massacre_*` counts
+	// (0xa12bd6)
 	// Opcode: SESSION_VALUE(90)
 	class SessionValueHandler : public PacketHandler
 	{

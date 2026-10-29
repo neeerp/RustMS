@@ -25,6 +25,7 @@
 #include "EnergyCharge.h"
 #include "Heal.h"
 #include "HitTiming.h"
+#include "Massacre.h"
 #include "MagicDamage.h"
 #include "MesoExplosion.h"
 #include "PhysicalDamage.h"
@@ -498,6 +499,10 @@ namespace ms
 			InChatMessage(Messages::SKILL_FIELD).drop();
 			return false;
 		}
+
+		// Rage of Pharaoh goes only with a use left, and says nothing (0x74d841).
+		if (pq == pq_skills::Kind::RAGE_OF_PHARAOH && !massacre::rage_ready(massacre::session().skill))
+			return false;
 
 		bool riding = player.has_buff(Buffstat::Id::MONSTER_RIDING);
 

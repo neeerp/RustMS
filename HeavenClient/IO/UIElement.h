@@ -153,6 +153,8 @@ namespace ms
 			MONSTERCARNIVAL,
 			COCONUT,
 			ARIANT,
+			PYRAMIDHUD,
+			PYRAMIDRESULT,
 			RAISE,
 			NUM_TYPES
 		};

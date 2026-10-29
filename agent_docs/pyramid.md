@@ -288,3 +288,17 @@ own, in `game_data::MobInfo`:
 - PYRAMID_SCORE (0x9E, `build_pyramid_score`), on the result map: a byte
   rank, 0 for S to 4 for D, then the EXP as an int. The tallies come from
   the session values sent before it.
+
+## HeavenClient
+
+`massacre::Session` (`Gameplay/Combat/Massacre.h`) keeps the four tallies
+across fields, and the gauge's count, the stage's clock and its length for
+the field. `UIPyramidHud` is up on field type 23 and draws, from
+`UIWindow.img/MonsterKilling`, what v83 draws where it draws it
+(`v83ref/reports/b328-pyramid-hud-positions.md`): the Count panel at
+(1, 21), with the uses and the key only when the map's
+`mobMassacre/disableSkill` is 0; the gauge at (251, 64), its bar ending at x
+540; and the clock, `Map/Obj/etc.img/killing`, at (304, 5). On that field a
+CLOCK of kind 2 sets the HUD's clock and puts up no other. `UIPyramidResult`
+shows PYRAMID_SCORE on field type 24 at (207, 158) for 5 seconds, with no
+button. The client tests are in `tests/massacre.cpp`.
