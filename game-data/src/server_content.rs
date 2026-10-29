@@ -1053,6 +1053,12 @@ pub mod keys {
     pub const PUPPETEER_DOOR_SEARCHED: &str = "puppeteer_door.searched";
     pub const FRANCIS_INTRUDER: &str = "francis.intruder";
     pub const FRANCIS_HIDEOUT_BUSY: &str = "francis.hideout_busy";
+    /// The Red Scorpions' door by the Scorching Desert (2103008, `thief_in1`):
+    /// its password prompt, a wrong one, and a right one before True or
+    /// False (3925) is done (pink).
+    pub const THIEF_DOOR_ASK: &str = "thief_door.ask";
+    pub const THIEF_DOOR_WRONG: &str = "thief_door.wrong";
+    pub const THIEF_DOOR_SHUT: &str = "thief_door.shut";
 
     /// "Gathering Some Strange Information" (21733): the Puppeteer's call
     /// in Tru's name (1204007, `q21733s`), and Tru (1002104, `q21733e`) on
@@ -4067,6 +4073,9 @@ mod tests {
                 keys::PUPPETEER_DOOR_WRONG,
                 keys::PUPPETEER_DOOR_SHUT,
                 keys::PUPPETEER_DOOR_SEARCHED,
+                keys::THIEF_DOOR_ASK,
+                keys::THIEF_DOOR_WRONG,
+                keys::THIEF_DOOR_SHUT,
                 keys::FRANCIS_INTRUDER,
                 keys::FRANCIS_HIDEOUT_BUSY,
                 keys::FAKE_TRU_CALL,
