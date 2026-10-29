@@ -1811,8 +1811,20 @@ can't be hurt. The leader hands the dungeon's Charles (`TREASURE_CHARLES`,
 That clears stage 1: the clear effect and 60,000 EXP for everyone in the
 event. Anyone else is told to send the leader. The tunnel (`out00`,
 `guyfawkes0_esc`) is blocked until then, with a pink line, and afterwards
-leads to the cave's portal 0. MV and the treasure room's chest come in
-later slices. The lines are placeholders.
+leads to the cave's portal 0. The lines are placeholders.
+
+In the cave, the rock (`TREASURE_ROCK`, 6741001, `guyfawkesRock`) brings
+out one MV (`TREASURE_MV`, 9400589) when broken, whose summons are its
+own skill's. MV's fall wins the run (`cleared_by_boss` stage 2, which any
+member may clear): the clear effect and 100,000 EXP for everyone in the
+event, wherever they are. Ten seconds on (`Bonus::after`, Cosmic
+`warpBonus`) the team goes to the treasure room for ten minutes, and
+then out to the lobby (picks in QUESTIONS b308). Its ten chests
+(`reactors::TREASURE_CHEST`, 6742014) spray at least fifteen drops with
+mesos (5 to 24 a pile), from Cosmic's 44-row table in
+`reward_overrides.toml` (its Persimmons and Chestnuts, quest items, as
+ordinary drops), and its own MV (9400748) drops Cosmic's four hats
+at 4% each (b309). Its other mobs drop nothing.
 
 ## Jr. Balrog's room
 

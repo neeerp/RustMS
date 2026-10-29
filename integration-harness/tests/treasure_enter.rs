@@ -3,30 +3,40 @@
 //! dungeon. A party with anyone under 140 is turned away. There a doll
 //! drops a secret letter, and the tunnel on stays blocked until the leader
 //! hands the dungeon's Charles fifteen of them, which clears the stage.
-//! Milla lets a member back out to the lobby.
+//! Milla lets a member back out to the lobby. In the cave the rock brings
+//! out MV, whose fall wins the run and takes the team on to the treasure
+//! room, on its own clock, whose chests spray their loot, and then out. The world runs events 60 times
+//! as fast (`RUSTMS_EVENT_SCALE`).
 
-use integration_harness::database::{grant_stack, set_job};
+use integration_harness::database::{
+    grant_stack, replace_item, set_job, set_str, set_weapon_attack,
+};
 use integration_harness::events::{maps, party, talk, told};
-use integration_harness::hunting::{hit_reactor, walk_to};
+use integration_harness::hunting::{attack, hit_reactor, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{
     SECRET_LETTER, SECRET_LETTERS_WANTED, TREASURE_CAVE, TREASURE_CHARLES, TREASURE_DUNGEON,
-    TREASURE_LOBBY,
+    TREASURE_LOBBY, TREASURE_MV, TREASURE_ROCK, TREASURE_ROOM,
 };
 use net::npc_scripts::CHARLES;
 use net::packet::op::RecvOpcode;
+use net::reactors::TREASURE_CHEST;
 use packet::io::write::PktWrite;
 use packet::Packet;
 use tokio::time::Duration;
 
 const MILLA: i32 = 9220019;
 const LETTER_DOLL: i32 = 6741015;
+/// Under the most a level-140 character with 32000 STR and a 1999-attack
+/// sword may hit for, and more than MV's 400,000 HP.
+const HIT: i32 = 5_000_000;
 
-/// A new character of `level`, holding `letters`, logged in at the lobby.
-async fn waiting(level: i16, letters: i16) -> WorldSession {
+/// A new character of `level`, holding `letters`, logged in at the lobby;
+/// one `strong` hits very hard.
+async fn waiting(level: i16, letters: i16, strong: bool) -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
     drop(relogin(&config).await);
@@ -34,6 +44,11 @@ async fn waiting(level: i16, letters: i16) -> WorldSession {
     set_job(id, 112, level, 50).await.unwrap();
     if letters > 0 {
         grant_stack(id, 4, 1, SECRET_LETTER, letters).await.unwrap();
+    }
+    if strong {
+        replace_item(id, -1, -11, 1302000).await.unwrap();
+        set_weapon_attack(id, 1_999).await.unwrap();
+        set_str(id, 32_000).await.unwrap();
     }
     let mut session = relogin(&config).await;
     let mut seen = Trace::default();
@@ -71,20 +86,21 @@ async fn tunnel(player: &mut WorldSession, seen: &mut Trace) {
 }
 
 #[tokio::test]
-async fn charles_takes_four_of_140_in_and_their_letters_open_the_tunnel() {
+async fn charles_takes_140s_in_whose_letters_open_the_tunnel_and_mvs_fall_wins() {
     // One of 139 is too low for the rest.
     let mut team = Vec::new();
     for level in [140, 140, 140, 139] {
-        team.push(waiting(level, 0).await);
+        team.push(waiting(level, 0, false).await);
     }
     party(&mut team).await;
     let refused = enter(&mut team[0]).await;
     assert!(!refused.warps.contains(&TREASURE_DUNGEON), "{refused:?}");
     drop(team);
 
-    let mut team = vec![waiting(140, SECRET_LETTERS_WANTED).await];
-    for _ in 0..3 {
-        team.push(waiting(140, 0).await);
+    // Five, so that one may leave and the run go on.
+    let mut team = vec![waiting(140, SECRET_LETTERS_WANTED, false).await];
+    for strong in [false, false, true, false] {
+        team.push(waiting(140, 0, strong).await);
     }
     party(&mut team).await;
     let mut seen = None;
@@ -168,6 +184,111 @@ async fn charles_takes_four_of_140_in_and_their_letters_open_the_tunnel() {
     assert!(asked.prompts.iter().any(|p| p.0 == MILLA), "{asked:?}");
     let mut trace = told(member, answer(1, 1, None)).await;
     until(&mut member.connection, &mut trace, |t| {
+        t.warps.contains(&TREASURE_LOBBY)
+    })
+    .await;
+    let left = team.remove(2);
+    traces.remove(2);
+
+    // The rock brings out MV, whose fall wins it for everyone.
+    let (player, trace) = (&mut team[2], &mut traces[2]);
+    trace.warps.clear();
+    tunnel(player, trace).await;
+    until(&mut player.connection, trace, |t| {
+        t.warps.contains(&TREASURE_CAVE)
+            && t.field
+                .reactors
+                .iter()
+                .any(|r| r.reactor_id == TREASURE_ROCK)
+    })
+    .await;
+    let rock = *trace
+        .field
+        .reactors
+        .iter()
+        .find(|r| r.reactor_id == TREASURE_ROCK)
+        .unwrap();
+    let c = &mut player.connection;
+    send(c, walk_to(rock.x, rock.y)).await;
+    for _ in 0..8 {
+        if !trace.field.alive(TREASURE_MV).is_empty() {
+            break;
+        }
+        send(c, hit_reactor(rock.object_id)).await;
+        read_for(c, trace, 600).await;
+    }
+    until(c, trace, |t| !t.field.alive(TREASURE_MV).is_empty()).await;
+    let mv = trace.field.alive(TREASURE_MV);
+    assert_eq!(mv.len(), 1, "{trace:?}");
+    for _ in 0..10 {
+        if trace.field.killed.contains(&mv[0]) {
+            break;
+        }
+        send(c, attack(mv[0], HIT)).await;
+        read_for(c, trace, 500).await;
+    }
+    assert!(trace.field.killed.contains(&mv[0]), "MV lives: {trace:?}");
+
+    // Each, wherever they are, gets the stage's EXP and goes on to the
+    // treasure room on its own clock; the one who left gets nothing.
+    for (player, trace) in team.iter_mut().zip(traces.iter_mut()) {
+        until(&mut player.connection, trace, |t| {
+            t.gains.iter().any(|&exp| exp >= 100_000) && t.warps.contains(&TREASURE_ROOM)
+        })
+        .await;
+        read_for(&mut player.connection, trace, 300).await;
+        assert!(
+            trace.countdowns.iter().any(|c| (8..=10).contains(c)),
+            "{:?}",
+            trace.countdowns
+        );
+    }
+    let mut left = left;
+    let mut seen = Trace::default();
+    read_for(&mut left.connection, &mut seen, 500).await;
+    assert!(!seen.gains.iter().any(|&exp| exp >= 100_000), "{seen:?}");
+    assert!(!seen.warps.contains(&TREASURE_ROOM), "{seen:?}");
+
+    // A chest there sprays its loot with mesos.
+    let (player, trace) = (&mut team[0], &mut traces[0]);
+    until(&mut player.connection, trace, |t| {
+        t.field
+            .reactors
+            .iter()
+            .any(|r| r.reactor_id == TREASURE_CHEST)
+    })
+    .await;
+    let chest = *trace
+        .field
+        .reactors
+        .iter()
+        .find(|r| r.reactor_id == TREASURE_CHEST)
+        .unwrap();
+    // Object ids start over on each map, so the dungeon's would mix in.
+    trace.field.drops.clear();
+    trace.field.reactors_removed.clear();
+    let c = &mut player.connection;
+    send(c, walk_to(chest.x, chest.y)).await;
+    for _ in 0..8 {
+        if trace
+            .field
+            .reactors_removed
+            .iter()
+            .any(|r| r.0 == chest.object_id)
+        {
+            break;
+        }
+        send(c, hit_reactor(chest.object_id)).await;
+        read_for(c, trace, 300).await;
+    }
+    until(c, trace, |t| {
+        let sprayed = &t.field.drops;
+        sprayed.len() >= 15 && sprayed.iter().any(|d| d.meso)
+    })
+    .await;
+
+    // Once its time is up, out to the lobby (this trace has not been there).
+    until(&mut player.connection, trace, |t| {
         t.warps.contains(&TREASURE_LOBBY)
     })
     .await;

@@ -37,7 +37,9 @@ tests.
   Tutorial Jr. Sentinel → 4031802 for quest 1035 (`Check.img/1035/1/item`),
   since the imported v95 data names another item, and Manon/Griffey add the
   pirates' 4031860/4031861 for 6944, which the pack lacks.
-  `quest = <id>` limits a drop to players with that quest started. Premium
+  `quest = <id>` limits a drop to players with that quest started, and
+  `quest = 0` makes a quest item an ordinary drop (MV's Lair's chests'
+  Persimmons and Chestnuts, which only a dated-out quest asks for). Premium
   (cash) drops are filtered out.
 - **Reactor drops** (`RewardTable::reactor_drops`): `rewards.json` mixes
   reactor ids in with the mobs. `[reactors.<id>]` overrides add to the

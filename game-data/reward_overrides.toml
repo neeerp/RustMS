@@ -239,6 +239,59 @@ quest_items = { 4031092 = 3239 }
 # time). The ten other dolls (6741016) have no drops and no script.
 replace = [{ item = 4032118, prob = 1.0 }]
 
+[reactors.6742014]
+# The chests in MV's Lair's treasure room (674030300), which spray their
+# loot with mesos (net::reactors::TREASURE_CHEST). The pack has no drops
+# for them; Cosmic's (131-reactordrops, chance n: one in n each). Every
+# item is in our Item.nx. Persimmons and Chestnuts are quest items, which
+# only quest 9330 (dated out) asks for, so `quest = 0` shows them to all.
+replace = [
+    { item = 2041100, prob = 0.5 },
+    { item = 2041103, prob = 0.5 },
+    { item = 2041106, prob = 0.5 },
+    { item = 2041109, prob = 0.5 },
+    { item = 2022278, prob = 0.5 },
+    { item = 2022103, prob = 0.5 },
+    { item = 2022098, prob = 0.5 },
+    { item = 2022097, prob = 0.5 },
+    { item = 2022055, prob = 0.5, quest = 0 },
+    { item = 2022056, prob = 0.5, quest = 0 },
+    { item = 2022063, prob = 0.2 },
+    { item = 2022064, prob = 0.2 },
+    { item = 2040803, prob = 0.2 },
+    { item = 2040818, prob = 0.2 },
+    { item = 2040909, prob = 0.2 },
+    { item = 2049000, prob = 0.2 },
+    { item = 2022014, prob = 0.2 },
+    { item = 2022016, prob = 0.2 },
+    { item = 2022020, prob = 0.2 },
+    { item = 2022021, prob = 0.2 },
+    { item = 2022024, prob = 0.2 },
+    { item = 2022026, prob = 0.2 },
+    { item = 2040823, prob = 0.2 },
+    { item = 2022185, prob = 0.2 },
+    { item = 1122001, prob = 0.1 },
+    { item = 1122002, prob = 0.04 },
+    { item = 1122003, prob = 0.1 },
+    { item = 1122004, prob = 0.066667 },
+    { item = 1122005, prob = 0.04 },
+    { item = 1122006, prob = 0.066667 },
+    { item = 1002527, prob = 0.1 },
+    { item = 1442026, prob = 0.1 },
+    { item = 1332053, prob = 0.066667 },
+    { item = 1102046, prob = 0.066667 },
+    { item = 1102047, prob = 0.066667 },
+    { item = 1102048, prob = 0.066667 },
+    { item = 1132005, prob = 0.066667 },
+    { item = 1132006, prob = 0.04 },
+    { item = 1112407, prob = 0.04 },
+    { item = 1112408, prob = 0.04 },
+    { item = 1132007, prob = 0.025 },
+    { item = 1132008, prob = 0.025 },
+    { item = 1082223, prob = 0.02 },
+    { item = 1132009, prob = 0.02 },
+]
+
 [reactors.2001002]
 # The Tower of Goddess's Salion stage (Map.nx 920010300): the spot that
 # takes the last Cellion's 4001074 (Reactor.nx 2001002-15, item event)
@@ -391,6 +444,17 @@ replace = [{ item = 2022613, prob = 1.0 }]
 # Hell's Pharaoh Jr. Yeti (926010070-89, info/link 9700019): the Hell chest
 # 2022618, the one with The Immortal Pharaoh Belt.
 replace = [{ item = 2022618, prob = 1.0 }]
+
+[mobs.9400748]
+# MV in MV's Lair's treasure room (674030300). The pack has no drops for
+# it; Cosmic's four hats at 4 in 100 each (152-drop-data, 9400748). Every
+# hat is in our String.nx.
+replace = [
+    { item = 1002858, prob = 0.04 },
+    { item = 1002859, prob = 0.04 },
+    { item = 1002860, prob = 0.04 },
+    { item = 1002861, prob = 0.04 },
+]
 
 [mobs.3300008]
 # The Prime Minister (Mushroom Castle Wedding Hall, and its refight's copy):

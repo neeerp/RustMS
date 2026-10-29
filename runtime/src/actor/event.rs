@@ -873,6 +873,7 @@ pub fn spawn(
         ariant: net::ariant::Scores::default(),
         ariant_board: None,
         ariant_results: false,
+        bonus_at: None,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -1048,6 +1049,8 @@ struct EventActor {
     ariant: net::ariant::Scores,
     /// When an Ariant battle's players next see its changed scores.
     ariant_board: Option<Instant>,
+    /// When a won team goes on to its bonus, a while after the win.
+    bonus_at: Option<Instant>,
     /// An Ariant battle's results are in: its time ends soon, and a player
     /// leaving doesn't end it while one is left (Cosmic `eventClear`).
     ariant_results: bool,
@@ -1134,6 +1137,10 @@ impl EventActor {
                     _ => self.time_up(),
                 },
                 _ = until(self.ariant_board) => self.show_ariant_scores(),
+                _ = until(self.bonus_at) => {
+                    self.bonus_at = None;
+                    self.start_bonus();
+                }
                 _ = until(self.gauge_out) => over = self.gauge_ran_out(),
             }
         }
@@ -3066,10 +3073,16 @@ impl EventActor {
         if let Some(map) = event.clear_map {
             self.move_team(None, map, None);
         }
-        // Ludibrium's takes the team on to its bonus at once (Cosmic
-        // `clearPQ`).
-        if event.bonus.as_ref().is_some_and(|bonus| bonus.on_win) {
-            self.start_bonus();
+        // Ludibrium's takes the team on to its bonus at once, and MV's
+        // Lair's ten seconds on (Cosmic `clearPQ`, TreasurePQ's
+        // `warpBonus`).
+        match event.bonus.as_ref().filter(|bonus| bonus.on_win) {
+            Some(bonus) if bonus.after > 0 => {
+                let after = net::events::scaled(Duration::from_secs(bonus.after));
+                self.bonus_at = Some(Instant::now() + after);
+            }
+            Some(_) => self.start_bonus(),
+            None => {}
         }
         if self.kind == EventKind::Showa && !self.showa_fell {
             self.slot_machine();

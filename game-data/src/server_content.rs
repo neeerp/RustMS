@@ -3068,7 +3068,8 @@ pub struct RewardEntry {
     pub min: Option<i32>,
     #[serde(default)]
     pub max: Option<i32>,
-    /// Only drops while this quest is started (our v83 overrides).
+    /// Only drops while this quest is started (our v83 overrides); 0 makes
+    /// a quest item an ordinary drop.
     #[serde(default)]
     pub quest: Option<i16>,
     /// Cash-shop "premium" drops, which v83 did not have.
@@ -5020,6 +5021,21 @@ mod tests {
         let katar = minister.iter().find(|d| d.item == Some(1302010)).unwrap();
         assert_eq!((katar.prob, katar.min, katar.max), (0.007, None, None));
         assert!(!minister.iter().any(|d| d.item == Some(2388070)));
+    }
+
+    #[test]
+    fn mvs_lairs_chests_and_mv_in_its_treasure_room_drop_without_the_pack() {
+        let table = RewardTable::load(None).unwrap();
+        let chest = table.reactor_drops(6742014);
+        assert_eq!(chest.len(), 44);
+        let scroll = chest.iter().find(|d| d.item == Some(2041100)).unwrap();
+        assert_eq!(scroll.prob, 0.5);
+        let gloves = chest.iter().find(|d| d.item == Some(1082223)).unwrap();
+        assert_eq!(gloves.prob, 0.02);
+        let hats = table.drops(9400748);
+        assert_eq!(hats.len(), 4);
+        assert!(hats.iter().all(|d| d.prob == 0.04));
+        assert!(table.drops(9400589).is_empty());
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {
