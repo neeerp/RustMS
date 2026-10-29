@@ -32,6 +32,10 @@ namespace ms
 
 		// Opens the board unless it is open; it asks for page 0.
 		static void open();
+		// Closes the board if it is open: when the player leaves the guild or
+		// is expelled, when their rank changes, and when the user list closes
+		// (v83 FUN_00a37490, FUN_0091cf4f and FUN_00919908).
+		static void dismiss();
 
 		UIGuildBBS();
 

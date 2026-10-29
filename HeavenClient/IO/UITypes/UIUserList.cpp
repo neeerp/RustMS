@@ -673,6 +673,7 @@ namespace ms
 		{
 			close_grade();
 			close_union();
+			UIGuildBBS::dismiss();
 		}
 
 		UIElement::toggle_active();
@@ -913,6 +914,7 @@ namespace ms
 			{
 				close_grade();
 				close_union();
+				UIGuildBBS::dismiss();
 				deactivate();
 			}
 			else if (keycode == KeyAction::Id::TAB)
@@ -1006,6 +1008,7 @@ namespace ms
 			case Buttons::BT_CLOSE:
 				close_grade();
 				close_union();
+				UIGuildBBS::dismiss();
 				deactivate();
 				break;
 			case Buttons::BT_HP:

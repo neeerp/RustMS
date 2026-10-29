@@ -243,6 +243,11 @@ parser in `Net/Handlers/Helpers/GuildBbsParser.cpp` (both covered by
   a reply asks for the page and waits for the server's thread.
 - Mode 8 says "This message had been deleted by another user. Please check
   again." and drops the thread. QUIT closes the board; Esc does not.
+- The board also closes, as v83's does (FUN_00a37490, FUN_0091cf4f,
+  FUN_00919908), when the player leaves the guild or is expelled, when
+  their own rank changes, and when the user list closes. A map change
+  leaves it open, as v83 does. v83 also writes a Korean line on the rank
+  change, from no string pool; that line is left out.
 - DELETE follows rank changes when the next thread arrives; the reply
   rows' delete buttons also on every reply scroll, as in v83.
 - WRITE, NOTICE (masters and Jr. Masters) and EDIT (the thread's poster or
@@ -586,8 +591,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
 - The board looks writers' names up when a list or thread arrives, where
   v83 looks them up on every draw, so a member who leaves keeps their name
   until the next request.
-- Nothing closes the board on a map change or when the player leaves the
-  guild; the server then ignores its requests.
 
 ## Inferred or unverified
 

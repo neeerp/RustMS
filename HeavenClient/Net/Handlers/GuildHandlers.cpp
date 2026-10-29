@@ -234,6 +234,7 @@ namespace ms
 			{
 				guild.clear();
 				chat_line(expelled ? "You have been expelled from the guild." : "You have quit the guild.");
+				UIGuildBBS::dismiss();
 			}
 			else
 			{
@@ -499,6 +500,10 @@ namespace ms
 
 			if (guild.set_rank(cid, rank))
 				chat_line("[" + guild.find(cid)->name + "]'s position has been changed to [" + guild.title(rank) + "].");
+
+			// v83 also writes a Korean line here that no string pool holds.
+			if (cid == Stage::get().get_player().get_oid())
+				UIGuildBBS::dismiss();
 
 			refresh();
 			break;

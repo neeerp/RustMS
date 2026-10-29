@@ -139,6 +139,14 @@ namespace ms
 		UI::get().emplace<UIGuildBBS>();
 	}
 
+	void UIGuildBBS::dismiss()
+	{
+		auto board = UI::get().get_element<UIGuildBBS>();
+
+		if (board && board->is_active())
+			board->close();
+	}
+
 	UIGuildBBS::UIGuildBBS() : UIElement(Point<int16_t>(), Point<int16_t>()), emblem_shown(false), page(0),
 		selected(0), body_scroll(0), reply_scroll(0), highlight(0), icon(0), mouse_down(false), wheel_on_body(false)
 	{
