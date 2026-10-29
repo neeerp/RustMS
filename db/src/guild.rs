@@ -1,6 +1,7 @@
 //! Guilds and their members. A character is in at most one guild (the
 //! member row's key); rank 1 is the master.
 
+use crate::alliance::GuildGone;
 use crate::schema::{characters, guild_members, guilds};
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
@@ -282,14 +283,42 @@ pub fn grow(guild_id: i32, by: i32, from: u8) -> crate::Result<Option<Vec<i32>>>
     )
 }
 
-/// Disband the guild, if member `by` is its master; its members go with it.
-/// Returns every member's id as it was, or `None` if `by` may not.
-pub fn disband(guild_id: i32, by: i32) -> crate::Result<Option<Vec<i32>>> {
-    change(
-        guild_id,
-        |guild| guild.is_master(by),
-        |conn| diesel::delete(guilds::table.find(guild_id)).execute(conn),
-    )
+/// A guild disbanded.
+#[derive(Debug)]
+pub struct Disbanded {
+    /// Every member's id, as it was.
+    pub members: Vec<i32>,
+    /// What became of its alliance, if it was in one.
+    pub alliance: Option<GuildGone>,
+}
+
+/// Disband the guild, if member `by` is its master; its members go with it,
+/// and, in the same transaction, its place in an alliance. Returns `None`
+/// if `by` may not.
+pub fn disband(guild_id: i32, by: i32) -> crate::Result<Option<Disbanded>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        let alliance_id = guilds::table
+            .find(guild_id)
+            .select(guilds::alliance_id)
+            .first::<i32>(conn)
+            .optional()?;
+        if let Some(alliance_id) = alliance_id.filter(|&id| id != 0) {
+            crate::alliance::lock(conn, alliance_id)?;
+        }
+        let Some(guild) = locked(conn, guild_id)?.filter(|guild| guild.is_master(by)) else {
+            return Ok(None);
+        };
+        diesel::delete(guilds::table.find(guild_id)).execute(conn)?;
+        let alliance = match guild.alliance_id {
+            0 => None,
+            alliance_id => crate::alliance::guild_gone(conn, alliance_id)?,
+        };
+        Ok(Some(Disbanded {
+            members: guild.members.iter().map(|member| member.id).collect(),
+            alliance,
+        }))
+    })?)
 }
 
 /// Check a change against the guild and make it, with the guild locked so

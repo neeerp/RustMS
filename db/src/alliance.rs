@@ -347,18 +347,31 @@ fn dissolve(conn: &mut PgConnection, alliance_id: i32) -> QueryResult<usize> {
 
 /// One of the alliance's guilds was disbanded. Without its master's guild
 /// the alliance goes too.
-pub fn guild_gone(alliance_id: i32) -> crate::Result<Option<GuildGone>> {
-    let mut conn = crate::connection()?;
-    Ok(conn.transaction(|conn| -> QueryResult<_> {
-        let Some(alliance) = locked(conn, alliance_id)? else {
-            return Ok(None);
-        };
-        if alliance.master().is_some() {
-            return Ok(Some(GuildGone::Remains(alliance)));
-        }
-        dissolve(conn, alliance_id)?;
-        Ok(Some(GuildGone::Disbanded(alliance)))
-    })?)
+/// Called within the transaction that deleted the guild.
+pub(crate) fn guild_gone(
+    conn: &mut PgConnection,
+    alliance_id: i32,
+) -> QueryResult<Option<GuildGone>> {
+    let Some(alliance) = locked(conn, alliance_id)? else {
+        return Ok(None);
+    };
+    if alliance.master().is_some() {
+        return Ok(Some(GuildGone::Remains(alliance)));
+    }
+    dissolve(conn, alliance_id)?;
+    Ok(Some(GuildGone::Disbanded(alliance)))
+}
+
+/// Lock the alliance until the transaction ends, before any of its guilds,
+/// the order its own changes take.
+pub(crate) fn lock(conn: &mut PgConnection, alliance_id: i32) -> QueryResult<()> {
+    alliances::table
+        .find(alliance_id)
+        .select(alliances::id)
+        .for_update()
+        .first::<i32>(conn)
+        .optional()?;
+    Ok(())
 }
 
 /// Check a change against the alliance and make it, with the alliance

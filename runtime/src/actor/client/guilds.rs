@@ -670,10 +670,17 @@ impl ClientActor {
         let disbanded = match self.in_game()?.player.guild.as_ref().map(|tag| tag.id) {
             Some(guild_id) => spawn_db(move || db::guild::disband(guild_id, cid))
                 .await?
-                .map(|to| (guild_id, to)),
+                .map(|disbanded| (guild_id, disbanded)),
             None => None,
         };
-        let Some((guild_id, to)) = disbanded else {
+        let Some((
+            guild_id,
+            db::guild::Disbanded {
+                members: to,
+                alliance,
+            },
+        )) = disbanded
+        else {
             return self
                 .send(&mut build_guild_error(GuildError::DisbandFailed)?)
                 .await;
@@ -694,7 +701,7 @@ impl ClientActor {
         match alliance_id {
             Some(alliance_id) => {
                 let guild_name = guild_name.unwrap_or_default();
-                self.allied_guild_disbanded(alliance_id, guild_id, &guild_name, &to)
+                self.allied_guild_disbanded(alliance_id, guild_id, &guild_name, &to, alliance)
                     .await
             }
             None => Ok(()),

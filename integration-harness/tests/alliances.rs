@@ -4,7 +4,8 @@
 //! time, for a price, and invites the masters of other guilds, online
 //! anywhere, who decline (DENY_ALLIANCE_REQUEST) or join. Alliance chat and
 //! the notice and titles reach the other guilds, who hear who logs in or
-//! out; a guild leaves, and the master disbands the alliance at Lenario.
+//! out; a guild leaves, another's master disbands it at Heracle, and the
+//! alliance's master disbands the alliance at Lenario.
 
 use integration_harness::database::{found_guild, set_meso};
 use integration_harness::events::{party, talk};
@@ -21,12 +22,15 @@ use tokio::time::Duration;
 
 const GUILD_HQ: i32 = 200_000_301;
 const LENARIO: i32 = 2010009;
+const HERACLE: i32 = 2010007;
 const CREATE_COST: i32 = 2_000_000;
 const GROW_COST: i32 = 1_000_000;
 // Lenario's menu.
 const CREATE: i32 = 2;
 const GROW: i32 = 3;
 const DISBAND: i32 = 4;
+// Heracle's.
+const HERACLE_DISBAND: i32 = 1;
 
 const INVITE: u8 = 0x03;
 const MEMBER_ONLINE: u8 = 0x0e;
@@ -334,6 +338,30 @@ async fn masters_found_grow_join_and_disband_an_alliance() {
         next_pink(session).await;
     }
     next_op(&mut c, GUILD_LEFT).await;
+
+    // Back in, C disbands the guild itself at Heracle; the others hear it
+    // leave the alliance.
+    send(&mut a.connection, invite(&c_name)).await;
+    next_op(&mut c, INVITE).await;
+    send(&mut c.connection, accept(alliance_id, &c_name)).await;
+    for session in [&mut a, &mut b, &mut c] {
+        next_op(session, GUILD_JOINED).await;
+    }
+    let t = step(&mut c.connection, "c talk", talk(GUILD_HQ, HERACLE)).await;
+    assert_eq!(t.prompts, [(HERACLE, 4)]);
+    let t = step(
+        &mut c.connection,
+        "c disband",
+        answer(4, 1, Some(HERACLE_DISBAND)),
+    )
+    .await;
+    assert_eq!(t.prompts, [(HERACLE, 1)]);
+    send(&mut c.connection, answer(1, 1, None)).await;
+    for session in [&mut a, &mut b] {
+        let left = next_op(session, GUILD_LEFT).await;
+        assert_eq!(alliance(&left).2.len(), 2);
+        next_pink(session).await;
+    }
 
     // Only the alliance's master disbands it.
     let t = lenario_menu(&mut b, DISBAND).await;
