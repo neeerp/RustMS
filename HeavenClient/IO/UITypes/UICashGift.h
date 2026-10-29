@@ -75,6 +75,9 @@ namespace ms
 		// What v83 says to a ring's or present's receiver and message, or nullptr,
 		// and whether it is about the name.
 		static std::pair<const char*, bool> gift_refusal(const std::string& name, const std::string& note);
+		// The same for the plain gift dialog (v83 7e47ef), which checks the
+		// name only for being there.
+		static std::pair<const char*, bool> plain_refusal(const std::string& name, const std::string& note);
 
 		void close();
 
