@@ -208,6 +208,11 @@ namespace ms
 			int32_t id;
 			int16_t y;
 			Text name, job, level, title;
+			// For the tooltips: the job's name if it was cut, whether the
+			// level is unknown, and the title.
+			std::string full_job;
+			bool unknown_level;
+			std::string title_text;
 		};
 
 		// The online or offline part of the guild's member list, a page at
@@ -334,6 +339,10 @@ namespace ms
 		void show_tip(const char* text);
 		// The Friend tab's tip for the cursor (0x91d82f, 0x90b304).
 		void friend_tip(Point<int16_t> cursor_relative);
+		// The guild and alliance tabs' tooltips, or nothing.
+		std::string guild_tip(Point<int16_t> cursor_relative) const;
+		std::string alliance_tip(Point<int16_t> cursor_relative) const;
+		static std::string row_tip(const GuildRow& row, Point<int16_t> cursor_relative, int16_t list_x);
 		Button::State blacklist_button(uint16_t buttonid);
 		// The Add prompt, and its checks once answered (0x919214).
 		void prompt_blacklist();

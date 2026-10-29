@@ -63,6 +63,44 @@ namespace ms
 		inline constexpr int16_t MEMBER_TEXT_Y = 4;
 		inline constexpr int16_t MEMBER_JOB_WIDTH = 67;
 		inline constexpr int16_t GUILD_ROW_WIDTH = 281;
+		// The tooltips over the guild and alliance tabs (FUN_00911997,
+		// FUN_009156c5; StringPool 0x2ac to 0x2b1 and 0xf0f, whose leading
+		// tab is left out). Rectangles leave out their right and bottom.
+		inline constexpr const char* TIP_ONLINE = "Online Guild Members / Total Registered Guild Members";
+		inline constexpr const char* TIP_OFFLINE = "Offline Guild Members / Total Registered Guild Members";
+		inline constexpr const char* TIP_SORT[] = { "Sort thru Name", "Sort thru Job", "Sort thru Level",
+				"Sort thru Grade" };
+		inline constexpr const char* TIP_UNKNOWN = "Unknown";
+		// The notice, in the window.
+		inline constexpr Point<int16_t> TIP_NOTICE_LT = Point<int16_t>(5, 83);
+		inline constexpr Point<int16_t> TIP_NOTICE_RB = Point<int16_t>(280, 99);
+
+		inline bool over_notice(Point<int16_t> cursor_relative)
+		{
+			return cursor_relative.x() >= TIP_NOTICE_LT.x() && cursor_relative.x() < TIP_NOTICE_RB.x() &&
+				   cursor_relative.y() >= TIP_NOTICE_LT.y() && cursor_relative.y() < TIP_NOTICE_RB.y();
+		}
+		// Below the notice, only the list's band shows anything, ends
+		// included.
+		inline constexpr int16_t TIP_LIST_TOP = 114;
+		inline constexpr int16_t TIP_LIST_BOTTOM = 304;
+		// A section's count, in the list from its header's top, 40 pixels
+		// wider than the count's text (0x90f8bb, 0x91345b).
+		inline constexpr int16_t TIP_COUNT_EXTRA = 40;
+		inline constexpr int16_t TIP_GUILD_COUNT_LEFT = 165;
+		inline constexpr int16_t TIP_GUILD_COUNT_TOP = 1;
+		inline constexpr int16_t TIP_GUILD_COUNT_BOTTOM = 23;
+		inline constexpr int16_t TIP_UNION_COUNT_LEFT = 70;
+		inline constexpr int16_t TIP_UNION_COUNT_TOP = 3;
+		inline constexpr int16_t TIP_UNION_COUNT_BOTTOM = 25;
+		// In a row: the cut job's cell, in the list's x, then the level's
+		// stretch, ends included, and where the title's starts, in the
+		// window's x.
+		inline constexpr int16_t TIP_JOB_LEFT = 97;
+		inline constexpr int16_t TIP_JOB_RIGHT = 164;
+		inline constexpr int16_t TIP_LEVEL_LEFT = 97;
+		inline constexpr int16_t TIP_LEVEL_RIGHT = 204;
+		inline constexpr int16_t TIP_TITLE_LEFT = 220;
 		// A picked row is filled from its second column (0xFF244768).
 		inline constexpr int16_t PICKED_LEFT = 1;
 		inline constexpr int16_t PICKED_WIDTH = GUILD_ROW_WIDTH - PICKED_LEFT;
