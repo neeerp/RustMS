@@ -90,23 +90,27 @@ namespace ms
 				mount = UICharInfo::Mount{ mount_level, mount_exp, mount_tiredness };
 		}
 
-		int8_t wishlist_size = recv.read_byte();
+		// The wish list's SNs, as many as an unsigned byte says.
+		auto wishlist_size = static_cast<uint8_t>(recv.read_byte());
+		std::vector<int32_t> wishes;
 
-		for (int8_t sn = 0; sn < wishlist_size; sn++)
-			recv.skip_int(); // wishlist_item
+		for (uint8_t i = 0; i < wishlist_size; i++)
+			wishes.push_back(recv.read_int());
 
-		recv.skip_int(); // monster_book_level
-		recv.skip_int(); // monster_book_card_normal
-		recv.skip_int(); // monster_book_card_special
-		recv.skip_int(); // monster_book_cards_total
-		recv.skip_int(); // monster_book_cover
+		// The Monster Book (FUN_00684798), then the medal worn and the medal quests done (FUN_00904ccc).
+		UICharInfo::Book book;
+		book.level = recv.read_int();
+		book.normal = recv.read_int();
+		book.special = recv.read_int();
+		book.total = recv.read_int();
+		book.cover = recv.read_int();
 
-		recv.skip_int(); // medal
+		int32_t medal = recv.read_int();
+		auto medal_quests_size = static_cast<uint16_t>(recv.read_short());
+		std::vector<int16_t> medal_quests;
 
-		int16_t medal_quests_size = recv.read_short();
-
-		for (int16_t s = 0; s < medal_quests_size; s++)
-			recv.skip_short(); // medal_quest
+		for (uint16_t i = 0; i < medal_quests_size; i++)
+			medal_quests.push_back(recv.read_short());
 
 		// Update the character information window
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
@@ -117,6 +121,9 @@ namespace ms
 
 			if (mount)
 				charinfo->update_mount(character_id, *mount);
+
+			charinfo->update_wishes(character_id, wishes);
+			charinfo->update_collection(character_id, book, medal, medal_quests);
 		}
 	}
 

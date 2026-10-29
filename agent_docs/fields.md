@@ -77,9 +77,13 @@ included, the field sends their client actor
 answers with CHAR_INFO (0x3D, `build::world::info::build_character_info`)
 built from its own `Player`, so the level and fame are current rather than
 the field's projection. It lists the pets out, without their equipment.
-It shows the worn mount's level, EXP and tiredness. Alliance, wish list,
-and monster book are empty; the medal is the item
-worn in the medal slot. A request for someone not on the map gets no answer.
+It shows the worn mount's level, EXP and tiredness. The alliance's name and
+the wish list's SNs come from the database. The Monster Book follows Cosmic:
+its level, the different normal and special cards, their total, and the
+cover as its card's mob (`net::monster_book::mob_of`), since v83 loads
+`Mob/<id>.img` for it. The medal is the item worn in the medal slot, followed
+by the completed quests from 29000, sorted, whose medals the client lists. A
+request for someone not on the map gets no answer.
 
 ## Fame
 

@@ -356,9 +356,16 @@ from `UI.nx`. Moved so far:
   Double-clicking someone else replaces the window. TAMING MOB, PET INFO, and
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
   and WISHLIST open `backgrnd4` and `backgrnd3` beside it. The pet page shows
-  the pets out and the taming page the mount worn, from CHAR_INFO; the
-  collection, item and wish list pages are empty, as the server sends an
-  empty wish list and monster book there and the client skips them.
+  the pets out and the taming page the mount worn, from CHAR_INFO. The
+  collection page shows the Monster Book's level (with its
+  `MonsterBook/icon`), the cover's mob, and the different normal and special
+  cards, then the medal worn and the titles of the medal quests done (from
+  29000, each quest's `viewMedalItem` less "'s Medal"), four at a time. The
+  item panel lists the equipment the character wears, from the look they came
+  with (one's own from the equipment), cash items before what they cover
+  (`char_info::worn_items`, v83 FUN_00903e24). The wish panel lists the wish
+  list from CHAR_INFO, last first, as Commodity.img sells it; its BtPresent
+  gift buttons are not drawn yet.
   Excluded items are disabled. Family opens the player's own Family
   window or someone else's Family Tree (`agent_docs/families.md`). REQ PARTY, greyed in the
   player's own window, invites the character when the player leads a party,
@@ -1000,7 +1007,7 @@ What is left that is larger:
 | --- | --- | --- |
 | MTS | Nothing, client or server | L |
 | Cash shop | CHARGE does nothing | S |
-| Character info | The collection, item and wish list pages are empty | S |
+| Character info | The wish panel's BtPresent (gift from the Cash Shop) | S |
 
 ## Protocol deviations fixed
 

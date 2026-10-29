@@ -85,6 +85,24 @@ namespace ms
 
 		// Show the pets out, and open the pet box to the first (FUN_00903ce7).
 		void update_pets(int32_t character_id, const std::vector<Pet> &pets);
+
+		// List the wishes, by their Cash Shop SNs, and the equipment the character wears now (FUN_009041c8,
+		// FUN_00903e24).
+		void update_wishes(int32_t character_id, const std::vector<int32_t> &sns);
+
+		// The Monster Book, from CHAR_INFO (FUN_00684798).
+		struct Book
+		{
+			int32_t level;
+			int32_t normal;
+			int32_t special;
+			int32_t total;
+			// The mob on the cover, or 0.
+			int32_t cover;
+		};
+
+		// Fill the collection page: the book, the medal worn and the medal quests completed (FUN_00904ccc).
+		void update_collection(int32_t character_id, const Book &book, int32_t medal, const std::vector<int16_t> &quests);
 		// Show the fame the player just raised or dropped (FAME_RESPONSE).
 		void change_fame(int16_t fame);
 
@@ -170,6 +188,17 @@ namespace ms
 		// The rows from `offset`, in the pet box or a little higher in the taming box.
 		void draw_items(const std::vector<ItemRow> &rows, int16_t offset, bool taming) const;
 		void set_panel(Panel panel);
+		// The rows of the panel open.
+		const std::vector<ItemRow> &panel_rows() const;
+		// Whether the cursor is on the panel.
+		bool on_panel(Point<int16_t> cursorpos) const;
+		void draw_panel() const;
+		void draw_collection() const;
+		// The medal titles from the list's place (0x902ae0).
+		void show_medals();
+		// The equipment the character wears now, for the item panel (FUN_00903e24).
+		void list_worn();
+		static ItemRow panel_row(int32_t itemid, const std::string &name, bool equip);
 
 		// Whether the window can show the mount: not when the saddle worn doesn't fit it (FUN_00903e24).
 		bool shows_mount() const;
@@ -223,6 +252,28 @@ namespace ms
 		Slider taming_slider;
 		Texture crown;
 		Texture req_level;
+
+		// The item and wish panels' rows, three at a time.
+		std::vector<ItemRow> worn_rows;
+		std::vector<ItemRow> wish_rows;
+		int16_t panel_offset = 0;
+		Slider panel_slider;
+
+		// The collection page.
+		std::vector<Texture> level_icons;
+		Texture level_icon;
+		Text book_level;
+		Text cover_name;
+		Text book_total;
+		Text book_normal;
+		Text book_special;
+		Texture medal_icon;
+		Text medal_name;
+		Text medal_count;
+		std::vector<int16_t> medal_quests;
+		std::vector<Text> medal_titles;
+		int16_t medal_offset = 0;
+		Slider medal_slider;
 		std::unique_ptr<UIPetExceptions> exceptions;
 		Point<int16_t> cursor;
 	};

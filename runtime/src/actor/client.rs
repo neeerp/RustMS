@@ -2011,15 +2011,22 @@ impl ClientActor {
             ServerMessage::FamilyBuff(buff) => self.family_buff(buff).await?,
             ServerMessage::FamilyBondingCount(online) => self.family_bonding(online).await?,
             ServerMessage::CharInfoRequested { requester } => {
-                let alliance = match self.alliance_id()? {
-                    Some(alliance_id) => spawn_db(move || db::alliance::name(alliance_id))
-                        .await?
-                        .unwrap_or_default(),
-                    None => String::new(),
-                };
-                let packet =
-                    build::world::info::build_character_info(&self.in_game()?.player, &alliance)
-                        .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+                let alliance_id = self.alliance_id()?;
+                let character_id = self.in_game()?.player.stats.id;
+                let (alliance, wishes) = spawn_db(move || {
+                    let alliance = match alliance_id {
+                        Some(alliance_id) => db::alliance::name(alliance_id)?.unwrap_or_default(),
+                        None => String::new(),
+                    };
+                    Ok((alliance, db::cash_shop::wish_list(character_id)?))
+                })
+                .await?;
+                let packet = build::world::info::build_character_info(
+                    &self.in_game()?.player,
+                    &alliance,
+                    &wishes,
+                )
+                .map_err(|e| RuntimeError::Handler(e.to_string()))?;
                 requester.send_packet(packet);
             }
             ServerMessage::Famed {

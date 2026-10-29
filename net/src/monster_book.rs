@@ -20,6 +20,24 @@ fn cards() -> Result<&'static HashMap<i32, i32>, &'static str> {
     })
 }
 
+/// Card to its mob, from the same `info/mob`.
+fn mobs() -> Result<&'static HashMap<i32, i32>, &'static str> {
+    static MOBS: OnceLock<Result<HashMap<i32, i32>, String>> = OnceLock::new();
+    load::once(&MOBS, || {
+        let data = crate::items::data()?;
+        let cards = data.monster_cards().map_err(|e| e.to_string())?;
+        Ok::<_, String>(cards.into_iter().collect::<HashMap<_, _>>())
+    })
+}
+
+/// The mob on `card`, if it is a card.
+pub fn mob_of(card: i32) -> Option<i32> {
+    if card == 0 {
+        return None;
+    }
+    mobs().ok()?.get(&card).copied()
+}
+
 /// The card `mob_id` drops, if it has one.
 pub fn card_for(mob_id: i32) -> Option<i32> {
     cards().ok()?.get(&mob_id).copied()
@@ -51,5 +69,14 @@ mod tests {
         assert_eq!(card_for(100100), Some(2380000)); // Snail
         assert_eq!(card_for(100101), Some(2380001)); // Blue Snail
         assert_eq!(card_for(9300018), None); // the tutorial's Jr. Sentinel
+    }
+
+    #[test]
+    fn a_card_names_its_mob() {
+        if crate::items::data().is_err() {
+            return;
+        }
+        assert_eq!(mob_of(2380001), Some(100101));
+        assert_eq!(mob_of(0), None);
     }
 }

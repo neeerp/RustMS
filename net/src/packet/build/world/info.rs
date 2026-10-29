@@ -3,10 +3,17 @@ use game::inventory::equip_slot;
 use game::{InventoryType, Player};
 use packet::{io::write::PktWrite, Packet};
 
+/// The medal (title) quests start here.
+const MEDAL_QUESTS: i16 = 29000;
+
 /// CHAR_INFO: what the character info window shows about `player`, whose
-/// guild is in the alliance `alliance` (empty for none). There are no wish
-/// lists or monster books yet, so those are empty.
-pub fn build_character_info(player: &Player, alliance: &str) -> Result<Packet, NetworkError> {
+/// guild is in the alliance `alliance` (empty for none), with their cash
+/// shop wish list `wishes` (commodity SNs).
+pub fn build_character_info(
+    player: &Player,
+    alliance: &str,
+    wishes: &[i32],
+) -> Result<Packet, NetworkError> {
     let stats = &player.stats;
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CharInfo as i16)?;
@@ -51,18 +58,39 @@ pub fn build_character_info(player: &Player, alliance: &str) -> Result<Packet, N
     } else {
         packet.write_byte(0)?;
     }
-    packet.write_byte(0)?; // wish list size
-    for _ in 0..5 {
-        // Monster book level, normal, special, and total cards, and cover.
-        packet.write_int(0)?;
+    packet.write_byte(wishes.len() as u8)?;
+    for &sn in wishes {
+        packet.write_int(sn)?;
     }
+    // The Monster Book (v83 FUN_00684798): its level, the different normal
+    // and special cards, their total, and the cover as its card's mob, whose
+    // `Mob/<id>.img` name the client shows.
+    let book = &player.monster_book;
+    let (normal, special) = (book.count(false), book.count(true));
+    packet.write_int(book.book_level())?;
+    packet.write_int(normal)?;
+    packet.write_int(special)?;
+    packet.write_int(normal + special)?;
+    packet.write_int(crate::monster_book::mob_of(book.cover()).unwrap_or(0))?;
     let medal = player
         .inventory
         .equipped_ids()
         .find(|&(slot, _)| slot == equip_slot::MEDAL)
         .map_or(0, |(_, id)| id);
     packet.write_int(medal)?;
-    packet.write_short(0)?; // completed medal quests
+    // The medal quests done (from 29000, as Cosmic counts them), whose
+    // `viewMedalItem` titles the client lists.
+    let mut medals: Vec<i16> = player
+        .quests
+        .completed()
+        .map(|(quest, _)| quest)
+        .filter(|&quest| quest >= MEDAL_QUESTS)
+        .collect();
+    medals.sort_unstable();
+    packet.write_short(medals.len() as i16)?;
+    for quest in medals {
+        packet.write_short(quest)?;
+    }
     Ok(packet)
 }
 
@@ -81,7 +109,7 @@ mod tests {
             equip_slot::MEDAL,
             Item::equipment(1142000, EquipStats::default()),
         );
-        let packet = build_character_info(&player, "").unwrap();
+        let packet = build_character_info(&player, "", &[]).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CharInfo as i16)
@@ -96,9 +124,8 @@ mod tests {
             .byte(0)
             .byte(0)
             .byte(0);
-        for _ in 0..5 {
-            expect.int(0);
-        }
+        // A book of no cards is at level 1.
+        expect.int(1).int(0).int(0).int(0).int(0);
         expect.int(1142000).short(0).end();
     }
 
@@ -127,7 +154,7 @@ mod tests {
             equip_slot::PET_CLOTHES[0] - 100,
             Item::equipment(1802000, EquipStats::default()),
         );
-        let packet = build_character_info(&player, "").unwrap();
+        let packet = build_character_info(&player, "", &[]).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
         expect.byte(10).short(100).short(7).byte(0);
@@ -157,7 +184,7 @@ mod tests {
             exp: 200,
             tiredness: 40,
         };
-        let packet = build_character_info(&player, "").unwrap();
+        let packet = build_character_info(&player, "", &[]).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
         expect.byte(10).short(100).short(7).byte(0);
@@ -176,7 +203,7 @@ mod tests {
             emblem: Emblem::default(),
             alliance_id: 0,
         });
-        let packet = build_character_info(&player, "Union").unwrap();
+        let packet = build_character_info(&player, "Union", &[]).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CharInfo as i16)
@@ -187,5 +214,50 @@ mod tests {
             .byte(0)
             .string("Testers")
             .string("Union");
+    }
+
+    #[test]
+    fn lists_the_wishes() {
+        let player = crate::codec::stats::sample_player();
+        let packet = build_character_info(&player, "", &[50200005, 20000053]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
+        expect.byte(10).short(100).short(7).byte(0);
+        expect.string("").string("").byte(0).byte(0).byte(0);
+        expect.byte(2).int(50200005).int(20000053);
+    }
+
+    #[test]
+    fn shows_the_book_and_the_medal_quests() {
+        use game::quest::{QuestLog, QuestRecord, QuestStatus};
+        use std::time::UNIX_EPOCH;
+
+        let mut player = crate::codec::stats::sample_player();
+        player.monster_book =
+            game::MonsterBook::new(2380001, [(2380000, 5), (2380001, 1), (2388000, 2)]);
+        let done = |quest_id| QuestRecord {
+            quest_id,
+            status: QuestStatus::Completed { at: UNIX_EPOCH },
+        };
+        player.quests = QuestLog::from_records([
+            done(29005),
+            done(1000),
+            done(29001),
+            QuestRecord {
+                quest_id: 29002,
+                status: QuestStatus::Started {
+                    kills: vec![],
+                    info: None,
+                },
+            },
+        ]);
+        let packet = build_character_info(&player, "", &[]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
+        expect.byte(10).short(100).short(7).byte(0);
+        expect.string("").string("").byte(0).byte(0).byte(0).byte(0);
+        let cover = crate::monster_book::mob_of(2380001).unwrap_or(0);
+        expect.int(1).int(2).int(1).int(3).int(cover);
+        expect.int(0).short(2).short(29001).short(29005).end();
     }
 }
