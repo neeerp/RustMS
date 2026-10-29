@@ -17,6 +17,7 @@ mod claim;
 mod coconut;
 mod combat;
 mod conti;
+mod death_item;
 mod door;
 mod duey;
 mod emote;
@@ -113,6 +114,7 @@ pub use self::combat::{
     MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
 };
 pub use self::conti::ContiStateRequestHandler;
+pub use self::death_item::UseDeathItemHandler;
 pub use self::door::UseDoorHandler;
 pub use self::duey::DueyActionHandler;
 pub use self::emote::FaceExpressionHandler;

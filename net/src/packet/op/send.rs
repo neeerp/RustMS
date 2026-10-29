@@ -207,6 +207,8 @@ pub enum SendOpcode {
     DamagePlayer = 0xC0,
     FacialExpression = 0xC1,
     ShowItemEffect = 0xC2,
+    /// A Wheel of Destiny's tomb effect (FUN_00983e40).
+    ShowUpgradeTombEffect = 0xC3,
     ShowForeignEffect = 0xC6,
     GiveForeignBuff = 0xC7,
     CancelForeignBuff = 0xC8,

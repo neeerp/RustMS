@@ -413,6 +413,19 @@ namespace ms
 			otherchar->set_item_effect(item_id);
 	}
 
+	void ShowUpgradeTombEffectHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		recv.skip_int(); // item id
+		int16_t x = static_cast<int16_t>(recv.read_int());
+		int16_t y = static_cast<int16_t>(recv.read_int());
+
+		Stage& stage = Stage::get();
+
+		if (stage.get_chars().get_char(cid))
+			stage.show_ground_effect(nl::nx::effect["BasicEff.img"]["TombUpgrade"], Point<int16_t>(x, y));
+	}
+
 	void ShowChairHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();

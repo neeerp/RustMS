@@ -1950,8 +1950,12 @@ measured from 2008 GMS footage. The window is "PRESS OK TO BE REVIVED."
 holding a Wheel of Destiny gets Notice/2 instead, which asks whether to revive
 on this map, with YES and NO. Wheels are refused in some field types and maps
 (v83 FUN_004a95bf, `field_limit::may_use_wheel`). Before showing Notice/2 the
-client sends USE_DEATHITEM (0x35: the wheel's id and the tombstone's position),
-which the server ignores. YES sets the wheel byte. The SET_FIELD that follows
+client sends USE_DEATHITEM (0x35: the wheel's id and the tombstone's position)
+and plays `BasicEff.img/TombUpgrade` there once (FUN_0095af8e, report b334).
+The server, for a dead player holding the wheel, sends the rest of the map
+SHOW_UPGRADE_TOMB_EFFECT (0xC3: the player's id, the wheel's id, x and y), and
+they play the same animation (`UseDeathItemHandler`); the wheel isn't used
+then. YES sets the wheel byte. The SET_FIELD that follows
 carries the new HP, which brings the player back up.
 
 Some mobs' hits knock items out of the bag (`loseItem/<n>`: `id`, `prop`,

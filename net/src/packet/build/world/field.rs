@@ -145,6 +145,23 @@ pub fn build_show_item_effect(character_id: i32, item_id: i32) -> Result<Packet,
     Ok(packet)
 }
 
+/// SHOW_UPGRADE_TOMB_EFFECT (recv 195): the Wheel of Destiny's
+/// `BasicEff/TombUpgrade`, played once at (`x`, `y`) for the others on the
+/// map (FUN_00983e40).
+pub fn build_upgrade_tomb_effect(
+    character_id: i32,
+    item_id: i32,
+    x: i32,
+    y: i32,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::ShowUpgradeTombEffect as i16)?;
+    for value in [character_id, item_id, x, y] {
+        packet.write_int(value)?;
+    }
+    Ok(packet)
+}
+
 /// SHOW_CONSUME_EFFECT (recv 166): the aura of the item buff `item_id`
 /// over a player, or none with 0. The owner is told too, and the client
 /// keeps it until told otherwise.

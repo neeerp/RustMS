@@ -100,6 +100,8 @@ pub enum RecvOpcode {
     GuildBbs = 0x9B,
     FaceExpression = 0x33,
     UseItemEffect = 0x34,
+    /// A dead player's Wheel of Destiny, with where they lie (FUN_0095af8e).
+    UseDeathItem = 0x35,
     Whisper = 0x78,
     /// A line to the player's spouse (FUN_008defff).
     SpouseChat = 0x79,
