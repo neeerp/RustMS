@@ -333,6 +333,12 @@ namespace ms
 		glfwSetClipboardString(glwnd, text.c_str());
 	}
 
+	void Window::move_cursor(int16_t x, int16_t y)
+	{
+		glfwSetCursorPos(glwnd, x, y);
+		cursor_callback(glwnd, x, y);
+	}
+
 	std::string Window::getclipboard() const
 	{
 		const char *text = glfwGetClipboardString(glwnd);

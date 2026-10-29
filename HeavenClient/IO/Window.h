@@ -71,6 +71,9 @@ namespace ms
 
 		std::string getclipboard() const;
 
+		// Puts the mouse pointer at `x, y` in the window, as if moved there.
+		void move_cursor(int16_t x, int16_t y);
+
 		void toggle_fullscreen();
 
 		// Save the next frame as the next free MapleNNNN.jpg in the working

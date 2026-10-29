@@ -250,8 +250,12 @@ from `UI.nx`. Moved so far:
   the window closes. BtGather and BtSort rearrange the bag, and BtCoin asks
   how many mesos to drop. The full window's BtCashshop enters the Cash Shop,
   as the status bar's button does. It is greyed on the Set-up and Cash tabs
-  and on a tab of 96 slots. v83 also has the shop show the tab's slot
-  expansion, which our Cash Shop can't take yet.
+  and on a tab of 96 slots. The shop then opens at the tab's slot expansion
+  package (Add Equip, Use or ETC Slots), turned to its page with the
+  pointer moved onto its cell, as v83 does (0x81d3ca sets the SN;
+  4bc324/4725ef/4b95ed show it). The wish-list present shows its item the
+  same way. The Equipment window's BtCashshop handler exists in v83, but
+  the window never creates the button, so it has none.
 - **Equipment window** (`UIEquipInventory`, `UIWindow.img/Equip`): the labelled
   `backgrnd` grid (33 px cells from (5,35)) with an icon per worn slot, and the
   `pet` panel that PET EQUIP opens beside it, laid out from period footage.
