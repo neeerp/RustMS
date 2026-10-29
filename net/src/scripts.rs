@@ -1591,6 +1591,8 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             )
         }
         "metro_in00" => opens(crate::npc_scripts::MR_LIM),
+        // Happyville's chimney: Santa has a word.
+        "in_xmas_party" => opens(crate::npc_scripts::SANTA),
         "metro_Chat00" => ScriptOutcome {
             effects: vec![Effect::ScenePart(
                 "Effect/Direction2.img/metro/Im".to_string(),
@@ -4183,6 +4185,11 @@ mod tests {
         assert_eq!(
             portal("metro_in00", &player).unwrap().effects,
             [Effect::OpenNpc(crate::npc_scripts::MR_LIM)]
+        );
+        let chimney = portal("in_xmas_party", &player).unwrap();
+        assert_eq!(
+            chimney.effects,
+            [Effect::OpenNpc(crate::npc_scripts::SANTA)]
         );
         let warned = portal("metro_Chat00", &player).unwrap();
         assert_eq!(

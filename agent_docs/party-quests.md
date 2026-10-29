@@ -1784,6 +1784,12 @@ lobby, and in an arena the way out to the exit map, which leaves the
 event (`NpcScript::snowman`). The exit map's portal `st01`
 (`08_xmas_out`) leads back to the lobby.
 
+In Happyville, Santa (`SANTA`, 9209100) only greets
+(`holiday.santa.greeting`). Pressing Up on the house's chimney
+(`chimney01`, `in_xmas_party`) goes nowhere. It opens Santa instead,
+who tells off anyone within 77 px of it (`holiday.santa.chimney`,
+`npc_scripts::by_santas_chimney`, after Cosmic's 9209100).
+
 ## MV's Lair
 
 MV's Lair (`EventKind::Treasure`, `events::TREASURE`; Cosmic's custom

@@ -6,7 +6,8 @@
 //! everyone, who land there too; the exit's portal leads back to the
 //! lobby, and the lobby's Snowman home to Happyville. The harness world
 //! runs events 60 times as fast (`RUSTMS_EVENT_SCALE`), so the clock reads
-//! seconds.
+//! seconds. In Happyville, Santa tells off anyone going down the chimney
+//! there.
 
 use game_data::server_content::keys;
 use integration_harness::events::{enter_holiday, maps, party, said, talk, told, waiting_in};
@@ -15,7 +16,7 @@ use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::WorldSession;
 use net::events::{HAPPYVILLE, HOLIDAY};
-use net::npc_scripts::{SNOWMAN, SNOW_SPIRIT};
+use net::npc_scripts::{SANTA, SANTAS_CHIMNEY, SNOWMAN, SNOW_SPIRIT};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -38,6 +39,22 @@ async fn take(player: &mut WorldSession, map: i32, name: &str) {
     p.write_str_with_length(name).unwrap();
     p.write_short(0).unwrap();
     send(&mut player.connection, p).await;
+}
+
+#[tokio::test]
+async fn santa_greets_and_tells_off_one_going_down_the_chimney() {
+    let mut player = waiting_in(HAPPYVILLE, 30, &[]).await;
+    let hello = told(&mut player, talk(HAPPYVILLE, SANTA)).await;
+    assert!(said(&hello, keys::HOLIDAY_SANTA_GREETING), "{hello:?}");
+    told(&mut player, answer(0, 0, None)).await;
+
+    let mut seen = Trace::default();
+    take(&mut player, HAPPYVILLE, SANTAS_CHIMNEY).await;
+    until(&mut player.connection, &mut seen, |t| {
+        said(t, keys::HOLIDAY_SANTA_CHIMNEY)
+    })
+    .await;
+    assert!(seen.arrivals.is_empty(), "{seen:?}");
 }
 
 #[tokio::test]

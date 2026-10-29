@@ -1390,6 +1390,8 @@ unsourced = [
     "holiday.busy",
     "holiday.snowman.home",
     "holiday.snowman.leave",
+    "holiday.santa.greeting",
+    "holiday.santa.chimney",
     "holiday.arena.intro",
     "holiday.arena.leader",
     "holiday.arena.grow",

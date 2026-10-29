@@ -155,6 +155,13 @@ impl ClientActor {
                 return self.start_script(script).await;
             }
         }
+        if npc_id == net::npc_scripts::SANTA {
+            let chimney =
+                net::npc_scripts::by_santas_chimney(player.stats.map_id, self.in_game()?.position);
+            return self
+                .start_script(net::npc_scripts::NpcScript::santa(chimney))
+                .await;
+        }
         if npc_id == net::npc_scripts::GUON && player.stats.map_id == net::events::PIRATE.lobby {
             return self.talk_about_event(net::events::EventKind::Pirate).await;
         }
