@@ -282,6 +282,9 @@ pub enum SendOpcode {
     Parcel = 0x142,
     QueryCashResult = 0x144,
     CashShopOperation = 0x145,
+    /// The receiver of a Cash Shop gift, for the client to check the gift
+    /// against and ask before paying (0x46ec85).
+    GiftInfoResult = 0x147,
     /// Whether the name typed for a Name Change is free (0x47baea).
     CheckNewNameResult = 0x148,
     /// Whether the character may ask for a new name (0x47bbb6).

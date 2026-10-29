@@ -279,6 +279,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::ExtraPendantSlot as i16 => "ExtraPendantSlot",
         x if x == SendOpcode::QueryCashResult as i16 => "QueryCashResult",
         x if x == SendOpcode::CashShopOperation as i16 => "CashShopOperation",
+        x if x == SendOpcode::GiftInfoResult as i16 => "GiftInfoResult",
         x if x == SendOpcode::CheckNewNameResult as i16 => "CheckNewNameResult",
         x if x == SendOpcode::NameChangeRulesResult as i16 => "NameChangeRulesResult",
         x if x == SendOpcode::CancelNameChangeResult as i16 => "CancelNameChangeResult",
@@ -638,8 +639,29 @@ pub fn build_cash_shop_buy_character_slot(cash_type: i32, sn: i32) -> Result<Pac
 }
 
 /// CASHSHOP_OPERATION gift: the birthday code, the serial number, and the
-/// receiver's name and message.
+/// receiver's name and message. The first asks about the receiver; the same
+/// again pays.
 pub fn build_cash_shop_gift(
+    birthday: i32,
+    sn: i32,
+    to: &str,
+    message: &str,
+) -> Result<Packet, String> {
+    build_cash_shop_gift_as(0x04, birthday, sn, to, message)
+}
+
+/// CASHSHOP_OPERATION 0x1F: a package's gift, paid for at once.
+pub fn build_cash_shop_package_gift(
+    birthday: i32,
+    sn: i32,
+    to: &str,
+    message: &str,
+) -> Result<Packet, String> {
+    build_cash_shop_gift_as(0x1F, birthday, sn, to, message)
+}
+
+fn build_cash_shop_gift_as(
+    action: u8,
     birthday: i32,
     sn: i32,
     to: &str,
@@ -647,7 +669,7 @@ pub fn build_cash_shop_gift(
 ) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
     packet
-        .write_byte(0x04)
+        .write_byte(action)
         .map_err(|e| format!("failed to write gift action: {e}"))?;
     packet
         .write_int(birthday)

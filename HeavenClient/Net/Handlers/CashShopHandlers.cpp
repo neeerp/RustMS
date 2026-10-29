@@ -18,9 +18,12 @@
 #include "CashShopHandlers.h"
 
 #include "Helpers/CashShopParser.h"
+#include "Helpers/CharacterParser.h"
 #include "Helpers/ItemParser.h"
+#include "Helpers/LoginParser.h"
 
 #include "../../Character/Inventory/ItemExpiry.h"
+#include "../../Character/Inventory/ItemProperties.h"
 #include "../../Data/CashCoupon.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/NameChange.h"
@@ -200,6 +203,87 @@ namespace ms
 			if (cashshop->buying_avatar())
 				cashshop->buy_next_avatar_item();
 		}
+	}
+
+	void GiftInfoResultHandler::handle(InPacket& recv) const
+	{
+		auto cashshop = UI::get().get_element<UICashShop>();
+
+		if (!cashshop)
+			return;
+
+		cashshop->answered();
+
+		// StringPool 0x11ba.
+		if (recv.read_byte() == 0)
+		{
+			UI::get().emplace<UIOk>("Please confirm whether\\nthe character's name is correct.", [](bool) {});
+
+			return;
+		}
+
+		int32_t birthday = recv.read_int();
+		int32_t sn = recv.read_int();
+		std::string to = recv.read_string();
+		std::string message = recv.read_string();
+
+		// The receiver's character data, as SET_FIELD sends it; v83 drops
+		// the answer unless every part is there.
+		if (recv.read_long() != -1)
+			return;
+
+		recv.skip_byte();
+		recv.skip_int();
+
+		StatsEntry stats = LoginParser::parse_stats(recv);
+		recv.skip_byte();
+
+		if (recv.read_bool())
+			recv.skip_string();
+
+		Inventory inventory;
+		SkillBook skills;
+		CharacterParser::parse_inventory(recv, inventory);
+		CharacterParser::parse_skillbook(recv, skills);
+
+		cash_gift::Receiver receiver;
+		receiver.name = to;
+		receiver.job = static_cast<int16_t>(stats.stats[MapleStat::Id::JOB]);
+		receiver.level = static_cast<int16_t>(stats.stats[MapleStat::Id::LEVEL]);
+		receiver.fame = static_cast<int16_t>(stats.stats[MapleStat::Id::FAME]);
+
+		int64_t pet = stats.petids.empty() ? 0 : stats.petids[0];
+		receiver.pet = pet != 0 && inventory.find_cash_item(InventoryType::Id::CASH, pet) != 0;
+		receiver.weapon = inventory.get_item_id(InventoryType::Id::EQUIPPED, EquipSlot::Id::WEAPON);
+		receiver.riding = skills.get_level(1004) > 0 || skills.get_level(10001004) > 0;
+
+		// An item the Scissors of Karma work on: tradeAvailable and no karma
+		// yet, in a tab or worn (not as cash). Pets' karma flag isn't kept here.
+		auto karma_target = [&](InventoryType::Id tab, int16_t slot)
+		{
+			int32_t id = inventory.get_item_id(tab, slot);
+
+			if (id == 0 || !ItemData::get(id).get_properties().trade_available)
+				return false;
+
+			if (auto equip = inventory.get_equip(tab, slot))
+				return !(equip->get_flags() & item_properties::EQUIP_KARMA);
+
+			if (auto item = inventory.get_item(tab, slot))
+				return !(item->get_flags() & item_properties::BUNDLE_KARMA);
+
+			return true;
+		};
+
+		for (InventoryType::Id tab : { InventoryType::Id::EQUIP, InventoryType::Id::USE, InventoryType::Id::SETUP,
+									   InventoryType::Id::ETC, InventoryType::Id::CASH })
+			for (int16_t slot = 1; slot <= inventory.get_slotmax(tab) && !receiver.karma_target; slot++)
+				receiver.karma_target = karma_target(tab, slot);
+
+		for (int16_t slot = 0; slot < 0x34 && !receiver.karma_target; slot++)
+			receiver.karma_target = karma_target(InventoryType::Id::EQUIPPED, slot);
+
+		cashshop->gift_looked_up(birthday, sn, to, message, receiver);
 	}
 
 	namespace

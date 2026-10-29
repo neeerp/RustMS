@@ -167,6 +167,9 @@ pub struct ClientActor {
     changing_channel: bool,
     /// The player left their field for the Cash Shop.
     in_cash_shop: bool,
+    /// The gift last asked about (SN, receiver, message), which the same ask
+    /// pays for if it comes next (report b331).
+    gift_lookup: Option<(i32, String, String)>,
     /// When each Cash Inventory item the client lists runs out of time.
     locker_expiry: HashMap<i64, SystemTime>,
     /// Until when a GM jailed the player (`jail`), if they still are.
@@ -273,6 +276,7 @@ impl ClientActor {
             npc_request_id: 0,
             changing_channel: false,
             in_cash_shop: false,
+            gift_lookup: None,
             locker_expiry: HashMap::new(),
             jailed_until: None,
             chat_blocked_until: None,
@@ -1146,6 +1150,7 @@ impl ClientActor {
         })
         .await?;
         self.in_cash_shop = true;
+        self.gift_lookup = None;
         // The shop sends the whole inventory, and the packets were for windows
         // the shop closes.
         self.later.clear();
@@ -1193,6 +1198,7 @@ impl ClientActor {
         use build::world::cash_shop as cs;
         let player = &self.in_game()?.player;
         let (account_id, character_id) = (player.account_id, player.stats.id);
+        let gift_lookup = self.gift_lookup.take();
         let mut packets = match request {
             CashShopRequest::Buy {
                 cash_type,
@@ -1244,10 +1250,21 @@ impl ClientActor {
                 }
             }
             CashShopRequest::Gift {
+                birthday,
                 commodity,
                 to,
                 message,
-            } => self.send_gift(account_id, commodity, to, message).await?,
+                confirmed,
+            } => {
+                let lookup = (commodity.sn, to, message);
+                if confirmed || gift_lookup.as_ref() == Some(&lookup) {
+                    let (_, to, message) = lookup;
+                    self.send_gift(account_id, commodity, to, message).await?
+                } else {
+                    self.look_up_gift(account_id, birthday, commodity, lookup)
+                        .await?
+                }
+            }
             CashShopRequest::BuyRing {
                 cash_type,
                 commodity,
@@ -1316,6 +1333,45 @@ impl ClientActor {
     /// Pay for `commodity` and put it, or a package's items, in the Cash
     /// Inventory of the account of the character named `to`, who sees it on
     /// next entering the shop.
+    /// The character named `to`, if `commodity` may go to them as a gift
+    /// from `account_id`, or the failure to send.
+    async fn gift_receiver(
+        account_id: i32,
+        commodity: &Commodity,
+        to: String,
+    ) -> Result<Result<db::cash_shop::GiftReceiver, Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let receiver = spawn_db(move || db::cash_shop::gift_receiver(&to)).await?;
+        let failure = match receiver {
+            None => cs::CashShopFailure::NoSuchCharacter,
+            Some(receiver) if receiver.account_id == account_id => cs::CashShopFailure::OwnAccount,
+            Some(receiver) if !commodity.for_gender(receiver.gender) => cs::CashShopFailure::Gender,
+            Some(receiver) => return Ok(Ok(receiver)),
+        };
+        Ok(Err(cs::build_cash_shop_failure(failure)?))
+    }
+
+    /// Answer the first ask to send a gift with its receiver's character,
+    /// and remember the gift, so that the same ask next pays for it.
+    async fn look_up_gift(
+        &mut self,
+        account_id: i32,
+        birthday: i32,
+        commodity: Commodity,
+        lookup: (i32, String, String),
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        let receiver = match Self::gift_receiver(account_id, &commodity, lookup.1.clone()).await? {
+            Ok(receiver) => receiver,
+            Err(failure) => return Ok(vec![failure]),
+        };
+        let character = spawn_db(move || db::player::load_player(receiver.id)).await?;
+        let (sn, to, message) = &lookup;
+        let packet =
+            build::world::cash_shop::build_gift_info(birthday, *sn, to, message, &character)?;
+        self.gift_lookup = Some(lookup);
+        Ok(vec![packet])
+    }
+
     async fn send_gift(
         &mut self,
         account_id: i32,
@@ -1325,21 +1381,9 @@ impl ClientActor {
     ) -> Result<Vec<Packet>, RuntimeError> {
         use build::world::cash_shop as cs;
         let sender = self.in_game()?.player.stats.name.clone();
-        let receiver = spawn_db(move || db::cash_shop::gift_receiver(&to)).await?;
-        let failure = match &receiver {
-            None => Some(cs::CashShopFailure::NoSuchCharacter),
-            Some(receiver) if receiver.account_id == account_id => {
-                Some(cs::CashShopFailure::OwnAccount)
-            }
-            Some(receiver) if !commodity.for_gender(receiver.gender) => {
-                Some(cs::CashShopFailure::Gender)
-            }
-            Some(_) => None,
-        };
-        let Some(receiver) = receiver.filter(|_| failure.is_none()) else {
-            return Ok(vec![cs::build_cash_shop_failure(
-                failure.unwrap_or(cs::CashShopFailure::Unknown),
-            )?]);
+        let receiver = match Self::gift_receiver(account_id, &commodity, to).await? {
+            Ok(receiver) => receiver,
+            Err(failure) => return Ok(vec![failure]),
         };
         // A package goes as its items, and only the first carries the
         // message, so the receiver is told once (report b331).

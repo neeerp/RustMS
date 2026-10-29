@@ -38,6 +38,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Handler for the receiver a gift is for, looked up before it's sent
+	// (v83 46ec85)
+	class GiftInfoResultHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handler for the Cash Inventory, gifts and wish list
 	class CashShopOperationHandler : public PacketHandler
 	{

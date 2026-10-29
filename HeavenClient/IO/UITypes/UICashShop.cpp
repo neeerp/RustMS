@@ -29,6 +29,7 @@
 #include "../Components/TwoSpriteButton.h"
 
 #include "../../Character/Marriage.h"
+#include "../../Character/Look/CashWeapon.h"
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -1070,6 +1071,104 @@ namespace ms
 	void UICashShop::answered()
 	{
 		pending = false;
+	}
+
+	void UICashShop::gift_looked_up(int32_t birthday, int32_t sn, const std::string& to, const std::string& message,
+									const cash_gift::Receiver& receiver)
+	{
+		auto by_sn = [this](int32_t serial)
+		{
+			return std::find_if(catalog.begin(), catalog.end(), [serial](const Commodity& c) { return c.sn == serial; });
+		};
+		auto commodity = by_sn(sn);
+
+		if (birthday == 0 || to.empty() || message.empty() || commodity == catalog.end() || commodity->price == 0)
+			return;
+
+		// StringPool 0x217. v83 checks NX Credit here, where the button
+		// checked NX Prepaid.
+		if (credit < commodity->price)
+		{
+			UI::get().emplace<UIOk>("You don't have enough cash.", [](bool) {});
+
+			return;
+		}
+
+		bool package = commodity->item_id / 10000 == 910;
+		std::vector<cash_gift::Member> members;
+
+		if (package)
+		{
+			for (nl::node member : nl::nx::etc["CashPackage.img"][std::to_string(commodity->item_id)]["SN"])
+			{
+				auto content = by_sn(static_cast<int32_t>(member.get_integer()));
+
+				if (content != catalog.end())
+					members.push_back({ content->item_id, content->period });
+			}
+		}
+		else
+		{
+			members.push_back({ commodity->item_id, commodity->period });
+		}
+
+		cash_gift::Lookup lookup;
+		lookup.equip = [](int32_t item_id) -> std::optional<cash_gift::Equip>
+		{
+			const EquipData& data = EquipData::get(item_id);
+
+			if (!data.is_valid())
+				return std::nullopt;
+
+			return cash_gift::Equip{ data.get_reqstat(MapleStat::Id::JOB), data.get_reqstat(MapleStat::Id::LEVEL),
+									 data.get_reqstat(MapleStat::Id::FAME) };
+		};
+		lookup.covers = [](int32_t sticker, int32_t weapon)
+		{
+			int32_t type = cash_weapon::type(weapon);
+			nl::node art = nl::nx::character["Weapon"]["0" + std::to_string(sticker) + ".img"];
+
+			return type != 0 && art[std::to_string(type)].size() > 0;
+		};
+
+		// StringPool 0x200, after the questions. v83 then offers only NX
+		// Credit to pay with.
+		std::string confirm = ItemData::get(commodity->item_id).get_name() + " (" + std::to_string(commodity->price) +
+							  " NX)\\nWill you buy this item as a gift for\\n'" + to + "'?";
+		auto send = [birthday, sn, to, message, mode = static_cast<uint8_t>(package ? 0x1F : 4)]()
+		{
+			if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
+				GiftCashItemPacket(birthday, sn, to, message, mode).dispatch();
+		};
+		auto questions = std::make_shared<std::vector<cash_gift::Question>>(cash_gift::questions(package, members, receiver, lookup));
+		auto ask = std::make_shared<std::function<void(size_t)>>();
+
+		*ask = [questions, confirm, send, weak = std::weak_ptr<std::function<void(size_t)>>(ask)](size_t i)
+		{
+			if (i == questions->size())
+			{
+				UI::get().emplace<UIYesNo>(confirm, [send](bool yes) { if (yes) send(); });
+
+				return;
+			}
+
+			const cash_gift::Question& question = (*questions)[i];
+
+			if (!question.ask)
+			{
+				UI::get().emplace<UIOk>(question.text, [](bool) {});
+
+				return;
+			}
+
+			UI::get().emplace<UIYesNo>(question.text, [next = weak.lock(), i](bool yes)
+			{
+				if (yes && next)
+					(*next)(i + 1);
+			});
+		};
+
+		(*ask)(0);
 	}
 
 	void UICashShop::set_name_change(int32_t sn)

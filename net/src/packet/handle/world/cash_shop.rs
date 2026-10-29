@@ -49,6 +49,9 @@ pub struct CashShopOperationHandler;
 
 const BUY: u8 = 0x03;
 const GIFT: u8 = 0x04;
+/// A package's gift, sent once the client has asked about the receiver, or
+/// straight from a wish list's PRESENT (0x46ec85, 0x472c67).
+const PACKAGE_GIFT: u8 = 0x1F;
 const SET_WISH_LIST: u8 = 0x05;
 const TAKE_OUT: u8 = 0x0D;
 const PUT_BACK: u8 = 0x0E;
@@ -124,13 +127,18 @@ impl WorldHandler for CashShopOperationHandler {
                     Err(failure) => return fail(failure),
                 }
             }
-            GIFT => {
+            action @ (GIFT | PACKAGE_GIFT) => {
                 let birthday = reader.read_int()?;
                 let sn = reader.read_int()?;
                 let to = reader.read_str_with_length()?;
                 let message = reader.read_str_with_length()?;
                 let commodity = match cash_shop::check_gift(cash_shop::commodity(sn)) {
                     Ok(commodity) if cash_shop::own_request(commodity.item_id) => {
+                        return fail(CashShopFailure::Unknown)
+                    }
+                    Ok(commodity)
+                        if action == PACKAGE_GIFT && cash_shop::package(commodity).is_none() =>
+                    {
                         return fail(CashShopFailure::Unknown)
                     }
                     Ok(commodity) => commodity,
@@ -143,9 +151,11 @@ impl WorldHandler for CashShopOperationHandler {
                     return fail(CashShopFailure::BirthdayCode);
                 }
                 CashShopRequest::Gift {
+                    birthday,
                     commodity: commodity.clone(),
                     to,
                     message,
+                    confirmed: action == PACKAGE_GIFT,
                 }
             }
             action @ (BUY_CRUSH_RING | BUY_FRIENDSHIP_RING) => {

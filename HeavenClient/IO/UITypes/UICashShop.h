@@ -28,6 +28,7 @@
 #include "../../Character/Look/CharLook.h"
 #include "../../Character/Look/PetLook.h"
 #include "../../Data/CashCatalog.h"
+#include "../../Data/CashGift.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
@@ -114,6 +115,10 @@ namespace ms
 		bool request();
 		// A balance or an operation result came.
 		void answered();
+		// The server found the gift's receiver (GIFT_INFO_RESULT): ask what
+		// v83 asks (46ec85), then send the gift again to confirm it.
+		void gift_looked_up(int32_t birthday, int32_t sn, const std::string& to, const std::string& message,
+							const cash_gift::Receiver& receiver);
 		// Something was bought with mesos: show its tab and row in the Item
 		// Inventory (v83 47b603). v83 also selects the slot.
 		void bought_with_mesos(int32_t item_id, int16_t slot);

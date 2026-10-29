@@ -246,10 +246,12 @@ namespace ms
 	{
 	public:
 		// Send the commodity sn to the character named to. The birthday code
-		// is the date as YYYYMMDD.
-		GiftCashItemPacket(int32_t birthday, int32_t sn, const std::string& to, const std::string& message) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		// is the date as YYYYMMDD. The server first answers mode 4 with the
+		// receiver (GIFT_INFO_RESULT), then the same mode 4 again sends it;
+		// a package (mode 0x1F) is sent at once (v83 46ec85, report b331).
+		GiftCashItemPacket(int32_t birthday, int32_t sn, const std::string& to, const std::string& message, uint8_t mode = 4) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
 		{
-			write_byte(4);
+			write_byte(mode);
 			write_int(birthday);
 			write_int(sn);
 			write_string(to);
