@@ -22,6 +22,9 @@ impl ClientActor {
         if let Some(script) = net::npc_scripts::shaman_rock(npc_id, nth, &game.player) {
             return self.start_script(script).await;
         }
+        if let Some(script) = net::npc_scripts::yulete_file(npc_id, nth, &game.player) {
+            return self.start_script(script).await;
+        }
         self.talk_to(npc_id).await
     }
 

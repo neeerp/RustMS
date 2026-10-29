@@ -755,6 +755,7 @@ keeps it). A quest whose start sets no string
 | 2166 Shining Stone | "" to "5" | the Shiny Stone (1092016, `nautil_stone`) in the Nautilus's Generator Room (120000301); Sharyl (1092003) completes it |
 | 2236 How to Shoo Away the Evil | "000000" to "111111" | the six Shaman Rocks (1063012 on 105050200, 105060000, 105070000; 1063013 twice on 105090000 and once on 105090100), each taking one charm (4032263) |
 | 3360 Verifying the Password | Parwen's password, set with the start, to "1" | Parwen's start script (`q3360s`); the Secret Passage (2111024) at the secret door |
+| 3367 Organizing the Lab Report | 30 digits, "0" to "1" | the 30 files (2112016) in Yulete's Lab 2 (926130102); the first 20 in the map's NPC order each give a Yulete's Report (4031797). A file done stays silent; with all 30 done each says so |
 | 3421 Collecting Meteorite Samples | "000000" to "111111" | the six meteorites in Kulan Field (2050014 on 221040000, 2050015 on 221040200, 2050016 on 221040300, 2050017 on 221040100, 2050018 on 221040201, 2050019 on 221040400), each giving one Meteorite Sample (4031117) |
 | 3114 Eliza's Eternal Sleep | "0" to "42" | the seven strings of the goddess's harp (2012027-2012033, do to si) in Eliza's Garden (920020000): each sounds its note to the map (`Effect::SoundToMap`, `Sound.nx/Field.img/orbis/<note>`) and, while the quest is under way, counts the notes of Twinkle Twinkle Little Star played right; a wrong one sets "0" again with the party quest's miss effect and sound |
 | 3345 The Black Magician's Magic Pentagram | "0" to "4" | the four circles of the pentagram in the Black Magician's lab (2111020-2111023 on 261040000), touched in turn; the last takes the three Magic Stones (4031739 from the start, 4031740 from Homunscullos, 4031741 from D. Roys, `reward_overrides.toml`). One out of turn, or the last without the stones, sets "0" |
@@ -774,6 +775,16 @@ have given theirs, any meteorite gives another sample while fewer than
 six are held, so a lost one can be replaced. 3421's completion only
 counts the six samples (it has no `infoex`). With no Etc slot free, a
 meteorite says so (`omega_meteorite.full`) and keeps its sample.
+Lab 2's files tell each other apart by `nth` too
+(`net::npc_scripts::yulete_file`); Cosmic's tell the 20 holding a report
+by object id instead, which no one sees. A file that holds one, with no
+Etc slot free, says so and stays undone; a report lost after is given back
+by Lab 2's door (`q3367in`, `map-travel.md`).
+Lab 1's beaker (reactor 2612005 on 926130101) drops the Finished Reagent
+(4031798) for those on Making the Reagent (3366), as Cosmic's reactor
+drops do (`reward_overrides.toml`), but the five liquids it takes
+(4031780-4031784) have no source yet, so 3366 can't be finished
+(`v83ref/lanes/QUESTIONS.md` b317).
 Not supported: the quests reading another record that no script sets.
 
 | Quest | Record | Set by |

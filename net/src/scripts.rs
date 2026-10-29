@@ -245,6 +245,10 @@ const MASTERIA_WAYS: [(&str, i32, i32, &str); 16] = [
     ("Masteria_CM2_D", MARKER_OF_HEROISM, 610020001, "CM2_E"),
     ("Masteria_CM2_E", MARKER_OF_HEROISM, 610020001, "CM2_F"),
 ];
+/// Yulete's Lab's quests whose rooms open off its Lab Entrance.
+const MAKING_THE_REAGENT: i16 = 3366;
+const ELIMINATING_OBSTACLES: i16 = 3368;
+const YULETE_LAB_ENTRANCE: i32 = 926_130_100;
 const PHANTOM_FOREST_MAP: i32 = 3_992_040;
 const MARKER_OF_HEROISM: i32 = 3_992_039;
 /// Where each room off the Tower of Goddess's hub lets out on it (Cosmic
@@ -2057,6 +2061,43 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(YULETE_LAB, YULETE_LAB_WAY_OUT))
         }
         "magatia_dark0" => refused(keys::MAGATIA_PIPE_DARK),
+        // Yulete's Lab Entrance's three rooms, each for those on its quest
+        // (Making the Reagent, Organizing the Lab Report, Eliminating
+        // Obstacles), and their exits' ways back (Cosmic `q3366in` to
+        // `q3368out`). Into Lab 2, a player who lost reports they found
+        // gets them back first.
+        "q3366in" | "q3367in" | "q3368in" => {
+            let (quest_id, room) = match script {
+                "q3366in" => (MAKING_THE_REAGENT, 926130101),
+                "q3367in" => (npc_scripts::ORGANIZING_THE_LAB_REPORT, 926130102),
+                _ => (ELIMINATING_OBSTACLES, 926130103),
+            };
+            if quest(quest_id) != QuestState::Started {
+                return Some(refused(keys::YULETE_LAB_NO_PERMISSION));
+            }
+            let mut way = through(Effect::WarpToPortal(room, 0));
+            let found = i32::try_from(npc_scripts::yulete_reports_found(player)).unwrap_or(0);
+            let held = player.inventory.count(npc_scripts::YULETES_REPORT);
+            let lost = i16::try_from(found - held).unwrap_or(0);
+            if script == "q3367in" && lost > 0 {
+                let report = npc_scripts::YULETES_REPORT;
+                if !crate::items::fits_until(&player.inventory, report, lost, None) {
+                    return Some(refused(keys::YULETE_LAB_FULL));
+                }
+                (way.effects).insert(
+                    0,
+                    Effect::GiveItem {
+                        item_id: report,
+                        quantity: lost,
+                    },
+                );
+            }
+            way
+        }
+        "q3366out" | "q3367out" | "q3368out" => {
+            let door = ["in00", "in01", "in02"][usize::from(script.as_bytes()[4] - b'6')];
+            through(to(YULETE_LAB_ENTRANCE, Portal::Named(door)))
+        }
         // The hub's doors into the rooms beside it, once a Card Key opened
         // them, those rooms' ways back, once a door opened them too, and
         // the hub's way on, once Romeo or Juliet opened it for the files
@@ -4723,6 +4764,62 @@ mod tests {
         // `out00`, its way out to Magatia.
         let lab = crate::game_data::get().unwrap().field(926130000).unwrap();
         assert_eq!(lab.portal_by_name("out00").unwrap().id, 2);
+    }
+
+    #[test]
+    fn yulete_labs_rooms_open_for_their_quests_and_lead_back() {
+        let fresh = player_with(&[]);
+        let shut = content::text().get(keys::YULETE_LAB_NO_PERMISSION, &[]);
+        for (script, quest, room) in [
+            ("q3366in", MAKING_THE_REAGENT, 926130101),
+            ("q3367in", npc_scripts::ORGANIZING_THE_LAB_REPORT, 926130102),
+            ("q3368in", ELIMINATING_OBSTACLES, 926130103),
+        ] {
+            let refused = portal(script, &fresh).unwrap();
+            assert_eq!(refused.effects, [Effect::Pink(shut.clone())], "{script}");
+            let on = player_with(&[(quest, QuestState::Started)]);
+            assert_eq!(
+                warp_of(&portal(script, &on).unwrap()),
+                Some((room, 0)),
+                "{script}"
+            );
+        }
+        // Into Lab 2, the reports found and lost since come back.
+        let mut lost = player_with(&[]);
+        lost.quests.upsert(game::QuestRecord {
+            quest_id: npc_scripts::ORGANIZING_THE_LAB_REPORT,
+            status: game::QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some("111".into()),
+            },
+        });
+        let report = npc_scripts::YULETES_REPORT;
+        lost.inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(report, 1));
+        let back = portal("q3367in", &lost).unwrap();
+        assert_eq!(
+            back.effects[0],
+            Effect::GiveItem {
+                item_id: report,
+                quantity: 2
+            }
+        );
+        // With no room for them, the way stays shut.
+        let mut full = player_with(&[]);
+        full.quests = lost.quests.clone();
+        full.inventory.set_slot_limit(InventoryType::Etc, 0);
+        let full = portal("q3367in", &full).unwrap();
+        assert!(matches!(full.effects[..], [Effect::Pink(_)]));
+        for (script, door) in [
+            ("q3366out", "in00"),
+            ("q3367out", "in01"),
+            ("q3368out", "in02"),
+        ] {
+            let out = portal(script, &fresh).unwrap();
+            let door = named(YULETE_LAB_ENTRANCE, door);
+            assert_ne!(door, 0);
+            assert_eq!(warp_of(&out), Some((YULETE_LAB_ENTRANCE, door)), "{script}");
+        }
     }
 
     #[test]

@@ -246,6 +246,13 @@ quest_items = { 4031092 = 3239 }
 # for 6002).
 replace = [{ item = 4031508, prob = 1.0, quest = 6002 }]
 
+[reactors.2612005]
+# Yulete's Lab 1's beaker (Map.nx 926130101; Reactor.nx 2612005, five
+# liquids dropped on it in turn, red to purple) drops the Finished Reagent
+# 4031798 that Making the Reagent (3366) checks for (Cosmic's reactor drops:
+# every time, for 3366).
+replace = [{ item = 4031798, prob = 1.0, quest = 3366 }]
+
 [reactors.6741015]
 # MV's Lair's dungeon (Map.nx 674030000): the seven Guy Fawkes dolls that
 # hold a secret letter, 4032118, which Charles (9220020) takes fifteen of
