@@ -1864,8 +1864,8 @@ impl NpcScript {
 
     /// Mr. Lim on the Dusty Platform's hub, for a player whose party may
     /// or may not go onto it.
-    pub fn mr_lim(entry: Entry, player: &Player) -> Self {
-        mr_lim(entry, player)
+    pub fn mr_lim(entry: Entry, train: Entry, player: &Player) -> Self {
+        mr_lim(entry, train, player)
     }
 
     /// An Event Assistant (`EVENT_ASSISTANTS`), while a GM's event is
@@ -2283,10 +2283,10 @@ impl NpcScript {
                 return Some(script);
             }
         }
-        // Back from the result map to the hub, at once (Cosmic `1052115`).
+        // Train 999 after a run, now or later; else back to the hub at
+        // once (Cosmic `1052115`).
         if npc_id == MR_LIM && player.stats.map_id == events::SUBWAY_RESULT {
-            let back = Effect::WarpToPortal(events::SUBWAY_LOBBY, 0);
-            return Some(NpcScript::new(MR_LIM, vec![Page::Done(vec![back])]));
+            return Some(mr_lim_result(player));
         }
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -13298,10 +13298,10 @@ fn duarte_medal(player: &Player) -> Page {
 }
 
 /// Mr. Lim on the Dusty Platform's hub (Cosmic `1052115`): a party's
-/// leader of levels 25 to 30 may take it onto the platform, and one with
-/// 10,000 kills there may have the <Honorary Employee> medal. Cosmic's
-/// Train 999, for a Boarding Pass, isn't in.
-fn mr_lim(entry: Entry, player: &Player) -> NpcScript {
+/// leader of levels 25 to 30 may take it onto the platform, one with a
+/// Boarding Pass board Train 999 (`train`), and one with 10,000 kills
+/// there have the <Honorary Employee> medal.
+fn mr_lim(entry: Entry, train: Entry, player: &Player) -> NpcScript {
     let event = &events::SUBWAY;
     let page = match entry {
         _ if !event.levels.contains(&player.stats.level) => {
@@ -13318,12 +13318,74 @@ fn mr_lim(entry: Entry, player: &Player) -> NpcScript {
             text: text(keys::SUBWAY_LIM_MENU),
             choices: vec![
                 (text(keys::SUBWAY_LIM_ENTER), vec![page]),
+                (
+                    text(keys::SUBWAY_LIM_TRAIN),
+                    vec![mr_lim_train(train, player)],
+                ),
                 (text(keys::SUBWAY_LIM_MEDAL), vec![mr_lim_medal(player)]),
             ],
         }],
     );
     // Someone left or moved since he checked, or the last copy went.
     script.refused = Some(text(keys::SUBWAY_LIM_FULL));
+    script
+}
+
+/// Mr. Lim's way onto Train 999, whose `train` entry the player has: he
+/// takes a Boarding Pass for it (Cosmic `1052115`, which checks nothing
+/// else).
+fn mr_lim_train(train: Entry, player: &Player) -> Page {
+    if player.inventory.count(events::SUBWAY_PASS) == 0 {
+        return Page::Say(text(keys::SUBWAY_LIM_NO_PASS));
+    }
+    match train {
+        Entry::Ready => Page::Done(vec![
+            Effect::TakeItem {
+                item_id: events::SUBWAY_PASS,
+                quantity: 1,
+            },
+            Effect::StartEvent(EventKind::SubwayTrain),
+        ]),
+        _ => Page::Say(text(keys::SUBWAY_LIM_TRAIN_FULL)),
+    }
+}
+
+/// Mr. Lim on the result map, after a run all the way through: onto Train
+/// 999 at once, or a Boarding Pass for it, which needs a free Etc slot, and
+/// back to the hub (Cosmic's 910330001 gives the pass so). Anyone else, as
+/// one revived there, goes straight back to the hub.
+fn mr_lim_result(player: &Player) -> NpcScript {
+    if !player.subway_ride {
+        let back = Effect::WarpToPortal(events::SUBWAY_LOBBY, 0);
+        return NpcScript::new(MR_LIM, vec![Page::Done(vec![back])]);
+    }
+    let later = if player.inventory.free(InventoryType::Etc) == 0 {
+        Page::Say(text(keys::SUBWAY_LIM_PASS_ROOM))
+    } else {
+        Page::Act {
+            text: text(keys::SUBWAY_LIM_PASS_GIVEN),
+            effects: vec![
+                Effect::GiveItem {
+                    item_id: events::SUBWAY_PASS,
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(events::SUBWAY_LOBBY, 0),
+            ],
+        }
+    };
+    let now = Page::Done(vec![Effect::StartEvent(EventKind::SubwayTrain)]);
+    let mut script = NpcScript::new(
+        MR_LIM,
+        vec![Page::Menu {
+            text: text(keys::SUBWAY_LIM_RESULT_MENU),
+            choices: vec![
+                (text(keys::SUBWAY_LIM_RESULT_NOW), vec![now]),
+                (text(keys::SUBWAY_LIM_RESULT_LATER), vec![later]),
+            ],
+        }],
+    );
+    // Every room of Train 999's platform is taken.
+    script.refused = Some(text(keys::SUBWAY_LIM_TRAIN_FULL));
     script
 }
 
@@ -24286,7 +24348,7 @@ mod tests {
             player
         };
         let enter = |entry, level| {
-            let mut lim = NpcScript::mr_lim(entry, &at(level));
+            let mut lim = NpcScript::mr_lim(entry, Entry::Ready, &at(level));
             assert_eq!(kind(&lim.begin()), Some(4));
             lim.respond(ScriptInput::Select(0)).unwrap()
         };
@@ -24312,8 +24374,7 @@ mod tests {
             page_text(&enter(Entry::Busy, 27)),
             text(keys::SUBWAY_LIM_FULL)
         );
-        // On a stage he lets one leave for the hub, and on the result map
-        // sends them there at once.
+        // On a stage he lets one leave for the hub.
         let mut lost = at(27);
         lost.stats.map_id = events::SUBWAY.stage_map(2);
         let mut lim = NpcScript::in_event(MR_LIM, &lost, false, false).unwrap();
@@ -24323,12 +24384,76 @@ mod tests {
             step.effects,
             [Effect::WarpToPortal(events::SUBWAY_LOBBY, 0)]
         );
-        lost.stats.map_id = events::SUBWAY_RESULT;
-        let mut lim = NpcScript::for_npc(MR_LIM, &lost).unwrap();
+    }
+
+    #[test]
+    fn mr_lim_boards_train_999_for_a_pass_or_after_a_run() {
+        let pass = events::SUBWAY_PASS;
+        let mut rider = player(50);
+        rider.stats.level = 31;
+        rider.stats.map_id = events::SUBWAY_LOBBY;
+        let board = |train, rider: &Player| {
+            let mut lim = NpcScript::mr_lim(Entry::Ready, train, rider);
+            assert_eq!(kind(&lim.begin()), Some(4));
+            lim.respond(ScriptInput::Select(1)).unwrap()
+        };
         assert_eq!(
-            lim.begin().effects,
+            page_text(&board(Entry::Ready, &rider)),
+            text(keys::SUBWAY_LIM_NO_PASS)
+        );
+        rider
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(pass, 1));
+        let take = Effect::TakeItem {
+            item_id: pass,
+            quantity: 1,
+        };
+        assert_eq!(
+            board(Entry::Ready, &rider).effects,
+            [take, Effect::StartEvent(EventKind::SubwayTrain)]
+        );
+        assert_eq!(
+            page_text(&board(Entry::Busy, &rider)),
+            text(keys::SUBWAY_LIM_TRAIN_FULL)
+        );
+
+        // On the result map, one revived there goes back to the hub.
+        let mut done = player(50);
+        done.stats.map_id = events::SUBWAY_RESULT;
+        let back = NpcScript::for_npc(MR_LIM, &done).unwrap().begin();
+        assert_eq!(back.prompt, None);
+        assert_eq!(
+            back.effects,
             [Effect::WarpToPortal(events::SUBWAY_LOBBY, 0)]
         );
+
+        // After a run: aboard at once, or a pass and back to the hub.
+        done.subway_ride = true;
+        let pick = |n, done: &Player| {
+            let mut lim = NpcScript::for_npc(MR_LIM, done).unwrap();
+            assert_eq!(kind(&lim.begin()), Some(4));
+            lim.respond(ScriptInput::Select(n)).unwrap()
+        };
+        assert_eq!(
+            pick(0, &done).effects,
+            [Effect::StartEvent(EventKind::SubwayTrain)]
+        );
+        let later = pick(1, &done);
+        assert_eq!(page_text(&later), text(keys::SUBWAY_LIM_PASS_GIVEN));
+        let give = Effect::GiveItem {
+            item_id: pass,
+            quantity: 1,
+        };
+        assert_eq!(
+            later.effects,
+            [give, Effect::WarpToPortal(events::SUBWAY_LOBBY, 0)]
+        );
+        let room = done.inventory.free(InventoryType::Etc);
+        for slot in 1..=(room as i16 + 1) {
+            done.inventory
+                .insert(InventoryType::Etc, slot, game::Item::stack(4_000_000, 1));
+        }
+        assert_eq!(page_text(&pick(1, &done)), text(keys::SUBWAY_LIM_PASS_ROOM));
     }
 
     #[test]
@@ -24336,9 +24461,9 @@ mod tests {
         use crate::pyramid::{HONORARY_KILLS, HONORARY_MEDAL, HONORARY_QUEST};
         let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
         let medal = |player: &Player| {
-            let mut lim = NpcScript::mr_lim(Entry::Ready, player);
+            let mut lim = NpcScript::mr_lim(Entry::Ready, Entry::Ready, player);
             lim.begin();
-            lim.respond(ScriptInput::Select(1)).unwrap()
+            lim.respond(ScriptInput::Select(2)).unwrap()
         };
         let mut worker = player(50);
         worker.stats.level = 30;

@@ -2883,6 +2883,14 @@ pub mod keys {
     pub const SUBWAY_LIM_MEDAL_MORE: &str = "subway.lim.medal_more";
     pub const SUBWAY_LIM_MEDAL_ROOM: &str = "subway.lim.medal_room";
     pub const SUBWAY_LIM_MEDAL_GIVEN: &str = "subway.lim.medal_given";
+    pub const SUBWAY_LIM_TRAIN: &str = "subway.lim.train";
+    pub const SUBWAY_LIM_NO_PASS: &str = "subway.lim.no_pass";
+    pub const SUBWAY_LIM_TRAIN_FULL: &str = "subway.lim.train_full";
+    pub const SUBWAY_LIM_RESULT_MENU: &str = "subway.lim.result_menu";
+    pub const SUBWAY_LIM_RESULT_NOW: &str = "subway.lim.result_now";
+    pub const SUBWAY_LIM_RESULT_LATER: &str = "subway.lim.result_later";
+    pub const SUBWAY_LIM_PASS_GIVEN: &str = "subway.lim.pass_given";
+    pub const SUBWAY_LIM_PASS_ROOM: &str = "subway.lim.pass_room";
     pub const PYRAMID_DUARTE_MEDAL_ROOM: &str = "pyramid.duarte.medal_room";
     pub const PYRAMID_DUARTE_MEDAL_GIVEN: &str = "pyramid.duarte.medal_given";
     pub const PYRAMID_DUARTE_TOMB: &str = "pyramid.duarte.tomb";
@@ -4642,6 +4650,14 @@ mod tests {
                 keys::SUBWAY_LIM_MEDAL_MORE,
                 keys::SUBWAY_LIM_MEDAL_ROOM,
                 keys::SUBWAY_LIM_MEDAL_GIVEN,
+                keys::SUBWAY_LIM_TRAIN,
+                keys::SUBWAY_LIM_NO_PASS,
+                keys::SUBWAY_LIM_TRAIN_FULL,
+                keys::SUBWAY_LIM_RESULT_MENU,
+                keys::SUBWAY_LIM_RESULT_NOW,
+                keys::SUBWAY_LIM_RESULT_LATER,
+                keys::SUBWAY_LIM_PASS_GIVEN,
+                keys::SUBWAY_LIM_PASS_ROOM,
                 keys::PYRAMID_DUARTE_MEDAL_ROOM,
                 keys::PYRAMID_DUARTE_MEDAL_GIVEN,
                 keys::PYRAMID_DUARTE_TOMB,
@@ -4976,6 +4992,18 @@ mod tests {
                 (Some(4001156), 1.0, None)
             );
         }
+    }
+
+    #[test]
+    fn train_999s_bubblings_each_drop_a_lost_and_found_box() {
+        let table = RewardTable::load(None).unwrap();
+        let [box_] = &table.drops(9700020)[..] else {
+            panic!("{:?}", table.drops(9700020));
+        };
+        assert_eq!(
+            (box_.item, box_.prob, box_.quest),
+            (Some(2022615), 1.0, None)
+        );
     }
 
     #[test]
