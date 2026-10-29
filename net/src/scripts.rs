@@ -48,6 +48,13 @@ const MUSHROOM_OPENING_SCENE: [&str; 10] = [
 ];
 const SPLIT_ROAD: i32 = 106020400;
 const CASTLE_WALL_EDGE: i32 = 106020501;
+/// The Shadow Cliffs' foot, where the guard on the watch sends one it
+/// spots (`TD_MC_faild`), and how long it looks first.
+const SHADOW_CLIFFS: i32 = 106020403;
+const SPOTTED_FOR: Duration = Duration::from_secs(2);
+/// James's Whereabouts (1): until it is done, James calls out from the
+/// castle's tower (`find_james`).
+const JAMES_FOUND: i16 = 2325;
 /// The castle wall's edge before its thorns are cleared, where Over the
 /// Castle Walls (2) has the player look at the wall (`investigate2`).
 const THORNY_WALL_EDGE: i32 = 106020500;
@@ -626,6 +633,9 @@ pub enum Effect {
     SoundToMap(String),
     /// A UI image anchored to the player (`UI/tutorial.img/<n>` hints).
     AvatarEffect(String),
+    /// One of `Effect.nx`'s scenes on its own (`Direction2.img/<scene>`),
+    /// which the client plays over the field, with the UI left alone.
+    ScenePart(String),
     /// A scene the client plays from `Effect.nx` (`Direction2.img/open`),
     /// one path per part, with the UI locked; it ends by asking for `exit`
     /// (`Player::scene_exit`), which the scene's own data names.
@@ -713,6 +723,13 @@ pub enum Effect {
         count: u16,
     },
     Warp(i32),
+    /// To a map's first spawn point `after` this long, if the player is
+    /// still on the map they were on. It takes the place of that map's own
+    /// time limit.
+    WarpAfter {
+        map_id: i32,
+        after: Duration,
+    },
     /// To a map's portal by id, rather than its first spawn point.
     WarpToPortal(i32, u8),
     /// Nothing is applied unless the ship from this platform is boarding
@@ -1500,6 +1517,33 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         "investigate2" => investigate(player, OVER_THE_CASTLE_WALLS, 2),
         "gotocastle" => refused(keys::MC_CASTLE_BLOCKED),
         "TD_MC_jump" => through(Effect::Warp(CASTLE_WALL_EDGE)),
+        // Spotted by the guard on the watch: its look, a line, and the
+        // cliffs' foot a little later (Kinoko `TD_MC_faild`).
+        "TD_MC_faild" => ScriptOutcome {
+            effects: vec![
+                Effect::ScenePart("Effect/Direction2.img/mushCatle/nugu".to_string()),
+                Effect::InfoText(content::text().get(keys::MC_WATCH_SPOTTED, &[])),
+                Effect::WarpAfter {
+                    map_id: SHADOW_CLIFFS,
+                    after: SPOTTED_FOR,
+                },
+            ],
+            block: false,
+            occupied: None,
+        },
+        // James calls out from the tower until found (Kinoko `find_james`).
+        "find_james" => ScriptOutcome {
+            effects: (player.quests.state(JAMES_FOUND) != QuestState::Completed)
+                .then(|| {
+                    Effect::AvatarEffect(
+                        "Effect/OnUserEff.img/normalEffect/mushroomcastle/chatBalloon2".to_string(),
+                    )
+                })
+                .into_iter()
+                .collect(),
+            block: false,
+            occupied: None,
+        },
         "TD_MC_Egate" => through(Effect::WarpToPortal(
             CASTLE_EAST_GATE,
             named(CASTLE_EAST_GATE, "right00"),
@@ -3676,6 +3720,36 @@ mod tests {
             portal("TD_MC_jump", &player_with(&[])).unwrap().effects,
             through(Effect::Warp(106020501))
         );
+    }
+
+    #[test]
+    fn the_guard_on_the_watch_sends_one_it_spots_to_the_cliffs_foot() {
+        let outcome = portal("TD_MC_faild", &player_with(&[])).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::ScenePart("Effect/Direction2.img/mushCatle/nugu".to_string()),
+                Effect::InfoText(content::text().get(keys::MC_WATCH_SPOTTED, &[])),
+                Effect::WarpAfter {
+                    map_id: 106020403,
+                    after: Duration::from_secs(2)
+                },
+            ]
+        );
+        assert!(!outcome.block);
+    }
+
+    #[test]
+    fn james_calls_out_from_the_tower_until_found() {
+        let balloon = Effect::AvatarEffect(
+            "Effect/OnUserEff.img/normalEffect/mushroomcastle/chatBalloon2".to_string(),
+        );
+        for quests in [&[][..], &[(2325, QuestState::Started)]] {
+            let outcome = portal("find_james", &player_with(quests)).unwrap();
+            assert_eq!(outcome.effects, [balloon.clone()], "{quests:?}");
+        }
+        let found = player_with(&[(2325, QuestState::Completed)]);
+        assert_eq!(portal("find_james", &found).unwrap().effects, []);
     }
 
     #[test]

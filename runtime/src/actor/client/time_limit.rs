@@ -66,6 +66,22 @@ impl ClientActor {
         self.send(&mut build_countdown(seconds)?).await
     }
 
+    /// Send the player from `map_id` to `to`'s first spawn point `after`
+    /// this long, if still there (`Effect::WarpAfter`), in place of the
+    /// map's own time limit.
+    pub(super) fn warp_after(&mut self, map_id: i32, to: i32, after: Duration) {
+        let now = Instant::now();
+        let started = (self.map_timer.as_ref())
+            .filter(|timer| timer.map_id == map_id)
+            .map_or(now, |timer| timer.started);
+        self.map_timer = Some(MapTimer {
+            map_id,
+            started,
+            ends: now + after,
+            to: (to, 0),
+        });
+    }
+
     /// How long the player has been on their timed map, as its timer
     /// counts.
     pub(super) fn time_on_map(&self) -> Option<Duration> {
