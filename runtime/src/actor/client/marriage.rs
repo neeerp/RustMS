@@ -279,6 +279,7 @@ impl ClientActor {
             }
             next.marriage = None;
             packets.push(build_couple_ended(&record)?);
+            take_rings(&mut next, &mut packets)?;
             let partner = record.partner_of(cid);
             self.send_to_directory(DirectoryMessage::CoupleEnded { partner, record })
                 .await?;
@@ -311,9 +312,19 @@ impl ClientActor {
         let mut next = player.clone();
         next.marriage = None;
         let mut packets = vec![build_couple_ended(&record)?];
+        take_rings(&mut next, &mut packets)?;
         take_tokens(&mut next, &mut packets)?;
         self.commit_engagement(next, packets).await
     }
+}
+
+/// Take the wedding rings of a couple now over.
+fn take_rings(player: &mut Player, packets: &mut Vec<Packet>) -> Result<(), RuntimeError> {
+    let changes = marriage::take_wedding_rings(player);
+    if !changes.is_empty() {
+        packets.push(inventory::build_inventory_operation(false, &changes)?);
+    }
+    Ok(())
 }
 
 /// Take every token the player holds, which mean nothing without a couple.

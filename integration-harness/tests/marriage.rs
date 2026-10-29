@@ -13,7 +13,7 @@
 //! b059).
 
 use integration_harness::database::{
-    grant_stack, marry, set_gender, set_job, stow_equip, wear_equip,
+    grant_stack, item_owner_and_hours, marry, set_gender, set_job, stow_equip, wear_equip,
 };
 use integration_harness::packets::RingLooks;
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -44,6 +44,7 @@ const ETC: u8 = 4;
 
 const ENGAGED: u8 = 11;
 const BROKEN: u8 = 13;
+const DIVORCED: u8 = 14;
 const WRONG_NAME: u8 = 18;
 const NOT_SAME_MAP: u8 = 19;
 const SAME_GENDER: u8 = 22;
@@ -182,9 +183,6 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     let [a_config, b_config, c_config, d_config] = &configs;
     let a_id = new_character(a_config, 0, 50, 2).await;
     let b_id = new_character(b_config, 1, 50, 0).await;
-    wear_equip(a_id, RING_SLOT, WEDDING_RING)
-        .await
-        .expect("a wedding ring worn before the engagement");
     new_character(c_config, 0, 50, 1).await;
     new_character(d_config, 1, 10, 0).await;
     let [an, bn, cn, dn] = configs.each_ref().map(|c| c.character_name.clone());
@@ -224,13 +222,7 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     assert_eq!(marriage(&mut b, 1).await.marriage, [asked(&an, a_id)]);
     send(&mut b.connection, answer(true, &an, a_id)).await;
     let at = marriage_and_map(&mut a, 1).await;
-    let mut bt = marriage_and_map(&mut b, 1).await;
-    // A already wears a wedding ring, so B sees A's look gain the couple.
-    until(&mut b.connection, &mut bt, |t| !t.looks.is_empty()).await;
-    assert_eq!(
-        marriages(&bt.looks),
-        [(a_id, Some((a_id, b_id, WEDDING_RING)))]
-    );
+    let bt = marriage_and_map(&mut b, 1).await;
     let (op, record) = &at.marriage[0];
     assert_eq!(*op, SendOpcode::MarriageResult as i16);
     assert_eq!(record.len(), 1 + 0x30);
@@ -251,8 +243,13 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     // Engaged now, on this login and the next.
     refused(&mut c, &bn, PARTNER_ENGAGED).await;
     refused(&mut a, &cn, ALREADY_ENGAGED).await;
+    // A wedding ring worn while engaged shows the couple (a player with
+    // no couple has every one taken on login).
     drop(a);
     tokio::time::sleep(Duration::from_millis(500)).await;
+    wear_equip(a_id, RING_SLOT, WEDDING_RING)
+        .await
+        .expect("a wedding ring worn while engaged");
     let mut a = enter(a_config, HENESYS).await;
     refused(&mut a, &cn, ALREADY_ENGAGED).await;
 
@@ -263,11 +260,14 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     until(&mut b.connection, &mut bt, |t| t.partner_maps.len() >= 2).await;
     read_for(&mut b.connection, &mut bt, 300).await;
     assert_eq!(bt.partner_maps, [(0, 0), (HENESYS, a_id)]);
+    let seen = bt.players.iter().find(|p| p.character_id == a_id).unwrap();
+    assert_eq!(seen.rings.marriage, Some((a_id, b_id, WEDDING_RING)));
     let mut at = Trace::default();
     until(&mut a.connection, &mut at, |t| t.partner_maps.len() >= 2).await;
     assert_eq!(at.partner_maps, [(PERION, b_id), (HENESYS, b_id)]);
 
-    // B drops the ring: both are told, and both tokens go.
+    // B drops the ring: both are told, and both tokens go, with A's
+    // wedding ring.
     send(&mut b.connection, break_off(RING)).await;
     let mut bt = marriage_and_map(&mut b, 1).await;
     until(&mut b.connection, &mut bt, |t| !t.looks.is_empty()).await;
@@ -276,7 +276,11 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     assert_eq!(bt.marriage, [result(BROKEN)]);
     assert_eq!(at.marriage, [result(BROKEN)]);
     assert!(matches!(bt.removed[..], [(ETC, _)]), "{:?}", bt.removed);
-    assert!(matches!(at.removed[..], [(ETC, _)]), "{:?}", at.removed);
+    assert!(
+        matches!(at.removed[..], [(1, RING_SLOT), (ETC, _)]),
+        "{:?}",
+        at.removed
+    );
     assert_eq!(bt.partner_maps, [(0, 0)]);
     assert_eq!(at.partner_maps, [(0, 0)]);
 
@@ -301,6 +305,9 @@ async fn a_wedding_ring_worn_shows_the_couple_to_the_map() {
     stow_equip(b_id, 1, WEDDING_RING, 0)
         .await
         .expect("B's ring");
+    grant_stack(a_id, i16::from(ETC), 1, EMPTY_BOX, 1)
+        .await
+        .expect("A's token");
 
     // B arrives and sees A wear the ring; A sees B without one.
     let mut a = enter(a_config, HENESYS).await;
@@ -333,6 +340,20 @@ async fn a_wedding_ring_worn_shows_the_couple_to_the_map() {
     let mut at = Trace::default();
     until(&mut a.connection, &mut at, |t| !t.looks.is_empty()).await;
     assert_eq!(marriages(&at.looks), [(b_id, None)]);
+
+    // With B away, A breaks it off with a token kept: A loses the worn
+    // ring with the token, and B the stowed one on the next login.
+    drop(b);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    send(&mut a.connection, break_off(EMPTY_BOX)).await;
+    let at = marriage(&mut a, 1).await;
+    assert_eq!(at.marriage, [result(DIVORCED)]);
+    assert!(at.removed.contains(&(1, RING_SLOT)), "{:?}", at.removed);
+    assert!(at.removed.iter().any(|&(kind, _)| kind == ETC));
+    drop(enter(b_config, HENESYS).await);
+    tokio::time::sleep(Duration::from_millis(800)).await;
+    assert!(item_owner_and_hours(b_id, WEDDING_RING).await.is_err());
+    assert!(item_owner_and_hours(a_id, WEDDING_RING).await.is_err());
 }
 
 fn spouse_chat(text: &str) -> Packet {

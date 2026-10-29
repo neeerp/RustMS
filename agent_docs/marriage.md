@@ -140,6 +140,15 @@ keeps the token until they drop it, which then just takes it. Tokens in
 storage, a trade or a parcel are not taken. Both players are saved at once,
 as on engaging.
 
+A married couple holds no token after the wedding, so only one kept
+elsewhere (storage, say) breaks them up. Their wedding rings go too, worn
+or in the bags (`marriage::take_wedding_rings`), since v83 refuses to drop
+one. Cosmic leaves the rings and only unlinks them, so taking them is
+RustMS's pick (QUESTIONS b313). A partner who was away loses theirs on
+the next login: whoever logs in with no record at all has every wedding
+ring taken. An engaged player keeps one. A ring still in a parcel stays
+until the login after it is taken out.
+
 ## Booking the wedding
 
 Nicole (9201005, the Cathedral) and Bonnie (9201008, the Chapel) in Amoria
@@ -691,7 +700,6 @@ For crush and friendship rings:
 
 ## Not done yet
 
-- Taking the wedding rings when a married couple breaks up.
 - The rest of the wedding: the onyx chests 4031423/4 that Pila 9201014
   opens (report b082), and the Giant Cake's drops (the content pack
   has none). The content pack gives the keys and the
