@@ -232,6 +232,13 @@ quest_items = { 4031145 = 3230 }
 # Mechanical Parts (3239). Its two look-alikes (2208000) drop nothing.
 quest_items = { 4031092 = 3239 }
 
+[reactors.6741015]
+# MV's Lair's dungeon (Map.nx 674030000): the seven Guy Fawkes dolls that
+# hold a secret letter, 4032118, which Charles (9220020) takes fifteen of
+# (Cosmic `6741015`: `dropItems`; its reactor drops have the letter every
+# time). The ten other dolls (6741016) have no drops and no script.
+replace = [{ item = 4032118, prob = 1.0 }]
+
 [reactors.2001002]
 # The Tower of Goddess's Salion stage (Map.nx 920010300): the spot that
 # takes the last Cellion's 4001074 (Reactor.nx 2001002-15, item event)

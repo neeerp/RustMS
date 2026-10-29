@@ -2130,6 +2130,11 @@ unsourced = [
     "treasure.milla.lobby",
     "treasure.milla.room",
     "treasure.milla.leave_ask",
+    "treasure.charles.letters_wanted",
+    "treasure.charles.letters_leader",
+    "treasure.charles.letters_taken",
+    "treasure.charles.tunnel_open",
+    "treasure.tunnel_blocked",
 ]
 
 [text."glTutoMsg0.message"]

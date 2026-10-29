@@ -2225,6 +2225,21 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         // `MD_cakeEnter`, `enter_td`). Not a dungeon's, for all its name.
         "MD_cakeEnter" => through(to(crate::events::TREASURE_LOBBY, Portal::Named("in00"))),
         "enter_td" => through(to(NEW_LEAF_CITY, Portal::Named("yn00"))),
+        // MV's Lair's tunnel from the dungeon to the cave, blocked until
+        // Charles has the letters, which clears the stage (Cosmic
+        // `guyfawkes0_esc`).
+        "guyfawkes0_esc" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireStage {
+                    stage: 1,
+                    refused: None,
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::TREASURE_CAVE, 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::TREASURE_TUNNEL_BLOCKED, &[])),
+        },
         script if script.starts_with("MD_") => {
             let dungeon = crate::dungeons::by_script(script)?;
             if player.stats.map_id != dungeon.base {
@@ -5928,6 +5943,19 @@ mod tests {
                 )
             ]
         );
+        let tunnel = portal("guyfawkes0_esc", &player).unwrap();
+        assert_eq!(
+            tunnel.effects,
+            [
+                Effect::RequireStage {
+                    stage: 1,
+                    refused: None
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::TREASURE_CAVE, 0)
+            ]
+        );
+        assert!(tunnel.occupied.is_some());
         assert_eq!(
             portal("enter_td", &player).unwrap().effects,
             [
