@@ -214,15 +214,15 @@ pub const LEAFRE_TO_ORBIS: Route = Route {
 };
 
 /// Ariant's platform is also the town's entrance. Both its spawn points are
-/// named `sp`; riders get the first, at the west end (Cosmic uses the
-/// second).
+/// named `sp`; riders get the second (portal 1, Cosmic's `Genie.js`), the
+/// nearer to where the Genie docks.
 pub const TO_ARIANT: Route = Route {
     platform: 200000151,
     waiting_room: 200000152,
     deck: 200090400,
     cabin: None,
     balrogs: None,
-    arrival: (260000100, Portal::Named("sp")),
+    arrival: (260000100, Portal::Id(1)),
     arrival_platform: 260000100,
     ticket: 4031576,
     price: 6000,
@@ -761,6 +761,8 @@ mod tests {
                 portal: Portal::Named("sp")
             }]
         );
+        // Ariant's riders step off at its second spawn point, by the dock.
+        assert_eq!(TO_ARIANT.arrival, (260000100, Portal::Id(1)));
         // Ariant's platform sees its own ship leave and the other dock.
         assert_eq!(
             happens(260000100, departure - MINUTE),
