@@ -110,6 +110,8 @@ namespace ms
 					return Tooltip::Parent::ITEMPROTECTOR;
 				case UIElement::Type::KARMASCISSORS:
 					return Tooltip::Parent::KARMASCISSORS;
+				case UIElement::Type::INCUBATOR:
+					return Tooltip::Parent::INCUBATOR;
 				case UIElement::Type::VEGARESULT:
 					return Tooltip::Parent::VEGARESULT;
 				case UIElement::Type::ENCHANTSKILL:

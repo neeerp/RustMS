@@ -45,6 +45,8 @@ namespace ms
 
 		void close();
 
+		void clear_tooltip();
+
 		enum Buttons : uint16_t
 		{
 			OK,
