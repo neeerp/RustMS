@@ -16,12 +16,12 @@ use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{
     replace_item, set_job, set_str, set_weapon_attack, start_quest,
 };
-use integration_harness::events::{cleared, said, talk, told};
+use integration_harness::events::{cleared, clears, said, talk, told};
 use integration_harness::guild_quest::touch_script_portal;
 use integration_harness::hunting::{attack, hit_reactor, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{barrier, send, until, warp, Trace};
+use integration_harness::trace::{barrier, read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{BALROG_CLEAR, BALROG_LEATHER, BALROG_TOMB, MU_YOUNG_MAP};
 use net::mobs::{BALROG_BODY, BALROG_CLAW, BALROG_LEFT_ARM, BALROG_RIGHT_ARM, SEALED_BALROG};
@@ -152,6 +152,8 @@ async fn the_balrog_s_arms_shield_its_body_whose_death_wins_the_leather() {
             && t.progress.contains(&(SEAL_QUEST, 1))
     })
     .await;
+    read_for(&mut member.connection, &mut mt, 1_000).await;
+    assert_eq!(clears(&mt), 1, "{mt:?}");
 
     // Mu Young takes each on to the clear map, whose box sprays its loot
     // and whose way out gives the leather and leads back to the temple's

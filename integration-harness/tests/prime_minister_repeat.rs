@@ -9,12 +9,12 @@
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{replace_item, set_job, set_quest, set_str, set_weapon_attack};
-use integration_harness::events::{cleared, party, said};
+use integration_harness::events::{cleared, clears, party, said};
 use integration_harness::hunting::{attack, walk_to};
 use integration_harness::packets::build_change_map;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{send, step, until, warp, Trace};
+use integration_harness::trace::{read_for, send, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{
     BLOCKED_ENTRANCE, PRIME_MINISTER, PRIME_MINISTER_AT, SEAL_OF_THE_EMPIRE, STORY_OF_BETRAYAL,
@@ -139,6 +139,8 @@ async fn the_blocked_entrance_takes_a_party_or_one_alone_to_the_prime_minister()
     let before = lt.field.drops.len();
     beat(c, &mut lt, prime_minister).await;
     until(c, &mut lt, cleared).await;
+    read_for(c, &mut lt, 1_000).await;
+    assert_eq!(clears(&lt), 1, "{lt:?}");
     // What it leaves comes from its own table (or is the harness's card),
     // and the Royal Seal only for those still on its quest.
     let table = game_data::server_content::RewardTable::load(None).unwrap();

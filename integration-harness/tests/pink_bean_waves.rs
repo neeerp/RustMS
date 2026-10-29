@@ -15,7 +15,7 @@ use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{replace_item, set_job, set_quest, set_str, set_weapon_attack};
 use integration_harness::events::maps;
-use integration_harness::events::{said, talk, told};
+use integration_harness::events::{clears, said, talk, told};
 use integration_harness::hunting::{attack, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::{answer, build_quest_completion};
@@ -204,6 +204,9 @@ async fn the_guardians_wake_in_waves_and_their_fall_lets_the_lightning_strike_th
     })
     .await;
     barrier(&mut leader.connection, &name, &mut lt).await;
+    read_for(&mut member.connection, &mut mt, 1_000).await;
+    assert_eq!(clears(&lt), 1, "{lt:?}");
+    assert_eq!(clears(&mt), 1, "{mt:?}");
     let left: Vec<_> = lt
         .field
         .mobs

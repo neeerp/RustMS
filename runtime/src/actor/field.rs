@@ -2328,6 +2328,17 @@ impl FieldActor {
             {
                 self.boss_falls()
             }
+            // An era's boss's last form in its room (Cosmic `TD_Battle`'s
+            // `monsterKilled`).
+            (mob, map)
+                if self.key.instance_id != 0
+                    && (1..=net::events::NEO_BOSSES.len() as u8).any(|era| {
+                        net::events::neo_boss_room(era) == map
+                            && net::events::NEO_BOSSES[usize::from(era) - 1] == mob
+                    }) =>
+            {
+                self.boss_falls()
+            }
             // The sealed Balrog comes out a little later (Cosmic
             // `BalrogBattle.spawnSealedBalrog`), and everyone here counts
             // the kill Balrog and the Seal (2239) asks for.

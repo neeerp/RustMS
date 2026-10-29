@@ -418,6 +418,13 @@ pub fn cleared(trace: &Trace) -> bool {
         .any(|(_, e)| e == "quest/party/clear")
 }
 
+/// How many times `trace` shows the clear effect.
+pub fn clears(trace: &Trace) -> usize {
+    (trace.field_effects.iter())
+        .filter(|(_, e)| e == "quest/party/clear")
+        .count()
+}
+
 /// Whether `trace` shows a wrong answer to a stage's puzzle.
 pub fn wrong(trace: &Trace) -> bool {
     trace

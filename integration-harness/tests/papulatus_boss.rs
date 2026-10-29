@@ -10,10 +10,10 @@ use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{
     grant_stack, replace_item, set_job, set_str, set_weapon_attack,
 };
-use integration_harness::events::{party, throw_down, waiting_in};
+use integration_harness::events::{clears, party, throw_down, waiting_in};
 use integration_harness::hunting::{attack, move_mob, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{send, until, warp, Trace};
+use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{CLOCKTOWER_DEPTHS, ORIGIN_OF_CLOCKTOWER};
 use net::packet::op::RecvOpcode;
@@ -208,6 +208,8 @@ async fn the_cracked_dimension_brings_out_papulatus_whose_death_wins_the_fight()
         t.field_effects.contains(&(4, "Party1/Clear".to_string()))
     })
     .await;
+    read_for(m, &mut mt, 1_000).await;
+    assert_eq!(clears(&mt), 1, "{mt:?}");
 
     // Won, the fight opens the gates.
     gates_go(&mut watcher, &mut seen, 0).await;
