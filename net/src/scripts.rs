@@ -2250,6 +2250,32 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             }
         }
         "TD_chat_enter" => opens(TIME_GATE),
+        // Into Guardian Nex's room for the era whose quest is under way,
+        // alone and only before its Nex is beaten (Cosmic `TD_neo_inTree`).
+        "TD_neo_inTree" => {
+            let era = (crate::events::NEX_QUESTS.iter())
+                .position(|&nex| quest(nex) == QuestState::Started);
+            match era {
+                None => refused(keys::GUARDIAN_NEX_NO_WAY),
+                Some(era)
+                    if player
+                        .quests
+                        .kills(crate::events::NEX_QUESTS[era])
+                        .iter()
+                        .any(|&kills| kills != 0) =>
+                {
+                    refused(keys::GUARDIAN_NEX_FACED)
+                }
+                Some(era) => ScriptOutcome {
+                    effects: vec![
+                        Effect::PortalSound,
+                        Effect::StartEvent(EventKind::GuardianNex(era as u8)),
+                    ],
+                    block: false,
+                    occupied: Some(content::text().get(keys::GUARDIAN_NEX_BUSY, &[])),
+                },
+            }
+        }
         "ariant_Agit"
             if [3928, 3931, 3934]
                 .iter()
@@ -5481,6 +5507,40 @@ mod tests {
             );
             assert!(outcome.occupied.is_some());
         }
+    }
+
+    #[test]
+    fn the_tera_forests_tree_leads_one_on_an_eras_nex_quest_to_its_nex() {
+        use crate::events::{NEX_QUESTS, TERA_FOREST};
+        let data = crate::get_game_data().unwrap();
+        let field = data.field(TERA_FOREST).unwrap();
+        let tree = field.portal_by_name("in00").unwrap();
+        assert_eq!(tree.script.as_deref(), Some("TD_neo_inTree"));
+        let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+        let outcome = portal("TD_neo_inTree", &player_with(&[])).unwrap();
+        assert_eq!(outcome.effects, pink(keys::GUARDIAN_NEX_NO_WAY));
+        // The third era's, with the first two done.
+        let mut on = player_with(&[
+            (NEX_QUESTS[0], QuestState::Completed),
+            (NEX_QUESTS[1], QuestState::Completed),
+            (NEX_QUESTS[2], QuestState::Started),
+        ]);
+        let outcome = portal("TD_neo_inTree", &on).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::PortalSound,
+                Effect::StartEvent(EventKind::GuardianNex(2))
+            ]
+        );
+        assert_eq!(
+            outcome.occupied,
+            Some(content::text().get(keys::GUARDIAN_NEX_BUSY, &[]))
+        );
+        // Once its Nex is beaten, the quest wants its end, not another.
+        *on.quests.kills_mut(NEX_QUESTS[2]).unwrap() = vec![1];
+        let outcome = portal("TD_neo_inTree", &on).unwrap();
+        assert_eq!(outcome.effects, pink(keys::GUARDIAN_NEX_FACED));
     }
 
     #[test]

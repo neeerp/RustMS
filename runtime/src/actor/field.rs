@@ -2317,6 +2317,17 @@ impl FieldActor {
             {
                 self.boss_falls()
             }
+            // An era's Nex in its own room (Cosmic `GuardianNex`'s
+            // `monsterKilled`).
+            (mob, map)
+                if self.key.instance_id != 0
+                    && (0..net::events::NEX_BOSSES.len() as u8).any(|era| {
+                        net::events::nex_room(era) == map
+                            && net::events::NEX_BOSSES[usize::from(era)] == mob
+                    }) =>
+            {
+                self.boss_falls()
+            }
             // The sealed Balrog comes out a little later (Cosmic
             // `BalrogBattle.spawnSealedBalrog`), and everyone here counts
             // the kill Balrog and the Seal (2239) asks for.

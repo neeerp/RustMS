@@ -1987,6 +1987,30 @@ others get `kenta.few`.
   then completes the quest through the quest window. The lines are
   placeholders (`kenta.*`).
 
+## Guardian Nex's rooms
+
+For the six "Nex the Time Guard" quests that open Neo City's eras
+(3719, 3724, 3730, 3736, 3742 and 3748, Years 2021 to 2503; Cosmic
+`GuardianNex` and `TD_neo_inTree`). The Tera Forest Time Gate's map
+(240070000) has a hidden portal, `in00` (`TD_neo_inTree`). It takes a player
+on one of these quests alone into that era's room (240070010 to 240070060,
+by tens) for fifteen minutes. The event is `events::GUARDIAN_NEX`,
+`EventKind::GuardianNex(era)`, with no level limit of its own; the
+quests' are enough.
+
+- One at a time an era on a channel (`runs: 1`); another is told so in
+  pink (`guardian_nex.busy`). One on none of the quests gets
+  `guardian_nex.no_way`. One whose quest already counts its Nex gets
+  `guardian_nex.faced` and should go back to Andy (2082004) to end it.
+- The room's Nex (7120100, 7120101, 7120102, 8120100, 8120101, 8140510)
+  is in Map.nx, out once (`mobTime` -1), so each copy has its own. Its
+  death counts for the quest and wins the event: the clear effect and
+  sound as it falls (`FieldActor::boss_falls`, the event's own effect kept
+  quiet so it plays once), the clock stopped, no reward from the event.
+- The player walks out by the room's `out00` to the forest's `in00`, or the
+  time up or a death sends them to the forest. The Time Gate (2083006)
+  then offers the era once its quest is done (`map-travel.md`).
+
 ## Kerning Square's Spirit of Rock
 
 For Blake's requests (2286-2288) and "Admission to the VIP Zone" (2291;
