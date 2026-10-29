@@ -141,6 +141,9 @@ pub enum EventKind {
     /// The Watch Hog's room for Monster Riding (6002), taken alone from
     /// Kenta (2060005) in the Aquarium's zoo.
     MonsterRiding,
+    /// Guardian Nex's room for an era, 0 (Year 2021) to 5 (Year 2503),
+    /// taken alone through the Tera Forest's `in00`.
+    GuardianNex(u8),
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -4070,6 +4073,46 @@ pub const PRIME_MINISTER_EVENT: Event = Event {
     ..LATANICA
 };
 
+/// The Tera Forest Time Gate's map, 240070000, whose `in00`
+/// (`TD_neo_inTree`) leads to Guardian Nex and whose `in00` portal the
+/// rooms' `out00` lead back to.
+pub const TERA_FOREST: i32 = 240_070_000;
+/// Each era's Guardian Nex quest, Years 2021 to 2503 (Nex the Time
+/// Guard), the Nex its check wants one of, which Map.nx keeps in that
+/// era's room once (`mobTime` -1), and the room, 240070010 on by tens.
+pub const NEX_QUESTS: [i16; 6] = [3719, 3724, 3730, 3736, 3742, 3748];
+pub const NEX_BOSSES: [i32; 6] = [7120100, 7120101, 7120102, 8120100, 8120101, 8140510];
+pub const fn nex_room(era: u8) -> i32 {
+    240_070_010 + 10 * era as i32
+}
+
+/// Guardian Nex's room for era `era`, 0 to 5 (Cosmic `GuardianNex`):
+/// one on its quest goes in alone for fifteen minutes, one at a time an
+/// era on a channel; the Nex's death wins it with the clear effect and
+/// stops the clock, and the player walks out by `out00` to the Tera
+/// Forest, where the time running out also sends them.
+const fn guardian_nex(era: u8) -> Event {
+    let room = nex_room(era);
+    Event {
+        lobby: TERA_FOREST,
+        maps: room..=room,
+        entry: room,
+        exit: TERA_FOREST,
+        team: 1..=1,
+        minutes: 15,
+        ..LATANICA
+    }
+}
+
+pub const GUARDIAN_NEX: [Event; 6] = [
+    guardian_nex(0),
+    guardian_nex(1),
+    guardian_nex(2),
+    guardian_nex(3),
+    guardian_nex(4),
+    guardian_nex(5),
+];
+
 /// Happyville (209000000), the Christmas town the Holiday PQ's lobbies
 /// lead back to.
 pub const HAPPYVILLE: i32 = 209_000_000;
@@ -4545,7 +4588,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 60] = [
+    pub const ALL: [EventKind; 66] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4606,6 +4649,12 @@ impl EventKind {
         EventKind::Ariant(3),
         EventKind::Treasure,
         EventKind::MonsterRiding,
+        EventKind::GuardianNex(0),
+        EventKind::GuardianNex(1),
+        EventKind::GuardianNex(2),
+        EventKind::GuardianNex(3),
+        EventKind::GuardianNex(4),
+        EventKind::GuardianNex(5),
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -4669,6 +4718,7 @@ impl EventKind {
             EventKind::Ariant(arena) => &ARIANT[usize::from(arena.clamp(1, 3) - 1)],
             EventKind::Treasure => &TREASURE,
             EventKind::MonsterRiding => &MONSTER_RIDING,
+            EventKind::GuardianNex(era) => &GUARDIAN_NEX[era as usize % GUARDIAN_NEX.len()],
         }
     }
 
@@ -6591,6 +6641,21 @@ mod tests {
         assert_eq!(check_jail(0, &[false; 7]), JailCheck::Open);
         let up = [true, true, false, false, true, false, true];
         assert_eq!(check_jail(0, &up), JailCheck::Open);
+    }
+
+    #[test]
+    fn each_eras_nex_is_fought_alone_for_fifteen_minutes_in_its_own_room() {
+        for era in 0..6 {
+            let nex = EventKind::GuardianNex(era).event();
+            assert!(nex.solo() && nex.runs == 1 && !nex.alone);
+            assert_eq!(nex.duration(), scaled(Duration::from_secs(15 * 60)));
+            assert_eq!((nex.lobby, nex.exit), (TERA_FOREST, TERA_FOREST));
+            assert!(event_map(nex_room(era)));
+            assert_eq!(nex.last_stage(), 1);
+            assert_eq!((nex.clear_map, nex.member_clears), (None, &[1][..]));
+        }
+        assert_eq!(nex_room(5), 240_070_060);
+        assert!(!event_map(TERA_FOREST));
     }
 
     #[test]

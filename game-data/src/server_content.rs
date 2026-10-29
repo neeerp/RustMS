@@ -1007,6 +1007,9 @@ pub mod keys {
     pub const YULETE_FILE_LEFT: &str = "yulete_lab.file_left";
     pub const YULETE_FILE_NO_ROOM: &str = "yulete_lab.file_no_room";
     pub const YULETE_FILES_DONE: &str = "yulete_lab.files_done";
+    pub const GUARDIAN_NEX_NO_WAY: &str = "guardian_nex.no_way";
+    pub const GUARDIAN_NEX_FACED: &str = "guardian_nex.faced";
+    pub const GUARDIAN_NEX_BUSY: &str = "guardian_nex.busy";
 
     /// King Pepe's room in the Mushroom Castle: the tower's way in
     /// (`TD_MC_enterboss1`) while another player is in it, and its way out
@@ -4070,6 +4073,9 @@ mod tests {
                 keys::YULETE_FILE_LEFT,
                 keys::YULETE_FILE_NO_ROOM,
                 keys::YULETE_FILES_DONE,
+                keys::GUARDIAN_NEX_NO_WAY,
+                keys::GUARDIAN_NEX_FACED,
+                keys::GUARDIAN_NEX_BUSY,
                 keys::KING_PEPE_BUSY,
                 keys::KING_PEPE_KEY,
                 keys::KING_PEPE_KEY_NO_ROOM,

@@ -118,12 +118,13 @@ impl ClientActor {
             // The East Castle Tower's portal takes the player in, and the
             // Wedding Hall's door likewise; Olson's own talk the dollhouse
             // room's, Cheng's the Toy Factory's Sector 4 and Kenta's the
-            // Watch Hog's room.
+            // Watch Hog's room; the Tera Forest's `in00` Guardian Nex's.
             EventKind::KingPepe
             | EventKind::WeddingHall
             | EventKind::Dollhouse
             | EventKind::MechanicalParts
-            | EventKind::MonsterRiding => return Ok(()),
+            | EventKind::MonsterRiding
+            | EventKind::GuardianNex(_) => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
             // Shuang registers guilds, not parties (`talk_to_shuang`).
@@ -2154,12 +2155,14 @@ impl ClientActor {
                 EventKind::Horntail | EventKind::Htpq | EventKind::Delli
             );
         // The maze's win, the Pirate Ship's and the Watch Hog's room's have
-        // no effect or sound (Cosmic `clearPQ`), only their EXP.
+        // no effect or sound (Cosmic `clearPQ`), only their EXP; Guardian
+        // Nex's room has shown its own as the Nex fell (`boss_falls`).
         let won = stage == event.last_stage();
         let quiet = zpq
             || zakum
             || ticket.kind == EventKind::LudiMaze
             || ticket.kind == EventKind::MonsterRiding
+            || matches!(ticket.kind, EventKind::GuardianNex(_))
             || (ticket.kind == EventKind::Pirate && won)
             || (matches!(ticket.kind, EventKind::Magatia(_))
                 && stage == events::MAGATIA_ROPES_STAGE);

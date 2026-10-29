@@ -475,11 +475,14 @@ impl EventTicket {
     /// leave it by, until the King's Corridor's door takes the earring
     /// (Cosmic `playerRevive` while `canRevive` is 0); Pink Bean's
     /// Forgotten Twilight, in the copy, whose portal leads back to the
-    /// fight (Cosmic's wz `returnMap`; Royals's Map.nx sends them out).
+    /// fight (Cosmic's wz `returnMap`; Royals's Map.nx sends them out); an
+    /// era's Nex's room, the Tera Forest, not its Leafre (Cosmic
+    /// `GuardianNex.playerRevive`).
     pub fn revive_to(&self) -> Option<i32> {
         let event = self.kind.event();
         match self.kind {
             EventKind::GuildQuest if !self.cleared.king_gate() => Some(event.exit),
+            EventKind::GuardianNex(_) => Some(event.exit),
             EventKind::PinkBean => Some(net::events::PINK_BEAN_REVIVE),
             _ => None,
         }
