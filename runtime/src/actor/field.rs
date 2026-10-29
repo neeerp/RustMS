@@ -230,6 +230,10 @@ struct HolidayArena {
     misses: u8,
     /// Snow Vigor where the snowman eats it, by when: (when, drop).
     eating: Vec<(Instant, i32)>,
+    /// Whether Scrooge has come out.
+    scrooge: bool,
+    /// When the whole snowman next heals, while Scrooge is out and alive.
+    heals_at: Option<Instant>,
 }
 
 /// An item a player put on a reactor that takes it, once it has lain there
@@ -377,6 +381,8 @@ impl FieldActor {
                 snowman: net::events::Snowman::default(),
                 misses: 0,
                 eating: Vec::new(),
+                scrooge: false,
+                heals_at: None,
             });
         // A Holiday PQ arena's mobs wait for its snowman (Cosmic
         // `allowSummonState(false)`).
@@ -591,6 +597,7 @@ impl FieldActor {
             }
         }
         self.eat_snow_vigor(now);
+        self.heal_whole_snowman(now);
         let spawned = self.reactors.respawn(now);
         self.show_reactors(&spawned);
         // Those whose time in their state is up go back (the forest's pond
@@ -934,7 +941,9 @@ impl FieldActor {
                 let _ = reply.send(self.mobs.live().count());
             }
             FieldMessage::HolidaySnowman { reply } => {
-                let _ = reply.send(self.holiday.as_ref().map_or(0, |arena| arena.snowman.form));
+                let arena = self.holiday.as_ref();
+                let _ = reply
+                    .send(arena.map_or((0, false), |arena| (arena.snowman.form, arena.scrooge)));
             }
             FieldMessage::DropCount { reply } => {
                 let _ = reply.send(self.drops.all().count());
@@ -1196,6 +1205,7 @@ impl FieldActor {
                 }
                 FieldRequest::ClearMobs => self.clear_mobs(),
                 FieldRequest::BringOutSnowman => self.bring_out_snowman(),
+                FieldRequest::BringOutScrooge => self.bring_out_scrooge(),
                 FieldRequest::SetReactorState { name, state } => {
                     for view in self.reactors.force_forward(name, state) {
                         if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
@@ -4140,6 +4150,52 @@ impl FieldActor {
         self.board(snowman, 1, net::events::HOLIDAY_SNOWMAN_AT);
         self.mobs.open();
         self.pink_line(keys::HOLIDAY_SNOWMAN_OUT);
+    }
+
+    /// The Snow Spirit brings out Scrooge where the whole snowman stands,
+    /// as everyone hears, and the snowman starts to heal every while
+    /// (Cosmic `9105004`'s leader page, `snowmanHeal`).
+    fn bring_out_scrooge(&mut self) {
+        let Some(arena) = self
+            .holiday
+            .as_mut()
+            .filter(|arena| arena.snowman.form == net::events::HOLIDAY_FORMS && !arena.scrooge)
+        else {
+            return;
+        };
+        arena.scrooge = true;
+        arena.heals_at = Some(Instant::now() + net::events::HOLIDAY_SNOWMAN_HEAL_EVERY);
+        let scrooge = net::events::holiday_scrooge(arena.level);
+        self.pink_line(keys::HOLIDAY_SCROOGE_OUT);
+        self.board(scrooge, 1, net::events::HOLIDAY_SNOWMAN_AT);
+    }
+
+    /// While Scrooge is out, the whole snowman heals 200 HP more than 200
+    /// for each difficulty every 10 seconds (Cosmic `snowmanHeal`); it
+    /// stops once Scrooge falls.
+    fn heal_whole_snowman(&mut self, now: Instant) {
+        let Some(level) = (self.holiday.as_ref())
+            .filter(|arena| arena.heals_at.is_some_and(|at| at <= now))
+            .map(|arena| arena.level)
+        else {
+            return;
+        };
+        let scrooge = !self.out(net::events::holiday_scrooge(level)).is_empty();
+        if let Some(arena) = self.holiday.as_mut() {
+            arena.heals_at = scrooge.then(|| now + net::events::HOLIDAY_SNOWMAN_HEAL_EVERY);
+        }
+        if !scrooge {
+            return;
+        }
+        let snowman = net::events::holiday_snowman(level, net::events::HOLIDAY_FORMS);
+        let hp = net::events::holiday_snowman_heal(level);
+        for object_id in self.out(snowman) {
+            if let Some((healed, hp, max_hp)) = self.mobs.heal(object_id, hp, 0) {
+                if let Ok(packet) = build_heal_mob(object_id, healed, hp, max_hp) {
+                    self.broadcast(None, packet);
+                }
+            }
+        }
     }
 
     /// A mob killed in a Holiday arena while its snowman grows may leave

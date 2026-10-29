@@ -10,8 +10,8 @@ use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
     self, Aura, Balloon, Cloto, CwkHost, CwkKeeper, Entry, EventCommand, EventKind, Find,
-    GatherTalk, HandIn, HeadCount, LeverCheck, MagatiaSide, PyramidMode, RopesTalk, Standing,
-    Statue,
+    GatherTalk, HandIn, HeadCount, LeverCheck, MagatiaSide, PyramidMode, RopesTalk, SnowSpirit,
+    Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::guild_quest;
@@ -1769,10 +1769,10 @@ impl NpcScript {
         snowman(map_id)
     }
 
-    /// The Snow Spirit in a Holiday PQ arena, to the run's `leader` or
-    /// another, with the snowman in its `form` (0 before it is out).
-    pub fn snow_spirit_arena(leader: bool, form: u8) -> Self {
-        snow_spirit_arena(leader, form)
+    /// The Snow Spirit in a Holiday PQ arena of difficulty `level`, to
+    /// `player`, who may lead the run, as the run stands (`view`).
+    pub fn snow_spirit_arena(level: u8, leader: bool, view: SnowSpirit, player: &Player) -> Self {
+        snow_spirit_arena(level, leader, view, player, &mut rand::thread_rng())
     }
 
     /// Guon Over the Pirate Ship, for a player whose party may or may not
@@ -12063,20 +12063,92 @@ fn snowman(map_id: i32) -> Option<NpcScript> {
 /// The Snow Spirit (Cosmic `9105004`) in a Holiday PQ arena: before the
 /// snowman is out it tells what to do, and its leader's Next brings it out;
 /// then it urges the snowman grown, and once it is whole, says so.
-fn snow_spirit_arena(leader: bool, form: u8) -> NpcScript {
-    let pages = match form {
-        0 if leader => vec![
+fn snow_spirit_arena(
+    level: u8,
+    leader: bool,
+    view: SnowSpirit,
+    player: &Player,
+    rng: &mut impl Rng,
+) -> NpcScript {
+    let mut script = NpcScript::new(SNOW_SPIRIT, Vec::new());
+    script.pages = match view {
+        SnowSpirit::Snowman(0) if leader => vec![
             Page::Say(text(keys::HOLIDAY_ARENA_INTRO)),
             Page::Done(vec![Effect::BringOutSnowman]),
         ],
-        0 => vec![
+        SnowSpirit::Snowman(0) => vec![
             Page::Say(text(keys::HOLIDAY_ARENA_INTRO)),
             Page::Say(text(keys::HOLIDAY_ARENA_LEADER)),
         ],
-        form if form < events::HOLIDAY_FORMS => vec![Page::Say(text(keys::HOLIDAY_ARENA_GROW))],
-        _ => vec![Page::Say(text(keys::HOLIDAY_ARENA_GROWN))],
+        SnowSpirit::Snowman(form) if form < events::HOLIDAY_FORMS => {
+            vec![Page::Say(text(keys::HOLIDAY_ARENA_GROW))]
+        }
+        SnowSpirit::Snowman(_) if leader => vec![
+            Page::Say(text(keys::HOLIDAY_ARENA_GROWN)),
+            Page::Done(vec![Effect::BringOutScrooge]),
+        ],
+        SnowSpirit::Snowman(_) => vec![
+            Page::Say(text(keys::HOLIDAY_ARENA_GROWN)),
+            Page::Say(text(keys::HOLIDAY_ARENA_LEADER)),
+        ],
+        SnowSpirit::Scrooge => vec![Page::Say(text(keys::HOLIDAY_ARENA_SCROOGE))],
+        // One holding a Force of the Spirit picks a Maplemas gift for it,
+        // each time; then each member takes a prize once.
+        SnowSpirit::Won { .. } if holds(player, events::FORCE_OF_THE_SPIRIT) => {
+            script.inventory_full = Some(text(keys::HOLIDAY_ARENA_GIFT_FULL));
+            let choices = (events::HOLIDAY_GIFTS.iter())
+                .map(|&((potion, potions), (first, kinds))| {
+                    let worn = first + rng.gen_range(0, i32::from(kinds));
+                    let label = format!("#i{potion}# #t{potion}# : {potions}#i{first}# #t{first}#");
+                    let gift = vec![
+                        Effect::TakeItem {
+                            item_id: events::FORCE_OF_THE_SPIRIT,
+                            quantity: 1,
+                        },
+                        Effect::GiveItem {
+                            item_id: potion,
+                            quantity: potions,
+                        },
+                        Effect::GiveItem {
+                            item_id: worn,
+                            quantity: 1,
+                        },
+                    ];
+                    (label, vec![Page::Done(gift)])
+                })
+                .collect();
+            vec![
+                Page::Say(text(keys::HOLIDAY_ARENA_WON)),
+                Page::Menu {
+                    text: text(keys::HOLIDAY_ARENA_GIFT),
+                    choices,
+                },
+            ]
+        }
+        SnowSpirit::Won { taken: false } => {
+            let rewards = events::HOLIDAY_REWARDS[usize::from(level.clamp(1, 3) - 1)];
+            let last = match rewards.choose(rng) {
+                Some(&(item_id, quantity)) if has_reward_slot(&player.inventory) => {
+                    Page::Done(vec![
+                        Effect::GiveItem { item_id, quantity },
+                        Effect::EventCommand(EventCommand::PrizeTaken),
+                    ])
+                }
+                _ => Page::End(text(keys::HOLIDAY_ARENA_PRIZE_FULL)),
+            };
+            script.inventory_full = Some(text(keys::HOLIDAY_ARENA_PRIZE_FULL));
+            vec![
+                Page::Say(text(keys::HOLIDAY_ARENA_WON)),
+                Page::Say(text(keys::HOLIDAY_ARENA_PRIZE)),
+                last,
+            ]
+        }
+        SnowSpirit::Won { taken: true } => vec![
+            Page::Say(text(keys::HOLIDAY_ARENA_WON)),
+            Page::End(text(keys::HOLIDAY_ARENA_THANKS)),
+        ],
     };
-    NpcScript::new(SNOW_SPIRIT, pages)
+    script
 }
 
 /// Amos the Strong (Cosmic `9201043`) on his training ground: a player
@@ -23933,8 +24005,10 @@ mod tests {
 
     #[test]
     fn the_snow_spirit_lets_the_leader_bring_out_the_snowman() {
+        let player = with_quests(&[]);
         let next = |leader, form| {
-            let mut spirit = NpcScript::snow_spirit_arena(leader, form);
+            let view = SnowSpirit::Snowman(form);
+            let mut spirit = NpcScript::snow_spirit_arena(1, leader, view, &player);
             let first = spirit.begin();
             (first, spirit.respond(ScriptInput::Next).unwrap())
         };
@@ -23953,11 +24027,70 @@ mod tests {
             (4, keys::HOLIDAY_ARENA_GROW),
             (5, keys::HOLIDAY_ARENA_GROWN),
         ] {
-            let mut spirit = NpcScript::snow_spirit_arena(true, form);
+            let view = SnowSpirit::Snowman(form);
+            let mut spirit = NpcScript::snow_spirit_arena(1, true, view, &player);
             let first = spirit.begin();
             assert_eq!(page_text(&first), content::text().get(key, &[]), "{form}");
             assert!(first.effects.is_empty(), "{form}");
         }
+    }
+
+    #[test]
+    fn the_snow_spirit_brings_out_scrooge_and_gives_out_the_prizes() {
+        let mut player = with_quests(&[]);
+        let say = |key| content::text().get(key, &[]);
+        let script = |view, leader, player: &Player| {
+            snow_spirit_arena(3, leader, view, player, &mut rand::thread_rng())
+        };
+        // At the whole snowman, the leader brings Scrooge out; another is
+        // sent to the leader.
+        let mut spirit = script(SnowSpirit::Snowman(5), true, &player);
+        spirit.begin();
+        let then = spirit.respond(ScriptInput::Next).unwrap();
+        assert_eq!(then.effects, [Effect::BringOutScrooge]);
+        let mut spirit = script(SnowSpirit::Snowman(5), false, &player);
+        spirit.begin();
+        let then = spirit.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&then), say(keys::HOLIDAY_ARENA_LEADER));
+        let first = script(SnowSpirit::Scrooge, true, &player).begin();
+        assert_eq!(page_text(&first), say(keys::HOLIDAY_ARENA_SCROOGE));
+        // After the win, a prize of the difficulty's, once.
+        let mut spirit = script(SnowSpirit::Won { taken: false }, false, &player);
+        assert_eq!(page_text(&spirit.begin()), say(keys::HOLIDAY_ARENA_WON));
+        spirit.respond(ScriptInput::Next).unwrap();
+        let prize = spirit.respond(ScriptInput::Next).unwrap();
+        let [Effect::GiveItem { item_id, quantity }, Effect::EventCommand(EventCommand::PrizeTaken)] =
+            prize.effects[..]
+        else {
+            panic!("{prize:?}");
+        };
+        assert!(events::HOLIDAY_REWARDS[2].contains(&(item_id, quantity)));
+        let mut spirit = script(SnowSpirit::Won { taken: true }, false, &player);
+        spirit.begin();
+        let then = spirit.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&then), say(keys::HOLIDAY_ARENA_THANKS));
+        // A Force of the Spirit buys a gift instead, each time.
+        let force = game::Item::stack(events::FORCE_OF_THE_SPIRIT, 1);
+        player.inventory.insert(game::InventoryType::Etc, 1, force);
+        let mut spirit = script(SnowSpirit::Won { taken: true }, false, &player);
+        spirit.begin();
+        let menu = spirit.respond(ScriptInput::Next).unwrap();
+        assert_eq!(kind(&menu), Some(4));
+        let gift = spirit.respond(ScriptInput::Select(1)).unwrap();
+        let [Effect::TakeItem {
+            item_id: events::FORCE_OF_THE_SPIRIT,
+            quantity: 1,
+        }, Effect::GiveItem {
+            item_id: 2000006,
+            quantity: 20,
+        }, Effect::GiveItem {
+            item_id: worn,
+            quantity: 1,
+        }] = gift.effects[..]
+        else {
+            panic!("{gift:?}");
+        };
+        assert!((1012011..1012020).contains(&worn), "{worn}");
     }
 
     #[test]

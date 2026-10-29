@@ -846,6 +846,10 @@ pub enum Effect {
     /// A Holiday PQ arena's snowman comes out in its first form, and the
     /// mobs start to come (the arena Snow Spirit's second page).
     BringOutSnowman,
+    /// Bring out Scrooge in the player's Holiday PQ arena, once its
+    /// snowman is whole, as everyone there hears; the whole snowman heals
+    /// while Scrooge is out (Cosmic `9105004`'s leader page).
+    BringOutScrooge,
     /// Set character `slot` of a started info quest's string
     /// (`game::quest::INFO_QUESTS`) from `from` to `to`, as Ariant's houses
     /// mark each delivery. Nothing is applied unless it reads `from`.

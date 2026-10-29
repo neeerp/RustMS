@@ -48,8 +48,9 @@ Crimsonwood Keep's party quest is an expedition's, which ends like a
 party's; it has its gate, its squad, its clocks, its end rules, its
 stages, its win and its rooms after ([Crimsonwood Keep](#crimsonwood-keep)).
 Happyville's Holiday PQ has its three lobbies, its entry, its arenas'
-clock, its ways out and its snowman to build up; Scrooge and gifts come
-in later slices ([the Holiday PQ](#the-holiday-pq)).
+clock, its ways out, its snowman to build up, Scrooge, the win and its
+prizes; the door to its lobbies comes in a later slice ([the Holiday
+PQ](#the-holiday-pq)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1756,7 +1757,26 @@ clears stage 1 for the run (`ClearEventStage`), with its effect and EXP. A
 mob that runs into it until it goes melts it back to its form before, at
 full HP, as everyone hears (`holiday.snowman.melted`); if it was in its
 first form, the run fails (`FieldActor::snowman_melted`). Once it is out,
-the Snow Spirit urges it grown, and once whole, says so.
+the Snow Spirit urges it grown.
+
+Once it is whole, the Snow Spirit tells the leader so, and its Next brings
+out Scrooge (`events::holiday_scrooge(level)`, 9400318 + level) by the
+snowman, as everyone hears in pink (`holiday.scrooge.out`;
+`Effect::BringOutScrooge`, `FieldActor::bring_out_scrooge`; picks in
+QUESTIONS b298); anyone else is sent to the leader, and while Scrooge is
+out everyone hears to fight. Every ten seconds while Scrooge lives, the
+whole snowman heals 200 + 200 x level HP (`heal_whole_snowman`; mobs that
+run into it still melt it back). Scrooge's death clears stage 2, the
+last, through `cleared_by_boss`: the clear effect and EXP again, the clock
+stops, the run is won, and every member takes the difficulty's Holiday
+Buff (`events::holiday_win_buff(level)`, 2022435 + level, as an item's
+effect). Then the Snow Spirit gives each member one item at random from
+the difficulty's prizes (`events::HOLIDAY_REWARDS`, Cosmic's lists), once
+(`EventCommand::PrizeTaken`), if a slot is free in Equip, Use and Etc;
+and each time a member holds a Force of the Spirit (4032092), it trades
+it for one of two gifts (`HOLIDAY_GIFTS`): 20 of 2000002 and the hat
+1002850, or 20 of 2000006 and one of the nine earrings from 1012011 at
+random.
 
 The Snowman (`SNOWMAN`, 9105005) offers the way home to Happyville in a
 lobby, and in an arena the way out to the exit map, which leaves the
