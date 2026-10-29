@@ -2014,16 +2014,18 @@ quests' are enough.
 ## Neo City's era bosses
 
 The map at the end of each era's way but the first's (240070202 to
-240070602, by hundreds; `net::events::neo_boss_door`) has a door,
-`right00` (`TD_Boss_enter`), to the era's boss. The boss is fought in the
+240070602, by hundreds; `net::events::neo_boss_door`) has a door to the
+era's boss, a portal with the script `TD_Boss_enter`: `right00`, but
+`right0` in 240070402 and `top00` in 240070502. The boss is fought in the
 next map (240070203 to 240070603; Cosmic `TD_Battle1` to `TD_Battle5`). The
 event is `events::NEO_BOSS`, `EventKind::NeoBoss(era)` for eras 1 to 5.
 The client actor answers the door (`scripts::NEO_BOSS_IN`,
 `neo_boss_portal`) once the directory says whether the party may go.
 
 - The leader of a party of two to six takes it in. Everyone must be on the
-  door's map and of level 70 or more (Cosmic's; the eras' maps' `lvLimit`
-  runs 70 to 90). One at a time an era on a channel. Refusals are pink:
+  door's map and of level 70 or more (Cosmic's). The door maps' own
+  `lvLimit`, 73, 77, 81, 85 and 90, keeps anyone lower from reaching them,
+  so that is the real floor. One at a time an era on a channel. Refusals are pink:
   `neo_boss.no_party`, `neo_boss.not_leader`, `neo_boss.not_eligible`
   (with `{least}`, `{most}` and `{level}`) and `neo_boss.busy`.
 - The minutes are 10, 10, 15, 15 and 20. The room's boss is in Map.nx,
@@ -2033,10 +2035,12 @@ The client actor answers the door (`scripts::NEO_BOSS_IN`,
   8220015 (`NEO_BOSSES`). It wins with `boss_falls`'s clear effect and
   sound, played once (the event's own is kept quiet), and the clock
   stops. There is no reward from the event.
-- The room's `left00` leads to the era's first map. Walking out of a fight
-  not won leaves too few, which ends it and sends the rest to the door
+- The room's `left00` (`under00` in 240070503) leads to the era's first
+  map. Before the win, the leader walking out ends the fight and sends the
+  rest to the door, and so does anyone leaving only one behind
   (`until_empty: false`, Cosmic `isEventTeamLackingNow`). So does the time
-  running out. A death revives in the Tera Forest, the room's
+  running out. The win frees the era's door for the next party at once,
+  though the winners are still in their room. A death revives in the Tera Forest, the room's
   `returnMap`.
 
 ## Kerning Square's Spirit of Rock

@@ -298,7 +298,7 @@ pub const PAPULATUS_IN: &str = "Populatus00";
 /// White Essence and their party may go (`latanica_portal`).
 pub const LATANICA_IN: &str = "captinsg00";
 /// The door at the end of each of Neo City's eras but the first
-/// (`right00`), to the era's boss, which the client actor answers once the
+/// (`right00`, `right0` or `top00`), to the era's boss, which the client actor answers once the
 /// directory says whether the party may go (`neo_boss_portal`).
 pub const NEO_BOSS_IN: &str = "TD_Boss_enter";
 /// The way from the Trial Grounds' first map into their rooms (`in00`),

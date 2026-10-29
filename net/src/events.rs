@@ -4123,8 +4123,8 @@ pub const GUARDIAN_NEX: [Event; 6] = [
 /// has for each (Cosmic `TD_Battle1` to `TD_Battle5`).
 pub const NEO_BOSSES: [i32; 5] = [7220005, 8220010, 8220011, 8220012, 8220015];
 const NEO_BOSS_MINUTES: [u64; 5] = [10, 10, 15, 15, 20];
-/// The map at the end of era `era`'s way, whose `right00`
-/// (`TD_Boss_enter`) leads to its boss.
+/// The map at the end of era `era`'s way, whose door (`TD_Boss_enter`)
+/// leads to its boss.
 pub const fn neo_boss_door(era: u8) -> i32 {
     240_070_102 + 100 * era as i32
 }
@@ -4727,6 +4727,22 @@ impl EventKind {
             EventKind::Carnival(_) => Some((1301, &[1_122_007])),
             _ => None,
         }
+    }
+
+    /// Whether the boss's own field shows the clear effect and sound as it
+    /// falls (`FieldActor::boss_falls`), so the win shows no more.
+    pub const fn boss_falls(self) -> bool {
+        matches!(
+            self,
+            EventKind::Papulatus
+                | EventKind::Latanica
+                | EventKind::PrimeMinister
+                | EventKind::Balrog
+                | EventKind::Showa
+                | EventKind::PinkBean
+                | EventKind::GuardianNex(_)
+                | EventKind::NeoBoss(_)
+        )
     }
 
     pub fn event(self) -> &'static Event {

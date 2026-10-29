@@ -1,10 +1,10 @@
 //! Neo City's era bosses: the door at the end of each era's way but the
-//! first (`right00`, `TD_Boss_enter`) lets the leader of a party of two to
+//! first (`TD_Boss_enter`; Year 2099's is `right00`) lets the leader of a party of two to
 //! six, all of level 70 or more, take it into its own copy of the boss's
 //! room, one party at a time an era on a channel. Year 2099's Bergamot
 //! comes back twice as it dies; its last form's death wins the fight with
-//! one clear effect. The party walks out by `left00` to the era's first
-//! map, and one walking out of a fight not won leaves too few, which ends
+//! one clear effect, which frees the door. The party walks out by `left00`
+//! to the era's first map, and one walking out of a fight not won leaves too few, which ends
 //! it and sends the rest back to the door.
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
@@ -147,13 +147,13 @@ async fn a_party_takes_the_door_to_its_eras_boss_whose_last_form_wins_it() {
         .count();
     assert_eq!(clears, 1, "{seen:?}");
 
-    // The winners walk out, which frees the room for the next party.
+    // The win frees the door for the next party, while the winners walk
+    // out.
+    send(&mut next[0].connection, enter()).await;
+    all_arrive(&mut next).await;
     for player in &mut team {
         walk_out(player).await;
     }
-    told(&mut next[0], walk_to(DOOR_AT.0, DOOR_AT.1)).await;
-    send(&mut next[0].connection, enter()).await;
-    all_arrive(&mut next).await;
 
     // One of them walking out of the fight leaves too few, which ends it.
     let (first, rest) = next.split_first_mut().unwrap();
