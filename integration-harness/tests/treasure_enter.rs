@@ -264,8 +264,9 @@ async fn charles_takes_140s_in_whose_letters_open_the_tunnel_and_mvs_fall_wins()
         .iter()
         .find(|r| r.reactor_id == TREASURE_CHEST)
         .unwrap();
-    // Drop ids start over on each map, so the dungeon's would mix in.
+    // Object ids start over on each map, so the dungeon's would mix in.
     trace.field.drops.clear();
+    trace.field.reactors_removed.clear();
     let c = &mut player.connection;
     send(c, walk_to(chest.x, chest.y)).await;
     for _ in 0..8 {
