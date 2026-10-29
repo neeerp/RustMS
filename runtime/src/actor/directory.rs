@@ -54,6 +54,8 @@ use tracing::{error, info, warn};
 /// How often messenger seats and guild members held through a channel
 /// change are checked.
 const PURGE_INTERVAL: Duration = Duration::from_secs(10);
+/// How often the bookings of weddings nobody began are dropped.
+const LAPSE_INTERVAL: Duration = Duration::from_secs(30);
 
 /// How long a mini-dungeon's copy stays taken for a team that hasn't
 /// arrived yet.
@@ -223,6 +225,7 @@ impl WorldDirectory {
 
     pub async fn run(mut self) {
         let mut purge = tokio::time::interval(PURGE_INTERVAL);
+        let mut lapse = tokio::time::interval(LAPSE_INTERVAL);
         loop {
             tokio::select! {
                 message = self.rx.recv() => match message {
@@ -238,6 +241,7 @@ impl WorldDirectory {
                     self.purge_family_summons(now);
                     self.run_party_searches(now);
                 }
+                _ = lapse.tick() => self.lapse_weddings(),
                 _ = at(self.avatar_banners.until()) => {
                     if let Some(banner) = self.avatar_banners.next(Instant::now()) {
                         self.show_everyone(banner);
@@ -508,6 +512,7 @@ impl WorldDirectory {
                 reply,
             } => self.join_wedding(from, venue, marriage_id, reply),
             DirectoryMessage::Married { from } => self.tell_married(from),
+            DirectoryMessage::WeddingsLapsed(couples) => self.tell_lapsed(couples),
             DirectoryMessage::WeddingClosed {
                 channel_id,
                 venue,

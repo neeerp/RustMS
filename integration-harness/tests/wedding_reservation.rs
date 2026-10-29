@@ -4,13 +4,16 @@
 //! gets 15 invitations and MARRIAGE_RESULT 16. A booked couple hears when
 //! the wedding starts and may not break off (MARRIAGE_RESULT 32). The
 //! assistant refuses without a ticket, with the partner away or offline,
-//! and with a partner who has no room or a wedding ring already.
+//! and with a partner who has no room or a wedding ring already. A booking
+//! the couple let pass unstarted goes, and they read MARRIAGE_RESULT 31.
 
 use game_data::GameData;
-use integration_harness::database::{engage, grant_stack, set_gender, set_job, stow_equip};
+use integration_harness::database::{
+    book_wedding, couple_status, engage, grant_stack, set_gender, set_job, stow_equip,
+};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{read_for, send, step, until, warp, Trace};
+use integration_harness::trace::{read_for, send, step, until, until_within, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
@@ -38,6 +41,7 @@ const SNAIL_SHELL: i32 = 4000000;
 
 const RESERVED: u8 = 16;
 const NO_BREAKING_OFF: u8 = 32;
+const CANCELLED: u8 = 31;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -220,4 +224,37 @@ async fn the_assistants_refuse_a_couple_not_ready() {
             assert_ne!(text, other, "each refusal says why");
         }
     }
+}
+
+#[tokio::test]
+async fn a_booking_let_pass_is_cancelled_and_the_couple_told() {
+    let configs = [
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    ];
+    let [a_config, b_config] = &configs;
+    let a_id = new_character(a_config, 0).await;
+    let b_id = new_character(b_config, 1).await;
+    engage(a_id, b_id, MOONSTONE_BOX).await.expect("engage");
+    let mut a = enter(a_config, HENESYS).await;
+    let mut b = enter(b_config, HENESYS).await;
+
+    // Booked for an hour ago: the directory's next sweep drops it.
+    let marriage_id = book_wedding(a_id, 0, -1).await.expect("book");
+    for session in [&mut a, &mut b] {
+        let mut t = Trace::default();
+        until_within(
+            &mut session.connection,
+            &mut t,
+            Duration::from_secs(45),
+            |t| !t.marriage.is_empty(),
+        )
+        .await;
+        read_for(&mut session.connection, &mut t, 300).await;
+        assert_eq!(t.marriage, [result(CANCELLED)]);
+    }
+    assert_eq!(
+        couple_status(marriage_id).await.expect("status"),
+        (1, false)
+    );
 }

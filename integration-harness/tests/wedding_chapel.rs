@@ -159,7 +159,7 @@ async fn due_couple(configs: &[HarnessConfig; 2]) -> (i32, WorldSession, WorldSe
     engage(groom, bride, MOONSTONE_BOX).await.expect("engage");
     grant_stack(groom, ETC, 1, EMPTY_BOX, 1).await.expect("box");
     grant_stack(bride, ETC, 1, RING, 1).await.expect("ring");
-    let marriage_id = book_wedding(groom, CHAPEL, 0).await.expect("book");
+    let marriage_id = book_wedding(groom, CHAPEL, 1).await.expect("book");
     wedding_due(marriage_id, 0).await.expect("due");
     let a = enter(&configs[0], AMORIA).await;
     let b = enter(&configs[1], AMORIA).await;

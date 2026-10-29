@@ -1251,6 +1251,9 @@ pub enum DirectoryMessage {
     Married {
         from: ClientId,
     },
+    /// These couples' bookings went unstarted and are gone, as (couple,
+    /// groom, bride): those online are told.
+    WeddingsLapsed(Vec<(i32, i32, i32)>),
     /// Wedding `id` at `venue` on `channel_id` is over; the venue is free.
     WeddingClosed {
         channel_id: u8,

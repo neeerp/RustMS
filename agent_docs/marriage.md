@@ -279,8 +279,12 @@ answers a player who isn't engaged, has no booking at his venue, is on
 another channel than the booking's, or comes before its `starts_at`. A
 partner without wedding clothes worn or in the Equip tab
 (`game::wedding::has_clothes`) is told to bring them. The couple has
-`NO_SHOW` (10 minutes) after `starts_at` to start; then the booking goes
-when next read. Saying yes (`Effect::StartWedding`) re-reads the booking
+`NO_SHOW` (10 minutes) after `starts_at` to start. Then the booking goes
+when next read, or at the directory's sweep every 30 seconds
+(`db::wedding::lapse`, which skips weddings under way), whichever comes
+first. The sweep sends `MARRIAGE_RESULT` 31 ("The reservation has been
+canceled...") to each partner online and outside the Cash Shop, as a
+failed wedding does (`DirectoryMessage::WeddingsLapsed`). Saying yes (`Effect::StartWedding`) re-reads the booking
 and asks the directory (`DirectoryMessage::StartWedding`): the partner
 must stand beside the player, and one wedding at a time may use a venue on
 a channel (`weddings` by channel and venue; ids come from the same counter
@@ -707,8 +711,6 @@ For crush and friendship rings:
   opens (report b082), and the Giant Cake's drops (the content pack
   has none). The content pack gives the keys and the
   chests a `period`, which RustMS ignores: the chests it grants don't
-  expire (review b083).
-- Sending `MARRIAGE_RESULT` 31 ("The reservation has been canceled...")
-  when a no-show's booking goes unstarted. A wedding that fails sends it.
+  expire (review b083). QUESTIONS b314 asks for the prize tables.
 
 Report b052 §7 lists them.
