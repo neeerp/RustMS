@@ -2690,6 +2690,14 @@ pub mod keys {
     pub const HOLIDAY_SNOWMAN_OUT: &str = "holiday.snowman.out";
     pub const HOLIDAY_FAKE_VIGOR: &str = "holiday.fake_vigor";
     pub const HOLIDAY_SNOWMAN_MELTED: &str = "holiday.snowman.melted";
+    pub const HOLIDAY_SCROOGE_OUT: &str = "holiday.scrooge.out";
+    pub const HOLIDAY_ARENA_SCROOGE: &str = "holiday.arena.scrooge";
+    pub const HOLIDAY_ARENA_WON: &str = "holiday.arena.won";
+    pub const HOLIDAY_ARENA_GIFT: &str = "holiday.arena.gift";
+    pub const HOLIDAY_ARENA_GIFT_FULL: &str = "holiday.arena.gift_full";
+    pub const HOLIDAY_ARENA_PRIZE: &str = "holiday.arena.prize";
+    pub const HOLIDAY_ARENA_PRIZE_FULL: &str = "holiday.arena.prize_full";
+    pub const HOLIDAY_ARENA_THANKS: &str = "holiday.arena.thanks";
     pub const PIRATE_GUON_DOORS: &str = "pirate.guon.doors";
     pub const PIRATE_GUON_BOSS: &str = "pirate.guon.boss";
     pub const PIRATE_PORTAL_SHUT: &str = "pirate.portal_shut";
@@ -4337,6 +4345,14 @@ mod tests {
                 keys::HOLIDAY_SNOWMAN_OUT,
                 keys::HOLIDAY_FAKE_VIGOR,
                 keys::HOLIDAY_SNOWMAN_MELTED,
+                keys::HOLIDAY_SCROOGE_OUT,
+                keys::HOLIDAY_ARENA_SCROOGE,
+                keys::HOLIDAY_ARENA_WON,
+                keys::HOLIDAY_ARENA_GIFT,
+                keys::HOLIDAY_ARENA_GIFT_FULL,
+                keys::HOLIDAY_ARENA_PRIZE,
+                keys::HOLIDAY_ARENA_PRIZE_FULL,
+                keys::HOLIDAY_ARENA_THANKS,
                 keys::PIRATE_GUON_DOORS,
                 keys::PIRATE_GUON_BOSS,
                 keys::PIRATE_PORTAL_SHUT,

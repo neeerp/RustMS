@@ -15,7 +15,7 @@ use game_data::{Area, PortalTemplate};
 use net::carnival::SpendRefusal;
 use net::events::{
     self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, CwkKeeper, Entry, EventCommand,
-    EventKind, HeadCount, JailCheck, LeverCheck, RopesTalk, Standing, Statue,
+    EventKind, HeadCount, JailCheck, LeverCheck, RopesTalk, SnowSpirit, Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
@@ -466,7 +466,9 @@ impl ClientActor {
 
     /// What the Snow Spirit says to the player in a Holiday PQ arena, if
     /// there on its run: before the snowman is out, the leader brings it
-    /// out; after, how it grows (Cosmic `9105004`'s `eim` branch).
+    /// out; after, how it grows; once it is whole, the leader brings out
+    /// Scrooge; after the win, the member's prize or gift (Cosmic
+    /// `9105004`'s `eim` branch).
     pub(super) async fn snow_spirit_arena(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let Some(ticket) = self.event.as_ref().filter(|ticket| {
@@ -476,12 +478,22 @@ impl ClientActor {
         }) else {
             return Ok(None);
         };
-        let leader = ticket.leader();
-        let (reply, form) = oneshot::channel();
+        let (leader, won, taken) = (ticket.leader(), ticket.won(), ticket.prize_taken);
+        let EventKind::Holiday(level) = ticket.kind else {
+            return Ok(None);
+        };
+        let (reply, arena) = oneshot::channel();
         self.send_to_field(FieldMessage::HolidaySnowman { reply })
             .await?;
-        let form = form.await.unwrap_or(0);
-        Ok(Some(NpcScript::snow_spirit_arena(leader, form)))
+        let view = match arena.await.unwrap_or((0, false)) {
+            _ if won => SnowSpirit::Won { taken },
+            (_, true) => SnowSpirit::Scrooge,
+            (form, false) => SnowSpirit::Snowman(form),
+        };
+        let player = &self.in_game()?.player;
+        Ok(Some(NpcScript::snow_spirit_arena(
+            level, leader, view, player,
+        )))
     }
 
     /// What Amos says to the player on the Amorian Challenge's rope or
@@ -2097,6 +2109,11 @@ impl ClientActor {
             }
         }
         self.send_all(&mut packets).await?;
+        // The Holiday PQ's win leaves each member a Holiday Buff (Cosmic
+        // `clearPQ`'s `applyEventPlayersItemBuff`).
+        if let (true, EventKind::Holiday(level)) = (won, ticket_kind) {
+            self.take_item_buff(events::holiday_win_buff(level)).await?;
+        }
         if won {
             let cleared = PartyQuestOutcome::Cleared {
                 took: entered.elapsed(),

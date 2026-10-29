@@ -1795,13 +1795,16 @@ pub fn cleared_by_catching(map_id: i32) -> Option<u8> {
 /// The stage cleared once `mob_id` dies on `map_id`, in an event's copy of
 /// it: the Forest of Poison Haze's last, by its Super-Charged Poison Golem
 /// (Cosmic `EllinPQ.monsterKilled`), each Dojo floor by its boss, and So
-/// Gong's trial by So Gong.
+/// Gong's trial by So Gong, and the Holiday PQ's second by Scrooge.
 pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
     if dojo_boss(map_id) == Some(mob_id) {
         return dojo_floor(map_id);
     }
     if map_id == DOJO_TRIAL_MAP && mob_id == DOJO_TRIAL_MOB {
         return Some(1);
+    }
+    if holiday_arena(map_id).is_some_and(|level| holiday_scrooge(level) == mob_id) {
+        return Some(HOLIDAY_SCROOGE_STAGE);
     }
     (map_id == ELLIN_STAGES[5] && mob_id == ELLIN_GOLEM_LAST).then_some(6)
 }
@@ -4116,6 +4119,102 @@ pub fn holiday_token(misses: &mut u8, roll: f64, real: f64) -> Option<i32> {
     })
 }
 
+/// The Holiday PQ's stage Scrooge's death clears, which wins it.
+pub const HOLIDAY_SCROOGE_STAGE: u8 = 2;
+
+/// Scrooge ("Cross") of difficulty `level` (1 to 3): 9400319 to 9400321,
+/// whom the Snow Spirit brings out where the snowman stands once it is
+/// whole (Cosmic `9105004`).
+pub const fn holiday_scrooge(level: u8) -> i32 {
+    9_400_318 + level as i32
+}
+
+/// How often the whole snowman heals while Scrooge is out, and by how
+/// much in difficulty `level`: 400, 600 or 800 HP every 10 seconds
+/// (Cosmic `snowmanHeal`).
+pub const HOLIDAY_SNOWMAN_HEAL_EVERY: Duration = Duration::from_secs(10);
+pub const fn holiday_snowman_heal(level: u8) -> i32 {
+    200 + 200 * level as i32
+}
+
+/// The Holiday Buff every member takes on winning difficulty `level`:
+/// 2022436 to 2022438 (Cosmic `clearPQ`'s `applyEventPlayersItemBuff`).
+pub const fn holiday_win_buff(level: u8) -> i32 {
+    2_022_435 + level as i32
+}
+
+/// Each member's prize from the Snow Spirit after the win, one of these
+/// drawn by difficulty (Cosmic `HolidayPQ_*`'s `setEventRewards`, not
+/// period-verified, QUESTIONS b295).
+pub const HOLIDAY_REWARDS: [&[(i32, i16)]; 3] = [
+    &[
+        (1002033, 1),
+        (2012005, 15),
+        (2012006, 15),
+        (2020002, 10),
+        (2022006, 5),
+        (2022002, 5),
+        (4010000, 2),
+        (4010001, 2),
+        (4010002, 2),
+        (4020000, 2),
+        (4020001, 2),
+        (4020006, 2),
+    ],
+    &[
+        (1302080, 1),
+        (1002033, 1),
+        (2012005, 15),
+        (2012006, 15),
+        (2020002, 15),
+        (2020025, 10),
+        (2020026, 10),
+        (4010003, 3),
+        (4010004, 3),
+        (4010005, 3),
+        (4020002, 3),
+        (4020003, 3),
+        (4020007, 3),
+    ],
+    &[
+        (1302080, 1),
+        (1002033, 1),
+        (2022153, 1),
+        (2022042, 5),
+        (2020006, 20),
+        (2020009, 15),
+        (2020016, 10),
+        (2020024, 10),
+        (4010006, 2),
+        (4010007, 4),
+        (4020004, 4),
+        (4020005, 4),
+        (4003002, 1),
+    ],
+];
+
+/// Force of the Spirit (quest 28003's reward), which the Snow Spirit
+/// trades for a Maplemas gift after the win.
+pub const FORCE_OF_THE_SPIRIT: i32 = 4_032_092;
+/// The Snow Spirit's two Maplemas gifts for a Force of the Spirit: 20
+/// potions and a hat, or 20 potions and one of nine face accessories, from
+/// 1012011 on, drawn (Cosmic `9105004`'s `prizeTree`).
+pub const HOLIDAY_GIFTS: [((i32, i16), (i32, u8)); 2] = [
+    ((2_000_002, 20), (1_002_850, 1)),
+    ((2_000_006, 20), (1_012_011, 9)),
+];
+
+/// Where a Holiday arena's run stands, as the Snow Spirit sees it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnowSpirit {
+    /// The snowman in this form, 0 before it is out.
+    Snowman(u8),
+    /// Scrooge is out.
+    Scrooge,
+    /// Scrooge fell; the member took their prize or not.
+    Won { taken: bool },
+}
+
 /// Kerning Square's 7th floor, 103040400, where June (1052125) keeps the
 /// way up to the Spirit of Rock's floors, and where they let out (their
 /// `forcedReturn`).
@@ -6074,6 +6173,20 @@ mod tests {
         assert_eq!(snowman, Snowman { form: 2, step: 0 });
         assert_eq!(Snowman { form: 1, step: 2 }.melted(), None);
         assert_eq!(Snowman { form: 5, step: 0 }.melted(), None);
+    }
+
+    #[test]
+    fn scrooges_death_wins_the_holiday_pq_for_a_buff_and_a_prize() {
+        assert_eq!(holiday_scrooge(1), 9400319);
+        assert_eq!(holiday_scrooge(3), 9400321);
+        assert_eq!(cleared_by_boss(889100011, 9400320), Some(2));
+        assert_eq!(cleared_by_boss(889100011, 9400319), None);
+        assert_eq!(cleared_by_boss(889100010, 9400320), None);
+        assert_eq!(EventKind::Holiday(2).event().last_stage(), 2);
+        assert_eq!(holiday_snowman_heal(3), 800);
+        assert_eq!([1, 2, 3].map(holiday_win_buff), [2022436, 2022437, 2022438]);
+        assert_eq!(HOLIDAY_REWARDS.map(<[_]>::len), [12, 13, 13]);
+        assert_eq!(HOLIDAY_REWARDS[2][12], (4003002, 1));
     }
 
     #[test]

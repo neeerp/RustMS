@@ -1006,6 +1006,9 @@ pub enum FieldRequest {
     /// The Snow Spirit brings out a Holiday PQ arena's snowman
     /// (`scripts::Effect::BringOutSnowman`).
     BringOutSnowman,
+    /// The Snow Spirit brings out Scrooge where the whole snowman stands
+    /// (`scripts::Effect::BringOutScrooge`).
+    BringOutScrooge,
     /// The player threw the catch item in USE `slot` at the mob `object_id`:
     /// catch it if it is a `catch.mob` within `catch.area` of them, below
     /// `catch.mob_hp` percent of its HP. Answered with
