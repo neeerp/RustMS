@@ -5,7 +5,11 @@
 //! Nett's Pyramid's are: three stages of 3 minutes (3 s, as the harness
 //! world runs events 60 times as fast), its kills counted toward the
 //! Honorary Employee medal's 7662 and its mirror 7762, and a rank and EXP
-//! on the Dusty Platform's result map, where Mr. Lim sends one back up.
+//! on the Dusty Platform's result map. There Mr. Lim puts one on Train
+//! 999 at once, or gives a Boarding Pass for it and sends one back up; at
+//! the station he takes the pass for it. Train 999's platform is a minute
+//! alone with 30 Metro Bubblings. One on the result map without a run is
+//! only sent up.
 
 use game_data::server_content::keys;
 use integration_harness::database::{set_job, set_quest};
@@ -16,7 +20,10 @@ use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::WorldSession;
 use integration_harness::{login_to_world_session, relogin};
-use net::events::{EventKind, SUBWAY_ARRIVAL_PORTAL, SUBWAY_LOBBY, SUBWAY_RESULT, SUBWAY_STAGES};
+use net::events::{
+    EventKind, METRO_BUBBLING, SUBWAY_ARRIVAL_PORTAL, SUBWAY_LOBBY, SUBWAY_PASS, SUBWAY_RESULT,
+    SUBWAY_STAGES, SUBWAY_TRAIN_ROOM,
+};
 use net::npc_scripts::{DIMENSIONAL_MIRROR, MR_LIM};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
@@ -42,6 +49,25 @@ fn text(key: &str) -> String {
 fn told_value(seen: &Trace, key: &str, value: i32) -> bool {
     let last = seen.session_values.iter().rev().find(|(k, _)| k == key);
     last.is_some_and(|(_, v)| *v == value.to_string())
+}
+
+/// Train 999's platform, just boarded: 30 Metro Bubblings, and the time
+/// running out (well under a second here, too soon for a kill) sends the
+/// rider back to the station.
+async fn ride_train_999(player: &mut WorldSession, mut seen: Trace) {
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&SUBWAY_TRAIN_ROOM) && t.field.mobs.len() >= 30
+    })
+    .await;
+    assert!(!seen.countdowns.is_empty(), "{seen:?}");
+    assert!(
+        seen.field.mobs.iter().all(|m| m.1 == METRO_BUBBLING),
+        "{seen:?}"
+    );
+    until(&mut player.connection, &mut seen, |t| {
+        t.arrivals.iter().any(|a| a.0 == SUBWAY_LOBBY)
+    })
+    .await;
 }
 
 /// A level-27 character the Mirror has sent from Henesys to the station.
@@ -127,13 +153,45 @@ async fn a_party_runs_the_dusty_platforms_three_stages_to_its_result() {
     let stages: Vec<i32> = (1..=SUBWAY_STAGES).map(|n| run.stage_map(n)).collect();
     assert_eq!(seen.warps, [stages, vec![SUBWAY_RESULT]].concat());
 
-    // Mr. Lim on the result map sends one back to the station.
-    let back = told(&mut player, talk(SUBWAY_RESULT, MR_LIM)).await;
+    // Mr. Lim on the result map gives a pass for later and sends one back
+    // to the station.
+    let offer = told(&mut player, talk(SUBWAY_RESULT, MR_LIM)).await;
+    assert!(said(&offer, keys::SUBWAY_LIM_RESULT_MENU), "{offer:?}");
+    let back = told(&mut player, answer(4, 1, Some(1))).await;
     assert!(
         matches!(back.arrivals[..], [(SUBWAY_LOBBY, 0, _)]),
         "{back:?}"
     );
-    assert!(!said(&back, keys::SUBWAY_LIM_MENU), "{back:?}");
+    assert!(back.added.iter().any(|a| a.2 == SUBWAY_PASS), "{back:?}");
+    told(&mut player, answer(0, 1, None)).await;
+
+    // There he takes it for Train 999.
+    told(&mut player, talk(SUBWAY_LOBBY, MR_LIM)).await;
+    let mut seen = Trace::default();
+    send(&mut player.connection, answer(4, 1, Some(1))).await;
+    until(&mut player.connection, &mut seen, |t| !t.removed.is_empty()).await;
+    ride_train_999(&mut player, seen).await;
+
+    // Without another, he sends one off.
+    told(&mut player, talk(SUBWAY_LOBBY, MR_LIM)).await;
+    let none = told(&mut player, answer(4, 1, Some(1))).await;
+    assert!(said(&none, keys::SUBWAY_LIM_NO_PASS), "{none:?}");
+}
+
+#[tokio::test]
+async fn the_result_map_boards_train_999_at_once() {
+    let mut player = at_the_station().await;
+    party_of_one(&mut player).await;
+    told(&mut player, talk(SUBWAY_LOBBY, MR_LIM)).await;
+    let mut seen = Trace::default();
+    send(&mut player.connection, answer(4, 1, Some(0))).await;
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&SUBWAY_RESULT) && !t.pyramid_scores.is_empty()
+    })
+    .await;
+    told(&mut player, talk(SUBWAY_RESULT, MR_LIM)).await;
+    send(&mut player.connection, answer(4, 1, Some(0))).await;
+    ride_train_999(&mut player, Trace::default()).await;
 }
 
 #[tokio::test]
@@ -168,11 +226,16 @@ async fn mr_lim_gives_the_medal_for_10000_kills_ending_its_quest() {
     let mut player = relogin(&config).await;
     let mut seen = Trace::default();
     let c = &mut player.connection;
-    assert_eq!(warp(c, SUBWAY_LOBBY, "", &mut seen).await, SUBWAY_LOBBY);
+    assert_eq!(warp(c, SUBWAY_RESULT, "", &mut seen).await, SUBWAY_RESULT);
+
+    // On the result map without a run, Mr. Lim only sends one up.
+    let up = told(&mut player, talk(SUBWAY_RESULT, MR_LIM)).await;
+    assert!(matches!(up.arrivals[..], [(SUBWAY_LOBBY, 0, _)]), "{up:?}");
+    assert!(up.added.is_empty() && up.prompts.is_empty(), "{up:?}");
 
     // Never taken from Dalair, the quest is started and ended with it.
     told(&mut player, talk(SUBWAY_LOBBY, MR_LIM)).await;
-    let mut seen = told(&mut player, answer(4, 1, Some(1))).await;
+    let mut seen = told(&mut player, answer(4, 1, Some(2))).await;
     until(&mut player.connection, &mut seen, |t| {
         t.states.get(&29931) == Some(&2)
     })
@@ -183,6 +246,6 @@ async fn mr_lim_gives_the_medal_for_10000_kills_ending_its_quest() {
     // One each.
     told(&mut player, answer(0, 1, None)).await;
     told(&mut player, talk(SUBWAY_LOBBY, MR_LIM)).await;
-    let again = told(&mut player, answer(4, 1, Some(1))).await;
+    let again = told(&mut player, answer(4, 1, Some(2))).await;
     assert!(said(&again, keys::SUBWAY_LIM_MEDAL_HAVE), "{again:?}");
 }

@@ -186,12 +186,12 @@ the Pyramid's, with guesses noted in v83ref `lanes/QUESTIONS.md` (b319).
   (`met_out`) goes back to the saved town, or else to the Construction
   Site's portal 12. Its `metro00` opens Mr. Lim, and `chat00` shows the
   `Direction2.img/metro/Im` effect.
-- Mr. Lim (1052115) on the station: a menu of entering and the medal.
-  The party's leader takes in the members of level 25 to 30 on the map,
-  one to six of them, in up to 5 runs at once on a channel.
-  Without a party, or as a member, one hears the terms. On a stage he lets
-  one leave for the station; on the result map (910320001) he sends one
-  there at once.
+- Mr. Lim (1052115) on the station: a menu of entering, Train 999 and the
+  medal, in Cosmic's order. The party's leader takes in the members of
+  level 25 to 30 on the map, one to six of them, in up to 5 runs at once
+  on a channel. Without a party, or as a member, one hears the terms. On a
+  stage he lets one leave for the station; on the result map (910320001)
+  he offers Train 999 (below).
 - The run: three stages, 910320100, 910320200 and 910320300, of 3 minutes
   each, each in the event's own copy (the NX's copies 1 to 4 are not
   used). After the third, or once the gauge runs out, the run ends on
@@ -204,7 +204,8 @@ the Pyramid's, with guesses noted in v83ref `lanes/QUESTIONS.md` (b319).
   level 25 and ends it when record 7662 is 10000 or more
   (`RECORD_QUESTS`). Every kill and cool kill on a stage adds to the
   player's 7662, and to 7762, which the quest's window shows
-  (`pyramid::kill_records`). Mr. Lim's second choice gives the Honorary
+  (`pyramid::kill_records`); Train 999's don't. Mr. Lim's third choice
+  gives the Honorary
   Employee Medal, 1142141, from 10000, as Duarte gives his: not to one who
   holds it, nor with a full Equip bag. It ends 29931 too, starting it first
   for one who never took it (`Effect::FinishQuest`).
@@ -212,8 +213,27 @@ the Pyramid's, with guesses noted in v83ref `lanes/QUESTIONS.md` (b319).
   for a kill, 10 for a cool kill, 5 off for a miss; Power Buff Lv.1 and
   Lv.2 (2022616, 2022617) at 100 and 300 kills; no Rage of Pharaoh, which
   stays the Pyramid's; and `disableSkill`.
-- Not in: Train 999 and its bonus room (910320010), the Platform Pass
-  (4001321), and the 910330xxx set and its Last Platform.
+- Train 999 (`EventKind::SubwayTrain`): the bonus room "Platform - Train
+  999" (910320010), one player alone at any level, for a minute in their
+  own copy, up to 20 at once on a channel (its 20 rooms). The room has no
+  life of its own: each copy opens with 30 Metro Bubblings (9700020; its
+  `fixedMobCapacity`), 10 on each platform and 10 on the floor, which don't
+  come back (`events::opening_mobs`). Each drops a Subway Lost and Found
+  box (2022615) every time (`reward_overrides.toml`). The time running out,
+  or its `out00`, takes one back to the station.
+  - After a run that outlasted the third stage's clock, Mr. Lim on the
+    result map offers it at once, or a Train 999 Boarding Pass (4001321)
+    for later, which needs a free Etc slot, and back to the station
+    (Cosmic's Last Platform, 910330001, gives the pass so). Such a run's
+    `PyramidScore.cleared` sets `Player::subway_ride`, which leaving the
+    result map clears. Anyone else there, as one revived there (the stages'
+    `returnMap`), he sends straight back to the station.
+  - On the station his second choice takes a pass for it (Cosmic
+    `1052115`, which checks nothing else); without one, or with every room
+    taken, he says so.
+  - The minute, the drop rate and the pass on the result map are guesses
+    (QUESTIONS b320).
+- Not in: the 910330xxx set and its Last Platform.
 
 ## Stage rules (`FieldTemplate::massacre`)
 

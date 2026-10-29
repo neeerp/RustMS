@@ -87,7 +87,13 @@ impl ClientActor {
             EventKind::PrimeMinister => NpcScript::blocked_entrance(entry),
             EventKind::Amoria => NpcScript::amos_lobby(entry),
             EventKind::Magatia(side) => NpcScript::magatia(side, entry),
-            EventKind::Subway => NpcScript::mr_lim(entry, &self.in_game()?.player),
+            EventKind::Subway => {
+                // He offers Train 999 too.
+                let Some(train) = self.event_entry(EventKind::SubwayTrain).await? else {
+                    return Ok(());
+                };
+                NpcScript::mr_lim(entry, train, &self.in_game()?.player)
+            }
             EventKind::Dojo => {
                 // He offers the run with a party too.
                 let Some(party) = self.event_entry(EventKind::DojoParty).await? else {
@@ -113,6 +119,9 @@ impl ClientActor {
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
             // Duarte takes the gem, or sends the player in from the Shades.
             EventKind::PyramidTomb(_) => return Ok(()),
+            // Mr. Lim boards Train 999 from the Dusty Platform's own talk,
+            // and from the result map.
+            EventKind::SubwayTrain => return Ok(()),
             // Mu Young's start script for 2245 takes the player in, and
             // June's own talk and 2291's end script the Spirit of Rock's.
             EventKind::Tristan | EventKind::RockSpirit | EventKind::RockSpiritVip => return Ok(()),
@@ -1727,7 +1736,8 @@ impl ClientActor {
     /// A Massacre run ended with `rank` and `exp`: a player its end took to
     /// its result map, `exit`, sees them on the result screen and gets the
     /// EXP (Cosmic `sendScore`, with no rates). A Pyramid run `cleared`
-    /// offers its mode's Tomb in the Shades.
+    /// offers its mode's Tomb in the Shades, and a Dusty Platform one
+    /// Train 999.
     pub(super) async fn pyramid_score(
         &mut self,
         exit: i32,
@@ -1741,6 +1751,9 @@ impl ClientActor {
         let gem = exit - events::PYRAMID_RESULT;
         if cleared && (0..events::PyramidMode::ALL.len() as i32).contains(&gem) {
             self.in_game_mut()?.player.pyramid_gem = Some(gem);
+        }
+        if cleared && exit == events::SUBWAY_RESULT {
+            self.in_game_mut()?.player.subway_ride = true;
         }
         let mut packets = vec![build_pyramid_score(rank, exp)?];
         if exp > 0 {
@@ -1948,6 +1961,9 @@ impl ClientActor {
         }
         if net::carnival::result_room(from).is_some() {
             player.carnival_result = None;
+        }
+        if from == events::SUBWAY_RESULT {
+            player.subway_ride = false;
         }
         // Areda gives what a battle earned only in the King's Room, and
         // the jewels go with it.

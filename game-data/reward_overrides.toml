@@ -52,6 +52,13 @@ replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 [mobs.9001004]
 replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 
+[mobs.9700020]
+# The Metro Bubbling on Train 999's platform (Map.nx 910320010) swallowed a
+# Subway Lost and Found 2022615 ("A Lost and Found box accidentally ingested
+# by Bubbling", its Item.nx text), which it drops every time; the rate is a
+# guess (v83ref QUESTIONS b320).
+replace = [{ item = 2022615, prob = 1.0 }]
+
 [mobs.2220000]
 # Mano: its monster book (String.nx MonsterBook.img/2220000/reward) lists the
 # Rainbow-colored Snail Shell 2210006 that Pia's rainbow snail shell quest

@@ -309,6 +309,10 @@ pub struct Player {
     /// in its room in the Shades; kept from its result map to that room,
     /// and gone on any other way out of either. Not saved.
     pub pyramid_gem: Option<i32>,
+    /// Whether the player went all the way through a Dusty Platform run,
+    /// so that Mr. Lim on its result map offers Train 999; kept on that
+    /// map only. Not saved.
+    pub subway_ride: bool,
     /// How the Monster Carnival battle the player just fought ended for
     /// them: whether their side won, and its CP in all, which 2042002
     /// grades in their result room. Gone on the way out of it. Not saved.
@@ -400,6 +404,7 @@ impl Player {
             dojo_energy: 0,
             pyramid_rage: 0,
             pyramid_gem: None,
+            subway_ride: false,
             carnival_result: None,
             ariant_tier: None,
             ariant_points: 0,

@@ -73,6 +73,10 @@ pub enum EventKind {
     /// Pyramid's, started by a party's leader at Mr. Lim (1052115) on its
     /// platform.
     Subway,
+    /// Train 999's platform, the Dusty Platform's bonus room, taken alone
+    /// with a Boarding Pass at Mr. Lim on its hub, or straight from the
+    /// result map after a run.
+    SubwayTrain,
     /// Jr. Balrog's room before Tristan's Tomb (2245), taken alone from
     /// Mu Young (1061014) in the Sleepywood dungeon.
     Tristan,
@@ -2037,7 +2041,8 @@ pub fn only_mobs(map_id: i32) -> Option<i32> {
 /// Crimsonwood Keep's bowmen's room, which has no spawn points, opens with
 /// five Master Guardians (9400594) along its slopes (Cosmic CWKPQ's
 /// `setup`). The Twilight of Gods opens with Pink Bean's statue
-/// (`PinkBeanBattle`'s `setup`). None come back.
+/// (`PinkBeanBattle`'s `setup`). Train 999's room opens with 30 Metro
+/// Bubblings. None come back.
 pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     const YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_YETI, (0, 0), 1)];
     const HELL_YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_HELL_YETI, (0, 0), 1)];
@@ -2085,6 +2090,15 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
         [(crate::mobs::PINK_BEAN_STATUE, PINK_BEAN_STATUE_AT, 1)];
     if map_id == PINK_BEAN_ARENA {
         return &PINK_BEAN_STATUE;
+    }
+    // Train 999's Bubblings, on both platforms and the floor between.
+    const BUBBLINGS: [(i32, (i16, i16), usize); 3] = [
+        (METRO_BUBBLING, (-100, 0), 10),
+        (METRO_BUBBLING, (150, 150), 10),
+        (METRO_BUBBLING, (350, 0), 10),
+    ];
+    if map_id == SUBWAY_TRAIN_ROOM {
+        return &BUBBLINGS;
     }
     const PRIME_MINISTER_ONLY: [(i32, (i16, i16), usize); 1] =
         [(PRIME_MINISTER, PRIME_MINISTER_AT, 1)];
@@ -3853,6 +3867,39 @@ pub const SUBWAY: Event = Event {
     ..DOJO
 };
 
+/// "Platform - Train 999" (String.nx), the Dusty Platform's bonus room:
+/// it has no life of its own, and its `out00` leads back to the hub.
+pub const SUBWAY_TRAIN_ROOM: i32 = 910320010;
+/// The Train 999 Boarding Pass, which Mr. Lim takes for a ride and gives
+/// for one later (its own text: "Allows one to board Train 999 through
+/// Mr. Lim").
+pub const SUBWAY_PASS: i32 = 4001321;
+/// The Metro Bubbling, whose Subway Lost and Found boxes (2022615) are the
+/// bonus room's prize.
+pub const METRO_BUBBLING: i32 = 9700020;
+
+/// Train 999's platform: one player alone, at any level (Cosmic `1052115`
+/// checks only the pass), for a minute in their own copy of the bonus room
+/// with 30 Metro Bubblings (its `fixedMobCapacity`), from the hub with a
+/// pass or from the result map after a run; then back to the hub. Twenty
+/// may go at once on a channel, as it has 20 rooms (Map.nx 910320010 to
+/// 029). The minute and the way in are guesses, QUESTIONS b320.
+pub const SUBWAY_TRAIN: Event = Event {
+    lobby: SUBWAY_LOBBY,
+    entrances: &[SUBWAY_RESULT],
+    maps: SUBWAY_TRAIN_ROOM..=SUBWAY_TRAIN_ROOM,
+    entry: SUBWAY_TRAIN_ROOM,
+    exit: SUBWAY_LOBBY,
+    levels: 1..=u8::MAX,
+    team: 1..=1,
+    minutes: 1,
+    exp_per_stage: &[],
+    meso_per_stage: &[],
+    member_clears: &[],
+    runs: 20,
+    ..DOJO
+};
+
 /// The room before Tristan's Tomb, 910520000, where the unknown Jr. Balrog
 /// waits (Map.nx `life`, spawned once).
 pub const TRISTAN_ROOM: i32 = 910520000;
@@ -4683,7 +4730,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 72] = [
+    pub const ALL: [EventKind; 73] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4714,6 +4761,7 @@ impl EventKind {
         EventKind::PyramidTomb(PyramidMode::Hard),
         EventKind::PyramidTomb(PyramidMode::Hell),
         EventKind::Subway,
+        EventKind::SubwayTrain,
         EventKind::Carnival(1),
         EventKind::Carnival(2),
         EventKind::Carnival(3),
@@ -4815,6 +4863,7 @@ impl EventKind {
             EventKind::PyramidParty(mode) => &PYRAMID_PARTY[mode as usize],
             EventKind::PyramidTomb(mode) => &PYRAMID_TOMB_RUNS[mode as usize],
             EventKind::Subway => &SUBWAY,
+            EventKind::SubwayTrain => &SUBWAY_TRAIN,
             EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
@@ -6315,10 +6364,15 @@ mod tests {
         for stage in [910320100, 910320200, 910320300] {
             assert!(massacre_stage(stage) && event_map(stage), "{stage}");
         }
-        // The hub, the result map and the bonus room are none of the run's.
-        for map in [SUBWAY_LOBBY, SUBWAY_RESULT, 910320010] {
-            assert!(!massacre_stage(map) && !event_map(map), "{map}");
+        // The hub and the result map are none of the run's, and the bonus
+        // room is Train 999's.
+        for map in [SUBWAY_LOBBY, SUBWAY_RESULT, SUBWAY_TRAIN_ROOM] {
+            assert!(
+                !massacre_stage(map) && subway.stage_on(map).is_none(),
+                "{map}"
+            );
         }
+        assert!(!event_map(SUBWAY_LOBBY) && !event_map(SUBWAY_RESULT));
         assert!(massacre_stage(926011100));
         assert_eq!(subway.minutes, 3);
         assert!(subway.lasts_until_empty() && !subway.solo());
@@ -6328,6 +6382,22 @@ mod tests {
         // Those of other levels stay behind.
         let team = subway.team(1, &[at(1, 30, hub), at(2, 24, hub)]);
         assert_eq!(team, Some(vec![1]));
+    }
+
+    #[test]
+    fn train_999_takes_one_alone_from_the_hub_or_the_result_map_to_30_bubblings() {
+        let train = EventKind::SubwayTrain.event();
+        assert!(train.solo() && !EventKind::SubwayTrain.massacre());
+        assert_eq!((train.entry, train.exit), (910320010, SUBWAY_LOBBY));
+        assert!(event_map(SUBWAY_TRAIN_ROOM));
+        assert_eq!((train.minutes, train.runs), (1, 20));
+        for map in [SUBWAY_LOBBY, SUBWAY_RESULT] {
+            assert_eq!(train.team(1, &[at(1, 31, map)]), Some(vec![1]), "{map}");
+        }
+        assert_eq!(train.team(1, &[at(1, 27, 910320100)]), None);
+        let mobs = opening_mobs(SUBWAY_TRAIN_ROOM);
+        assert!(mobs.iter().all(|m| m.0 == METRO_BUBBLING));
+        assert_eq!(mobs.iter().map(|m| m.2).sum::<usize>(), 30);
     }
 
     #[test]
