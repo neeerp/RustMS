@@ -4,6 +4,7 @@ extern crate num_derive;
 extern crate serde_derive;
 extern crate serde;
 
+pub mod ariant;
 pub mod beacon;
 pub mod berserk;
 pub mod carnival;

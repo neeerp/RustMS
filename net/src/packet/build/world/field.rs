@@ -310,6 +310,26 @@ pub fn build_pyramid_score(rank: u8, exp: i32) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// ARIANT_ARENA_USER_SCORE: the Ariant Coliseum's ranking, each player's
+/// name with their Spirit Jewels.
+pub fn build_ariant_score(scores: &[(String, i32)]) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::AriantScore as i16)?;
+    packet.write_byte(scores.len().min(usize::from(u8::MAX)) as u8)?;
+    for (name, score) in scores.iter().take(usize::from(u8::MAX)) {
+        packet.write_str_with_length(name)?;
+        packet.write_int(*score)?;
+    }
+    Ok(packet)
+}
+
+/// ARIANT_RESULT: the Ariant Coliseum's results banner as its fight ends.
+pub fn build_ariant_result() -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::AriantResult as i16)?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -492,6 +512,22 @@ mod tests {
             .byte(1)
             .int(60_000)
             .end();
+    }
+
+    #[test]
+    fn the_ariant_coliseum_sends_its_ranking_and_results() {
+        let scores = [("Ann".to_string(), 12), ("Bo".to_string(), 0)];
+        let packet = build_ariant_score(&scores).unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x129)
+            .byte(2)
+            .string("Ann")
+            .int(12)
+            .string("Bo")
+            .int(0)
+            .end();
+        let packet = build_ariant_result().unwrap();
+        Expect::new(&packet.bytes).short(0x9B).end();
     }
 
     #[test]

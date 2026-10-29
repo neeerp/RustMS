@@ -19,14 +19,18 @@ use tracing::info;
 
 /// A squad, and once it set out, the way back into its event.
 pub(super) struct SquadEntry {
-    squad: Squad,
-    event: Option<EventJoiner>,
+    pub(super) squad: Squad,
+    pub(super) event: Option<EventJoiner>,
 }
 
 impl WorldDirectory {
     /// The squad of `kind` on `channel_id`, unless it lapsed, in which case
     /// it goes.
-    fn live_squad(&mut self, channel_id: u8, kind: EventKind) -> Option<&mut SquadEntry> {
+    pub(super) fn live_squad(
+        &mut self,
+        channel_id: u8,
+        kind: EventKind,
+    ) -> Option<&mut SquadEntry> {
         let key = (channel_id, kind);
         if self
             .squads
@@ -57,6 +61,9 @@ impl WorldDirectory {
         command: SquadCommand,
         reply: oneshot::Sender<SquadAnswer>,
     ) {
+        if let EventKind::Ariant(arena) = kind {
+            return self.ariant_command(from, arena, command, reply);
+        }
         let answer = match command {
             SquadCommand::Rejoin => {
                 if let Some(reply) = self.rejoin_squad(from, kind, reply) {
@@ -64,7 +71,7 @@ impl WorldDirectory {
                 }
                 return;
             }
-            SquadCommand::Open => self.open_squad(from, kind),
+            SquadCommand::Open | SquadCommand::OpenFor(_) => self.open_squad(from, kind),
             SquadCommand::Join => self.join_squad(from, kind),
             SquadCommand::Expel(who) => self.expel_from_squad(from, kind, who),
             SquadCommand::Stop => self.stop_squad(from, kind),
@@ -80,7 +87,7 @@ impl WorldDirectory {
 
     /// Where `from` is and their name, if online on the lobby of `kind`,
     /// where its NPC stands.
-    fn squad_asker(&self, from: ClientId, kind: EventKind) -> Option<(u8, i32, String)> {
+    pub(super) fn squad_asker(&self, from: ClientId, kind: EventKind) -> Option<(u8, i32, String)> {
         let entry = self.clients.get(&from)?;
         let presence = &entry.presence;
         (presence.map_id == kind.event().lobby && !entry.in_cash_shop)
@@ -267,6 +274,6 @@ impl WorldDirectory {
     }
 }
 
-fn member_ids(squad: &Squad) -> Vec<ClientId> {
+pub(super) fn member_ids(squad: &Squad) -> Vec<ClientId> {
     squad.members().iter().map(|&(id, _)| id).collect()
 }

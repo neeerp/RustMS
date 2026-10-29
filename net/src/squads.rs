@@ -144,6 +144,9 @@ pub enum SquadView {
 pub enum SquadCommand {
     /// Gather one, and lead it.
     Open,
+    /// Gather one for at most this many, and lead it (an Ariant arena's
+    /// host, `crate::ariant::cap`).
+    OpenFor(usize),
     Join,
     /// The leader turns a member out, for good.
     Expel(ClientId),
@@ -161,6 +164,8 @@ pub struct Squad {
     /// The leader first, then the others in the order they joined.
     members: Vec<(ClientId, String)>,
     banned: HashSet<ClientId>,
+    /// How many it takes: its event's most, or fewer as its leader set.
+    cap: usize,
     /// When it lapses, unless started.
     closes: Instant,
     /// The event it started, once it has.
@@ -173,9 +178,21 @@ impl Squad {
             kind,
             members: vec![(leader, name)],
             banned: HashSet::new(),
+            cap: *kind.event().team.end(),
             closes: now + REGISTRATION,
             started: None,
         }
+    }
+
+    /// It takes at most `cap`, if fewer than its event's most.
+    pub fn with_cap(mut self, cap: usize) -> Self {
+        self.cap = self.cap.min(cap);
+        self
+    }
+
+    /// How many it takes.
+    pub fn cap(&self) -> usize {
+        self.cap
     }
 
     pub fn leader(&self) -> ClientId {
@@ -224,7 +241,7 @@ impl Squad {
             SquadView::Registered { leader: leader() }
         } else if self.banned.contains(&who) {
             SquadView::Banned { leader: leader() }
-        } else if self.members.len() >= *self.kind.event().team.end() {
+        } else if self.members.len() >= self.cap {
             SquadView::Full
         } else {
             SquadView::Joinable
@@ -341,9 +358,25 @@ mod tests {
     }
 
     #[test]
+    fn an_ariant_arena_is_full_at_its_hosts_cap() {
+        let now = Instant::now();
+        let squad = Squad::open(EventKind::Ariant(1), 1, named(1), now);
+        assert_eq!(squad.cap(), 7);
+        let mut squad = squad.with_cap(3);
+        assert!(squad.join(2, named(2)));
+        assert!(squad.join(3, named(3)));
+        assert_eq!(squad.view(4), SquadView::Full);
+        assert!(!squad.join(4, named(4)));
+        let squad = Squad::open(EventKind::Ariant(2), 1, named(1), now).with_cap(9);
+        assert_eq!(squad.cap(), 7, "never more than its event takes");
+    }
+
+    #[test]
     fn every_squads_event_has_its_texts() {
         for kind in EventKind::ALL {
-            assert_eq!(kind.event().squad, text(kind).is_some(), "{kind:?}");
+            // The Ariant arenas gather without a word to anyone.
+            let says = kind.event().squad && !matches!(kind, EventKind::Ariant(_));
+            assert_eq!(says, text(kind).is_some(), "{kind:?}");
         }
     }
 }

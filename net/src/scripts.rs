@@ -2182,6 +2182,20 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 .unwrap_or(crate::carnival::CARNIVAL_FALLBACK);
             go_back(CARNIVAL_RETURN, Effect::Warp(back))
         }
+        // Out of the Ariant Coliseum's lobby, back to where the Dimensional
+        // Mirror sent the player from (Cosmic `aMatchMove2`).
+        "aMatchMove2" => {
+            let back = player
+                .saved_locations
+                .get(&DOJO_RETURN)
+                .copied()
+                .unwrap_or(crate::ariant::ARIANT_FALLBACK);
+            go_back(DOJO_RETURN, Effect::Warp(back))
+        }
+        // Out of the King's Room, and on from there to the Coliseum's lobby
+        // (Cosmic `ariantMout`, `ariantMout2`).
+        "ariantMout" => through(Effect::WarpToPortal(crate::ariant::ARIANT_EXIT, 0)),
+        "ariantMout2" => through(Effect::WarpToPortal(crate::ariant::ARIANT_LOBBY, 0)),
         // A Monster Carnival room's revive room, back into its battle
         // (Cosmic `MCrevive1` to `MCrevive6`).
         script if script.starts_with("MCrevive") => {
@@ -5944,6 +5958,35 @@ mod tests {
             [Effect::PortalSound, Effect::WarpToPortal(980000301, 0)]
         );
         assert_eq!(portal("MCrevive7", &player), None);
+    }
+
+    #[test]
+    fn the_ariant_coliseum_leads_back_by_the_mirror_and_out_to_its_lobby() {
+        let mut player = player_with(&[]);
+        let out = |to| {
+            vec![
+                Effect::SaveLocation(DOJO_RETURN, None),
+                Effect::PortalSound,
+                Effect::Warp(to),
+            ]
+        };
+        assert_eq!(
+            portal("aMatchMove2", &player).unwrap().effects,
+            out(260000000)
+        );
+        player.saved_locations.insert(DOJO_RETURN, 211000000);
+        assert_eq!(
+            portal("aMatchMove2", &player).unwrap().effects,
+            out(211000000)
+        );
+        assert_eq!(
+            portal("ariantMout", &player).unwrap().effects,
+            [Effect::PortalSound, Effect::WarpToPortal(980010020, 0)]
+        );
+        assert_eq!(
+            portal("ariantMout2", &player).unwrap().effects,
+            [Effect::PortalSound, Effect::WarpToPortal(980010000, 0)]
+        );
     }
 
     #[test]

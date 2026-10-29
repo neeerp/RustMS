@@ -105,6 +105,8 @@ impl ClientActor {
             | EventKind::Papulatus
             | EventKind::Latanica => return Ok(()),
             EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
+            // Cesar opens the arenas (`talk_to_ariant_lobby`).
+            EventKind::Ariant(_) => return Ok(()),
             // Duarte asks after every run at once (`talk_to_duarte`).
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
             // Duarte takes the gem, or sends the player in from the Shades.
@@ -163,6 +165,49 @@ impl ClientActor {
         };
         let script = NpcScript::spiegelmann(&entries, &rooms, &self.in_game()?.player);
         self.start_script(script).await
+    }
+
+    /// Cesar in the Ariant Coliseum's lobby shows the player its arenas.
+    pub(super) async fn talk_to_ariant_lobby(&mut self) -> Result<(), RuntimeError> {
+        let (reply, lobby) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::AriantLobby {
+            from: self.client_id,
+            reply,
+        })
+        .await?;
+        let Ok(lobby) = lobby.await else {
+            return Ok(());
+        };
+        let script = NpcScript::ariant_lobby(&lobby, &self.in_game()?.player);
+        self.start_script(script).await
+    }
+
+    /// Cesar (2101017): at an arena's entrance, its roster; in its battle,
+    /// on the player's run, the bombs and rocks; anywhere else, the
+    /// Coliseum.
+    pub(super) async fn talk_to_ariant_host(&mut self) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(arena) = net::ariant::arena_at(map_id) else {
+            let taken = (self.event.as_ref())
+                .filter(|ticket| {
+                    matches!(ticket.kind, EventKind::Ariant(_))
+                        && net::ariant::battle_of(map_id).is_some()
+                        && ticket.holds(map_id)
+                })
+                .map(|ticket| ticket.prize_taken);
+            return self.start_script(NpcScript::ariant_battle(taken)).await;
+        };
+        let (reply, host) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::AriantHost {
+            from: self.client_id,
+            reply,
+        })
+        .await?;
+        let Ok(host) = host.await else {
+            return Ok(());
+        };
+        self.start_script(NpcScript::ariant_host(arena, &host))
+            .await
     }
 
     /// The player, a party's leader, picked Monster Carnival room `room`:

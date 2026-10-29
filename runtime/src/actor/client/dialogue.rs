@@ -165,6 +165,14 @@ impl ClientActor {
         {
             return self.talk_to_spiegelmann().await;
         }
+        if npc_id == net::npc_scripts::ARIANT_CESAR
+            && player.stats.map_id == net::ariant::ARIANT_LOBBY
+        {
+            return self.talk_to_ariant_lobby().await;
+        }
+        if npc_id == net::npc_scripts::ARIANT_HOST {
+            return self.talk_to_ariant_host().await;
+        }
         if npc_id == net::npc_scripts::ROLLY && player.stats.map_id == net::events::LUDIMAZE.lobby {
             return self
                 .talk_about_event(net::events::EventKind::LudiMaze)

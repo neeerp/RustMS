@@ -1037,6 +1037,7 @@ impl EventActor {
                         let left = self.team.leave(client_id);
                         over = self
                             .carnival_left(client_id)
+                            .or_else(|| self.ariant_left())
                             .or_else(|| self.guild_quest_left(client_id, left))
                             .unwrap_or(left);
                     }
@@ -1351,6 +1352,21 @@ impl EventActor {
                 Some(over)
             }
         }
+    }
+
+    /// A player left an Ariant battle: with fewer than two left in it, it
+    /// ends and they go back to the lobby (Cosmic AriantColiseum's
+    /// `leaveArenaInternal` and `dispose`). Whether that ends the event,
+    /// or None if it isn't one.
+    fn ariant_left(&mut self) -> Option<bool> {
+        if !matches!(self.kind, EventKind::Ariant(_)) {
+            return None;
+        }
+        let over = self.team.members().len() < 2;
+        if over {
+            self.move_team(None, net::ariant::ARIANT_LOBBY, None);
+        }
+        Some(over)
     }
 
     /// The other side left the battle field before the end: those still
