@@ -22,11 +22,11 @@ namespace ms
 			constexpr const char* ENGAGED = "You are already engaged.";
 			constexpr const char* NAME_PROMPT = "Please enter your partner's name.";
 			constexpr const char* WAITING = "Waiting for her response...";
-			// StringPool 0x10a1, 0x335 and 0x114.
+			// StringPool 0x10a1 and 0x114.
 			constexpr const char* GUEST_PROMPT = "Please enter the guest name.";
-			constexpr const char* TOO_SHORT = "Please enter at least 4 characters.";
 			constexpr const char* NOT_HERE = "You can't use it here in this map.";
-			// The guest prompt's shortest name.
+			// The guest prompt's shortest name: a shorter one says 0x335
+			// and the prompt stays open.
 			constexpr size_t GUEST_MIN = 4;
 			// A character's name.
 			constexpr size_t NAME_LIMIT = 12;
@@ -101,14 +101,6 @@ namespace ms
 
 			UI::get().emplace<UIEnterText>(GUEST_PROMPT, [slot](const std::string& name)
 			{
-				// v83's prompt stays open on a short name.
-				if (name.size() < GUEST_MIN)
-				{
-					UI::get().emplace<UIOk>(TOO_SHORT, [slot](bool) { invite(slot); });
-
-					return;
-				}
-
 				Player& player = Stage::get().get_player();
 				auto& record = player.get_marriage();
 
@@ -122,7 +114,7 @@ namespace ms
 
 				// The server's answer, whatever it is, ends the wait.
 				player.request(InviteGuestPacket(name, record->id, slot), ExclRequest::USE_WAIT);
-			}, NAME_LIMIT);
+			}, NAME_LIMIT, false, GUEST_MIN);
 		}
 
 		void open_invitation(int16_t slot, int32_t item_id)

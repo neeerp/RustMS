@@ -610,7 +610,8 @@ not made.
 - Double-clicking a wedding invitation in the Etc tab calls
   `MarriageActions::invite` (report b069). It does nothing unless the
   record says engaged. It asks for the guest's name (4 to 12
-  characters; a shorter one gives v83's notice and asks again), refuses
+  characters; a shorter one gives v83's notice and the prompt stays
+  open), refuses
   the groom's or the bride's exact name with v83's "yourself" notice, and
   sends `RING_ACTION` 5 as a `USE_WAIT` request, which the server's stat
   update ends. A received invitation sends `RING_ACTION` 6, or, on a map
