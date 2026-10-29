@@ -27,6 +27,7 @@ pub mod pet;
 pub mod quest;
 pub mod quest_ex;
 pub mod quick_slots;
+pub mod requirements;
 pub mod ring;
 pub mod scroll;
 pub mod skill;

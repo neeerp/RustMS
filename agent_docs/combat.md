@@ -289,7 +289,11 @@ costs: HP (Dragon Roar's is its `x` percent of max HP, and needs half of
 it), MP, mesos (`moneyCon`; Shadow Meso's grows by Shadow Partner's `y`
 percent while that buff is on), and the item (`itemCon`, named in the line).
 The four cost lines share one two-second throttle, so a second refusal within
-two seconds prints nothing. An attack with no weapon says so next. Then the
+two seconds prints nothing. An attack with no weapon says so next, and one
+with a weapon that doesn't count toward the stats (see "Equipment
+requirements" in `inventory.md`), or a cash weapon over none that does, says
+"You cannot use this weapon with the current stats." on the same two-second
+timer (0x95b85a). Then the
 weapon (`skill_weapon::check`). A shot needs its job's weapon whatever
 `Skill.img` says: a bow or crossbow for archers, a claw for thieves, a gun for
 pirates, nothing for anyone else, with eight exceptions such as Taunt and

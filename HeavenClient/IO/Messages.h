@@ -52,6 +52,8 @@ namespace ms
 			DOOR_PORTAL,
 			// Attacking without a weapon
 			ATTACK_NOWEAPON,
+			// Or with one whose requirements aren't met (StringPool 0xb1d)
+			ATTACK_UNMET,
 			// The map forbids the item (fieldLimit)
 			ITEM_FIELD,
 			DROP_FIELD,

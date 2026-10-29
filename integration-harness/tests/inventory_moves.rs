@@ -1,6 +1,7 @@
 //! Equipping, unequipping, and moving items, as the client asks with ITEM_MOVE.
 
 use integration_harness::connection::MapleTestConnection;
+use integration_harness::database::{set_equip_str, set_job, set_str, stow_equip};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read, send, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -124,6 +125,36 @@ async fn equipment_moves_persist_and_update_the_look_for_others() {
     drop(restored);
     let worn = relogin(&config).await;
     assert_eq!(worn.equipped[&WEAPON.abs()], weapon);
+}
+
+const CUTLASS: i32 = 1302004;
+const WORK_GLOVES: i32 = 1082002;
+const GLOVES: i16 = -8;
+
+#[tokio::test]
+async fn other_equipment_s_stats_count_toward_an_equip_s_requirements() {
+    let config = load_harness_config_or_fail().await;
+    let id = login_to_world_session(&config).await.unwrap().character_id;
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    // The Cutlass asks a level 35 warrior for 110 STR; the gloves give 2.
+    set_job(id, 100, 35, 50).await.unwrap();
+    set_str(id, 108).await.unwrap();
+    stow_equip(id, 5, CUTLASS, 7).await.unwrap();
+    stow_equip(id, 6, WORK_GLOVES, 5).await.unwrap();
+    set_equip_str(id, 6, 2).await.unwrap();
+
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+    assert_eq!(request(c, 1, 5, WEAPON).await, Reply::Refused);
+    assert_eq!(
+        request(c, 1, 6, GLOVES).await,
+        Reply::Moves(vec![(1, 6, GLOVES)])
+    );
+    assert_eq!(
+        request(c, 1, 5, WEAPON).await,
+        Reply::Moves(vec![(1, 5, WEAPON)])
+    );
 }
 
 const SHOES: i16 = -7;

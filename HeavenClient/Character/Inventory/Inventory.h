@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "Equip.h"
+#include "EquipCount.h"
 #include "InventoryType.h"
 #include "Item.h"
 #include "Pet.h"
@@ -32,6 +33,7 @@
 #include "../../Template/Optional.h"
 
 #include <map>
+#include <set>
 #include <unordered_map>
 
 namespace ms
@@ -65,9 +67,9 @@ namespace ms
 
 		Inventory();
 
-		// Recalculate sums of equip stats, and pick the projectile a
-		// character of `level` shoots.
-		void recalc_stats(Weapon::Type weapontype, int32_t level);
+		// Recalculate sums of the equip stats that count for `wearer`, and
+		// pick the projectile a character of `level` shoots.
+		void recalc_stats(Weapon::Type weapontype, int32_t level, const equip_count::Wearer &wearer);
 
 		// Set the meso amount.
 		void set_meso(int64_t meso);
@@ -108,6 +110,14 @@ namespace ms
 
 		// Return if an equip is equipped in the specfied slot.
 		bool has_equipped(EquipSlot::Id slot) const;
+
+		// Whether the equip worn in `slot` counts toward the stats, as of
+		// the last recalc_stats.
+		bool counts(int16_t slot) const;
+
+		// Whether the equip in Equip tab `slot` would count for `wearer`
+		// worn at `position`, in place of what is there.
+		bool would_count(int16_t slot, int16_t position, const equip_count::Wearer &wearer) const;
 
 		// Return the currently active projectile slot.
 		int16_t get_bulletslot() const;
@@ -211,6 +221,9 @@ namespace ms
 			int64_t cash_id;
 		};
 
+		// What is worn, as the equip count sees it, and the equips.
+		std::vector<equip_count::Worn> worn_list(std::vector<const Equip *> &worn_equips) const;
+
 		// Whether a stack is ammo for the weapon that the character may
 		// shoot. v83 passes over ammo above their level (FUN_00949b5d).
 		bool is_bullet(const Slot &slot) const;
@@ -222,6 +235,7 @@ namespace ms
 		int32_t running_uid;
 
 		EnumMap<EquipStat::Id, uint16_t> totalstats;
+		std::set<int16_t> uncounted;
 		EnumMap<InventoryType::Id, uint8_t> slotmaxima;
 		int64_t meso;
 		int64_t extra_pendant;

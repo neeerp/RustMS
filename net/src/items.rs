@@ -3,12 +3,14 @@
 
 use crate::load::{self, asset_path};
 use game::inventory::FLAG_LOCK;
+use game::requirements::Requirements;
 use game::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item, Player};
 use game_data::items::{EquipInfo, ItemData, ItemInfo, ItemNames};
 use game_data::maker::MakerData;
 use game_data::vega_spell::VegaSpells;
 use rand::Rng;
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::sync::{OnceLock, RwLock};
 use std::time::SystemTime;
 
 pub fn data() -> Result<&'static ItemData, &'static str> {
@@ -261,29 +263,42 @@ pub fn base_stats(equip: &EquipInfo) -> EquipStats {
     }
 }
 
-/// Whether `player` meets an equipment's requirements, counting what they
-/// wear (v83 FUN_004f2cee).
-pub fn can_wear(equip: &EquipInfo, player: &game::Player) -> bool {
-    let stats = &player.stats;
-    // GMs wear anything.
-    let branch = stats.job % 1000 / 100;
-    if branch == 8 || branch == 9 {
-        return true;
+/// An equipment item's requirements, or None for an item with no data.
+/// Read once per item, as players' stats look them up often.
+pub fn requirements(item_id: i32) -> Option<Requirements> {
+    static SEEN: OnceLock<RwLock<HashMap<i32, Option<Requirements>>>> = OnceLock::new();
+    let seen = SEEN.get_or_init(Default::default);
+    if let Some(&known) = seen.read().ok()?.get(&item_id) {
+        return known;
     }
-    let mask = if branch == 0 { 0 } else { 1 << (branch - 1) };
-    let job_ok = match equip.req_job {
-        0 => true,
-        -1 => mask == 0,
-        req => req > 0 && req & mask != 0,
-    };
-    let (str, dex, luk) = crate::skills::total_stats(player);
-    job_ok
-        && i16::from(stats.level) >= equip.req_level
-        && str >= i32::from(equip.req_str)
-        && dex >= i32::from(equip.req_dex)
-        && crate::skills::total_int(player) >= i32::from(equip.req_int)
-        && luk >= i32::from(equip.req_luk)
-        && (equip.req_fame == 0 || stats.fame >= equip.req_fame)
+    let found = info(item_id)
+        .and_then(|info| info.equip)
+        .map(|equip| Requirements {
+            level: equip.req_level,
+            job: equip.req_job,
+            str: equip.req_str,
+            dex: equip.req_dex,
+            int: equip.req_int,
+            luk: equip.req_luk,
+            fame: equip.req_fame,
+        });
+    seen.write().ok()?.insert(item_id, found);
+    found
+}
+
+/// Whether `item` would count in `player`'s worn slot `to`, in place of
+/// what is there, as v83 works out its equipment's requirements
+/// (FUN_0077e227 with the item tried on, `requirements::counted`).
+pub fn can_wear(player: &Player, item: &Item, to: i16) -> bool {
+    let mut worn: Vec<(i16, &Item)> = player
+        .worn_items()
+        .into_iter()
+        .filter(|(position, _)| *position != to)
+        .collect();
+    worn.push((to, item));
+    let counts =
+        game::requirements::counted(&player.stats, player.maple_warrior(), &worn, requirements);
+    counts.last().copied().unwrap_or(false)
 }
 
 /// What a sweep of expired items took from a player.
@@ -370,26 +385,34 @@ mod tests {
     use rand::SeedableRng;
 
     #[test]
-    fn requirements_follow_the_job_bits_and_what_is_worn() {
+    fn trying_an_item_on_counts_what_it_replaces_out() {
+        // Cutlass (1302004: level 35, warriors, 110 STR) and Work Gloves.
+        let needs = requirements(1302004).expect("a sword");
+        assert_eq!(needs.str, 110);
         let mut player = crate::codec::stats::sample_player();
-        player.stats.job = 0;
-        let beginners = EquipInfo {
-            req_job: -1,
-            ..EquipInfo::default()
+        player.stats.job = 100;
+        player.stats.level = 200;
+        player.stats.str = needs.str - 2;
+        let sword = Item::equipment(1302004, EquipStats::default());
+        let gloves = |str| {
+            Item::equipment(
+                1082002,
+                EquipStats {
+                    str,
+                    ..EquipStats::default()
+                },
+            )
         };
-        let warriors = EquipInfo {
-            req_job: 1 | 8,
-            req_str: player.stats.str + 5,
-            ..EquipInfo::default()
-        };
-        assert!(can_wear(&beginners, &player));
-        assert!(!can_wear(&warriors, &player));
+        assert!(!can_wear(&player, &sword, -11));
+        player
+            .inventory
+            .insert(game::InventoryType::Equipped, -8, gloves(2));
+        assert!(can_wear(&player, &sword, -11));
 
-        player.stats.job = 2110;
-        assert!(!can_wear(&beginners, &player));
-        assert!(!can_wear(&warriors, &player), "short of STR");
-        let gloves = Item::equipment(
-            1082002,
+        // The sword it would replace adds nothing to it.
+        player.stats.str = needs.str - 4;
+        let strong = Item::equipment(
+            1302004,
             EquipStats {
                 str: 5,
                 ..EquipStats::default()
@@ -397,16 +420,8 @@ mod tests {
         );
         player
             .inventory
-            .insert(game::InventoryType::Equipped, -8, gloves);
-        assert!(can_wear(&warriors, &player));
-
-        let famous = EquipInfo {
-            req_fame: 1,
-            ..EquipInfo::default()
-        };
-        player.stats.fame = -3;
-        assert!(can_wear(&EquipInfo::default(), &player));
-        assert!(!can_wear(&famous, &player));
+            .insert(game::InventoryType::Equipped, -11, strong);
+        assert!(!can_wear(&player, &sword, -11));
     }
 
     #[test]

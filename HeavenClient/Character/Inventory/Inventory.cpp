@@ -39,25 +39,27 @@ namespace ms
 		slotmaxima[InventoryType::Id::EQUIPPED] = EquipSlot::Id::LENGTH;
 	}
 
-	void Inventory::recalc_stats(Weapon::Type type, int32_t level)
+	void Inventory::recalc_stats(Weapon::Type type, int32_t level, const equip_count::Wearer &wearer)
 	{
 		totalstats.clear();
+		uncounted.clear();
 
-		for (auto &iter : inventories[InventoryType::Id::EQUIPPED])
+		std::vector<const Equip *> worn_equips;
+		std::vector<equip_count::Worn> worn = worn_list(worn_equips);
+
+		// What its wearer doesn't meet stays on but adds nothing.
+		std::vector<bool> counted = equip_count::counted(wearer, worn);
+
+		for (size_t i = 0; i < worn.size(); i++)
 		{
-			// A pendant in the second slot does nothing once the slot is shut.
-			if (iter.first == EquipSlot::Id::PENDANT2 && !extra_pendant_open())
-				continue;
-
-			auto equip_iter = equips.find(iter.second.unique_id);
-
-			if (equip_iter != equips.end())
+			if (!counted[i])
 			{
-				const Equip &equip = equip_iter->second;
-
-				for (auto stat_iter : totalstats)
-					stat_iter.second += equip.get_stat(stat_iter.first);
+				uncounted.insert(worn[i].slot);
+				continue;
 			}
+
+			for (auto stat_iter : totalstats)
+				stat_iter.second += worn_equips[i]->get_stat(stat_iter.first);
 		}
 
 		int32_t prefix;
@@ -285,6 +287,74 @@ namespace ms
 	bool Inventory::has_equipped(EquipSlot::Id slot) const
 	{
 		return inventories[InventoryType::Id::EQUIPPED].count(slot) > 0;
+	}
+
+	bool Inventory::counts(int16_t slot) const
+	{
+		return inventories[InventoryType::Id::EQUIPPED].count(slot) > 0 && uncounted.count(slot) == 0;
+	}
+
+	static equip_count::Worn describe(int16_t position, const Equip &equip)
+	{
+		const EquipData &data = EquipData::get(equip.get_item_id());
+		equip_count::Worn item;
+		item.slot = position;
+		item.item_id = equip.get_item_id();
+		item.bonus = { equip.get_stat(EquipStat::Id::STR), equip.get_stat(EquipStat::Id::DEX),
+					   equip.get_stat(EquipStat::Id::INT), equip.get_stat(EquipStat::Id::LUK) };
+		item.requirements.level = data.get_reqstat(MapleStat::Id::LEVEL);
+		item.requirements.job = data.get_reqstat(MapleStat::Id::JOB);
+		item.requirements.stats = { data.get_reqstat(MapleStat::Id::STR), data.get_reqstat(MapleStat::Id::DEX),
+									data.get_reqstat(MapleStat::Id::INT), data.get_reqstat(MapleStat::Id::LUK) };
+		item.requirements.fame = data.get_reqstat(MapleStat::Id::FAME);
+
+		return item;
+	}
+
+	std::vector<equip_count::Worn> Inventory::worn_list(std::vector<const Equip *> &worn_equips) const
+	{
+		std::vector<equip_count::Worn> worn;
+
+		for (auto &iter : inventories[InventoryType::Id::EQUIPPED])
+		{
+			// A pendant in the second slot does nothing once the slot is shut.
+			if (iter.first == EquipSlot::Id::PENDANT2 && !extra_pendant_open())
+				continue;
+
+			auto equip_iter = equips.find(iter.second.unique_id);
+
+			if (equip_iter != equips.end())
+			{
+				worn.push_back(describe(iter.first, equip_iter->second));
+				worn_equips.push_back(&equip_iter->second);
+			}
+		}
+
+		return worn;
+	}
+
+	bool Inventory::would_count(int16_t slot, int16_t position, const equip_count::Wearer &wearer) const
+	{
+		auto iter = inventories[InventoryType::Id::EQUIP].find(slot);
+
+		if (iter == inventories[InventoryType::Id::EQUIP].end())
+			return false;
+
+		auto equip_iter = equips.find(iter->second.unique_id);
+
+		if (equip_iter == equips.end())
+			return false;
+
+		// Tried on like v83's tooltips do (0x4f1782), so what it replaces
+		// adds nothing to it.
+		std::vector<const Equip *> worn_equips;
+		std::vector<equip_count::Worn> worn = worn_list(worn_equips);
+		worn.erase(std::remove_if(worn.begin(), worn.end(), [&](const equip_count::Worn &item) {
+			return item.slot == position;
+		}), worn.end());
+		worn.push_back(describe(position, equip_iter->second));
+
+		return equip_count::counted(wearer, worn).back();
 	}
 
 	int16_t Inventory::get_bulletslot() const

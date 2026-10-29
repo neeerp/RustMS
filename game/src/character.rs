@@ -425,13 +425,32 @@ impl Player {
     /// The stats of what the player wears that count. A pendant in the
     /// second pendant slot stops counting once the slot runs out, as v83's
     /// BasicStat::SetFrom (0x77ec9f) skips slot 51 past its expiry; it
-    /// stays worn.
+    /// stays worn. Nor does an item whose requirements the player no longer
+    /// meets count (`requirements::counted`).
     pub fn worn_equips(&self) -> impl Iterator<Item = &EquipStats> {
+        let worn = self.worn_items();
+        let counts = crate::requirements::counted_worn(&self.stats, self.maple_warrior(), &worn);
+        worn.into_iter()
+            .zip(counts)
+            .filter(|(_, counts)| *counts)
+            .filter_map(|((_, item), _)| item.equip.as_ref())
+    }
+
+    /// What the player wears, by position, but a pendant in a shut second
+    /// pendant slot.
+    pub fn worn_items(&self) -> Vec<(i16, &Item)> {
         let shut = !self.extra_pendant_open(std::time::SystemTime::now());
         self.inventory
             .items(InventoryType::Equipped)
-            .filter(move |(position, _)| !(shut && *position == equip_slot::PENDANT2))
-            .filter_map(|(_, item)| item.equip.as_ref())
+            .filter(|(position, _)| !(shut && *position == equip_slot::PENDANT2))
+            .collect()
+    }
+
+    /// Maple Warrior's percent of the player's own STR, DEX, INT and LUK.
+    pub fn maple_warrior(&self) -> i32 {
+        self.buffs
+            .value(BuffStat::MapleWarrior)
+            .map_or(0, i32::from)
     }
 
     pub fn id(&self) -> i32 {
