@@ -57,11 +57,37 @@ int main()
 		require(wish(wishes, 7) == wishes, "a wish is listed once");
 		require(wish({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 11).size() == WISH_LIST_SIZE, "the wish list holds ten");
 		require(unwish({ 7, 9, 0 }, 7) == std::vector<int32_t>({ 9 }), "removing a wish keeps the rest");
-		require(wish_refusal({ 7, 0, 0 }, 9) == nullptr, "a new wish is added");
-		require(std::string(wish_refusal({ 7, 9, 0 }, 9)) == "You already have this item on your wish list.",
-			"a wish already listed is refused");
-		require(std::string(wish_refusal({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 10)) == "Your wish list is full.",
-			"a full list is refused before a listed wish");
+		{
+			auto commodity = [](int32_t sn, int32_t item_id, int16_t count, int32_t period, int32_t price) {
+				Commodity c{};
+				c.sn = sn;
+				c.item_id = item_id;
+				c.count = count;
+				c.period = period;
+				c.price = price;
+				return c;
+			};
+			std::vector<Commodity> all = {
+				commodity(7, 5000000, 1, 90, 1000),
+				commodity(9, 5000001, 1, 90, 1000),
+				commodity(10, 5000001, 1, 90, 1200),
+				commodity(11, 5000001, 1, 30, 1000),
+				commodity(12, 5000001, 2, 90, 1000),
+				commodity(13, 5000002, 1, 0, 0),
+			};
+
+			require(wish_refusal(all, { 7, 0, 0 }, 9) == nullptr, "a new wish is added");
+			require(std::string(wish_refusal(all, { 7, 9, 0 }, 9)) == "You already have this item on your wish list.",
+				"a wish already listed is refused");
+			require(std::string(wish_refusal(all, { 7, 9, 0 }, 10)) == "You already have this item on your wish list.",
+				"so is the same item, count and period under another SN");
+			require(wish_refusal(all, { 7, 9, 0 }, 11) == nullptr && wish_refusal(all, { 7, 9, 0 }, 12) == nullptr,
+				"another period or count is another wish");
+			require(std::string(wish_refusal(all, { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 10)) == "Your wish list is full.",
+				"a full list is refused before a listed wish");
+			require(wish_sent(all, 9) && !wish_sent(all, 13) && !wish_sent(all, 99),
+				"a free wish, or one not in the catalog, is dropped silently");
+		}
 
 		require(PAYMENTS[default_payment(payment_options(1000, 5000, 5000, 5000))] == PREPAID, "NX Prepaid is checked first");
 		require(PAYMENTS[default_payment(payment_options(1000, 5000, 0, 0))] == CREDIT, "then whatever covers the price");

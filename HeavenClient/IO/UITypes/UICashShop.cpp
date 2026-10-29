@@ -1409,11 +1409,11 @@ namespace ms
 
 	void UICashShop::reserve(int32_t sn)
 	{
-		if (const char* refusal = wish_refusal(wish_list, sn))
+		if (const char* refusal = wish_refusal(catalog, wish_list, sn))
 		{
 			UI::get().emplace<UIOk>(refusal, [](bool) {});
 		}
-		else if (request())
+		else if (wish_sent(catalog, sn) && request())
 		{
 			wish_added = true;
 			SetWishListPacket(wish(wish_list, sn)).dispatch();
