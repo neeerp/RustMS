@@ -159,6 +159,32 @@ pub fn drop_over(now: SystemTime) -> crate::Result<usize> {
     .execute(&mut conn)?)
 }
 
+/// Drop every booking whose couple let it pass by `now`, but those of the
+/// weddings under way (`running`, by couple); the couples whose booking
+/// went, as (couple, groom, bride).
+pub fn lapse(now: SystemTime, running: &[i32]) -> crate::Result<Vec<(i32, i32, i32)>> {
+    let mut conn = crate::connection()?;
+    let cutoff = now - NO_SHOW;
+    Ok(
+        conn.transaction(|conn| -> QueryResult<Vec<(i32, i32, i32)>> {
+            let lapsed: Vec<i32> = diesel::delete(
+                wedding_reservations::table
+                    .filter(wedding_reservations::starts_at.le(cutoff))
+                    .filter(wedding_reservations::marriage_id.ne_all(running)),
+            )
+            .returning(wedding_reservations::marriage_id)
+            .get_results(conn)?;
+            if lapsed.is_empty() {
+                return Ok(Vec::new());
+            }
+            marriages::table
+                .filter(marriages::id.eq_any(&lapsed))
+                .select((marriages::id, marriages::groom_id, marriages::bride_id))
+                .load(conn)
+        })?,
+    )
+}
+
 /// What came of inviting a guest.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Invite {

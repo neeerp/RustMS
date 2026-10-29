@@ -6,17 +6,20 @@
 use super::WorldDirectory;
 use crate::actor::client::leave_at_duey;
 use crate::actor::wedding::{WeddingMessage, WeddingStart, WeddingTicket, WEDDING_QUEUE_CAPACITY};
-use crate::message::{ServerMessage, WeddingNews};
+use crate::db::spawn_db;
+use crate::message::{DirectoryMessage, ServerMessage, WeddingNews};
 use game::marriage::{MarriageRecord, Refusal, MIN_LEVEL};
 use game::wedding::{GuestRefusal, Invitation, PartnerRefusal, StartRefusal, Venue};
 use game_data::server_content::keys;
 use net::packet::build::world::marriage::{
-    build_marriage_notice, build_marriage_refusal, build_married_notice,
+    build_marriage_notice, build_marriage_refusal, build_married_notice, build_wedding_notice,
+    WeddingNotice,
 };
 use net::ClientId;
+use std::time::SystemTime;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::{mpsc, oneshot};
-use tracing::info;
+use tracing::{info, warn};
 
 /// A wedding under way, which guests reach through here.
 pub(super) struct Wedding {
@@ -219,6 +222,48 @@ impl WorldDirectory {
             tx,
             rx,
         })
+    }
+
+    /// Drop the bookings of weddings nobody began, in the background, and
+    /// have the couples told. Only a directory that can hear back does so.
+    pub(super) fn lapse_weddings(&self) {
+        let Some((_, directory)) = &self.event_spawner else {
+            return;
+        };
+        let directory = directory.clone();
+        let running: Vec<i32> = self.weddings.values().map(|w| w.marriage_id).collect();
+        tokio::spawn(async move {
+            let now = SystemTime::now();
+            match spawn_db(move || db::wedding::lapse(now, &running)).await {
+                Ok(couples) if couples.is_empty() => {}
+                Ok(couples) => {
+                    if let Some(directory) = directory.upgrade() {
+                        let _ = directory
+                            .send(DirectoryMessage::WeddingsLapsed(couples))
+                            .await;
+                    }
+                }
+                Err(error) => warn!(%error, "Failed to drop the weddings nobody began"),
+            }
+        });
+    }
+
+    /// These couples let their wedding pass unstarted: each partner online
+    /// reads that the booking is cancelled (MARRIAGE_RESULT 31), as for a
+    /// wedding that failed. One begun meanwhile is left alone.
+    pub(super) fn tell_lapsed(&self, couples: Vec<(i32, i32, i32)>) {
+        let running: Vec<i32> = self.weddings.values().map(|w| w.marriage_id).collect();
+        for (marriage_id, groom, bride) in couples {
+            info!(marriage_id, "Wedding booking lapsed");
+            if running.contains(&marriage_id) {
+                continue;
+            }
+            for partner in [groom, bride] {
+                if self.clients.get(&partner).is_some_and(|e| !e.in_cash_shop) {
+                    self.send_packet(partner, build_wedding_notice(WeddingNotice::Cancelled));
+                }
+            }
+        }
     }
 
     /// `from`, invited to the wedding of `marriage_id` at `venue`, asks to

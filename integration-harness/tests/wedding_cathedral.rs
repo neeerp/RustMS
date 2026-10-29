@@ -209,7 +209,7 @@ async fn book(configs: &[HarnessConfig], premium: bool) -> (i32, i32, i32, Vec<i
     engage(groom, bride, MOONSTONE_BOX).await.expect("engage");
     grant_stack(groom, ETC, 1, EMPTY_BOX, 1).await.expect("box");
     grant_stack(bride, ETC, 1, RING, 1).await.expect("ring");
-    let marriage_id = book_wedding(groom, CATHEDRAL, 0).await.expect("book");
+    let marriage_id = book_wedding(groom, CATHEDRAL, 1).await.expect("book");
     if premium {
         wedding_premium(marriage_id).await.expect("premium");
     }
