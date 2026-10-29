@@ -57,6 +57,7 @@
 #include "../../IO/UITypes/UIMiniMap.h"
 #include "../../IO/UITypes/UIMobGage.h"
 #include "../../IO/UITypes/UIPyramidHud.h"
+#include "../../IO/UITypes/UIPyramidResult.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../../IO/UITypes/UIMiniGame.h"
@@ -103,6 +104,7 @@ namespace ms
 				UIAriant::show_on(Stage::get().get_mapinfo().get_fieldtype());
 				// And a Pyramid stage's.
 				UIPyramidHud::show_on(Stage::get().get_mapinfo().get_fieldtype());
+				UIPyramidResult::show_waiting();
 
 				UI::get().enable();
 				Timer::get().start();

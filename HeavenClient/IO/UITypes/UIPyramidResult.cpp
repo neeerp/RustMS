@@ -1,5 +1,7 @@
 #include "UIPyramidResult.h"
 
+#include "../UI.h"
+
 #include "../../Constants.h"
 #include "../../Gameplay/Combat/Massacre.h"
 #include "../../Util/NxFiles.h"
@@ -48,6 +50,18 @@ namespace ms
 		// The counts the server kept for the run, as they stand.
 		const massacre::Session &state = massacre::session();
 		counts = { state.hit, state.cool, state.miss };
+	}
+
+	void UIPyramidResult::show(massacre::Result result)
+	{
+		UI::get().remove(TYPE);
+		UI::get().emplace<UIPyramidResult>(result.rank, result.exp);
+	}
+
+	void UIPyramidResult::show_waiting()
+	{
+		if (auto result = massacre::field_loaded(massacre::session()))
+			show(*result);
 	}
 
 	void UIPyramidResult::draw_number(const std::array<Texture, 10> &font, Point<int16_t> pos, int32_t slots,

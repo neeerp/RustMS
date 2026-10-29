@@ -27,6 +27,17 @@ int main()
 		require(state.field == FIELD_RESULT && state.hit == 12 && state.skill == 2, "the counts outlast the field");
 		require(state.count == 0 && state.length == 0 && !state.clock.is_shown(), "the gauge and clock don't");
 
+		require(!score(state, { 3, 500 }), "a result while the room loads waits");
+		auto waited = field_loaded(state);
+		require(waited && waited->rank == 3 && waited->exp == 500, "and shows as it has loaded");
+		require(!field_loaded(state), "once");
+		auto now = score(state, { 0, 900 });
+		require(now && now->exp == 900, "one after shows at once");
+		enter_field(state, FIELD_RESULT);
+		score(state, { 1, 1 });
+		enter_field(state, FIELD_STAGE);
+		require(!field_loaded(state), "a field left drops its waiting result");
+
 		require(rage_ready(1) && !rage_ready(0), "Rage of Pharaoh takes a use left");
 
 		require(gauge(120, 120, 1, 0, 100) == 0, "the gauge starts empty");

@@ -178,13 +178,18 @@ namespace ms
 		// The key opens with the first use of Rage of Pharaoh and closes after the last (0x560a97).
 		if (!skill_disabled && state.skill != last_skill)
 		{
+			massacre::KeyPanel::State before = key.get();
 			key.skill_changed(last_skill, state.skill);
 			last_skill = state.skill;
 
-			if (key.get() == massacre::KeyPanel::State::OPENING)
-				key_open.play(Animation::End::HOLD);
-			else if (key.get() == massacre::KeyPanel::State::CLOSING)
-				key_close.play(Animation::End::HOLD);
+			// Only a change of state starts its animation over.
+			if (key.get() != before)
+			{
+				if (key.get() == massacre::KeyPanel::State::OPENING)
+					key_open.play(Animation::End::HOLD);
+				else if (key.get() == massacre::KeyPanel::State::CLOSING)
+					key_close.play(Animation::End::HOLD);
+			}
 		}
 
 		key_open.update();

@@ -891,6 +891,8 @@ namespace ms
 					UIElement::Type::MONSTERCARNIVAL,
 					UIElement::Type::COCONUT,
 					UIElement::Type::ARIANT,
+					UIElement::Type::PYRAMIDHUD,
+					UIElement::Type::PYRAMIDRESULT,
 					UIElement::Type::AVATARMEGAPHONE,
 					UIElement::Type::PARTYSEARCHICON,
 					UIElement::Type::GUILDRANK

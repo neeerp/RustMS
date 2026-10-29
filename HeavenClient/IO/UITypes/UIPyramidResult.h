@@ -2,6 +2,7 @@
 
 #include "../UIElement.h"
 
+#include "../../Gameplay/Combat/Massacre.h"
 #include "../../Graphics/Animation.h"
 
 #include <array>
@@ -20,6 +21,12 @@ namespace ms
 
 		// The rank goes 0 for S to 4 for D; any other has none drawn.
 		UIPyramidResult(int8_t rank, int32_t exp);
+
+		// Puts up this result in place of any before it.
+		static void show(massacre::Result result);
+
+		// The field has loaded: shows a result that came while it loaded.
+		static void show_waiting();
 
 		void draw(float alpha) const override;
 

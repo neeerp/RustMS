@@ -301,4 +301,5 @@ the field. `UIPyramidHud` is up on field type 23 and draws, from
 540; and the clock, `Map/Obj/etc.img/killing`, at (304, 5). On that field a
 CLOCK of kind 2 sets the HUD's clock and puts up no other. `UIPyramidResult`
 shows PYRAMID_SCORE on field type 24 at (207, 158) for 5 seconds, with no
-button. The client tests are in `tests/massacre.cpp`.
+button; a score that comes while the room is still loading waits for it
+(`massacre::score`). The client tests are in `tests/massacre.cpp`.

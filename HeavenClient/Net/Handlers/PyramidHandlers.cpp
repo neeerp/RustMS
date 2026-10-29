@@ -22,7 +22,7 @@ namespace ms
 		int8_t rank = recv.read_byte();
 		int32_t exp = recv.read_int();
 
-		UI::get().remove(UIElement::Type::PYRAMIDRESULT);
-		UI::get().emplace<UIPyramidResult>(rank, exp);
+		if (auto result = massacre::score(massacre::session(), { rank, exp }))
+			UIPyramidResult::show(*result);
 	}
 }

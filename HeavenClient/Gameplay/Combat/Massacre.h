@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,6 +22,12 @@ namespace ms
 		// What the server last said. The counts (SESSION_VALUE `massacre_*`, the context's +0x38a4 to +0x38b0)
 		// outlast the field, for the result room; the gauge's count (PYRAMID_GAUGE, +0x854) and the clock
 		// (CLOCK kind 2, +0x850) go with it.
+		struct Result
+		{
+			int8_t rank;
+			int32_t exp;
+		};
+
 		struct Session
 		{
 			// The field type of the field being entered or on.
@@ -34,6 +41,9 @@ namespace ms
 			// The stage's length, in seconds.
 			int32_t length = 0;
 			dojo_energy::Countdown clock;
+			// Whether the field has loaded, and a result that came before it did.
+			bool loaded = false;
+			std::optional<Result> result;
 		};
 
 		inline Session &session()
@@ -50,6 +60,31 @@ namespace ms
 			state.count = 0;
 			state.length = 0;
 			state.clock = {};
+			state.loaded = false;
+			state.result.reset();
+		}
+
+		// PYRAMID_SCORE: the result to show now. One that comes while the result room is still loading waits
+		// for it, as v83 reads the packet in the room, and shows for its whole time there.
+		inline std::optional<Result> score(Session &state, Result result)
+		{
+			if (state.loaded)
+				return result;
+
+			state.result = result;
+
+			return std::nullopt;
+		}
+
+		// The field has loaded: the result that waited for it, if any.
+		inline std::optional<Result> field_loaded(Session &state)
+		{
+			state.loaded = true;
+
+			std::optional<Result> result = state.result;
+			state.result.reset();
+
+			return result;
 		}
 
 		// The stage's clock (CLOCK kind 2, 0x560389).
