@@ -2879,6 +2879,18 @@ pub mod keys {
     pub const ARIANT_KIT_TAKEN: &str = "ariant_arena.kit_taken";
     pub const ARIANT_KIT_FULL: &str = "ariant_arena.kit_full";
     pub const ARIANT_ABOUT: &str = "ariant_arena.about";
+    pub const ARIANT_ABSENT: &str = "ariant_arena.absent";
+    pub const ARIANT_NO_JEWELS: &str = "ariant_arena.no_jewels";
+    pub const ARIANT_JEWELS: &str = "ariant_arena.jewels";
+    pub const ARIANT_THANKS: &str = "ariant_arena.thanks";
+    pub const ARIANT_KING_MENU: &str = "ariant_arena.king.menu";
+    pub const ARIANT_KING_POINTS: &str = "ariant_arena.king.points";
+    pub const ARIANT_KING_ABOUT: &str = "ariant_arena.king.about";
+    pub const ARIANT_KING_TRADE: &str = "ariant_arena.king.trade";
+    pub const ARIANT_KING_NEARLY: &str = "ariant_arena.king.nearly";
+    pub const ARIANT_KING_SHORT: &str = "ariant_arena.king.short";
+    pub const ARIANT_KING_INFO: &str = "ariant_arena.king.info";
+    pub const ARIANT_CHAIR_FULL: &str = "ariant_arena.king.chair_full";
     pub const CARNIVAL_SPIEGELMANN_GO: &str = "carnival.spiegelmann.go";
     pub const CARNIVAL_GUIDE_BACK: &str = "carnival.guide.back";
     pub const CARNIVAL_SPIEGELMANN_WAITING: &str = "carnival.spiegelmann.waiting";
@@ -4566,6 +4578,18 @@ mod tests {
                 keys::ARIANT_KIT_TAKEN,
                 keys::ARIANT_KIT_FULL,
                 keys::ARIANT_ABOUT,
+                keys::ARIANT_ABSENT,
+                keys::ARIANT_NO_JEWELS,
+                keys::ARIANT_JEWELS,
+                keys::ARIANT_THANKS,
+                keys::ARIANT_KING_MENU,
+                keys::ARIANT_KING_POINTS,
+                keys::ARIANT_KING_ABOUT,
+                keys::ARIANT_KING_TRADE,
+                keys::ARIANT_KING_NEARLY,
+                keys::ARIANT_KING_SHORT,
+                keys::ARIANT_KING_INFO,
+                keys::ARIANT_CHAIR_FULL,
                 keys::CARNIVAL_SPIEGELMANN_GO,
                 keys::CARNIVAL_GUIDE_BACK,
                 keys::CARNIVAL_SPIEGELMANN_WAITING,

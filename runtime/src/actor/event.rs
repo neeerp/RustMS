@@ -45,7 +45,9 @@ use net::packet::build::world::carnival::{
     build_party_cp,
 };
 use net::packet::build::world::effect::{build_field_effect, build_field_sound};
-use net::packet::build::world::field::{build_pyramid_gauge, build_session_value};
+use net::packet::build::world::field::{
+    build_ariant_result, build_ariant_score, build_pyramid_gauge, build_session_value,
+};
 use net::packet::build::world::guild::{build_quest_registrant_left, build_quest_too_few};
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::ClientId;
@@ -138,6 +140,15 @@ pub enum EventMessage {
     },
     /// How many are in the team now.
     TeamSize { reply: oneshot::Sender<usize> },
+    /// `client_id`, named `name`, holds `jewels` Spirit Jewels in an
+    /// Ariant battle, the bombs having knocked `lost` out since they last
+    /// told.
+    AriantJewels {
+        client_id: ClientId,
+        name: String,
+        jewels: i32,
+        lost: i32,
+    },
     /// A Monster Carnival room's waiting party accepted the challenge of
     /// `members`, who come in as Maple Blue.
     Challengers { members: Vec<ClientHandle> },
@@ -373,6 +384,12 @@ pub struct EventTicket {
     /// When the member was let in, which a party quest's record times its
     /// clear from.
     pub entered: Instant,
+    /// How many Spirit Jewels the member last told an Ariant battle they
+    /// hold.
+    pub jewels_told: Option<i32>,
+    /// How many Spirit Jewels a bomb knocked out of the member's bag since
+    /// they last told.
+    pub jewels_lost: i32,
 }
 
 impl Drop for EventTicket {
@@ -647,6 +664,19 @@ impl EventTicket {
         size.await.ok()
     }
 
+    /// Tell an Ariant battle the member, named `name`, holds `jewels`
+    /// Spirit Jewels, the bombs having knocked `lost` out since last.
+    pub async fn ariant_jewels(&self, name: String, jewels: i32, lost: i32) {
+        let _ = (self.event.tx)
+            .send(EventMessage::AriantJewels {
+                client_id: self.member,
+                name,
+                jewels,
+                lost,
+            })
+            .await;
+    }
+
     /// Tell the event what the member's script did.
     pub async fn command(&self, command: EventCommand) {
         let _ = self
@@ -770,6 +800,11 @@ pub fn spawn(
             EventKind::GuildQuest => {
                 Some(Instant::now() + net::events::scaled(net::guild_quest::GATHERING))
             }
+            // An Ariant battle's results come a little before its end.
+            EventKind::Ariant(_) => Some(
+                Instant::now() + kind.event().duration()
+                    - net::events::scaled(net::ariant::RESULTS_BEFORE),
+            ),
             _ => (kind.event().minutes > 0).then(|| Instant::now() + kind.event().duration()),
         },
         joiner: tx.downgrade(),
@@ -835,6 +870,9 @@ pub fn spawn(
         pyramid_end: None,
         gathering: None,
         closing: false,
+        ariant: net::ariant::Scores::default(),
+        ariant_board: None,
+        ariant_results: false,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -1006,6 +1044,13 @@ struct EventActor {
     /// The Guild Quest can't go on: it ends when the clock runs out, a few
     /// seconds after its notice.
     closing: bool,
+    /// An Ariant battle's scores.
+    ariant: net::ariant::Scores,
+    /// When an Ariant battle's players next see its changed scores.
+    ariant_board: Option<Instant>,
+    /// An Ariant battle's results are in: its time ends soon, and a player
+    /// leaving doesn't end it while one is left (Cosmic `eventClear`).
+    ariant_results: bool,
 }
 
 impl EventActor {
@@ -1079,9 +1124,16 @@ impl EventActor {
                     Some(EventMessage::TeamSize { reply }) => {
                         let _ = reply.send(self.team.members().len());
                     }
+                    Some(EventMessage::AriantJewels { client_id, name, jewels, lost }) => {
+                        self.ariant_jewels(client_id, &name, jewels, lost);
+                    }
                     None => over = true,
                 },
-                _ = until(ends) => over = self.time_up(),
+                _ = until(ends) => over = match self.kind {
+                    EventKind::Ariant(arena) => self.ariant_time_up(arena).await,
+                    _ => self.time_up(),
+                },
+                _ = until(self.ariant_board) => self.show_ariant_scores(),
                 _ = until(self.gauge_out) => over = self.gauge_ran_out(),
             }
         }
@@ -1116,7 +1168,7 @@ impl EventActor {
         EventTicket {
             id: self.id,
             kind: self.kind,
-            clock: self.ends,
+            clock: self.clock(),
             member,
             event,
             cleared: self.cleared.clone(),
@@ -1127,6 +1179,8 @@ impl EventActor {
             grid: None,
             side: self.carnival.side(member).unwrap_or(0),
             entered: Instant::now(),
+            jewels_told: None,
+            jewels_lost: 0,
         }
     }
 
@@ -1362,11 +1416,98 @@ impl EventActor {
         if !matches!(self.kind, EventKind::Ariant(_)) {
             return None;
         }
-        let over = self.team.members().len() < 2;
+        let least = if self.ariant_results { 1 } else { 2 };
+        let over = self.team.members().len() < least;
         if over {
             self.move_team(None, net::ariant::ARIANT_LOBBY, None);
         }
         Some(over)
+    }
+
+    /// When the time shown on the event's maps runs out: an Ariant
+    /// battle's ten minutes, past its results.
+    fn clock(&self) -> Option<Instant> {
+        match self.kind {
+            EventKind::Ariant(_) if !self.ariant_results => {
+                (self.ends).map(|ends| ends + net::events::scaled(net::ariant::RESULTS_BEFORE))
+            }
+            _ => self.ends,
+        }
+    }
+
+    /// A member of an Ariant battle holds `jewels` Spirit Jewels: the
+    /// players see the scores within `SCORES_EVERY`.
+    fn ariant_jewels(&mut self, client_id: ClientId, name: &str, jewels: i32, lost: i32) {
+        if !matches!(self.kind, EventKind::Ariant(_)) || !self.team.has(client_id) {
+            return;
+        }
+        if self.ariant.hold(client_id, name, jewels, lost) && self.ariant_board.is_none() {
+            self.ariant_board = Some(Instant::now() + net::ariant::SCORES_EVERY);
+        }
+    }
+
+    /// The players of an Ariant battle see its scores.
+    fn show_ariant_scores(&mut self) {
+        self.ariant_board = None;
+        let Ok(board) = build_ariant_score(&self.ariant.board()) else {
+            return;
+        };
+        self.to_members(&[board]);
+    }
+
+    /// `packets` to every member, if on the event's maps.
+    fn to_members(&self, packets: &[packet::Packet]) {
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventPackets {
+                    id: self.id,
+                    packets: packets.to_vec(),
+                });
+            }
+        }
+    }
+
+    /// An Ariant battle's time is up: first its results, ten seconds
+    /// before its end, then the end, which takes its players to the
+    /// King's Room (Cosmic `showArenaResults` and `enterKingsRoom`). At
+    /// the results its players see the scoreboard, its mobs go, and each
+    /// is told their Battle Arena points.
+    async fn ariant_time_up(&mut self, arena: u8) -> bool {
+        if self.ariant_results {
+            return true;
+        }
+        self.ariant_results = true;
+        self.ends = Some(Instant::now() + net::events::scaled(net::ariant::RESULTS_BEFORE));
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::ariant::battle(arena),
+            instance_id: self.id,
+        });
+        let (reply, items) = oneshot::channel();
+        let on_floor = match field.tx.send(FieldMessage::FloorItems { reply }).await {
+            Ok(()) => (items.await.unwrap_or_default().iter())
+                .filter(|&&(item_id, _)| item_id == net::ariant::SPIRIT_JEWEL)
+                .count(),
+            Err(_) => 0,
+        };
+        let _ = field.tx.send(FieldMessage::ClearMobs).await;
+        let points = self
+            .ariant
+            .points(i32::try_from(on_floor).unwrap_or(i32::MAX));
+        info!(id = self.id, arena, ?points, "Ariant results");
+        if let Ok(result) = build_ariant_result() {
+            self.to_members(&[result]);
+        }
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                let earned = points.iter().find(|(who, _)| who == member);
+                handle.send(ServerMessage::AriantResult {
+                    id: self.id,
+                    points: earned.map_or(0, |&(_, points)| points),
+                });
+            }
+        }
+        false
     }
 
     /// The other side left the battle field before the end: those still

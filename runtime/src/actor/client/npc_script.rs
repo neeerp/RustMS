@@ -174,6 +174,23 @@ impl ClientActor {
                     next.dojo.tutorial_done = true;
                     changed = true;
                 }
+                Effect::AriantPoints(points) => {
+                    let Some(total) =
+                        (next.ariant_points.checked_add(*points)).filter(|total| *total >= 0)
+                    else {
+                        warn!(
+                            points,
+                            "Battle Arena points no longer held; nothing applied"
+                        );
+                        return Ok(Applied::Refused);
+                    };
+                    next.ariant_points = total;
+                    changed = true;
+                }
+                Effect::AriantPrizeTaken => {
+                    next.ariant_tier = next.ariant_tier.map(|_| 0);
+                    changed = true;
+                }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
                 Effect::Scene { parts, exit } => {
                     afterwards.push(effect::build_lock_ui(true)?);

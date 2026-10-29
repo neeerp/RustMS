@@ -813,6 +813,13 @@ diesel::table! {
     }
 }
 diesel::joinable!(dojo_records -> characters (character_id));
+diesel::table! {
+    ariant_records (character_id) {
+        character_id -> Int4,
+        points -> Int4,
+    }
+}
+diesel::joinable!(ariant_records -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -871,5 +878,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     minigame_records,
     reports,
     dojo_records,
+    ariant_records,
     votes,
 );
