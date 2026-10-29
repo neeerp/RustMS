@@ -683,7 +683,8 @@ namespace ms
 			SET_TITLES = 13,
 			CHANGE_RANK = 14,
 			SET_EMBLEM = 15,
-			SET_NOTICE = 16
+			SET_NOTICE = 16,
+			AGREE = 30
 		};
 
 		GuildOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
@@ -800,6 +801,17 @@ namespace ms
 			GuildOperationPacket(GuildOperationPacket::Operation::SET_NOTICE)
 		{
 			write_string(notice);
+		}
+	};
+
+	// Signs the guild contract a party member is asked to (mode 0x1e), or not
+	class AgreeToGuildPacket : public GuildOperationPacket
+	{
+	public:
+		AgreeToGuildPacket(int32_t cid, bool agree) : GuildOperationPacket(GuildOperationPacket::Operation::AGREE)
+		{
+			write_int(cid);
+			write_byte(agree);
 		}
 	};
 

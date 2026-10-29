@@ -7,6 +7,7 @@ mod squad;
 
 use crate::actor::avatar_banners::{AvatarBanners, Queued};
 use crate::actor::event::EventStart;
+use crate::actor::guild_foundings::{Asking, GuildFoundings, Outcome};
 use crate::actor::guild_invites::GuildInvites;
 use crate::actor::maple_tv::{MapleTvLine, OnAir};
 use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
@@ -27,9 +28,9 @@ use net::packet::build::world::alliance;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
 use net::packet::build::world::guild::{
-    build_guild_error, build_guild_info, build_guild_invite, build_guild_job_change,
-    build_guild_level_up, build_invite_refused, build_member_level_job, build_member_online,
-    GuildError, InviteRefusal,
+    build_guild_agreement, build_guild_error, build_guild_info, build_guild_invite,
+    build_guild_job_change, build_guild_level_up, build_invite_refused, build_member_level_job,
+    build_member_online, GuildError, InviteRefusal,
 };
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::maple_tv::{build_remove_tv, build_send_tv, TvRefusal};
@@ -133,6 +134,7 @@ pub struct WorldDirectory {
     names: HashMap<String, ClientId>,
     parties: Parties,
     party_searches: PartySearches,
+    guild_foundings: GuildFoundings,
     guild_invites: GuildInvites,
     /// Invitations to alliances, to guild masters, by alliance id.
     alliance_invites: GuildInvites,
@@ -188,6 +190,7 @@ impl WorldDirectory {
             names: HashMap::new(),
             parties: Parties::default(),
             party_searches: PartySearches::default(),
+            guild_foundings: GuildFoundings::default(),
             guild_invites: GuildInvites::default(),
             alliance_invites: GuildInvites::default(),
             messengers: Messengers::default(),
@@ -448,6 +451,13 @@ impl WorldDirectory {
                 if self.guild_invites.accept(from, guild_id, Instant::now()) {
                     self.tell(from, ServerMessage::JoinGuild { guild_id });
                 }
+            }
+            DirectoryMessage::FoundGuild { from, name, reply } => {
+                let _ = reply.send(self.found_guild(from, name, Instant::now()));
+            }
+            DirectoryMessage::GuildAgree { from, agree } => {
+                let outcome = self.guild_foundings.answer(from, agree, Instant::now());
+                self.founding_ended(outcome);
             }
             DirectoryMessage::GuildDeny {
                 from,
@@ -1028,6 +1038,8 @@ impl WorldDirectory {
             // section 7).
             self.party_searches.stop(client_id);
             self.guild_invites.forget(client_id);
+            let founding = self.guild_foundings.forget(client_id);
+            self.founding_ended(founding);
             self.alliance_invites.forget(client_id);
             self.family_invites.forget(client_id);
             // Requests the player made go with them (keyed by the senior).
@@ -1608,6 +1620,78 @@ impl WorldDirectory {
         } else {
             let refused = build_invite_refused(InviteRefusal::AnotherInvitation, &name);
             self.send_packet(from, refused);
+        }
+    }
+
+    /// Ask the members of the party `from` leads, on their map and in no
+    /// guild, to found `name` with them (v83 report b337).
+    fn found_guild(&mut self, from: ClientId, name: String, now: Instant) -> Asking {
+        self.guild_foundings.withdraw(from);
+        let (Some(here), Some(party)) = (self.party_here(from), self.parties.of(from)) else {
+            return Asking::Alone;
+        };
+        let party_id = party.id;
+        let members: Vec<ClientId> = here[1..]
+            .iter()
+            .copied()
+            .filter(|id| {
+                self.clients
+                    .get(id)
+                    .is_some_and(|entry| entry.presence.guild_id.is_none())
+            })
+            .collect();
+        if members.is_empty() {
+            return Asking::Alone;
+        }
+        let Some(master) = self.clients.get(&from).map(|e| e.presence.name.clone()) else {
+            return Asking::Alone;
+        };
+        let packet = match build_guild_agreement(party_id, &master, &name) {
+            Ok(packet) => packet,
+            Err(error) => {
+                warn!(from, %error, "Failed to build packet");
+                return Asking::Busy;
+            }
+        };
+        if !self.guild_foundings.start(from, name, members.clone(), now) {
+            return Asking::Busy;
+        }
+        for id in std::iter::once(from).chain(members) {
+            self.send_packet(id, Ok(packet.clone()));
+        }
+        Asking::Asked
+    }
+
+    /// Tell the founder what their party said.
+    fn founding_ended(&self, outcome: Option<Outcome>) {
+        match outcome {
+            None => {}
+            Some(Outcome::Agreed {
+                founder,
+                name,
+                cofounders,
+            }) => {
+                // Each must still be there, in the party and in no guild.
+                let here = self.party_here(founder).unwrap_or_default();
+                let all_there = cofounders.iter().all(|id| {
+                    here.contains(id)
+                        && self
+                            .clients
+                            .get(id)
+                            .is_some_and(|entry| entry.presence.guild_id.is_none())
+                });
+                if all_there {
+                    self.tell(founder, ServerMessage::FoundGuild { name, cofounders })
+                } else {
+                    self.send_packet(founder, build_guild_error(GuildError::AgreementFailed))
+                }
+            }
+            Some(Outcome::Refused { founder }) => {
+                self.send_packet(founder, build_guild_error(GuildError::Disagreed))
+            }
+            Some(Outcome::Broken { founder }) => {
+                self.send_packet(founder, build_guild_error(GuildError::AgreementFailed))
+            }
         }
     }
 
@@ -3061,6 +3145,94 @@ mod tests {
         }
         assert_eq!(directory.party_here(1), Some(vec![1, 2]));
         assert_eq!(directory.party_here(2), None, "not the leader");
+    }
+
+    fn founding_party(directory: &mut WorldDirectory) {
+        let now = Instant::now();
+        for name in ["Bobby", "Carol", "Danny"] {
+            let name = name.into();
+            directory.party_request(1, PartyRequest::Invite { name }, now);
+        }
+        for id in [2, 3, 4] {
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+    }
+
+    fn found(directory: &mut WorldDirectory, from: ClientId) -> Asking {
+        let (reply, mut asking) = tokio::sync::oneshot::channel();
+        directory.handle(DirectoryMessage::FoundGuild {
+            from,
+            name: "Maples".into(),
+            reply,
+        });
+        asking.try_recv().unwrap()
+    }
+
+    #[test]
+    fn a_guild_is_founded_once_the_party_agrees() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = member_online(&mut directory, 1, "Alice", None, 1);
+        let mut bobby = member_online(&mut directory, 2, "Bobby", None, 2);
+        let mut carol = member_online(&mut directory, 3, "Carol", Some(9), 3);
+        let mut danny = online(&mut directory, 4, "Danny", 20000);
+        assert_eq!(found(&mut directory, 1), Asking::Alone, "in no party");
+        founding_party(&mut directory);
+        for rx in [&mut alice, &mut bobby, &mut carol, &mut danny] {
+            while rx.try_recv().is_ok() {}
+        }
+        assert_eq!(found(&mut directory, 2), Asking::Alone, "not the leader");
+        // Carol is in a guild and Danny elsewhere: only Bobby is asked.
+        assert_eq!(found(&mut directory, 1), Asking::Asked);
+        let asked = build_guild_agreement(1, "Alice", "Maples").unwrap().bytes;
+        assert_eq!(packets(&mut alice), [asked.clone()]);
+        assert_eq!(packets(&mut bobby), [asked]);
+        assert!(packets(&mut carol).is_empty() && packets(&mut danny).is_empty());
+
+        directory.handle(DirectoryMessage::GuildAgree {
+            from: 3,
+            agree: false,
+        });
+        assert!(alice.try_recv().is_err(), "Carol wasn't asked");
+        directory.handle(DirectoryMessage::GuildAgree {
+            from: 2,
+            agree: true,
+        });
+        match alice.try_recv() {
+            Ok(ServerMessage::FoundGuild { name, cofounders }) => {
+                assert_eq!((name.as_str(), cofounders), ("Maples", vec![2]))
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_refusal_or_a_member_leaving_ends_the_founding() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = member_online(&mut directory, 1, "Alice", None, 1);
+        let _bobby = member_online(&mut directory, 2, "Bobby", None, 2);
+        let _carol = member_online(&mut directory, 3, "Carol", None, 3);
+        founding_party(&mut directory);
+        let error = |error| build_guild_error(error).unwrap().bytes;
+
+        found(&mut directory, 1);
+        packets(&mut alice);
+        for (from, agree) in [(2, true), (3, false)] {
+            directory.handle(DirectoryMessage::GuildAgree { from, agree });
+        }
+        assert_eq!(packets(&mut alice), [error(GuildError::Disagreed)]);
+
+        found(&mut directory, 1);
+        packets(&mut alice);
+        directory.unregister(3, 3, false);
+        assert!(packets(&mut alice).contains(&error(GuildError::AgreementFailed)));
+        directory.handle(DirectoryMessage::GuildAgree {
+            from: 2,
+            agree: true,
+        });
+        assert!(!std::iter::from_fn(|| alice.try_recv().ok())
+            .any(|message| matches!(message, ServerMessage::FoundGuild { .. })));
     }
 
     /// The copies `rx` was sent to, and from where.

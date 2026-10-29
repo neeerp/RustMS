@@ -1,4 +1,5 @@
 use super::ClientActor;
+use crate::actor::guild_foundings::Asking;
 use crate::{
     db::spawn_db,
     error::RuntimeError,
@@ -65,6 +66,13 @@ impl ClientActor {
                 Some(guild_id) => self.invite_to_guild(guild_id, name).await,
                 None => Ok(()),
             },
+            GuildRequest::Agree { agree } => {
+                self.send_to_directory(DirectoryMessage::GuildAgree {
+                    from: self.client_id,
+                    agree,
+                })
+                .await
+            }
             GuildRequest::Accept { guild_id } => {
                 self.send_to_directory(DirectoryMessage::GuildAccept {
                     from: self.client_id,
@@ -361,7 +369,9 @@ impl ClientActor {
     }
 
     /// Found a guild with the name the player gave Heracle. Everything the
-    /// script checked is checked again; a taken name asks again.
+    /// script checked is checked again; a taken name asks again. The
+    /// members of a party the player leads, there with them, are asked to
+    /// agree first (v83 report b337).
     async fn create_guild(&mut self, name: String) -> Result<(), RuntimeError> {
         if !self.naming_guild {
             warn!(
@@ -370,52 +380,108 @@ impl ClientActor {
             );
             return Ok(());
         }
-        let player = &self.in_game()?.player;
-        let refusal = if player.gm_level > 0 {
-            Some(GuildError::Admin)
-        } else if player.guild.is_some() {
-            Some(GuildError::AlreadyInGuild)
-        } else if player.stats.level < guild::MIN_LEVEL {
-            Some(GuildError::LevelTooLow)
-        } else if !guild::name_is_valid(&name) || forbidden_names()?.forbids(&name) {
-            // The client checks names too; ask again as for a taken one.
-            Some(GuildError::NameTaken)
-        } else {
-            None
-        };
-        if refusal.is_none() && player.meso < guild::CREATE_COST {
+        let world_id = self.in_game()?.player.world_id;
+        let mut refusal = self.founding_refusal(&name)?;
+        if refusal.is_none() {
+            let taken = name.clone();
+            if spawn_db(move || db::guild::name_taken(world_id, &taken)).await? {
+                refusal = Some(GuildError::NameTaken);
+            }
+        }
+        if let Some(error) = refusal {
+            self.naming_guild = error == GuildError::NameTaken;
+            return self.send(&mut build_guild_error(error)?).await;
+        }
+        self.naming_guild = false;
+        if self.in_game()?.player.meso < guild::CREATE_COST {
             // Heracle checked before asking; the client has no message for it.
             warn!(
                 self.client_id,
                 "Mesos for the guild went since Heracle asked"
             );
-            self.naming_guild = false;
             return Ok(());
         }
-        let (world_id, cid) = (player.world_id, self.client_id);
-        let created = match refusal {
-            Some(error) => Err(error),
-            None => spawn_db(move || db::guild::create(world_id, &name, cid))
-                .await?
-                .map_err(|error| match error {
-                    CreateError::NameTaken => GuildError::NameTaken,
-                    CreateError::AlreadyInGuild => GuildError::AlreadyInGuild,
-                }),
-        };
+        let (reply, asking) = tokio::sync::oneshot::channel();
+        self.send_to_directory(DirectoryMessage::FoundGuild {
+            from: self.client_id,
+            name: name.clone(),
+            reply,
+        })
+        .await?;
+        match asking.await {
+            Ok(Asking::Alone) => self.found_guild(name, vec![]).await,
+            Ok(Asking::Asked) => Ok(()),
+            Ok(Asking::Busy) | Err(_) => {
+                self.send(&mut build_guild_error(GuildError::AgreementFailed)?)
+                    .await
+            }
+        }
+    }
+
+    /// Why the player can't found guild `name`, if they can't: the checks
+    /// the client shows a message for.
+    fn founding_refusal(&self, name: &str) -> Result<Option<GuildError>, RuntimeError> {
+        let player = &self.in_game()?.player;
+        Ok(if player.gm_level > 0 {
+            Some(GuildError::Admin)
+        } else if player.guild.is_some() {
+            Some(GuildError::AlreadyInGuild)
+        } else if player.stats.level < guild::MIN_LEVEL {
+            Some(GuildError::LevelTooLow)
+        } else if !guild::name_is_valid(name) || forbidden_names()?.forbids(name) {
+            // The client checks names too; ask again as for a taken one.
+            Some(GuildError::NameTaken)
+        } else {
+            None
+        })
+    }
+
+    /// The party members the player asked all agreed to found `name`: check
+    /// again and found it.
+    pub(super) async fn found_agreed_guild(
+        &mut self,
+        name: String,
+        cofounders: Vec<ClientId>,
+    ) -> Result<(), RuntimeError> {
+        if self.founding_refusal(&name)?.is_some()
+            || self.in_game()?.player.meso < guild::CREATE_COST
+        {
+            warn!(self.client_id, "The guild can't be founded now");
+            return self
+                .send(&mut build_guild_error(GuildError::FoundingFailed)?)
+                .await;
+        }
+        self.found_guild(name, cofounders).await
+    }
+
+    /// Found guild `name` with the player its master and `cofounders` its
+    /// jr. masters, and take the fee.
+    async fn found_guild(
+        &mut self,
+        name: String,
+        cofounders: Vec<ClientId>,
+    ) -> Result<(), RuntimeError> {
+        let (world_id, cid) = (self.in_game()?.player.world_id, self.client_id);
+        let others = cofounders.clone();
+        let created = spawn_db(move || db::guild::create(world_id, &name, cid, &others)).await?;
         let guild_id = match created {
             Ok(guild_id) => guild_id,
             Err(error) => {
+                let error = match error {
+                    _ if !cofounders.is_empty() => GuildError::FoundingFailed,
+                    CreateError::NameTaken => GuildError::NameTaken,
+                    CreateError::AlreadyInGuild => GuildError::AlreadyInGuild,
+                };
                 self.naming_guild = error == GuildError::NameTaken;
                 return self.send(&mut build_guild_error(error)?).await;
             }
         };
-        self.naming_guild = false;
 
         let mut guild = spawn_db(move || db::guild::load(guild_id))
             .await?
             .ok_or(db::Error::NotFound)?;
         for member in &mut guild.members {
-            member.online = member.id == cid;
+            member.online = member.id == cid || cofounders.contains(&member.id);
         }
         let player = &mut self.in_game_mut()?.player;
         player.meso -= guild::CREATE_COST;
@@ -428,6 +494,18 @@ impl ClientActor {
             build_guild_created(&guild)?,
         ];
         self.send_all(&mut packets).await?;
+        if !cofounders.is_empty() {
+            // Their clients say they joined.
+            self.send_to_directory(DirectoryMessage::Deliver {
+                to: cofounders.clone(),
+                packet: build_guild_created(&guild)?,
+            })
+            .await?;
+            for client_id in cofounders {
+                self.send_to_directory(DirectoryMessage::GuildChanged { client_id })
+                    .await?;
+            }
+        }
         self.set_guild(Some(guild.tag())).await
     }
 

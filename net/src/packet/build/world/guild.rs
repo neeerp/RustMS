@@ -9,6 +9,7 @@ use game::guild::{Emblem, Guild, GuildMember, Standing};
 use packet::{io::write::PktWrite, Packet};
 
 const OP_NAME_PROMPT: u8 = 0x01;
+const OP_AGREEMENT: u8 = 0x03;
 const OP_INVITE: u8 = 0x05;
 const OP_EMBLEM_MAKER: u8 = 0x11;
 const OP_INFO: u8 = 0x1A;
@@ -47,11 +48,19 @@ const JOB_CHANGE_GUILD: u8 = 0;
 pub enum GuildError {
     /// Heracle says "The name is already in use..." and asks again.
     NameTaken = 0x1C,
+    /// Heracle says "The problem has happened during the process of
+    /// gathering agreement of forming the guild...": a party member left.
+    AgreementFailed = 0x1F,
     /// "Already joined the guild."
     AlreadyInGuild = 0x21,
     /// "You cannot make a guild, due to the limitation of minimum level
     /// requirement."
     LevelTooLow = 0x23,
+    /// Heracle says "Somebody has disagreed to form a guild...".
+    Disagreed = 0x24,
+    /// Heracle says "The problem has happened during the process of
+    /// forming the guild...".
+    FoundingFailed = 0x26,
     /// "Admin cannot make a guild."
     Admin = 0x38,
     /// The invitee is already in a guild: "Already joined the guild."
@@ -176,6 +185,22 @@ pub fn build_guild_created(guild: &Guild) -> Result<Packet, NetworkError> {
 
 pub fn build_guild_error(error: GuildError) -> Result<Packet, NetworkError> {
     guild_operation(error as u8)
+}
+
+/// The party's leader, `master`, asks its members to found `name` with
+/// them. A member's client opens the agreement window, which answers with
+/// `GUILD_OPERATION` mode 0x1E; the leader's has Heracle say the others are
+/// being asked, and reads nothing more.
+pub fn build_guild_agreement(
+    party_id: i32,
+    master: &str,
+    name: &str,
+) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_AGREEMENT)?;
+    packet.write_int(party_id)?;
+    packet.write_str_with_length(master)?;
+    packet.write_str_with_length(name)?;
+    Ok(packet)
 }
 
 /// `inviter` asks the player to join guild `guild_id`; the client answers

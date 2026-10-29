@@ -54,14 +54,35 @@ case (a unique index on `lower(name)`).
   (5), accept an invitation (6), leave (7), expel (8), set the five titles
   (0x0D), move a member to a rank (0x0E, the id and a byte), set the emblem
   (0x0F: background as a short, its colour as a byte, mark as a short, its
-  colour as a byte), or post the notice (0x10). Other modes are ignored. `DENY_GUILD_REQUEST` (127) turns an invitation down: 0x35 when
+  colour as a byte), post the notice (0x10), or agree to found the party
+  leader's guild (0x1E: the player's id and a byte, 1 for yes). Other modes
+  are ignored. `DENY_GUILD_REQUEST` (127) turns an invitation down: 0x35 when
   the client was busy, 0x36 when it already shows one, 0x37 when declined.
 - The client actor (`runtime/src/actor/client/guilds.rs`) founds the guild
   only while `naming_guild` is set, so a forged create does nothing. It
   checks everything again: a GM gets 0x38, a member 0x21, a low level 0x23,
   and a bad or taken name 0x1C, which asks for another. If the mesos went
-  since Heracle asked, nothing is sent. On success it takes the fee, saves,
-  and sends the meso update and 0x20 with the guild. The map sees the new
+  since Heracle asked, nothing is sent. A player who leads a party asks its
+  members on the map and in no guild first (below); with nobody to ask, the
+  guild is founded at once. On success it takes the fee, saves, and sends
+  the meso update and 0x20 with the guild.
+- Founding with the party (v83 report b337): the world directory sends
+  0x03 (the party's id, the leader's name and the guild's) to the leader,
+  whose client has Heracle say the others are being asked, and to each of
+  those members, whose client opens the guild contract
+  (`UIGuildMakeAgreement`): the scroll unrolls, a second later the
+  contract fades in with the two names written into it twice in yellow,
+  and two seconds after that Accept and Decline show
+  (`GuildMakeTimeline`). Enter and Esc answer at once; thirty seconds
+  from the text the client says the time has run out and declines. Its
+  answer is 0x1E (the player's id, 1 to agree). `runtime/src/actor/guild_foundings.rs` keeps who was asked, a member
+  in one founding at a time (another gets 0x1F). A no sends the leader
+  0x24; a member leaving the game sends 0x1F; once all agree, the leader's
+  actor checks everything again (0x26 if anything changed) and
+  `db::guild::create` founds it with them as jr. masters (Cosmic's rank for
+  cofounders). Each of them gets 0x20 too, which their client shows as
+  joining, and their actor re-reads its tag (`GuildChanged`). Cosmic needs
+  six founders; here one is enough, as before. The map sees the new
   name and emblem (`GUILD_NAME_CHANGED`, `GUILD_MARK_CHANGED`) through
   `FieldMessage::UpdateAvatar`, whose `announce` is a list.
 - On entering the game, a channel change included, a member's actor loads the

@@ -17,6 +17,7 @@ pub mod field_shops;
 pub mod field_snowball;
 pub mod field_summons;
 pub mod field_trades;
+pub mod guild_foundings;
 pub mod guild_invites;
 pub mod login;
 pub mod maple_tv;

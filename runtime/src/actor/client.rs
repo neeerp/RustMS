@@ -1916,6 +1916,9 @@ impl ClientActor {
             } => self.married(id, record, blessings, clock).await?,
             ServerMessage::WeddingPriest { id, line } => self.wedding_priest(id, line).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
+            ServerMessage::FoundGuild { name, cofounders } => {
+                self.found_agreed_guild(name, cofounders).await?
+            }
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::JailChanged => self.jail_changed().await?,
             ServerMessage::ChatBlockChanged => self.chat_block_changed().await?,

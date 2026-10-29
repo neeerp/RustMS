@@ -9,6 +9,7 @@
 //! up, or advances a job. At Heracle the master grows the guild five
 //! members at a time, for a price, or disbands it; at Lea they make it an
 //! emblem, for a price. Members of a guild gone meanwhile stay connected.
+//! A party's leader founds one with the members there, who must all agree.
 
 use game_data::GameData;
 use integration_harness::connection::MapleTestConnection;
@@ -16,6 +17,7 @@ use integration_harness::database::{
     delete_guild, grant_stack, guild_capacity_and_members, join_guild, set_guild_capacity,
     set_guild_rank, set_job, set_meso, set_str,
 };
+use integration_harness::events::party;
 use integration_harness::packets::{
     build_change_channel, build_player_logged_in, decode_channel_change,
 };
@@ -45,6 +47,9 @@ const DISBAND: i32 = 1;
 const GROW: i32 = 2;
 
 const NAME_PROMPT: u8 = 0x01;
+const AGREEMENT: u8 = 0x03;
+const AGREE: u8 = 0x1e;
+const DISAGREED: u8 = 0x24;
 const EMBLEM_MAKER: u8 = 0x11;
 const INFO: u8 = 0x1a;
 const NAME_TAKEN: u8 = 0x1c;
@@ -169,6 +174,30 @@ fn guild_data(body: &[u8]) -> (String, Vec<(i32, bool)>) {
         })
         .collect();
     (name, members)
+}
+
+/// A GUILDDATA block's members' ranks.
+fn ranks(body: &[u8]) -> Vec<i32> {
+    let mut r = Cursor::new(body);
+    r.read_int().unwrap();
+    for _ in 0..6 {
+        r.read_str_with_length().unwrap();
+    }
+    let count = r.read_byte().unwrap();
+    r.read_bytes(4 * usize::from(count)).unwrap();
+    (0..count)
+        .map(|_| {
+            r.read_bytes(13).unwrap();
+            let [_job, _level, rank, _online, _, _] = [(); 6].map(|_| r.read_int().unwrap());
+            rank
+        })
+        .collect()
+}
+
+fn agree(id: i32, yes: bool) -> Packet {
+    let mut p = operation(AGREE, &[id], None);
+    p.write_byte(u8::from(yes)).unwrap();
+    p
 }
 
 /// A GUILDDATA block's rank titles and notice.
@@ -1144,4 +1173,62 @@ async fn members_of_a_guild_gone_meanwhile_stay_connected() {
     assert!(bt.guild_ops.is_empty());
     barrier(&mut b.connection, "b still here", &mut bt).await;
     assert_eq!(guild_capacity_and_members(&name).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn a_party_founds_its_guild_together() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let name = a_config.character_name.clone();
+    let b_id = new_character(&b_config).await;
+    let mut b = relogin(&b_config).await;
+    let mut bt = Trace::default();
+    assert_eq!(
+        warp(&mut b.connection, GUILD_HQ, "", &mut bt).await,
+        GUILD_HQ
+    );
+    let a = founder(&a_config, FEE + 100_000).await;
+    let a_id = a.character_id;
+    let mut team = [a, b];
+    party(&mut team).await;
+    let [mut a, mut b] = team;
+
+    // B, in A's party and there, is asked; B's no ends it, the fee kept.
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    next_op(&mut a, AGREEMENT).await;
+    let asked = next_op(&mut b, AGREEMENT).await;
+    let mut r = Cursor::new(&asked[1..]);
+    assert!(r.read_int().unwrap() > 0, "the party's id");
+    assert_eq!(r.read_str_with_length().unwrap(), a.character_name);
+    assert_eq!(r.read_str_with_length().unwrap(), name);
+    send(&mut b.connection, agree(b_id, false)).await;
+    let t = next_op(&mut a, DISAGREED).await;
+    assert_eq!(t, [DISAGREED]);
+
+    // Asked again, B agrees: both are in the guild, B a jr. master.
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    next_op(&mut b, AGREEMENT).await;
+    let t = step(&mut b.connection, "b agrees", agree(b_id, true)).await;
+    let created = match t.guild_ops.iter().find(|op| op[0] == CREATED) {
+        Some(op) => op.clone(),
+        None => next_op(&mut b, CREATED).await,
+    };
+    let members = vec![(a_id, true), (b_id, true)];
+    assert_eq!(guild_data(&created[1..]), (name.clone(), members.clone()));
+    assert_eq!(ranks(&created[1..]), [1, 2]);
+    let created = next_op(&mut a, CREATED).await;
+    assert_eq!(guild_data(&created[1..]), (name.clone(), members));
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.guild_names.contains(&(b_id, name.clone()))
+    })
+    .await;
+    drop(a);
+    drop(b);
+    let a = relogin(&a_config).await;
+    assert_eq!(a.meso, 100_000);
 }

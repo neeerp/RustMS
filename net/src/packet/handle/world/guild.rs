@@ -7,9 +7,9 @@ use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
 /// `GUILD_OPERATION`: ask for the guild again, name a new guild in answer
-/// to the name prompt, invite, join, leave, expel, or change the rank
-/// titles, a member's rank, the emblem or the notice. Other modes aren't
-/// supported yet.
+/// to the name prompt, agree to found the party leader's, invite, join,
+/// leave, expel, or change the rank titles, a member's rank, the emblem or
+/// the notice. Other modes aren't supported yet.
 pub struct GuildOperationHandler;
 
 impl WorldHandler for GuildOperationHandler {
@@ -58,6 +58,13 @@ impl WorldHandler for GuildOperationHandler {
             0x10 => GuildRequest::SetNotice {
                 notice: reader.read_str_with_length()?,
             },
+            // The player's id comes first; the server knows it.
+            0x1E => {
+                reader.read_int()?;
+                GuildRequest::Agree {
+                    agree: reader.read_byte()? != 0,
+                }
+            }
             _ => return Ok(HandlerResult::empty()),
         };
         Ok(HandlerResult::empty().with(WorldAction::Guild(request)))
@@ -134,6 +141,16 @@ mod tests {
 
         // Alliances and the rest come later.
         assert_eq!(guild_request(&operation(0x30)), None);
+    }
+
+    #[test]
+    fn reads_an_agreement() {
+        for (byte, agree) in [(1, true), (0, false)] {
+            let mut packet = operation(0x1E);
+            packet.write_int(7).unwrap();
+            packet.write_byte(byte).unwrap();
+            assert_eq!(guild_request(&packet), Some(GuildRequest::Agree { agree }));
+        }
     }
 
     #[test]
