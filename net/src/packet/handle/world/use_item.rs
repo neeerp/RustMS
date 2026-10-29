@@ -561,7 +561,7 @@ const MOON_BUNNIES: i32 = 922231000;
 /// its mobs with its percent chance, on the ground below the player
 /// (Cosmic). The client opens none, unless its player is a GM, where
 /// fieldLimit 0x4 forbids it and `allowedItem` doesn't list it; nor does
-/// the server.
+/// the server, which also keeps one with a `reqMap` to the maps it lists.
 pub struct UseSummonSackHandler;
 
 impl WorldHandler for UseSummonSackHandler {
@@ -621,17 +621,23 @@ fn open_sack(
     {
         return Err(SackRefused::Invalid);
     }
-    let sack = items::info(item_id).ok_or(SackRefused::Invalid)?.sack;
+    let info = items::info(item_id).ok_or(SackRefused::Invalid)?;
+    let map_id = player.stats.map_id;
     let field = crate::get_game_data()
         .ok()
-        .and_then(|data| data.field(player.stats.map_id))
+        .and_then(|data| data.field(map_id))
         .ok_or(SackRefused::Invalid)?;
-    if sack.is_empty() {
+    if info.sack.is_empty() {
         return Err(SackRefused::Invalid);
     }
-    if player.gm_level <= 0 && !field.may_summon(item_id) {
+    // Some work only in their own maps (`reqMap`), as the Ariant
+    // Coliseum's Bomb does.
+    let here =
+        field.may_summon(item_id) && (info.req_map.is_empty() || info.req_map.contains(&map_id));
+    if player.gm_level <= 0 && !here {
         return Err(SackRefused::NotHere);
     }
+    let sack = info.sack;
     let changes = player
         .inventory_mut()
         .take(InventoryType::Use, slot, 1)
@@ -1513,6 +1519,23 @@ mod tests {
         player.gm_level = 1;
         player.stats.map_id = 10_000;
         assert!(open_sack(&mut player, 1, 2100001, |_| true).is_ok());
+    }
+
+    #[test]
+    fn the_coliseums_bomb_works_only_in_its_battle_maps() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2100067, 2));
+        player.stats.map_id = 100_000_000;
+        let refused = open_sack(&mut player, 1, 2100067, |_| true);
+        assert_eq!(refused.unwrap_err(), SackRefused::NotHere);
+        player.stats.map_id = 980_010_201;
+        let (_, mobs) = open_sack(&mut player, 1, 2100067, |_| true).unwrap();
+        assert_eq!(mobs, [9300166]);
     }
 
     fn scroll_request(slot: i16, item_id: i32) -> Packet {

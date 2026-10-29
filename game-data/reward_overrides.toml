@@ -920,3 +920,17 @@ replace = [
     { item = 2290108, prob = 0.01 },
     { item = 2290138, prob = 0.03 },
 ]
+
+[mobs.9300157]
+# The Ariant Coliseum's mob (the life of Map.nx 980010101, 980010201 and
+# 980010301) leaves the Bomb 2100067, whose `reqMap` lists those maps, and
+# the Coliseum's pickup items 2022266-2022269, which work when picked up
+# (`consumeOnPickup`). The pack has no drops for it; the rates are the
+# community servers'.
+replace = [
+    { item = 2100067, prob = 0.1 },
+    { item = 2022266, prob = 0.2 },
+    { item = 2022267, prob = 0.2 },
+    { item = 2022268, prob = 0.2 },
+    { item = 2022269, prob = 0.2 },
+]

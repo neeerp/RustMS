@@ -950,6 +950,10 @@ pub enum FieldRequest {
         loot: crate::loot::Loot,
         vanish: bool,
     },
+    /// `count` of `item_id`, knocked out of the player's bag by a mob's
+    /// hit, fall one by one around them for anyone at once: the first at
+    /// their feet, the rest further out to either side in turn.
+    Shed { item_id: i32, count: i16 },
     /// Swing at the reactor `object_id`, or use `skill` by it. The `flags`
     /// are bit 0 facing left and bit 1 on a foothold; others see the hit
     /// `delay` ms later.
