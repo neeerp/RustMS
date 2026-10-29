@@ -1809,6 +1809,8 @@
 "holiday.busy" = "[placeholder] Another party is guarding the snowman already. Try another channel."
 "holiday.snowman.home" = "[placeholder] Do you want to go back to Happyville?"
 "holiday.snowman.leave" = "[placeholder] Do you want to give up and leave?"
+"holiday.santa.greeting" = "[placeholder] Ho ho! A happy, healthy year to you!"
+"holiday.santa.chimney" = "[placeholder] No sneaking down other people's chimneys! You don't want to end up on the naughty list, do you?"
 "holiday.arena.intro" = "[placeholder] You made it! Scrooge's men are out to melt the snowman Happyville is building. Beat them: they drop Snow Vigor, and Snow Vigor dropped on the snowman makes it grow. Grow it back to its full size before time runs out. But beware: some drop fake Snow Vigor, which only shrinks it."
 "holiday.arena.leader" = "[placeholder] Your party's leader must talk to me to begin."
 "holiday.arena.grow" = "[placeholder] Beat Scrooge's men and feed their Snow Vigor to the snowman until it is whole again."

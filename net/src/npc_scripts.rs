@@ -984,6 +984,9 @@ pub const GUON: i32 = 2094000;
 /// Happyville there and out of the arena inside.
 pub const SNOW_SPIRIT: i32 = 9105004;
 pub const SNOWMAN: i32 = 9105005;
+pub const SANTA: i32 = 9209100;
+/// The house's chimney in Happyville (`in_xmas_party`).
+pub const SANTAS_CHIMNEY: &str = "chimney01";
 pub const GUON_ABOARD: i32 = 2094002;
 /// Amos the Strong on his training ground, who lets a ticket holder into
 /// the Amorian Challenge's Entrance and trades keys for tickets; Amos on
@@ -1797,6 +1800,16 @@ impl NpcScript {
     /// PQ lobby, and out to its exit from an arena; none elsewhere.
     pub fn snowman(map_id: i32) -> Option<Self> {
         snowman(map_id)
+    }
+
+    /// Santa in Happyville, to a player who may be at the chimney.
+    pub fn santa(by_the_chimney: bool) -> Self {
+        let key = if by_the_chimney {
+            keys::HOLIDAY_SANTA_CHIMNEY
+        } else {
+            keys::HOLIDAY_SANTA_GREETING
+        };
+        Self::new(SANTA, vec![Page::Say(text(key))])
     }
 
     /// The Snow Spirit in a Holiday PQ arena of difficulty `level`, to
@@ -12469,6 +12482,21 @@ fn snowman(map_id: i32) -> Option<NpcScript> {
             on_no: None,
         }],
     ))
+}
+
+/// Whether `position` on `map_id` is at Happyville's chimney (within
+/// Cosmic `9209100`'s 77 px), where Santa tells off one going in.
+pub fn by_santas_chimney(map_id: i32, (x, y): (i16, i16)) -> bool {
+    if map_id != events::HAPPYVILLE {
+        return false;
+    }
+    let chimney = crate::game_data::get()
+        .ok()
+        .and_then(|data| data.field(map_id)?.portal_by_name(SANTAS_CHIMNEY).cloned());
+    chimney.is_some_and(|portal| {
+        let (dx, dy) = (portal.x - i32::from(x), portal.y - i32::from(y));
+        f64::from(dx).hypot(f64::from(dy)) < 77.0
+    })
 }
 
 /// The Snow Spirit (Cosmic `9105004`) in a Holiday PQ arena: before the
@@ -25515,6 +25543,23 @@ mod tests {
         assert_eq!(yes(889100021), [Effect::WarpToPortal(889100022, 0)]);
         assert!(NpcScript::snowman(889100002).is_none());
         assert!(NpcScript::snowman(889100100).is_none());
+    }
+
+    #[test]
+    fn santa_tells_off_one_at_the_chimney_and_greets_the_rest() {
+        let chimney = (2387, -326);
+        assert!(by_santas_chimney(events::HAPPYVILLE, chimney));
+        assert!(by_santas_chimney(
+            events::HAPPYVILLE,
+            (2387 - 50, -326 + 50)
+        ));
+        assert!(!by_santas_chimney(events::HAPPYVILLE, (2387 - 80, -326)));
+        assert!(!by_santas_chimney(events::HAPPYVILLE, (271, -390)));
+        assert!(!by_santas_chimney(events::HAPPYVILLE + 1, chimney));
+        let says = |near| page_text(&NpcScript::santa(near).begin());
+        assert_eq!(says(true), text(keys::HOLIDAY_SANTA_CHIMNEY));
+        assert_eq!(says(false), text(keys::HOLIDAY_SANTA_GREETING));
+        assert_eq!(NpcScript::santa(true).npc_id, SANTA);
     }
 
     #[test]

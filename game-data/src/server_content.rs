@@ -2735,6 +2735,8 @@ pub mod keys {
     pub const HOLIDAY_BUSY: &str = "holiday.busy";
     pub const HOLIDAY_SNOWMAN_HOME: &str = "holiday.snowman.home";
     pub const HOLIDAY_SNOWMAN_LEAVE: &str = "holiday.snowman.leave";
+    pub const HOLIDAY_SANTA_GREETING: &str = "holiday.santa.greeting";
+    pub const HOLIDAY_SANTA_CHIMNEY: &str = "holiday.santa.chimney";
     pub const HOLIDAY_ARENA_INTRO: &str = "holiday.arena.intro";
     pub const HOLIDAY_ARENA_LEADER: &str = "holiday.arena.leader";
     pub const HOLIDAY_ARENA_GROW: &str = "holiday.arena.grow";
@@ -4510,6 +4512,8 @@ mod tests {
                 keys::HOLIDAY_BUSY,
                 keys::HOLIDAY_SNOWMAN_HOME,
                 keys::HOLIDAY_SNOWMAN_LEAVE,
+                keys::HOLIDAY_SANTA_GREETING,
+                keys::HOLIDAY_SANTA_CHIMNEY,
                 keys::HOLIDAY_ARENA_INTRO,
                 keys::HOLIDAY_ARENA_LEADER,
                 keys::HOLIDAY_ARENA_GROW,
