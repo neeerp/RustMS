@@ -100,6 +100,9 @@ namespace ms
 
 		Rectangle<int16_t> get_bounds() const;
 
+		// Moves the field within its parent.
+		void set_bounds(Rectangle<int16_t> bounds);
+
 		const std::string &get_text() const;
 
 		// Where each row of a wrapped field's text begins.
