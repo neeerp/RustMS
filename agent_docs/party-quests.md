@@ -48,8 +48,8 @@ Crimsonwood Keep's party quest is an expedition's, which ends like a
 party's; it has its gate, its squad, its clocks, its end rules, its
 stages, its win and its rooms after ([Crimsonwood Keep](#crimsonwood-keep)).
 Happyville's Holiday PQ has its three lobbies, its entry, its arenas'
-clock and its ways out; its snowman, Scrooge and gifts come in later
-slices ([the Holiday PQ](#the-holiday-pq)).
+clock, its ways out and its snowman to build up; Scrooge and gifts come
+in later slices ([the Holiday PQ](#the-holiday-pq)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1729,9 +1729,34 @@ In a lobby, the Snow Spirit (`SNOW_SPIRIT`, 9105004) offers a menu: to go
 in, or to hear what the party must do (`holiday.*`). Its leader takes 3 to
 6 of the difficulty's levels who are there into the arena, one party a
 channel and difficulty, on a clock of 15, 20 or 25 minutes. The
-difficulty's quest items (4032094 and 4032095) are taken on leaving. The
-arena keeps its Map.nx spawns for now; the snowman to build up comes
-later.
+difficulty's quest items (4032094 and 4032095) are taken on leaving.
+
+In a run's copy of an arena (`events::holiday_arena`, the field's
+`HolidayArena`; picks in QUESTIONS b297) no mob comes (`MobSet::shut`)
+until the leader talks to the Snow Spirit there
+(`NpcScript::snow_spirit_arena`): its Next brings out the snowman's first
+form at (-180, 15) (`Effect::BringOutSnowman`,
+`FieldActor::bring_out_snowman`), opens the spawns and tells everyone in
+pink (`holiday.snowman.out`); anyone else hears only the leader may begin.
+The snowman is `events::holiday_snowman(level, form)`, 9400316 + 5 x level
++ form, five forms a difficulty, all friendly. Each kill while it grows
+may leave Snow Vigor (4032094) or, 23% of the time, fake Snow Vigor
+(4032095) for anyone where the mob fell: 42% of kills, and always (real)
+after five that left none (`events::holiday_token`). Dropped by the
+snowman, on the ground of Cosmic's collectors' area (reactors 9400300 and
+9400301, which our Map.nx's arenas lack: `events::holiday_feeds_at`), one
+at a time, they are eaten after five seconds, as an item on a reactor is
+taken (`FieldActor::put_on_snowman`, `eat_snow_vigor`), but only while the
+snowman grows. A fake takes the snowman a step back, as everyone hears
+(`holiday.fake_vigor`); a real one heals it 200 more for each form, and
+after 2 more than the difficulty times its form, grows it into its next
+form in its place (`events::Snowman::feed`, `FieldActor::feed_snowman`).
+Its fifth, whole form sends every other mob away, stops the spawns, and
+clears stage 1 for the run (`ClearEventStage`), with its effect and EXP. A
+mob that runs into it until it goes melts it back to its form before, at
+full HP, as everyone hears (`holiday.snowman.melted`); if it was in its
+first form, the run fails (`FieldActor::snowman_melted`). Once it is out,
+the Snow Spirit urges it grown, and once whole, says so.
 
 The Snowman (`SNOWMAN`, 9105005) offers the way home to Happyville in a
 lobby, and in an arena the way out to the exit map, which leaves the

@@ -222,6 +222,16 @@ fn reactor_item(loot: &Loot) -> Option<(i32, i16)> {
     }
 }
 
+/// A run's copy of a Holiday PQ arena (Cosmic `HolidayPQ_*`'s `level`,
+/// `snowmanLevel`, `snowmanStep` and `missingDrops`).
+struct HolidayArena {
+    level: u8,
+    snowman: net::events::Snowman,
+    misses: u8,
+    /// Snow Vigor where the snowman eats it, by when: (when, drop).
+    eating: Vec<(Instant, i32)>,
+}
+
 /// An item a player put on a reactor that takes it, once it has lain there
 /// long enough.
 struct ItemOnReactor {
@@ -340,6 +350,9 @@ pub struct FieldActor {
     /// of the goddess's guardians due or out, from the first; one past the
     /// last once that is down.
     guardians_wave: Option<usize>,
+    /// In a run's copy of a Holiday PQ arena, its difficulty, its snowman,
+    /// and its kills that left no Snow Vigor.
+    holiday: Option<HolidayArena>,
     /// What this field does to itself later, once due: the Balrog's tomb
     /// lets its claw go a minute in, and brings out the sealed Balrog after
     /// the win.
@@ -357,6 +370,19 @@ impl FieldActor {
         mut reactors: ReactorSet,
         tick: Duration,
     ) -> Self {
+        let holiday = net::events::holiday_arena(key.map_id)
+            .filter(|_| key.instance_id != 0)
+            .map(|level| HolidayArena {
+                level,
+                snowman: net::events::Snowman::default(),
+                misses: 0,
+                eating: Vec::new(),
+            });
+        // A Holiday PQ arena's mobs wait for its snowman (Cosmic
+        // `allowSummonState(false)`).
+        if holiday.is_some() {
+            mobs.shut();
+        }
         mobs.start(Instant::now());
         reactors.respawn(Instant::now());
         if reactors::shuffled(key.map_id) {
@@ -453,6 +479,7 @@ impl FieldActor {
             race: None,
             stirges_gone: false,
             guardians_wave: None,
+            holiday,
             later: Vec::new(),
             tick,
         };
@@ -563,6 +590,7 @@ impl FieldActor {
                 took.push(reactor);
             }
         }
+        self.eat_snow_vigor(now);
         let spawned = self.reactors.respawn(now);
         self.show_reactors(&spawned);
         // Those whose time in their state is up go back (the forest's pond
@@ -905,6 +933,9 @@ impl FieldActor {
             FieldMessage::MobCount { reply } => {
                 let _ = reply.send(self.mobs.live().count());
             }
+            FieldMessage::HolidaySnowman { reply } => {
+                let _ = reply.send(self.holiday.as_ref().map_or(0, |arena| arena.snowman.form));
+            }
             FieldMessage::DropCount { reply } => {
                 let _ = reply.send(self.drops.all().count());
             }
@@ -1164,6 +1195,7 @@ impl FieldActor {
                     self.npc_special_action(npc_id, action)
                 }
                 FieldRequest::ClearMobs => self.clear_mobs(),
+                FieldRequest::BringOutSnowman => self.bring_out_snowman(),
                 FieldRequest::SetReactorState { name, state } => {
                     for view in self.reactors.force_forward(name, state) {
                         if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
@@ -1822,6 +1854,7 @@ impl FieldActor {
         let Some((item_id, quantity)) = reactor_item(&drop.loot) else {
             return;
         };
+        self.put_on_snowman(drop, item_id, quantity, now);
         if !self.reactors.any_takes_items() {
             return;
         }
@@ -2199,6 +2232,7 @@ impl FieldActor {
             }
         }
         self.make_real(kill.mob_id);
+        self.leave_snow_vigor(kill);
         match (kill.mob_id, self.key.map_id) {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
             (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
@@ -4086,6 +4120,186 @@ impl FieldActor {
         }
         if net::events::protected(hit.mob_id) && self.key.instance_id != 0 {
             self.fail_event();
+        }
+        self.snowman_melted(hit.mob_id);
+    }
+
+    /// The Snow Spirit brings out a Holiday arena's snowman in its first
+    /// form, and Scrooge's men start to come, as everyone hears (Cosmic
+    /// `9105004`'s second page).
+    fn bring_out_snowman(&mut self) {
+        let Some(arena) = self
+            .holiday
+            .as_mut()
+            .filter(|arena| arena.snowman.form == 0)
+        else {
+            return;
+        };
+        arena.snowman.form = 1;
+        let snowman = net::events::holiday_snowman(arena.level, 1);
+        self.board(snowman, 1, net::events::HOLIDAY_SNOWMAN_AT);
+        self.mobs.open();
+        self.pink_line(keys::HOLIDAY_SNOWMAN_OUT);
+    }
+
+    /// A mob killed in a Holiday arena while its snowman grows may leave
+    /// Snow Vigor, real or fake, for anyone, where it fell (Cosmic
+    /// `monsterKilled`).
+    fn leave_snow_vigor(&mut self, kill: &Kill) {
+        let Some(arena) = self.holiday.as_mut() else {
+            return;
+        };
+        if !(1..net::events::HOLIDAY_FORMS).contains(&arena.snowman.form) {
+            return;
+        }
+        let mut rng = rand::thread_rng();
+        let (roll, real) = (rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0));
+        let Some(item_id) = net::events::holiday_token(&mut arena.misses, roll, real) else {
+            return;
+        };
+        let killer = kill.damage_by.first().map(|&(client, _)| client);
+        let Some(owner) = killer.or_else(|| self.occupants.keys().next().copied()) else {
+            return;
+        };
+        let loot = vec![Loot::Item {
+            item_id,
+            quantity: 1,
+            quest: None,
+        }];
+        let (x, y) = (kill.x, kill.y);
+        self.spawn_loot(owner, Ownership::FreeForAll, loot, x, y, kill.object_id);
+    }
+
+    /// Snow Vigor, real or fake, landing where a Holiday arena's snowman
+    /// eats it, is eaten once it has lain there as long as an item on a
+    /// reactor (Cosmic's collectors).
+    fn put_on_snowman(&mut self, drop: &Drop, item_id: i32, quantity: i16, now: Instant) {
+        let tokens = [net::events::SNOW_VIGOR, net::events::FAKE_SNOW_VIGOR];
+        if quantity != 1 || !tokens.contains(&item_id) {
+            return;
+        }
+        let at = self.landing(drop);
+        let Some(arena) = self.holiday.as_mut() else {
+            return;
+        };
+        if net::events::holiday_feeds_at(at)
+            && !arena.eating.iter().any(|&(_, d)| d == drop.object_id)
+        {
+            arena.eating.push((now + ITEM_TAKEN_AFTER, drop.object_id));
+        }
+    }
+
+    /// The snowman eats the Snow Vigor that has lain long enough where it
+    /// eats it, while it grows; it leaves what lies there before it is out
+    /// or once it is whole (Cosmic's collectors, which close then).
+    fn eat_snow_vigor(&mut self, now: Instant) {
+        let Some(arena) = self.holiday.as_mut() else {
+            return;
+        };
+        let (due, waiting): (Vec<_>, Vec<_>) = std::mem::take(&mut arena.eating)
+            .into_iter()
+            .partition(|&(at, _)| at <= now);
+        arena.eating = waiting;
+        for (_, object_id) in due {
+            let growing = self.holiday.as_ref().map(|arena| arena.snowman.form);
+            if !growing.is_some_and(|form| (1..net::events::HOLIDAY_FORMS).contains(&form)) {
+                continue;
+            }
+            let Some(drop) = self.drops.remove(object_id) else {
+                continue;
+            };
+            if let Ok(packet) = build_remove_drop(object_id, None) {
+                self.send_drop_packet(packet);
+            }
+            let fake = reactor_item(&drop.loot)
+                .is_some_and(|(item_id, _)| item_id == net::events::FAKE_SNOW_VIGOR);
+            self.feed_snowman(fake);
+        }
+    }
+
+    /// A Holiday arena's snowman eats Snow Vigor. A fake takes it a step
+    /// back, as everyone hears; a real one heals it, or grows it into its
+    /// next form, and the last form clears the stage: every other mob goes
+    /// and no more come (Cosmic `snowmanSnack`, `snowmanSnackFake`,
+    /// `snowmanEvolve`).
+    fn feed_snowman(&mut self, fake: bool) {
+        let Some(arena) = self.holiday.as_mut() else {
+            return;
+        };
+        let level = arena.level;
+        let was = net::events::holiday_snowman(level, arena.snowman.form);
+        if fake {
+            if arena.snowman.fake() {
+                self.pink_line(keys::HOLIDAY_FAKE_VIGOR);
+            }
+            return;
+        }
+        match arena.snowman.feed(level) {
+            None => {}
+            Some(net::events::Feeding::Healed(hp)) => {
+                for object_id in self.out(was) {
+                    if let Some((healed, hp, max_hp)) = self.mobs.heal(object_id, hp, 0) {
+                        if let Ok(packet) = build_heal_mob(object_id, healed, hp, max_hp) {
+                            self.broadcast(None, packet);
+                        }
+                    }
+                }
+            }
+            Some(net::events::Feeding::Grew(form)) => {
+                // The old form vanishes as the new comes out in its place
+                // (Cosmic `killMonster(.., 2)`, a leave the client doesn't
+                // play).
+                let now = Instant::now();
+                for object_id in self.out(was) {
+                    self.mobs.take_away_one(object_id, now);
+                    if let Ok(packet) = build_kill_mob(object_id, 0) {
+                        self.broadcast(None, packet);
+                    }
+                }
+                let grown = net::events::holiday_snowman(level, form);
+                self.board(grown, 1, net::events::HOLIDAY_SNOWMAN_AT);
+                if form < net::events::HOLIDAY_FORMS {
+                    return;
+                }
+                self.clear_mobs();
+                let stage = net::events::HOLIDAY_SNOWMAN_STAGE;
+                for occupant in self.occupants.values() {
+                    occupant.handle.send(ServerMessage::ClearEventStage(stage));
+                }
+            }
+        }
+    }
+
+    /// A Holiday arena's snowman, `mob_id`, melted under Scrooge's men:
+    /// its form before comes back, as everyone hears, or, from its first
+    /// form or its whole one, the run is lost (QUESTIONS b297).
+    fn snowman_melted(&mut self, mob_id: i32) {
+        let Some(arena) = self.holiday.as_mut() else {
+            return;
+        };
+        if net::events::holiday_snowman(arena.level, arena.snowman.form) != mob_id {
+            return;
+        }
+        let level = arena.level;
+        match arena.snowman.melted() {
+            Some(form) => {
+                let snowman = net::events::holiday_snowman(level, form);
+                self.board(snowman, 1, net::events::HOLIDAY_SNOWMAN_AT);
+                self.pink_line(keys::HOLIDAY_SNOWMAN_MELTED);
+            }
+            None => {
+                // The run is lost: no other snowman comes out here.
+                self.holiday = None;
+                self.fail_event();
+            }
+        }
+    }
+
+    /// A pink line, text `key`, for everyone here.
+    fn pink_line(&self, key: &str) {
+        let line = net::content::text().get(key, &[]);
+        if let Ok(packet) = build_broadcast(Broadcast::Pink, &line) {
+            self.broadcast(None, packet);
         }
     }
 

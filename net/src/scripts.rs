@@ -843,6 +843,9 @@ pub enum Effect {
     /// Every mob on the player's map that isn't friendly goes, and no more
     /// come, as Cosmic's `killAllMonsters`.
     ClearMobs,
+    /// A Holiday PQ arena's snowman comes out in its first form, and the
+    /// mobs start to come (the arena Snow Spirit's second page).
+    BringOutSnowman,
     /// Set character `slot` of a started info quest's string
     /// (`game::quest::INFO_QUESTS`) from `from` to `to`, as Ariant's houses
     /// mark each delivery. Nothing is applied unless it reads `from`.

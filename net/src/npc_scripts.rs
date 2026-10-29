@@ -1769,6 +1769,12 @@ impl NpcScript {
         snowman(map_id)
     }
 
+    /// The Snow Spirit in a Holiday PQ arena, to the run's `leader` or
+    /// another, with the snowman in its `form` (0 before it is out).
+    pub fn snow_spirit_arena(leader: bool, form: u8) -> Self {
+        snow_spirit_arena(leader, form)
+    }
+
     /// Guon Over the Pirate Ship, for a player whose party may or may not
     /// board it.
     pub fn guon(entry: Entry) -> Self {
@@ -12052,6 +12058,25 @@ fn snowman(map_id: i32) -> Option<NpcScript> {
             on_no: None,
         }],
     ))
+}
+
+/// The Snow Spirit (Cosmic `9105004`) in a Holiday PQ arena: before the
+/// snowman is out it tells what to do, and its leader's Next brings it out;
+/// then it urges the snowman grown, and once it is whole, says so.
+fn snow_spirit_arena(leader: bool, form: u8) -> NpcScript {
+    let pages = match form {
+        0 if leader => vec![
+            Page::Say(text(keys::HOLIDAY_ARENA_INTRO)),
+            Page::Done(vec![Effect::BringOutSnowman]),
+        ],
+        0 => vec![
+            Page::Say(text(keys::HOLIDAY_ARENA_INTRO)),
+            Page::Say(text(keys::HOLIDAY_ARENA_LEADER)),
+        ],
+        form if form < events::HOLIDAY_FORMS => vec![Page::Say(text(keys::HOLIDAY_ARENA_GROW))],
+        _ => vec![Page::Say(text(keys::HOLIDAY_ARENA_GROWN))],
+    };
+    NpcScript::new(SNOW_SPIRIT, pages)
 }
 
 /// Amos the Strong (Cosmic `9201043`) on his training ground: a player
@@ -23904,6 +23929,35 @@ mod tests {
         assert_eq!(yes(889100021), [Effect::WarpToPortal(889100022, 0)]);
         assert!(NpcScript::snowman(889100002).is_none());
         assert!(NpcScript::snowman(889100100).is_none());
+    }
+
+    #[test]
+    fn the_snow_spirit_lets_the_leader_bring_out_the_snowman() {
+        let next = |leader, form| {
+            let mut spirit = NpcScript::snow_spirit_arena(leader, form);
+            let first = spirit.begin();
+            (first, spirit.respond(ScriptInput::Next).unwrap())
+        };
+        let (first, then) = next(true, 0);
+        assert!(page_text(&first).contains("Snow Vigor"), "{first:?}");
+        assert_eq!(then.prompt, None);
+        assert_eq!(then.effects, [Effect::BringOutSnowman]);
+        let (_, then) = next(false, 0);
+        assert!(then.effects.is_empty(), "{then:?}");
+        assert_eq!(
+            page_text(&then),
+            content::text().get(keys::HOLIDAY_ARENA_LEADER, &[])
+        );
+        for (form, key) in [
+            (1, keys::HOLIDAY_ARENA_GROW),
+            (4, keys::HOLIDAY_ARENA_GROW),
+            (5, keys::HOLIDAY_ARENA_GROWN),
+        ] {
+            let mut spirit = NpcScript::snow_spirit_arena(true, form);
+            let first = spirit.begin();
+            assert_eq!(page_text(&first), content::text().get(key, &[]), "{form}");
+            assert!(first.effects.is_empty(), "{form}");
+        }
     }
 
     #[test]

@@ -83,6 +83,11 @@ impl ClientActor {
         {
             return Ok(());
         }
+        if npc_id == net::npc_scripts::SNOW_SPIRIT {
+            if let Some(script) = self.snow_spirit_arena().await? {
+                return self.start_script(script).await;
+            }
+        }
         let player = &self.in_game()?.player;
         if npc_id == net::npc_scripts::TORY && player.stats.map_id == net::events::HPQ.lobby {
             return self.talk_about_event(net::events::EventKind::Hpq).await;

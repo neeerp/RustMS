@@ -464,6 +464,26 @@ impl ClientActor {
         )))
     }
 
+    /// What the Snow Spirit says to the player in a Holiday PQ arena, if
+    /// there on its run: before the snowman is out, the leader brings it
+    /// out; after, how it grows (Cosmic `9105004`'s `eim` branch).
+    pub(super) async fn snow_spirit_arena(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| {
+            matches!(ticket.kind, EventKind::Holiday(_))
+                && events::holiday_arena(map_id).is_some()
+                && ticket.holds(map_id)
+        }) else {
+            return Ok(None);
+        };
+        let leader = ticket.leader();
+        let (reply, form) = oneshot::channel();
+        self.send_to_field(FieldMessage::HolidaySnowman { reply })
+            .await?;
+        let form = form.await.unwrap_or(0);
+        Ok(Some(NpcScript::snow_spirit_arena(leader, form)))
+    }
+
     /// What Amos says to the player on the Amorian Challenge's rope or
     /// platform stage, if there: how the leader's try weighs, by where the
     /// team stands on the stage's areas. A wrong try shows to the map as a
