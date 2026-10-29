@@ -2,7 +2,8 @@
 
 The way to Horntail in Leafre's Cave of Life, after Cosmic. Built so far:
 the quests, the doors, the ways out, the expedition into the cave, its
-two trials, the fight and its win. The Horntail party quest, on the
+two trials, the fight and its win, and the Nine Spirit's Nest, where the
+egg Horntail drops hatches. The Horntail party quest, on the
 Trial Grounds before the slate, is in
 [party-quests](./party-quests.md) ("Horntail's Trial Grounds"). The slice
 plan and its open questions are in v83ref's `reports/a115-horntail.md`; the
@@ -149,6 +150,43 @@ Not in yet:
 - HeavenClient shows the -3 children at once, rather than once their
   parent leaves as the original client does.
 
+## The Nine Spirit's Nest
+
+Horntail drops the Nine Spirit's Egg (4001094) every time (the content
+pack's drops). Dragon Squad's Mission (3706, from Raul 2081007) ends at
+Nine Spirit's Baby Dragon (2081008), which is on no map: it hatches from
+that egg in the Nine Spirit's Nest (240040611), after Cosmic's NineSpirit
+event and its `dragonNest` and reactor `2406000` scripts.
+
+- **The way in.** Below the Dangerous Nest (240040610), `dragonNest`
+  leads, once 3706 is completed, to the hatched dragon's nest (240040612
+  `out00`, where 3714 is; see [quests](./quests.md)). Before that, one
+  holding an egg, or who has placed one (marker `NINE_SPIRIT_EGG_PLACED`,
+  32700, for Cosmic's unknown quest 100203), goes in alone
+  (`EventKind::NineSpirit`) onto the nest's `out00` (portal 1, as
+  Cosmic's `changeMap(.., 1)`), with the portal sound; anyone else gets
+  the pink `portal.nine_spirit_nest.blocked`.
+- **The run.** Solo, any level, 5 minutes (Cosmic's and Server.NX
+  FieldSet DragonBaby's `timeOut`), then back below the nest; its exit is
+  the same. Eight may go at once on a channel, each in their own copy;
+  with all eight taken, the pink `nine_spirit.nest.busy`.
+- **The egg.** The nest's reactor `dragonBaby` (2406000) has no touch in
+  our Reactor.nx (Cosmic's WZ adds `activateByTouch`), but the nest's
+  touch portal `act01` (type 9, `summondragon`, no source script) sits on
+  it. The first egg brought there is taken, the reactor goes to state 1
+  (`Effect::SetReactorState`, the egg on the nest) and the marker is
+  set. A hit then takes it to state 2: the Baby Dragon comes out on the
+  ground below it, with a pink `nine_spirit.nest.hatched` to the map
+  (`reactors::Action::Appear`), and 3706 can be completed at it from the
+  quest window.
+- **Coming back.** One with the marker who enters the nest finds the Baby
+  Dragon waiting where the egg would be (`scripts::unscripted_map_enter`,
+  `Effect::BringOutNpc`, which brings out an NPC unless it is there
+  already). Cosmic does so for anyone without an egg and sets 100203 only
+  at the hatch; here the marker is set at placing, so one who placed an
+  egg and left before the hit still finds the dragon (v83ref QUESTIONS
+  b322).
+
 ## Tests
 
 `net`'s `keroben_and_the_slate_let_the_dragon_squad_on_toward_horntail`
@@ -167,6 +205,13 @@ the parts and the clock,
 and beats the tail, which lowers the body's bar but leaves it alive; then
 beats all eight parts and checks that the body and dead parts die, the
 clear, the stopped clock, the leader's Victory buff, and the world's line.
+`tests/nine_spirit_nest.rs` places an egg, hatches it, ends 3706 at the
+Baby Dragon, sees the time run out, and takes `dragonNest` on to 240040612;
+finds the dragon waiting on coming back without an egg; and is kept out
+with neither. `net`'s
+`the_nine_spirits_nest_takes_one_alone_to_place_the_egg_for_its_baby_dragon`
+and `the_nine_spirits_nest_is_five_minutes_alone_back_below_it` cover the
+scripts, the data and the event.
 `field_mobs`'s `horntails_parts_share_its_hp_but_never_kill_it` and
 `net`'s `horntails_stone_breaks_on_its_sixth_hit` and
 `a_mob_out_of_another_names_it` cover the rest.

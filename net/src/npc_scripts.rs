@@ -6844,7 +6844,7 @@ const CAPTAIN_AL: i32 = 1002103;
 pub const FAMILY_QUEST_SCRIPTS: [&str; 4] = ["q2232e", "q2233e", "q2234e", "q29508e"];
 /// Nine Spirit's Baby Dragon, in its nest (240040612).
 const BABY_DRAGON: i32 = 2081011;
-const NINE_SPIRIT_EGG: i32 = 4001094;
+pub const NINE_SPIRIT_EGG: i32 = 4001094;
 const DRAGON_STONE: i32 = 2041200;
 
 /// `q3714s`, the Remnants of Horned Tail: the egg from Horned Tail hatches

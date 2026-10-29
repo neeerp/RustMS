@@ -1221,6 +1221,11 @@ impl FieldActor {
                     self.handle_bring_out_mob(from, mob_id, at)
                 }
                 FieldRequest::BringOutMobs { mob_id, at } => self.bring_out_mobs(from, mob_id, &at),
+                FieldRequest::BringOutNpc { npc_id, at } => {
+                    if !self.map_npcs.iter().any(|npc| npc.npc_id == npc_id) {
+                        self.appear(npc_id, at);
+                    }
+                }
                 FieldRequest::OpenReactor { name } => self.open_reactor(name),
                 FieldRequest::NpcSpecialAction { npc_id, action } => {
                     self.npc_special_action(npc_id, action)

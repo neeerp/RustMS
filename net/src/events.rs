@@ -77,6 +77,10 @@ pub enum EventKind {
     /// with a Boarding Pass at Mr. Lim on its hub, or straight from the
     /// result map after a run.
     SubwayTrain,
+    /// The Nine Spirit's Nest below Leafre's Dangerous Nest, taken alone
+    /// through `dragonNest` with the Nine Spirit's Egg, or after placing
+    /// one (Cosmic NineSpirit).
+    NineSpirit,
     /// Jr. Balrog's room before Tristan's Tomb (2245), taken alone from
     /// Mu Young (1061014) in the Sleepywood dungeon.
     Tristan,
@@ -3900,6 +3904,45 @@ pub const SUBWAY_TRAIN: Event = Event {
     ..DOJO
 };
 
+/// Below the Dangerous Nest (240040610), whose `dragonNest` leads into
+/// the nest.
+pub const BELOW_THE_NEST: i32 = 240040610;
+/// The Nine Spirit's Nest (240040611), where the egg is placed and
+/// hatches. Its `out00`, portal 1, is where one comes in (Cosmic
+/// `changeMap(.., 1)`).
+pub const NINE_SPIRIT_NEST: i32 = 240040611;
+pub const NINE_SPIRIT_NEST_ARRIVAL: u8 = 1;
+/// The nest's egg, reactor 2406000 `dragonBaby`: placed (state 1) through
+/// the `summondragon` touch portal on it, and hatched by a hit (state 2).
+pub const NINE_SPIRIT_NEST_EGG: &str = "dragonBaby";
+pub const NINE_SPIRIT_NEST_EGG_AT: (i16, i16) = (-16, -275);
+/// Nine Spirit's Baby Dragon (2081008), out of the egg, where Dragon
+/// Squad's Mission (3706) ends. It is on no map of its own.
+pub const NINE_SPIRIT_BABY: i32 = 2081008;
+/// Set when one has placed an egg in the nest, which lets them back in
+/// without another, to find the Baby Dragon there (Cosmic starts the
+/// unknown quest 100203 at the hatch).
+pub const NINE_SPIRIT_EGG_PLACED: i16 = 32700;
+
+/// The Nine Spirit's Nest: one player alone, at any level, for 5 minutes
+/// in their own copy of the nest, then back below it (Cosmic NineSpirit,
+/// and Server.NX FieldSet DragonBaby's `timeOut` of 300 s). Eight may go
+/// at once on a channel, as Cosmic's lobbies.
+pub const NINE_SPIRIT: Event = Event {
+    lobby: BELOW_THE_NEST,
+    maps: NINE_SPIRIT_NEST..=NINE_SPIRIT_NEST,
+    entry: NINE_SPIRIT_NEST,
+    exit: BELOW_THE_NEST,
+    levels: 1..=u8::MAX,
+    team: 1..=1,
+    minutes: 5,
+    exp_per_stage: &[],
+    meso_per_stage: &[],
+    member_clears: &[],
+    runs: 8,
+    ..DOJO
+};
+
 /// The room before Tristan's Tomb, 910520000, where the unknown Jr. Balrog
 /// waits (Map.nx `life`, spawned once).
 pub const TRISTAN_ROOM: i32 = 910520000;
@@ -4730,7 +4773,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 73] = [
+    pub const ALL: [EventKind; 74] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4762,6 +4805,7 @@ impl EventKind {
         EventKind::PyramidTomb(PyramidMode::Hell),
         EventKind::Subway,
         EventKind::SubwayTrain,
+        EventKind::NineSpirit,
         EventKind::Carnival(1),
         EventKind::Carnival(2),
         EventKind::Carnival(3),
@@ -4864,6 +4908,7 @@ impl EventKind {
             EventKind::PyramidTomb(mode) => &PYRAMID_TOMB_RUNS[mode as usize],
             EventKind::Subway => &SUBWAY,
             EventKind::SubwayTrain => &SUBWAY_TRAIN,
+            EventKind::NineSpirit => &NINE_SPIRIT,
             EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
@@ -6382,6 +6427,17 @@ mod tests {
         // Those of other levels stay behind.
         let team = subway.team(1, &[at(1, 30, hub), at(2, 24, hub)]);
         assert_eq!(team, Some(vec![1]));
+    }
+
+    #[test]
+    fn the_nine_spirits_nest_is_five_minutes_alone_back_below_it() {
+        let nest = EventKind::NineSpirit.event();
+        assert!(nest.solo() && nest.until_empty);
+        assert_eq!((nest.entry, nest.exit), (NINE_SPIRIT_NEST, BELOW_THE_NEST));
+        assert_eq!((nest.minutes, nest.runs), (5, 8));
+        assert!(event_map(NINE_SPIRIT_NEST) && !event_map(BELOW_THE_NEST));
+        assert_eq!(nest.team(1, &[at(1, 120, BELOW_THE_NEST)]), Some(vec![1]));
+        assert!(opening_mobs(NINE_SPIRIT_NEST).is_empty());
     }
 
     #[test]
