@@ -60,6 +60,8 @@ namespace ms
 		const Point<int16_t> SUBTAB_POS = Point<int16_t>(283, 75);
 		const Point<int16_t> LIST_POS = Point<int16_t>(277, 97);
 		const Point<int16_t> CELL_STEP = Point<int16_t>(206, 81);
+		// Where in a cell the shop puts the pointer to show an item.
+		const Point<int16_t> CELL_POINTER = Point<int16_t>(34, 34);
 		const Point<int16_t> PAGES_POS = Point<int16_t>(480, 505);
 		const Point<int16_t> BEST_POS = Point<int16_t>(697, 158);
 		const int16_t BEST_STEP = 69;
@@ -314,6 +316,10 @@ namespace ms
 		change_tab(EVENT_TAB);
 
 		dimension = background.get_dimensions();
+
+		// Opened from the item window, at the commodity it asked for
+		// (v83 469550, 4bc324), once the server's changes are in.
+		opening = std::exchange(opening_sn(), 0);
 	}
 
 	void UICashShop::draw(float inter) const
@@ -456,6 +462,14 @@ namespace ms
 	void UICashShop::update()
 	{
 		UIElement::update();
+
+		if (int32_t sn = std::exchange(opening, 0))
+		{
+			auto commodity = std::find_if(commodities.begin(), commodities.end(), [sn](const Commodity& c) { return c.sn == sn; });
+
+			if (commodity != commodities.end())
+				show(*commodity);
+		}
 
 		for (Animation& label : labels)
 			label.update();
@@ -1512,8 +1526,17 @@ namespace ms
 
 		auto at = std::find_if(listed.begin(), listed.end(), [&commodity](const Commodity& c) { return c.sn == commodity.sn; });
 
-		if (at != listed.end())
-			change_page(static_cast<size_t>(at - listed.begin()) / PAGE_SIZE);
+		if (at == listed.end())
+			return;
+
+		size_t index = static_cast<size_t>(at - listed.begin());
+		change_page(index / PAGE_SIZE);
+
+		// The pointer goes onto the item's cell (4b95ed).
+		size_t cell = index % PAGE_SIZE;
+		Point<int16_t> pointer = position + LIST_POS + CELL_POINTER +
+								 Point<int16_t>(CELL_STEP.x() * (cell % LIST_COLUMNS), CELL_STEP.y() * (cell / LIST_COLUMNS));
+		Window::get().move_cursor(pointer.x(), pointer.y());
 	}
 
 	void UICashShop::take_out(const CashItem& item)

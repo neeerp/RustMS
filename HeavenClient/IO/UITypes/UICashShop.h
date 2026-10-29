@@ -148,8 +148,8 @@ namespace ms
 		// Offer the present the player came in for (v83 472c67), once the
 		// balance is known.
 		void give(const cash_catalog::Present& present);
-		// Turn the list to the tab, sub-tab and page that hold a commodity
-		// (v83 4725ef).
+		// Turn the list to the tab, sub-tab and page that hold a commodity,
+		// and put the pointer on it (v83 4725ef).
 		void show(const cash_catalog::Commodity& commodity);
 		// Move an item between the Cash and Item Inventories, unless v83
 		// (472632 and 472820) keeps it where it is.
@@ -286,6 +286,8 @@ namespace ms
 		Point<int16_t> tooltip_pos;
 		// The commodity on the page whose tooltip is shown, kept while the cursor stays on it.
 		int16_t hovered = -1;
+		// The commodity the shop was opened at, shown on the first update.
+		int32_t opening = 0;
 		// The Cash Inventory item whose tooltip is shown.
 		int64_t hovered_cash = 0;
 

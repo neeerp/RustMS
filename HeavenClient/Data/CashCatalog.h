@@ -553,6 +553,15 @@ namespace ms
 			return present;
 		}
 
+		// The commodity the next Cash Shop opens at, 0 for none. The item window's button sets it before asking to
+		// go in, and the shop takes it when it opens (v83 keeps it at CWvsContext+0x37fc).
+		inline int32_t &opening_sn()
+		{
+			static int32_t sn = 0;
+
+			return sn;
+		}
+
 		// What a present buys (FUN_00471be9): the commodity sn if it is on sale, else one on sale with the
 		// same item, count and period.
 		inline std::optional<Commodity> on_sale_as(const std::vector<Commodity>& all, int32_t sn)

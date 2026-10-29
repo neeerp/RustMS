@@ -1324,8 +1324,15 @@ namespace ms
 				set_full(false);
 				break;
 			case Buttons::BT_CASHSHOP:
-				// v83 also asks the shop to show the tab's expansion item
-				// (0x81d3ca), which our Cash Shop doesn't take.
+				// The shop opens at the tab's slot expansion package (v83
+				// 0x81d3ca); the button is off for Setup and Cash.
+				if (tab == InventoryType::Id::EQUIP)
+					cash_catalog::opening_sn() = 50200093;
+				else if (tab == InventoryType::Id::USE)
+					cash_catalog::opening_sn() = 50200094;
+				else if (tab == InventoryType::Id::ETC)
+					cash_catalog::opening_sn() = 50200095;
+
 				Stage::get().enter_cash_shop();
 				break;
 			case Buttons::BT_COIN:
