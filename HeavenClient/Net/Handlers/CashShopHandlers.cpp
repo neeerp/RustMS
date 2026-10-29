@@ -515,6 +515,16 @@ namespace ms
 			cashshop->remove_cash_item(cash_id);
 			break;
 		}
+		case 0x6E:
+		{
+			// A Cash Inventory item ran out of time and is gone (v83 0x47b1ab).
+			int64_t cash_id = recv.read_long();
+
+			if (int32_t item_id = cashshop->remove_cash_item(cash_id))
+				UI::get().emplace<UIOk>("[" + ItemData::get(item_id).get_name() + "]\\nhas passed its expiration date\\nand will be removed\\nfrom your inventory.",
+					[](bool) {}, Sound::Name::BUYSHOPITEM);
+			break;
+		}
 		case 0x6A:
 		{
 			// A character's item is back in the Cash Inventory.

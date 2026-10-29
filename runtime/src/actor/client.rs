@@ -1,6 +1,7 @@
 mod alliances;
 mod buddies;
 mod buff;
+mod cash_expiry;
 mod chat_block;
 mod claim;
 mod combat;
@@ -78,7 +79,7 @@ use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
 use rand::{thread_rng, Rng};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -166,6 +167,8 @@ pub struct ClientActor {
     changing_channel: bool,
     /// The player left their field for the Cash Shop.
     in_cash_shop: bool,
+    /// When each Cash Inventory item the client lists runs out of time.
+    locker_expiry: HashMap<i64, SystemTime>,
     /// Until when a GM jailed the player (`jail`), if they still are.
     jailed_until: Option<SystemTime>,
     /// Until when a GM blocked the account from chatting (`chat_block`), if
@@ -270,6 +273,7 @@ impl ClientActor {
             npc_request_id: 0,
             changing_channel: false,
             in_cash_shop: false,
+            locker_expiry: HashMap::new(),
             jailed_until: None,
             chat_blocked_until: None,
             coupon_strikes: 0,
@@ -318,6 +322,7 @@ impl ClientActor {
             let hazard_due = self.hazard_due();
             let pets_due = self.pets_due();
             let items_due = self.items_due();
+            let locker_due = self.locker_due();
             let later_due = self.later_due();
             let family_buff_due = self.family_buff_due();
             let quests_due = self.quest_clocks_due();
@@ -339,6 +344,9 @@ impl ClientActor {
                 }
                 _ = sleep_until(items_due.unwrap_or_else(Instant::now)), if items_due.is_some() => {
                     self.expire_items().await
+                }
+                _ = sleep_until(locker_due.unwrap_or_else(Instant::now)), if locker_due.is_some() => {
+                    self.expire_locker().await
                 }
                 _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
                     self.update_buffs().await
@@ -1155,6 +1163,7 @@ impl ClientActor {
             ))
         })
         .await?;
+        self.listed_in_locker(&items);
         let player = &self.in_game()?.player;
         let best = net::cash_shop::best_items(&best_sellers);
         let mut packets = [
@@ -1213,6 +1222,7 @@ impl ClientActor {
                             price,
                             "Bought from the Cash Shop"
                         );
+                        self.listed_in_locker(&bought);
                         let bought = match (&package, bought.as_slice()) {
                             (None, [item]) => cs::build_bought_cash_item(item)?,
                             _ => cs::build_bought_package(&bought)?,
@@ -1421,6 +1431,7 @@ impl ClientActor {
             price,
             "Bought a ring pair from the Cash Shop"
         );
+        self.listed_in_locker(std::slice::from_ref(&bought));
         Ok(vec![
             cs::build_bought_ring(&bought, &receiver.name)?,
             cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
@@ -1711,6 +1722,7 @@ impl ClientActor {
                     item_id = item.item_id,
                     "Put back a cash item"
                 );
+                self.listed_in_locker(std::slice::from_ref(&cash_item));
                 Ok(vec![cs::build_put_back(&cash_item)?])
             }
             Err(error) => {

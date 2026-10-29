@@ -94,7 +94,8 @@ namespace ms
 		// The account's character slots (v83 CCashShop+0x490).
 		void set_character_slots(int16_t slots);
 		int16_t get_character_slots() const;
-		void remove_cash_item(int64_t cash_id);
+		// Take an item off the Cash Inventory, returning its item id, or 0 if it wasn't there.
+		int32_t remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
 		// Whether the last change to the wish list added a wish (v83 CCashShop+0x4c8 clear), which
 		// v83 announces when the list comes back.

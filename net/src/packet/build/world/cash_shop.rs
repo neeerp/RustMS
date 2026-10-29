@@ -105,6 +105,7 @@ const CHARACTER_SLOTS: u8 = 0x64;
 const SLOT_EXTENDED: u8 = 0x66;
 const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
+const EXPIRED: u8 = 0x6E;
 const BOUGHT_RING: u8 = 0x87;
 const BOUGHT_PACKAGE: u8 = 0x89;
 const BOUGHT_WITH_MESOS: u8 = 0x8D;
@@ -286,6 +287,17 @@ pub fn build_put_back(item: &CashItem) -> Result<Packet, NetworkError> {
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(PUT_BACK)?;
     encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: the Cash Inventory item `cash_id` ran out of time
+/// and is gone. v83 takes it off the list and names it in a notice
+/// (0x47b1ab).
+pub fn build_cash_item_expired(cash_id: i64) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(EXPIRED)?;
+    packet.write_long(cash_id)?;
     Ok(packet)
 }
 
@@ -610,6 +622,17 @@ mod tests {
         expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
         expect_item(&mut expect, &items[1], 116_444_736_000_000_000);
         expect.short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn an_expired_cash_item_is_named_by_its_serial() {
+        let packet = build_cash_item_expired(0x0102_0304_0506_0708).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x6E)
+            .long(0x0102_0304_0506_0708);
         expect.end();
     }
 

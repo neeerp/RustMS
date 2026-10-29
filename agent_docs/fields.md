@@ -212,6 +212,14 @@ item in that quantity, preferring one on sale. Either way, a failed write
 restores the in-memory inventory. A full bag fails with 0xBB. A pet comes out
 named after its kind, or as it was if it has been out before; see `pets.md`.
 
+A Cash Inventory item with an expiry can run out while the player is in the
+Cash Shop. The client actor keeps the dates of the items the client lists
+(`locker_expiry`, filled on entry and as items are bought, gifted by coupon or
+put back) and wakes at the earliest. `db::cash_shop::expire` then deletes the
+account's rows whose date has passed, and each one goes to the client as 0x6E
+with its serial; v83 (`0x47b1ab`) takes it off the list and says "[name] has
+passed its expiration date and will be removed from your inventory."
+
 A gift (0x04) names the commodity, a receiving character and a message of 1 to
 73 bytes, and carries the birthday code the client asked for. Accounts don't
 record a birthday, so any real date passes, and anything else fails with 0xC4.
