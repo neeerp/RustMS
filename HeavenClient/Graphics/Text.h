@@ -86,6 +86,7 @@ namespace ms
 			{
 				std::vector<Word> words;
 				Point<int16_t> position;
+				int16_t width = 0;
 			};
 
 			Layout(const std::vector<Line> &lines, const std::vector<int16_t> &advances, int16_t width, int16_t height,
@@ -105,6 +106,10 @@ namespace ms
 
 			// The top-left corner of the n-th inline box.
 			Point<int16_t> box(size_t index) const;
+
+			// The character drawn at `point`, relative to where the text is
+			// drawn, or npos if there is none.
+			size_t index_at(Point<int16_t> point) const;
 
 			using iterator = std::vector<Line>::const_iterator;
 
@@ -171,6 +176,10 @@ namespace ms
 
 		// Where each row of the text begins, once wrapped.
 		std::vector<size_t> line_starts() const;
+
+		// The character drawn at `point`, relative to where the text is
+		// drawn, or npos if there is none.
+		size_t index_at(Point<int16_t> point) const;
 
 	private:
 		void reset_layout();

@@ -45,8 +45,13 @@ namespace ms
 		// Opens with the NPC's fields marked, as FIND NPC does, or says no
 		// world map shows them (v83 FUN_0087e769).
 		static void find_npc(int32_t npc);
+		// Opens on the field as if the player stood there, as a map's name
+		// in the quest log does, or says no world map shows it (v83
+		// FUN_0087e809).
+		static void find_map(int32_t map);
 
 		void show_npc(const std::vector<int32_t>& maps, const std::string& world);
+		void show_map(int32_t map, const std::string& world);
 
 		void draw(float inter) const override;
 
@@ -103,7 +108,9 @@ namespace ms
 
 		bool show_path_img;
 
+		// The field marked as the player's, and the one the player is on.
 		int32_t mapid = -1;
+		int32_t seen_map = -1;
 		std::vector<int32_t> target_maps;
 
 		std::string parent_map;

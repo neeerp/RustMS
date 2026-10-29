@@ -38,6 +38,11 @@ int main()
 			lookups, &images) == "\x01\\n\x01 3 Apple\\n\x01 and \x01#fnot an image#", "captured images leave placeholders");
 		require(images == Images{{'f', "UI/UIWindow.img/QuestIcon/4/0"}, {'v', "2010000"}, {'s', "1001"}, {'i', "2010009"}},
 			"captured images in order");
+		using Links = std::vector<ms::NpcTextMarkup::Link>;
+		Links links;
+		require(ms::NpcTextMarkup::expand("See #b#p2000##k in #m10000#, not #m1#.", lookups, nullptr, &links) ==
+			"See #bRoger#k in Mushroom Town, not ?.", "links keep the text");
+		require(links == Links{{'p', 2000, 6, 11}, {'m', 10000, 17, 30}, {'m', 1, 36, 37}}, "each NPC and map name is a link");
 		using Choices = std::vector<std::pair<int32_t, std::string>>;
 		auto choices = ms::NpcTextMarkup::choices;
 		require(choices("Pick:\\r\\n#L0#One#l\\r\\n#L1#Two#l") == Choices{{0, "One"}, {1, "Two"}}, "closed choices");

@@ -150,6 +150,11 @@ namespace ms
 		return starts;
 	}
 
+	size_t Text::index_at(Point<int16_t> point) const
+	{
+		return layout.index_at(point);
+	}
+
 	const std::string &Text::get_text() const
 	{
 		return text;

@@ -96,6 +96,15 @@ int main()
 		require(tip.advance(apostrophe + 1) - tip.advance(apostrophe) == 6, "the apostrophe is drawn");
 		require(word_at(blessing.find('e')).color == ms::Color::Name::NUM_COLORS, "the words after stay plain");
 
+		// Finding the character under the cursor, as for a name in the quest log.
+		auto words = layout("abc def", 24);
+		require(words.index_at({ 7, 10 }) == 1, "the b of the first line");
+		require(words.index_at({ 1, 25 }) == 4, "the d starts the second line");
+		require(words.index_at({ 13, 33 }) == 6, "a letter's tail still counts");
+		require(words.index_at({ -1, 10 }) == std::string::npos && words.index_at({ 18, 10 }) == std::string::npos,
+			"left and right of a line hold nothing");
+		require(words.index_at({ 1, 40 }) == std::string::npos, "nor does below the text");
+
 		std::cout << "text layout tests passed\n";
 		return 0;
 	}

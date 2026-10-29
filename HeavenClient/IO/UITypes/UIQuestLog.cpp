@@ -595,7 +595,8 @@ namespace ms
 		};
 
 		std::vector<NpcTextMarkup::InlineImage> tags;
-		text = NpcTextMarkup::expand(quest_counts(text, selected), lookups, &tags);
+		links.clear();
+		text = NpcTextMarkup::expand(quest_counts(text, selected), lookups, &tags, &links);
 
 		description = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, text, TEXT_WIDTH);
 		images.set(tags, description);
@@ -719,15 +720,46 @@ namespace ms
 
 	void UIQuestLog::doubleclick(Point<int16_t> cursorpos)
 	{
-		// The portrait finds the NPC on the first two tabs (FUN_0087e5d0).
-		if (!details_open || tab == TAB2)
+		if (!details_open)
 			return;
 
-		Point<int16_t> feet = position + Point<int16_t>(DETAIL_X, 0) + PORTRAIT_POS;
-		Point<int16_t> corner = feet - portrait.get_origin();
+		Point<int16_t> detail = position + Point<int16_t>(DETAIL_X, 0);
 
-		if (Rectangle<int16_t>(corner, corner + portrait.get_dimensions()).contains(cursorpos))
+		// The portrait finds the NPC on the first two tabs (FUN_0087e5d0).
+		Point<int16_t> corner = detail + PORTRAIT_POS - portrait.get_origin();
+
+		if (tab != TAB2 && Rectangle<int16_t>(corner, corner + portrait.get_dimensions()).contains(cursorpos))
+		{
 			find_npc();
+			return;
+		}
+
+		// An NPC's name in the text finds that NPC, and becomes the one
+		// FIND NPC finds; a map's name shows that map on the world map. This
+		// works on every tab.
+		if (!TEXT_VIEW.contains(cursorpos.y() - detail.y()))
+			return;
+
+		Point<int16_t> text = detail + TEXT_POS - Point<int16_t>(0, detail_offset * TEXT_STEP);
+		size_t index = description.index_at(cursorpos - text);
+
+		for (const NpcTextMarkup::Link& link : links)
+		{
+			if (index < link.first || index >= link.last)
+				continue;
+
+			if (link.tag == 'p')
+			{
+				start_npc = link.id;
+				find_npc();
+			}
+			else
+			{
+				UIWorldMap::find_map(link.id);
+			}
+
+			return;
+		}
 	}
 
 	void UIQuestLog::close()
