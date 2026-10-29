@@ -140,6 +140,20 @@ pub fn open_cash_inventory(account_id: i32) -> crate::Result<(Vec<CashItem>, Vec
     })?)
 }
 
+/// Delete those of the account's Cash Inventory items `ids` whose time ran
+/// out by `now`, returning which.
+pub fn expire(account_id: i32, ids: &[i64], now: SystemTime) -> crate::Result<Vec<i64>> {
+    let mut conn = crate::connection()?;
+    Ok(diesel::delete(
+        cash_items::table
+            .filter(cash_items::account_id.eq(account_id))
+            .filter(cash_items::id.eq_any(ids))
+            .filter(cash_items::expires_at.le(now)),
+    )
+    .returning(cash_items::id)
+    .get_results(&mut conn)?)
+}
+
 diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
 
 /// The character named `name`, ignoring case, that a gift would go to.

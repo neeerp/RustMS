@@ -78,6 +78,7 @@ impl ClientActor {
         .await?;
         Ok(match requested {
             Requested::Done(receipt, balance) => {
+                self.listed_in_locker(std::slice::from_ref(&receipt));
                 info!(
                     self.client_id,
                     character_id, new_name, price, "Bought a Name Change"

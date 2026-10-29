@@ -93,6 +93,7 @@ impl ClientActor {
                 self.in_game_mut()?.player.mark_saved();
                 self.coupon_strikes = 0;
                 info!(self.client_id, coupon_id, "Redeemed a coupon");
+                self.listed_in_locker(&cash_items);
                 let mut packets = packets;
                 packets.push(cs::build_coupon_redeemed(
                     &cash_items,

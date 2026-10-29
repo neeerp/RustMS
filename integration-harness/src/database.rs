@@ -1082,6 +1082,55 @@ pub async fn gift_cash_item(
     Ok(serial.id)
 }
 
+/// Have the Cash Inventory item `serial` run out of time `seconds` from now.
+pub async fn expire_cash_item_in(serial: i64, seconds: i32) -> Result<(), HarnessError> {
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "expire a cash item",
+        message,
+    };
+    let updated = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "UPDATE cash_items SET expires_at = now() + make_interval(secs => $2) WHERE id = $1",
+        )
+        .bind::<BigInt, _>(serial)
+        .bind::<Integer, _>(seconds)
+        .execute(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    if updated == 0 {
+        return Err(fixture("no such cash item".to_string()));
+    }
+    Ok(())
+}
+
+/// Whether the Cash Inventory item `serial` is still there.
+pub async fn cash_item_exists(serial: i64) -> Result<bool, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Found {
+        #[diesel(sql_type = Bool)]
+        found: bool,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "look for a cash item",
+        message,
+    };
+    let found = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query("SELECT EXISTS (SELECT 1 FROM cash_items WHERE id = $1) AS found")
+            .bind::<BigInt, _>(serial)
+            .get_result::<Found>(&mut conn)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(found.found)
+}
+
 /// One row of a hired merchant: `bundles` of `quantity` of `item_id`, at
 /// `price` a bundle.
 pub struct MerchantRow {

@@ -1376,8 +1376,11 @@ namespace ms
 		update_cash_slider();
 	}
 
-	void UICashShop::remove_cash_item(int64_t cash_id)
+	int32_t UICashShop::remove_cash_item(int64_t cash_id)
 	{
+		auto listed = std::find_if(cash_items.begin(), cash_items.end(), [cash_id](const CashItem& item) { return item.cash_id == cash_id; });
+		int32_t item_id = listed == cash_items.end() ? 0 : listed->item_id;
+
 		cash_items.erase(
 			std::remove_if(cash_items.begin(), cash_items.end(), [cash_id](const CashItem& item) { return item.cash_id == cash_id; }),
 			cash_items.end()
@@ -1392,6 +1395,8 @@ namespace ms
 			cash_row = rows > CASH_ROWS ? rows - CASH_ROWS : 0;
 
 		update_cash_slider();
+
+		return item_id;
 	}
 
 	void UICashShop::set_wish_list(const std::vector<int32_t>& sns)
