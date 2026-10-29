@@ -304,6 +304,10 @@ pub struct Trace {
     pub pyramid_gauges: Vec<i32>,
     /// PYRAMID_SCORE: a Nett's Pyramid run's (rank, EXP).
     pub pyramid_scores: Vec<(u8, i32)>,
+    /// ARIANT_ARENA_USER_SCORE: an Ariant battle's (name, jewels) boards.
+    pub ariant_scores: Vec<Vec<(String, i32)>>,
+    /// ARIANT_RESULT: an Ariant battle's results banners.
+    pub ariant_results: usize,
     /// STOP_CLOCK: the countdown taken down.
     pub clocks_stopped: usize,
     /// ZAKUM_SHRINE: (whether Zakum is out, minutes left) of each line on
@@ -495,6 +499,16 @@ impl Trace {
         } else if op == SendOpcode::PyramidScore as i16 {
             let rank = r.read_byte().unwrap();
             self.pyramid_scores.push((rank, r.read_int().unwrap()));
+        } else if op == SendOpcode::AriantScore as i16 {
+            let board = (0..r.read_byte().unwrap())
+                .map(|_| {
+                    let name = r.read_str_with_length().unwrap();
+                    (name, r.read_int().unwrap())
+                })
+                .collect();
+            self.ariant_scores.push(board);
+        } else if op == SendOpcode::AriantResult as i16 {
+            self.ariant_results += 1;
         } else if op == SendOpcode::SessionValue as i16 {
             let key = r.read_str_with_length().unwrap();
             self.session_values

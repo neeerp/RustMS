@@ -4028,7 +4028,7 @@ const fn ariant(arena: u8) -> Event {
         gated: &[],
         puzzles: 1..=0,
         areas_taken: 0,
-        items: &[],
+        items: &[crate::ariant::SPIRIT_JEWEL],
         passes: 0,
         hand_ins: &[],
         gates: false,

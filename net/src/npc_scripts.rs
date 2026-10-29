@@ -2213,6 +2213,13 @@ impl NpcScript {
         if npc_id == CARNIVAL_GUIDE && carnival::result_room(player.stats.map_id).is_some() {
             return Some(carnival_grade(player));
         }
+        if player.stats.map_id == ariant::KINGS_ROOM {
+            match npc_id {
+                ARIANT_AREDA => return Some(areda(player)),
+                ARIANT_KING => return Some(ariant_king(player)),
+                _ => {}
+            }
+        }
         if carnival::waiting_room(player.stats.map_id).is_some() {
             // The leader's leaving gives the room up (`EventActor`).
             let back = carnival::CARNIVAL_LOBBY;
@@ -12761,6 +12768,93 @@ fn ariant_battle(taken: Option<bool>) -> NpcScript {
     };
     let mut script = NpcScript::new(ARIANT_HOST, vec![page]);
     script.inventory_full = Some(text(keys::ARIANT_KIT_FULL));
+    script
+}
+
+/// Areda and Abdullah VIII in the King's Room, where an Ariant battle's
+/// players go at its end (Cosmic `2101016` and `2101015`).
+pub const ARIANT_AREDA: i32 = 2101016;
+pub const ARIANT_KING: i32 = 2101015;
+
+/// Areda takes the Spirit Jewels of a player who was in a battle at its
+/// results, for its Battle Arena points and 92.7 EXP each at the player's
+/// rate; a player who wasn't there, or brought none, gets nothing.
+fn areda(player: &Player) -> NpcScript {
+    let Some(points) = player.ariant_tier else {
+        return NpcScript::new(ARIANT_AREDA, vec![Page::Say(text(keys::ARIANT_ABSENT))]);
+    };
+    let jewels = player.inventory.count(ariant::SPIRIT_JEWEL);
+    if jewels < 1 {
+        return NpcScript::new(ARIANT_AREDA, vec![Page::Say(text(keys::ARIANT_NO_JEWELS))]);
+    }
+    let rate = crate::rates::exp(player, SystemTime::now());
+    let told = content::text().get(
+        keys::ARIANT_JEWELS,
+        &[
+            ("jewels", &jewels.to_string()),
+            ("points", &points.to_string()),
+        ],
+    );
+    let mut effects = vec![Effect::TakeItem {
+        item_id: ariant::SPIRIT_JEWEL,
+        quantity: i16::try_from(jewels).unwrap_or(i16::MAX),
+    }];
+    if points > 0 {
+        effects.push(Effect::GainExp(ariant::prize_exp(points, rate)));
+    }
+    effects.extend([Effect::AriantPoints(points), Effect::AriantPrizeTaken]);
+    NpcScript::new(
+        ARIANT_AREDA,
+        vec![
+            Page::Say(told),
+            Page::Act {
+                text: text(keys::ARIANT_THANKS),
+                effects,
+            },
+        ],
+    )
+}
+
+/// Abdullah VIII tells a player who was in a battle at its results their
+/// Battle Arena points, and trades `ariant::CHAIR_POINTS` of them for the
+/// Palm Tree Beach Chair.
+fn ariant_king(player: &Player) -> NpcScript {
+    let Some(tier) = player.ariant_tier else {
+        return NpcScript::new(ARIANT_KING, vec![Page::Say(text(keys::ARIANT_ABSENT))]);
+    };
+    let held = player.ariant_points;
+    let price = ariant::CHAIR_POINTS.to_string();
+    let told = |key| content::text().get(key, &[("points", &held.to_string()), ("price", &price)]);
+    let points = if held >= ariant::CHAIR_POINTS {
+        vec![
+            Page::Say(told(keys::ARIANT_KING_TRADE)),
+            Page::Done(vec![
+                Effect::AriantPoints(-ariant::CHAIR_POINTS),
+                Effect::GiveItem {
+                    item_id: ariant::CHAIR,
+                    quantity: 1,
+                },
+            ]),
+        ]
+    } else if held.saturating_add(tier) >= ariant::CHAIR_POINTS {
+        vec![Page::Say(told(keys::ARIANT_KING_NEARLY))]
+    } else {
+        vec![Page::Say(told(keys::ARIANT_KING_SHORT))]
+    };
+    let mut script = NpcScript::new(
+        ARIANT_KING,
+        vec![Page::Menu {
+            text: text(keys::ARIANT_KING_MENU),
+            choices: vec![
+                (text(keys::ARIANT_KING_POINTS), points),
+                (
+                    text(keys::ARIANT_KING_ABOUT),
+                    vec![Page::Say(text(keys::ARIANT_KING_INFO))],
+                ),
+            ],
+        }],
+    );
+    script.inventory_full = Some(text(keys::ARIANT_CHAIR_FULL));
     script
 }
 

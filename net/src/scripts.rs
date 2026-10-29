@@ -793,6 +793,12 @@ pub enum Effect {
     },
     /// Mark So Gong's first-time trial beaten, for the Dojo itself to open.
     DojoTrialDone,
+    /// Add to the player's Battle Arena points (`Player::ariant_points`);
+    /// nothing is applied if they would fall below 0.
+    AriantPoints(i32),
+    /// Areda gave the player their last Ariant battle's points: none are
+    /// left to give (`Player::ariant_tier`).
+    AriantPrizeTaken,
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,

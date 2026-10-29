@@ -5,18 +5,30 @@
 //! them all into its battle map, where he gives each player bombs and
 //! rocks once. Once fewer than two are left in a battle, it ends and the
 //! rest go back to the lobby, whose way out leads back by the mirror.
+//! Otherwise its players see each other's Spirit Jewels as they change, and
+//! at its results earn a Battle Arena point for every ten (one only for a
+//! winner far ahead), then go to the King's Room, where Areda (2101016)
+//! gives them with EXP for the jewels, and Abdullah VIII (2101015) trades a
+//! hundred points for a chair.
 
 use game_data::server_content::keys;
-use integration_harness::events::{armed_in, said, talk, told};
+use integration_harness::database::{grant_stack, set_ariant_points, set_job};
+use integration_harness::events::{armed_in, armed_with, said, talk, told};
 use integration_harness::hunting::walk_to;
+use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::protocol::WorldSession;
 use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
-use net::ariant::{battle, entrance, ARIANT_FALLBACK, ARIANT_LOBBY, BOMB, ELEMENT_ROCK};
-use net::npc_scripts::{ARIANT_CESAR, ARIANT_HOST};
+use integration_harness::{login_to_world_session, relogin};
+use net::ariant::{
+    battle, entrance, ARIANT_FALLBACK, ARIANT_LOBBY, BOMB, CHAIR, ELEMENT_ROCK, KINGS_ROOM,
+    SPIRIT_JEWEL,
+};
+use net::npc_scripts::{ARIANT_AREDA, ARIANT_CESAR, ARIANT_HOST, ARIANT_KING};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
+use std::time::Duration;
 
 const HENESYS: i32 = 100_000_000;
 const SAY: u8 = 0;
@@ -25,6 +37,8 @@ const TEXT: u8 = 2;
 const MENU: u8 = 4;
 const START: i32 = 2;
 const BAN: i32 = 1;
+const ETC: u8 = 4;
+const EXP: i32 = 0x10000;
 
 /// NPC_TALK_MORE: answer a text prompt with `typed`.
 fn typed(typed: &str) -> Packet {
@@ -184,12 +198,11 @@ async fn cesar_opens_an_arena_its_host_takes_into_battle_and_it_ends_below_two()
     })
     .await;
 
-    // A battling arena isn't offered in the lobby.
+    // A battling arena isn't offered in the lobby. The other tests here
+    // hold arenas 2 and 3.
     let t = told(&mut banned, lobby_cesar()).await;
-    assert!(
-        offered(&t, 3).is_some() && offered(&t, 1).is_none(),
-        "{t:?}"
-    );
+    assert_eq!(t.prompts, [(ARIANT_CESAR, MENU)], "{t:?}");
+    assert!(offered(&t, 1).is_none(), "{t:?}");
     told(&mut banned, answer(MENU, 0, None)).await;
 
     // Cesar gives the bombs and rocks once.
@@ -273,4 +286,126 @@ async fn the_host_leaving_sends_the_arena_back_to_the_lobby() {
         t.warps.contains(&ARIANT_LOBBY)
     })
     .await;
+}
+
+/// Whether `t` saw a board giving `name` `jewels`.
+fn scored(t: &Trace, name: &str, jewels: i32) -> bool {
+    (t.ariant_scores.last()).is_some_and(|board| board.contains(&(name.to_owned(), jewels)))
+}
+
+#[tokio::test]
+async fn a_battles_jewels_earn_points_that_areda_gives_and_abdullah_trades_for_a_chair() {
+    // The host has 98 points from battles before.
+    let config = load_harness_config_or_fail().await;
+    let id = login_to_world_session(&config).await.unwrap().character_id;
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_job(id, 0, 25, 50).await.unwrap();
+    grant_stack(id, ETC.into(), 1, SPIRIT_JEWEL, 30)
+        .await
+        .unwrap();
+    set_ariant_points(id, 98).await.unwrap();
+    let mut host = relogin(&config).await;
+    let mut ht = Trace::default();
+    warp(&mut host.connection, ARIANT_LOBBY, "", &mut ht).await;
+    let mut member = armed_with(ARIANT_LOBBY, 25, &[(SPIRIT_JEWEL, 25)]).await;
+    let mut t = open(&mut host, 3, "2").await;
+    until(&mut host.connection, &mut t, |t| {
+        t.warps.contains(&entrance(3))
+    })
+    .await;
+    join(&mut member, 3).await;
+    let mut ht = host_picks(&mut host, 3, START).await;
+    let mut mt = Trace::default();
+    until(&mut member.connection, &mut mt, |t| {
+        t.warps.contains(&battle(3))
+    })
+    .await;
+
+    // Both see the board.
+    let (hn, mn) = (host.character_name.clone(), member.character_name.clone());
+    until(&mut host.connection, &mut ht, |t| {
+        scored(t, &hn, 30) && scored(t, &mn, 25)
+    })
+    .await;
+    until(&mut member.connection, &mut mt, |t| {
+        scored(t, &hn, 30) && scored(t, &mn, 25)
+    })
+    .await;
+
+    // Away from the battle, Areda and Abdullah have nothing for them.
+    let mut far = armed_in(ARIANT_LOBBY, 25).await;
+    let mut ft = Trace::default();
+    warp(&mut far.connection, KINGS_ROOM, "", &mut ft).await;
+    let t = told(&mut far, talk(KINGS_ROOM, ARIANT_AREDA)).await;
+    assert!(said(&t, keys::ARIANT_ABSENT), "{t:?}");
+    close(&mut far).await;
+
+    // At the results, 30 and 25 jewels are 3 and 2 points, then both go to
+    // the King's Room.
+    until(&mut host.connection, &mut ht, |t| {
+        t.ariant_results == 1 && t.warps.contains(&KINGS_ROOM)
+    })
+    .await;
+    until(&mut member.connection, &mut mt, |t| {
+        t.ariant_results == 1 && t.warps.contains(&KINGS_ROOM)
+    })
+    .await;
+    // With 98 points and 3 to come, Abdullah sends the host to Areda.
+    told(&mut host, talk(KINGS_ROOM, ARIANT_KING)).await;
+    let t = told(&mut host, answer(MENU, 1, Some(0))).await;
+    let nearly = net::content::text().get(keys::ARIANT_KING_NEARLY, &[("points", "98")]);
+    assert!(
+        t.prompt_texts.iter().any(|said| said.contains(&nearly)),
+        "{t:?}"
+    );
+    close(&mut host).await;
+    let t = told(&mut host, talk(KINGS_ROOM, ARIANT_AREDA)).await;
+    let jewels =
+        net::content::text().get(keys::ARIANT_JEWELS, &[("jewels", "30"), ("points", "3")]);
+    assert!(
+        t.prompt_texts.iter().any(|said| said.contains(&jewels)),
+        "{t:?}"
+    );
+    let t = told(&mut host, answer(SAY, 1, None)).await;
+    assert!(said(&t, keys::ARIANT_THANKS), "{t:?}");
+    assert!(t.removed.contains(&(ETC, 1)), "{t:?}");
+    assert!(
+        (t.stat_updates.iter()).any(|update| update.get(&EXP).is_some_and(|&exp| exp > 0)),
+        "{t:?}"
+    );
+    close(&mut host).await;
+    let t = told(&mut host, talk(KINGS_ROOM, ARIANT_AREDA)).await;
+    assert!(said(&t, keys::ARIANT_NO_JEWELS), "{t:?}");
+    close(&mut host).await;
+
+    // A hundred of the 101 buy the chair.
+    told(&mut host, talk(KINGS_ROOM, ARIANT_KING)).await;
+    let t = told(&mut host, answer(MENU, 1, Some(0))).await;
+    let trade = net::content::text().get(keys::ARIANT_KING_TRADE, &[("price", "100")]);
+    assert!(
+        t.prompt_texts.iter().any(|said| said.contains(&trade)),
+        "{t:?}"
+    );
+    let t = told(&mut host, answer(SAY, 1, None)).await;
+    assert!(t.added.iter().any(|&(_, _, item)| item == CHAIR), "{t:?}");
+
+    // The one left is far short of another.
+    told(&mut host, talk(KINGS_ROOM, ARIANT_KING)).await;
+    let t = told(&mut host, answer(MENU, 1, Some(0))).await;
+    let short = net::content::text().get(
+        keys::ARIANT_KING_SHORT,
+        &[("points", "1"), ("price", "100")],
+    );
+    assert!(
+        t.prompt_texts.iter().any(|said| said.contains(&short)),
+        "{t:?}"
+    );
+    close(&mut host).await;
+
+    // Leaving without seeing Areda takes the jewels.
+    let mut mt = Trace::default();
+    warp(&mut member.connection, HENESYS, "", &mut mt).await;
+    read_for(&mut member.connection, &mut mt, 300).await;
+    assert!(mt.removed.contains(&(ETC, 1)), "{mt:?}");
 }

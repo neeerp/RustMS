@@ -15,6 +15,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/papulatus.md`: the fight with Papulatus in Ludibrium's Clocktower: the party's portal, the gates, the way out, the summon, and the win
 - `agent_docs/pianus.md`: Pianus in Aqua Road's Cave of Pianus: the two spawn points, their skills and Bloody Booms, and the drops
 - `agent_docs/dojo.md`: the Mu Lung Dojo: the notice board, So Gong's solo and party runs, its floors and bosses, the door's warp up (0xCF), and the ways on and out
+- `agent_docs/ariant.md`: the Ariant Coliseum's Battle Arena: the lobby and the arenas' rosters, the battle, its scores and results, the jewels, and the King's Room's Areda and Abdullah VIII
 - `agent_docs/pyramid.md`: Nett's Pyramid: its stages and their copies, the gauge and its rules, cool kills and misses, and the packets
 - `agent_docs/carnival.md`: the Monster Carnival: the Carnival Field and Spiegelmann, the rooms and their battle fields, CP, and the packets
 - `agent_docs/coconut.md`: Coconut Season: its fields, the teams, a GM's `/start` and `/reset`, opening a GM's event to players through the Event Assistants, the nuts' hits and the score, the end, and the packets

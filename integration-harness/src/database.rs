@@ -233,6 +233,21 @@ pub async fn set_dojo_points(character_id: i32, points: i32) -> Result<(), Harne
     .await
 }
 
+/// Give the logged-out character `character_id` `points` Battle Arena
+/// points.
+pub async fn set_ariant_points(character_id: i32, points: i32) -> Result<(), HarnessError> {
+    change_one_row("set Ariant points", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO ariant_records (character_id, points) VALUES ($1, $2) \
+             ON CONFLICT (character_id) DO UPDATE SET points = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(points)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Mark So Gong's first-time trial beaten for the logged-out character
 /// `character_id`, so he takes them on into the Dojo.
 pub async fn set_dojo_trial_done(character_id: i32) -> Result<(), HarnessError> {

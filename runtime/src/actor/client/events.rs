@@ -1746,6 +1746,48 @@ impl ClientActor {
         self.cure_diseases().await
     }
 
+    /// The Ariant battle `id` has its results: the player's `points` are
+    /// kept for Areda in the King's Room, and with them their jewels.
+    pub(super) fn ariant_result(&mut self, id: u32, points: i32) {
+        if !self.on_event_maps(id) {
+            return;
+        }
+        if let Some(game) = self.game.as_mut() {
+            game.player.ariant_tier = Some(points);
+        }
+    }
+
+    /// A bomb knocked `count` Spirit Jewels out of the player's bag, which
+    /// count against the Ariant battle's winner (Cosmic `addLostShards`).
+    pub(super) fn ariant_jewels_lost(&mut self, count: i16) {
+        if let Some(ticket) =
+            (self.event.as_mut()).filter(|t| matches!(t.kind, EventKind::Ariant(_)))
+        {
+            ticket.jewels_lost = ticket.jewels_lost.saturating_add(count.max(0).into());
+        }
+    }
+
+    /// Tell an Ariant battle how many Spirit Jewels the player holds, if
+    /// that changed or a bomb knocked some out (Cosmic
+    /// `updateAriantScore`).
+    pub(super) async fn sync_ariant_jewels(&mut self) {
+        let (Some(ticket), Some(game)) = (self.event.as_mut(), self.game.as_ref()) else {
+            return;
+        };
+        if !matches!(ticket.kind, EventKind::Ariant(_)) || self.in_cash_shop {
+            return;
+        }
+        let jewels = (game.player.inventory.count(net::ariant::SPIRIT_JEWEL))
+            .try_into()
+            .unwrap_or(i32::MAX);
+        if ticket.jewels_told == Some(jewels) && ticket.jewels_lost == 0 {
+            return;
+        }
+        ticket.jewels_told = Some(jewels);
+        let lost = std::mem::take(&mut ticket.jewels_lost);
+        (ticket.ariant_jewels(game.player.stats.name.clone(), jewels, lost)).await;
+    }
+
     /// Record `outcome` in the party quest record of event `kind`, if it
     /// keeps one, with the rewards the player has: its info quest starts if
     /// it has not, and the client is sent the record whole.
@@ -1885,6 +1927,17 @@ impl ClientActor {
         if net::carnival::result_room(from).is_some() {
             player.carnival_result = None;
         }
+        // Areda gives what a battle earned only in the King's Room, and
+        // the jewels go with it.
+        let mut unearned = Vec::new();
+        if player.ariant_tier.is_some() && map_id != net::ariant::KINGS_ROOM {
+            player.ariant_tier = None;
+            unearned = take_jewels(player);
+        }
+        if !unearned.is_empty() && !self.in_cash_shop {
+            self.send(&mut build_inventory_operation(false, &unearned)?)
+                .await?;
+        }
         let clock = events::clock_on(map_id);
         match &mut self.event {
             Some(ticket) if !ticket.holds(map_id) => self.drop_event_ticket().await?,
@@ -1920,7 +1973,11 @@ impl ClientActor {
         let Some(game) = self.game.as_mut() else {
             return Ok(());
         };
-        let (changes, worn) = ticket.kind.event().take_items(&mut game.player);
+        // A battle's jewels stay for Areda once it has its results.
+        let (changes, worn) = match ticket.kind {
+            EventKind::Ariant(_) if game.player.ariant_tier.is_some() => Default::default(),
+            kind => kind.event().take_items(&mut game.player),
+        };
         let refit = worn && game.player.fit_hp_mp();
         game.player.pyramid_rage = 0;
         // The blessing stays in the event (Cosmic `playerUnregistered`).
@@ -2390,7 +2447,23 @@ impl ClientActor {
         if let (Some(ticket), Some(game)) = (self.event.take(), self.game.as_mut()) {
             let _ = ticket.kind.event().take_items(&mut game.player);
         }
+        if let Some(game) = self.game.as_mut() {
+            if game.player.ariant_tier.take().is_some() {
+                take_jewels(&mut game.player);
+            }
+        }
     }
+}
+
+/// Take all the player's Spirit Jewels.
+fn take_jewels(player: &mut game::Player) -> Vec<game::InventoryChange> {
+    let held = i16::try_from(player.inventory.count(net::ariant::SPIRIT_JEWEL)).unwrap_or(i16::MAX);
+    if held < 1 {
+        return Vec::new();
+    }
+    (player.inventory_mut())
+        .remove(net::ariant::SPIRIT_JEWEL, held)
+        .unwrap_or_default()
 }
 
 /// The boss site an event is held at, whose closing time its players are

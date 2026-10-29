@@ -313,6 +313,15 @@ pub struct Player {
     /// them: whether their side won, and its CP in all, which 2042002
     /// grades in their result room. Gone on the way out of it. Not saved.
     pub carnival_result: Option<(bool, i32)>,
+    /// The Battle Arena points the Ariant battle the player was in at its
+    /// results earned them, until Areda (2101016) gives them (0 then) or
+    /// they leave a map other than a battle map, which takes their Spirit
+    /// Jewels too (Cosmic's `ariantColiseum` and its `rewardTier`). Not
+    /// saved.
+    pub ariant_tier: Option<i32>,
+    /// The Battle Arena points the player holds, which Abdullah VIII
+    /// (2101015) trades for a chair (Cosmic `ariantPoints`).
+    pub ariant_points: i32,
     /// Where the player came from before a trip, to go back to when it
     /// ends: the town they entered the Free Market from
     /// (`FREE_MARKET_RETURN`), the map a world tour or a trip to Florina
@@ -392,6 +401,8 @@ impl Player {
             pyramid_rage: 0,
             pyramid_gem: None,
             carnival_result: None,
+            ariant_tier: None,
+            ariant_points: 0,
             saved_locations: BTreeMap::new(),
             quest_ex: Default::default(),
             auto_potions: AutoPotions::default(),

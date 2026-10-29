@@ -371,6 +371,7 @@ impl ClientActor {
             if let Err(error) = self.sync_presence().await {
                 break error;
             }
+            self.sync_ariant_jewels().await;
         };
 
         match outcome {
@@ -474,6 +475,13 @@ impl ClientActor {
             RuntimeError::Handler(e.to_string())
         })?;
         for action in result.actions {
+            if let WorldAction::Field(net::FieldRequest::Shed {
+                item_id: net::ariant::SPIRIT_JEWEL,
+                count,
+            }) = action
+            {
+                self.ariant_jewels_lost(count);
+            }
             self.apply(action).await?;
         }
         Ok(())
@@ -1841,6 +1849,7 @@ impl ClientActor {
             ServerMessage::CarnivalResult { id, won, points } => {
                 self.carnival_result(id, won, points).await?
             }
+            ServerMessage::AriantResult { id, points } => self.ariant_result(id, points),
             ServerMessage::RecordPartyQuest { id, outcome } => {
                 if let Some(kind) = self.event.as_ref().filter(|t| t.id == id).map(|t| t.kind) {
                     self.record_party_quest(kind, outcome).await?

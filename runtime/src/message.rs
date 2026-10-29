@@ -446,6 +446,13 @@ pub enum ServerMessage {
         won: bool,
         points: i32,
     },
+    /// The Ariant battle `id` has its results: the player earned `points`
+    /// Battle Arena points, which Areda (2101016) gives them in the King's
+    /// Room the event takes them to next, with EXP, for their jewels.
+    AriantResult {
+        id: u32,
+        points: i32,
+    },
     /// Event `id` tells the player `outcome` for their party quest record
     /// (`game::quest_ex`): a Monster Carnival battle started or ended.
     RecordPartyQuest {

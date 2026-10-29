@@ -8,10 +8,10 @@ use crate::character::Character;
 use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
-    accounts, auto_potions, character_mounts, character_quests, characters, dojo_records,
-    equipment_stats, explored_maps, extra_pendant_slots, gacha_exp, inventory_items, keybindings,
-    monster_book_cards, quest_ex_records, quick_slots, saved_locations, skill_macros, skills,
-    teleport_rocks,
+    accounts, ariant_records, auto_potions, character_mounts, character_quests, characters,
+    dojo_records, equipment_stats, explored_maps, extra_pendant_slots, gacha_exp, inventory_items,
+    keybindings, monster_book_cards, quest_ex_records, quick_slots, saved_locations, skill_macros,
+    skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -308,6 +308,14 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
             vanquisher_kills,
         };
     }
+    if let Some(points) = ariant_records::table
+        .find(character_id)
+        .select(ariant_records::points)
+        .first::<i32>(&mut conn)
+        .optional()?
+    {
+        player.ariant_points = points;
+    }
     Ok(player)
 }
 
@@ -380,6 +388,24 @@ fn save_dojo(conn: &mut PgConnection, id: i32, dojo: &DojoRecord) -> QueryResult
         .on_conflict(dojo_records::character_id)
         .do_update()
         .set(values)
+        .execute(conn)?;
+    Ok(())
+}
+
+/// Keep a row for Battle Arena points only once there are any.
+fn save_ariant(conn: &mut PgConnection, id: i32, points: i32) -> QueryResult<()> {
+    if points == 0 {
+        diesel::delete(ariant_records::table.find(id)).execute(conn)?;
+        return Ok(());
+    }
+    diesel::insert_into(ariant_records::table)
+        .values((
+            ariant_records::character_id.eq(id),
+            ariant_records::points.eq(points),
+        ))
+        .on_conflict(ariant_records::character_id)
+        .do_update()
+        .set(ariant_records::points.eq(points))
         .execute(conn)?;
     Ok(())
 }
@@ -527,6 +553,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         }
         save_mount(conn, id, &player.mount)?;
         save_dojo(conn, id, &player.dojo)?;
+        save_ariant(conn, id, player.ariant_points)?;
         save_inventory(conn, id, &player.inventory)?;
         crate::pet::save(conn, &player.inventory, &player.pets)?;
         // Script markers are whatever the player holds now.
