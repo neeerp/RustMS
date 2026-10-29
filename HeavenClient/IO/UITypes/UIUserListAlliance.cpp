@@ -276,11 +276,10 @@ namespace ms
 		{
 			const GuildMember& member = *members[i];
 			Color::Name color = member.id == alliance_picked ? Color::Name::WHITE : Color::Name::BLACK;
-			std::string job = member.job < 0
-							  ? "??"
-							  : fit(Text::Font::A12M, Job(static_cast<uint16_t>(member.job)).get_name(),
-									MEMBER_JOB_WIDTH, "..");
+			std::string full_job = member.job < 0 ? "" : Job(static_cast<uint16_t>(member.job)).get_name();
+			std::string job = member.job < 0 ? "??" : fit(Text::Font::A12M, full_job, MEMBER_JOB_WIDTH, "..");
 			std::string level = member.level < 0 ? "??" : std::to_string(member.level);
+			std::string title = alliance.title(member.alliance_rank);
 
 			section.rows.push_back({
 					member.id,
@@ -288,7 +287,10 @@ namespace ms
 					Text(Text::Font::A12M, Text::Alignment::LEFT, color, member.name),
 					Text(Text::Font::A12M, Text::Alignment::LEFT, color, job),
 					Text(Text::Font::A12M, Text::Alignment::LEFT, color, level),
-					Text(Text::Font::A12M, Text::Alignment::LEFT, color, alliance.title(member.alliance_rank))
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, title),
+					job == full_job ? "" : full_job,
+					member.level < 0,
+					title
 			});
 
 			y += ROW;
@@ -475,6 +477,52 @@ namespace ms
 		return alliance.find_member(guild, alliance_picked);
 	}
 
+	std::string UIUserList::alliance_tip(Point<int16_t> cursor_relative) const
+	{
+		if (over_notice(cursor_relative))
+			return union_notice.get_text();
+
+		if (cursor_relative.y() < TIP_LIST_TOP || cursor_relative.y() > TIP_LIST_BOTTOM)
+			return "";
+
+		int16_t x = cursor_relative.x() - GUILD_LIST.x();
+		int16_t y = cursor_relative.y() - GUILD_LIST.y() + alliance_scroll * GUILD_STEP;
+
+		// Only the first two guilds' counts and headings have tips.
+		for (size_t i = 0; i < 2; i++)
+		{
+			const AllianceSection& section = alliance_sections[i];
+
+			if (!section.shown)
+				continue;
+
+			int16_t right = TIP_UNION_COUNT_LEFT + TIP_COUNT_EXTRA + section.count.width();
+
+			if (x >= TIP_UNION_COUNT_LEFT && x < right && y >= section.top + TIP_UNION_COUNT_TOP &&
+				y < section.top + TIP_UNION_COUNT_BOTTOM)
+				return TIP_ONLINE;
+		}
+
+		for (size_t i = 0; i < 2; i++)
+		{
+			const AllianceSection& section = alliance_sections[i];
+
+			if (section.shown && section.expanded)
+				if (guild_sort::Column column = guild_sort::column_at(x, y - (section.first - COLUMNS)))
+					return TIP_SORT[column - 1];
+		}
+
+		if (x < 0 || x >= GUILD_ROW_WIDTH)
+			return "";
+
+		for (const AllianceSection& section : alliance_sections)
+			for (const GuildRow& row : section.rows)
+				if (y >= row.y && y < row.y + ROW)
+					return row_tip(row, cursor_relative, x);
+
+		return "";
+	}
+
 	Cursor::State UIUserList::alliance_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
@@ -500,6 +548,9 @@ namespace ms
 				return Cursor::State::IDLE;
 			}
 		}
+
+		std::string tip = alliance_tip(cursor_relative);
+		show_tip(tip.empty() ? nullptr : tip.c_str());
 
 		if (Cursor::State state = alliance_slider.send_cursor(cursor_relative, clicked))
 			return state;

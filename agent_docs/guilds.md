@@ -512,6 +512,12 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     (`guildinfo7`). Names ignore case and turn about whole; job, level and
     title (by rank) keep equal values in name order either way. Each
     section keeps its own order across updates.
+  - Tooltips (v83's FUN_00911997, report b332), first match wins: the
+    whole notice over its box; over a section's "[online/total]" count,
+    what it counts; "Sort thru Name", "Job", "Level" or "Grade" over a
+    folded-out section's headings; and over a row, the job's full name
+    if it was cut, "Unknown" over a level v83 does not know, or the rank's
+    title over the title column.
   - Clicking a tab, even the one shown, drops the guild pick.
   - MAP (BtWhere), with someone else picked who is online, sends the same
     find as `/find` (WHISPER 0x05 and the name, FUN_00911c5c); the answer
@@ -530,7 +536,10 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     frame, its name, "[online/total]", and its members online only, five
     a page, with the guild tab's fold and page buttons. Titles are the
     alliance's ranks. The column headings sort a section as the guild
-    tab's do, with the title by alliance rank (FUN_00915456). The list scrolls 33 px a step over 18 px a shown
+    tab's do, with the title by alliance rank (FUN_00915456). The
+    tooltips are the guild tab's (FUN_009156c5), with the alliance's
+    notice and titles, but only the first two sections' counts and
+    headings have them, and both counts read as the online one. The list scrolls 33 px a step over 18 px a shown
     row plus 572, as v83 counts it, so it runs on past the last section.
   - Any click on the window that misses the buttons picks the row under
     it, or no one. The rules (`Alliance::tab_buttons`): INVITE for the
@@ -572,9 +581,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
 - The alliance's rank panel slides no more than the guild's.
-- The Alliance tab's tooltips: the whole notice over its box, the online
-  and total counts, "Sort thru" over the column heads, and "Unknown" over a
-  level v83 does not know.
 - A joining guild's members, and new members of an allied guild, always
   start at alliance rank 5, even while rank 5 has no title.
 - The deny's reason (invitations switched off, another card showing,
