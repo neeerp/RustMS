@@ -244,17 +244,13 @@ namespace ms
 			return;
 		}
 
-		// Both a receiver and a message are needed.
-		if (to.empty())
+		if (auto [refusal, name] = plain_refusal(to.get_text(), message.get_text()); refusal)
 		{
-			to.set_state(Textfield::State::FOCUSED);
-
-			return;
-		}
-
-		if (message.empty())
-		{
-			message.set_state(Textfield::State::FOCUSED);
+			UI::get().emplace<UIOk>(refusal, [name = name](bool)
+			{
+				if (auto gift = UI::get().get_element<UICashGift>())
+					gift->refocus(name);
+			});
 
 			return;
 		}
@@ -279,6 +275,25 @@ namespace ms
 
 		if (!CurseData::valid(name))
 			return { "Cursing is not allowed.", true };
+
+		if (!CurseData::valid(note))
+			return { "Cursing is not allowed.", false };
+
+		if (note.empty())
+			return { "Please enter the message.", false };
+
+		if (note.size() > 72)
+			return { "The message can be no longer than 72 characters long.", false };
+
+		return { nullptr, false };
+	}
+
+	std::pair<const char*, bool> UICashGift::plain_refusal(const std::string& name, const std::string& note)
+	{
+		// v83 reads several names split by ';' and checks each but the last
+		// like a ring's; only one is sent here, so that one isn't checked.
+		if (name.find_first_not_of(" ;") == std::string::npos)
+			return { "Please enter the name of the receiving character.", true };
 
 		if (!CurseData::valid(note))
 			return { "Cursing is not allowed.", false };

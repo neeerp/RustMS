@@ -972,8 +972,15 @@ the screen size.
   Prepaid" when NX Prepaid doesn't cover the price, or else asks "Would you
   like to gift this item to someone? [ ITEM ]". Yes opens `UICashGift` on `CashShop.img/CSGift/backgrnd`, with
   a To field and a message box that wraps over its two ruled rows (73
-  characters). OK, once both are filled, swaps the art for `CSNotice/1` and asks
-  for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
+  characters). Its OK (7e47ef) refuses, leaving the dialog open, an empty name
+  ("Please enter the name of the receiving character."), cursing in the
+  message ("Cursing is not allowed."), an empty message ("Please enter the
+  message.") and one over 72 characters ("The message can be no longer than 72
+  characters long."), then gives the field at fault the keys. v83 reads
+  several names split by ';' and checks each but the last for length, the
+  player's own and repeats ("There are repeating character names."); only one
+  name is sent here, so it isn't checked. Otherwise OK swaps the art for
+  `CSNotice/1` and asks for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
   and message, after asking "This contains an item that will disappear once
   the expiration date has passed. Do you want to give it as a gift?" for an
   item with a period (`0x46ec85`). On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
@@ -1003,8 +1010,7 @@ the screen size.
   ("Cursing is not allowed."), an empty message ("Please enter the
   message.") and one over 72 characters ("The message can be no longer than
   72 characters long."); once the notice closes, the field at fault has the
-  keys. The plain gift dialog on `CSGift` still only puts the cursor back on
-  an empty field.
+  keys.
 - **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
   "Are you sure you want to leave the Cash Shop?", as v83 does
   (`FUN_004bcc86`).
