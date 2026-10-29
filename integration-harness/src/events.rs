@@ -13,7 +13,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{Event, AMORIA, ELLIN, HPQ, HTPQ, KPQ, LPQ, OPQ, PIRATE, ZPQ};
+use net::events::{Event, AMORIA, ELLIN, HOLIDAY, HPQ, HTPQ, KPQ, LPQ, OPQ, PIRATE, ZPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -314,6 +314,14 @@ pub async fn enter_pirate(team: &mut [WorldSession]) -> Vec<Trace> {
 /// Amos, as `enter_lpq` does, once any party before it is out.
 pub async fn enter_amoria(team: &mut [WorldSession]) -> Vec<Trace> {
     enter_from_menu(team, &AMORIA, net::npc_scripts::AMOS_LOBBY, 20).await
+}
+
+/// The party's leader, first, takes it into the Holiday PQ's arena of
+/// difficulty `level` (1 to 3) from the Snow Spirit, as `enter_lpq` does,
+/// once any party before it is out.
+pub async fn enter_holiday(team: &mut [WorldSession], level: u8) -> Vec<Trace> {
+    let event = &HOLIDAY[usize::from(level) - 1];
+    enter_from_menu(team, event, net::npc_scripts::SNOW_SPIRIT, 20).await
 }
 
 /// `pairs` married couples of new characters at `level`, a man and then

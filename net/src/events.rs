@@ -124,6 +124,9 @@ pub enum EventKind {
     /// which a party's leader holding a White Essence starts by its portal
     /// on the ship's last deck.
     Latanica,
+    /// The Holiday PQ in one of its difficulties (1 to 3), started by a
+    /// party's leader at the Snow Spirit (9105004) in its lobby.
+    Holiday(u8),
     /// The battle with Pink Bean in the Temple of Time's Twilight of Gods,
     /// an expedition gathered at its last gate (2141001)
     /// (`crate::squads`).
@@ -3923,6 +3926,76 @@ pub const PRIME_MINISTER_EVENT: Event = Event {
     ..LATANICA
 };
 
+/// Happyville (209000000), the Christmas town the Holiday PQ's lobbies
+/// lead back to.
+pub const HAPPYVILLE: i32 = 209_000_000;
+/// The Holiday PQ's three lobbies, one for each of its difficulties, easy
+/// first (Map.nx 889100000/010/020): the Snow Spirit (9105004) starts it
+/// there, and the Snowman (9105005) leads back to Happyville. A
+/// difficulty's arena is its lobby's id plus 1, and its exit plus 2.
+pub const HOLIDAY_LOBBIES: [i32; 3] = [889_100_000, 889_100_010, 889_100_020];
+/// Snow Vigor and Fake Snow Vigor, which the arena's mobs leave for the
+/// snowman: of use only in the Holiday PQ.
+pub const HOLIDAY_ITEMS: [i32; 2] = [4_032_094, 4_032_095];
+
+/// The Holiday PQ (Cosmic `HolidayPQ_1`-`_3`, the snowman Scrooge would
+/// melt) in difficulty `level`, 1 to 3: three to six of a party, all of
+/// levels 21 to 30, 31 to 40 or 41 to 50, in the difficulty's lobby with
+/// their leader, go into their own copy of its arena for 15, 20 or 25
+/// minutes, one party a channel. It ends when the leader leaves or fewer
+/// than three remain; the time running out sends everyone to the exit
+/// map. The defaults are in `v83ref/lanes/QUESTIONS.md` b295.
+const fn holiday(level: u8) -> Event {
+    let lobby = HOLIDAY_LOBBIES[level as usize - 1];
+    let low = 11 + level * 10;
+    Event {
+        lobby,
+        entrances: &[],
+        maps: lobby + 1..=lobby + 1,
+        entry: lobby + 1,
+        entries: 1,
+        exit: lobby + 2,
+        levels: low..=low + 9,
+        spread: None,
+        team: 3..=6,
+        married: false,
+        minutes: 10 + level as u64 * 5,
+        exp_per_stage: &[],
+        meso_per_stage: &[],
+        stride: 1,
+        stage_maps: &[],
+        talk_clears: &[],
+        member_clears: &[],
+        clear_portals: &[],
+        stage_copies: &[],
+        gated: &[],
+        puzzles: 1..=0,
+        areas_taken: 0,
+        items: &HOLIDAY_ITEMS,
+        passes: 0,
+        hand_ins: &[],
+        gates: false,
+        clear_map: None,
+        bonus: None,
+        blessings: &[],
+        squad: false,
+        gate: &[],
+        until_empty: false,
+        survive: None,
+        runs: 1,
+        alone: false,
+    }
+}
+
+/// The Holiday PQ by difficulty, easy first.
+pub const HOLIDAY: [Event; 3] = [holiday(1), holiday(2), holiday(3)];
+
+/// The Holiday PQ's difficulty (1 to 3) whose lobby is `map_id`.
+pub fn holiday_lobby(map_id: i32) -> Option<u8> {
+    let index = HOLIDAY_LOBBIES.iter().position(|&lobby| lobby == map_id)?;
+    Some(index as u8 + 1)
+}
+
 /// Kerning Square's 7th floor, 103040400, where June (1052125) keeps the
 /// way up to the Spirit of Rock's floors, and where they let out (their
 /// `forcedReturn`).
@@ -4062,7 +4135,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 52] = [
+    pub const ALL: [EventKind; 55] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4115,6 +4188,9 @@ impl EventKind {
         EventKind::Balrog,
         EventKind::Latanica,
         EventKind::PinkBean,
+        EventKind::Holiday(1),
+        EventKind::Holiday(2),
+        EventKind::Holiday(3),
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -4174,6 +4250,7 @@ impl EventKind {
             EventKind::Balrog => &BALROG,
             EventKind::Latanica => &LATANICA,
             EventKind::PinkBean => &PINK_BEAN,
+            EventKind::Holiday(level) => &HOLIDAY[usize::from(level.clamp(1, 3) - 1)],
         }
     }
 
@@ -5796,6 +5873,41 @@ mod tests {
             [(PRIME_MINISTER, PRIME_MINISTER_AT, 1)]
         );
         assert!(opening_mobs(WEDDING_HALL).is_empty());
+    }
+
+    #[test]
+    fn the_holiday_pq_takes_three_to_six_of_a_difficultys_levels() {
+        let terms = |level: u8| {
+            let event = EventKind::Holiday(level).event();
+            (
+                event.lobby,
+                event.entry,
+                event.exit,
+                event.levels.clone(),
+                event.minutes,
+            )
+        };
+        assert_eq!(terms(1), (889100000, 889100001, 889100002, 21..=30, 15));
+        assert_eq!(terms(2), (889100010, 889100011, 889100012, 31..=40, 20));
+        assert_eq!(terms(3), (889100020, 889100021, 889100022, 41..=50, 25));
+        let hard = EventKind::Holiday(3).event();
+        assert!(!hard.solo() && !hard.alone && !hard.lasts_until_empty());
+        assert_eq!((hard.runs, hard.items), (1, &HOLIDAY_ITEMS[..]));
+        let lobby = |id, level| at(id, level, 889100020);
+        let three = [lobby(1, 41), lobby(2, 45), lobby(3, 50)];
+        assert_eq!(hard.team(1, &three), Some(vec![1, 2, 3]));
+        // Two are too few, and those out of its levels or away stay behind.
+        assert_eq!(hard.team(1, &three[..2]), None);
+        let some = [
+            lobby(1, 41),
+            lobby(2, 51),
+            lobby(3, 40),
+            at(4, 45, 889100000),
+        ];
+        assert_eq!(hard.team(1, &some), None);
+        assert_eq!(holiday_lobby(889100010), Some(2));
+        assert_eq!(holiday_lobby(889100011), None);
+        assert!(event_map(889100021) && !event_map(889100020) && !event_map(889100022));
     }
 
     #[test]

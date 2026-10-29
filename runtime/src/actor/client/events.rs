@@ -82,6 +82,7 @@ impl ClientActor {
             EventKind::Tylus => NpcScript::tylus(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             EventKind::Pirate => NpcScript::guon(entry),
+            EventKind::Holiday(level) => NpcScript::snow_spirit(level, entry),
             EventKind::PrimeMinister => NpcScript::blocked_entrance(entry),
             EventKind::Amoria => NpcScript::amos_lobby(entry),
             EventKind::Magatia(side) => NpcScript::magatia(side, entry),
