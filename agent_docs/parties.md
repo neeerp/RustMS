@@ -134,8 +134,10 @@ reconstruction of v83:
   v83. It refuses what v83 refuses before contacting the server: creating or
   inviting as a Beginner, Noblesse or Legend below level 10, inviting
   yourself, inviting or expelling without leading the party, inviting into a
-  full party, and expelling someone who isn't a member. v83's check for maps
-  where leaving or expelling isn't allowed is not implemented.
+  full party, and expelling someone who isn't a member. As in v83, nobody
+  leaves a party in a field of type 23, 25 or 26, nor is expelled there or in
+  one of type 10, 11 or 15 ("Cannot kick another user in this map";
+  `field_limit::may_leave_party`, `may_expel`).
 
 ### Party search
 

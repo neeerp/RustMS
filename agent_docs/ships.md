@@ -38,8 +38,11 @@ other end, its ticket and its fare:
 | `LUDIBRIUM_TO_ORBIS` | 220000110 | 200090110 | 200000100 | 6,000 |
 | `TO_LEAFRE` | 200000131 | 200090200 | 240000100 | 30,000 |
 | `LEAFRE_TO_ORBIS` | 240000110 | 200090210 | 200000100 | 30,000 |
-| `TO_ARIANT` | 200000151 | 200090400 | 260000100 | 6,000 |
+| `TO_ARIANT` | 200000151 | 200090400 | 260000100 portal 1 | 6,000 |
 | `ARIANT_TO_ORBIS` | 260000100 | 200090410 | 200000100 | 6,000 |
+
+Ariant's two spawn points are both named `sp`; riders get the second
+(portal 1), by the dock, as Cosmic's `Genie.js` has it.
 
 The fares and the 10-minute timetable come from Cosmic and have not been
 checked against v83.
@@ -279,7 +282,3 @@ after (`Stage::pending_clock`). The rules are in `ClockRules.h`.
 The client's `tMove` is in real seconds, while the harness's route clock
 runs 60 times as fast. A ship seen against the harness therefore leaves
 again before it has finished docking.
-
-## Not yet
-
-- Ariant arrivals use the town's first `sp` portal; Cosmic uses the second.
