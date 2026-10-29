@@ -2,6 +2,12 @@
 //! clock from the start, and when it runs out the quest is forfeited. The
 //! time counts only while the player stays in the game: leaving it, or going
 //! to the Cash Shop, gives the quest up (report b149).
+//!
+//! The timed titles (`QuestInfo` `timeLimit2`) have no clock on screen:
+//! their started record names the date they end, and when it passes they
+//! are forfeited the same way, whether the player is in the game then or
+//! logs in later, as Cosmic does. The 2025 client does nothing itself at
+//! that date, and only says so on mode 15 (report 2010-quest-summary §5).
 
 use super::quest::forfeit;
 use super::ClientActor;
@@ -41,10 +47,12 @@ impl QuestClocks {
     }
 }
 
-/// A started quest's clock: when its time is up.
+/// A started quest's clock: when its time is up, and whether the client
+/// shows it (a timed title's isn't).
 pub(super) struct QuestClock {
     quest_id: i16,
     ends: Instant,
+    shown: bool,
 }
 
 /// The seconds `quest_id` gives, if it is timed.
@@ -52,14 +60,29 @@ fn time_limit(quest_id: i16) -> Option<u32> {
     quests::catalog().ok()?.quest(quest_id)?.time_limit
 }
 
+/// The seconds a timed title (`timeLimit2`) gives.
+fn time_limit2(quest_id: i16) -> Option<u32> {
+    quests::catalog().ok()?.quest(quest_id)?.time_limit2
+}
+
 impl ClientActor {
-    /// The quest just started: its clock starts too, shown first.
+    /// The quest just started: its clock starts too, shown first. A timed
+    /// title's runs unseen for its `timeLimit2`, to the date its record
+    /// names.
     pub(super) fn start_quest_clock(
         &mut self,
         quest_id: i16,
         packets: &mut Vec<Packet>,
     ) -> Result<(), RuntimeError> {
         let Some(seconds) = time_limit(quest_id) else {
+            if let Some(seconds) = time_limit2(quest_id) {
+                self.stop_quest_clock(quest_id);
+                self.quest_clocks.push(QuestClock {
+                    quest_id,
+                    ends: Instant::now() + Duration::from_secs(u64::from(seconds)),
+                    shown: false,
+                });
+            }
             return Ok(());
         };
         self.stop_quest_clock(quest_id);
@@ -70,6 +93,7 @@ impl ClientActor {
         self.quest_clocks.push(QuestClock {
             quest_id,
             ends: Instant::now() + limit,
+            shown: true,
         });
         Ok(())
     }
@@ -86,10 +110,14 @@ impl ClientActor {
         Ok(())
     }
 
+    /// Whether a clock the client shows went.
     fn stop_quest_clock(&mut self, quest_id: i16) -> bool {
-        let before = self.quest_clocks.len();
+        let shown = self
+            .quest_clocks
+            .iter()
+            .any(|clock| clock.quest_id == quest_id && clock.shown);
         self.quest_clocks.retain(|clock| clock.quest_id != quest_id);
-        self.quest_clocks.len() != before
+        shown
     }
 
     /// When the next clock runs out.
@@ -127,9 +155,14 @@ impl ClientActor {
     }
 
     /// Off to the Cash Shop: the timed quests are given up, as v83's
-    /// servers do, and their clocks go.
+    /// servers do, and their clocks go. The titles keep theirs.
     pub(super) async fn give_up_timed_quests(&mut self) -> Result<(), RuntimeError> {
-        let running: Vec<i16> = self.quest_clocks.iter().map(|c| c.quest_id).collect();
+        let running: Vec<i16> = self
+            .quest_clocks
+            .iter()
+            .filter(|c| c.shown)
+            .map(|c| c.quest_id)
+            .collect();
         for quest_id in running {
             let mut packets = match self.drop_quest(quest_id).await {
                 Ok(packets) => packets,
@@ -145,12 +178,14 @@ impl ClientActor {
     }
 
     /// Changing channel: the clocks go with the session, handed over
-    /// before the client is sent on, so the new channel finds them.
+    /// before the client is sent on, so the new channel finds them. The
+    /// titles' come back from their records.
     pub(super) fn hand_over_quest_clocks(&mut self, session_id: i32) {
         let (now, wall) = (Instant::now(), SystemTime::now());
         let handed = self
             .quest_clocks
             .drain(..)
+            .filter(|clock| clock.shown)
             .map(|clock| {
                 (
                     clock.quest_id,
@@ -164,12 +199,16 @@ impl ClientActor {
     }
 
     /// Leaving the game: the timed quests are given up, unless the player
-    /// is only changing channel and their clocks went with them.
+    /// is only changing channel and their clocks went with them. The titles
+    /// stay started.
     pub(super) async fn leave_timed_quests(&mut self) {
         if self.changing_channel {
             return;
         }
         for clock in std::mem::take(&mut self.quest_clocks) {
+            if !clock.shown {
+                continue;
+            }
             let Ok(game) = self.in_game_mut() else {
                 return;
             };
@@ -181,8 +220,10 @@ impl ClientActor {
 
     /// Entering the game as `player`, before the client hears of them:
     /// timed quests started on another channel keep their clocks, which
-    /// that client still shows; any other is given up. Returns what to tell
-    /// the client once in the game: the clocks that ran out on the way.
+    /// that client still shows; any other is given up. A timed title runs
+    /// on to its date, or is given up if that passed. Returns what to tell
+    /// the client once in the game: the clocks and titles that ran out on
+    /// the way.
     pub(super) async fn resume_timed_quests(
         &mut self,
         player: &mut Player,
@@ -199,6 +240,29 @@ impl ClientActor {
             .collect();
         let (now, wall) = (Instant::now(), SystemTime::now());
         let mut packets = Vec::new();
+        let titles: Vec<(i16, Option<SystemTime>)> = player
+            .quests
+            .started()
+            .filter(|record| time_limit(record.quest_id).is_none())
+            .filter_map(|record| {
+                let end = player.quests.info(record.quest_id)?;
+                time_limit2(record.quest_id).map(|_| (record.quest_id, game::quest::end_time(end)))
+            })
+            .collect();
+        for (quest_id, end) in titles {
+            match end.map(|end| end.duration_since(wall).unwrap_or_default()) {
+                Some(left) if !left.is_zero() => self.quest_clocks.push(QuestClock {
+                    quest_id,
+                    ends: now + left,
+                    shown: false,
+                }),
+                Some(_) => {
+                    forfeit(player, quest_id).await?;
+                    packets.push(quest::build_quest_expired(quest_id)?);
+                }
+                None => {}
+            }
+        }
         for quest_id in started {
             let left = handed
                 .iter()
@@ -208,6 +272,7 @@ impl ClientActor {
                 Some(left) if !left.is_zero() => self.quest_clocks.push(QuestClock {
                     quest_id,
                     ends: now + left,
+                    shown: true,
                 }),
                 ran_out => {
                     forfeit(player, quest_id).await?;

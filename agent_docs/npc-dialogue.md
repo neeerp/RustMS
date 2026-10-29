@@ -244,7 +244,11 @@ out.
 Image tags draw inline: `#v`/`#i` item icons and `#s` skill icons in a 32x32
 slot, `#f`/`#F` any image by NX path (`UI/UIWindow.img/QuestIcon/4/0`). `UI/`
 paths are read from `UIClassic.nx`, then from `UI.nx`, whose
-`UIWindow2.img` holds the quest icons. Each image becomes a `Text::BOX` character that the text layout sizes
+`UIWindow2.img` holds the quest icons. `#W<key>#` is
+`UI/UIWindow.img/Quest/<key>` (`basic`, `prob`, `select`), as in the
+2025 client (0x9a16d8); a key that is empty or holds anything but letters
+and digits is left as text, and a choice's `#L<n>#` passes whole, so
+`#L0#Wait` is not an image. Each image becomes a `Text::BOX` character that the text layout sizes
 like the image, bottom on the baseline; a taller image pushes its line
 down. As in 2008 GMS footage, the images show as soon as a page opens and
 only the text types out. Images inside `#L` menu choices are still dropped.

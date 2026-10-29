@@ -93,6 +93,26 @@ pub fn end_date(at: SystemTime) -> String {
     )
 }
 
+/// The time a timed title's started record names, the reverse of
+/// `end_date`, if it is one.
+pub fn end_time(record: &str) -> Option<SystemTime> {
+    if record.len() != 14 || !record.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let part = |at: usize, length: usize| record[at..at + length].parse::<i64>().ok();
+    let (month, day) = (part(4, 2)?, part(6, 2)?);
+    let year = part(0, 4)? - i64::from(month <= 2);
+    // Howard Hinnant's days_from_civil.
+    let era = year.div_euclid(400);
+    let year_of_era = year - era * 400;
+    let day_of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+    let seconds = days * 86_400 + part(8, 2)? * 3600 + part(10, 2)? * 60 + part(12, 2)?;
+    let seconds = u64::try_from(seconds).ok()?;
+    Some(std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds))
+}
+
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuestState {
@@ -359,6 +379,11 @@ mod tests {
         assert_eq!(end_date(UNIX_EPOCH), "19700101000000");
         assert_eq!(end_date(at(951_782_400)), "20000229000000");
         assert_eq!(end_date(at(1_798_761_599)), "20261231235959");
+        for seconds in [0, 951_782_400, 1_234_567_890, 1_798_761_599] {
+            assert_eq!(end_time(&end_date(at(seconds))), Some(at(seconds)));
+        }
+        assert_eq!(end_time("2009021323313"), None);
+        assert_eq!(end_time("2009/2/1323313"), None);
     }
 
     #[test]

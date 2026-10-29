@@ -40,6 +40,30 @@ async fn end(session: &mut WorldSession, m: &str) -> (Option<u8>, Vec<(i32, i32)
     (t.states.get(&CELEBRITY).copied(), t.items)
 }
 
+/// Read until the title is said to have expired (UPDATE_QUEST_INFO 15),
+/// and given up, within 10 seconds.
+async fn expires(session: &mut WorldSession) {
+    let mut trace = Trace::default();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    while !trace
+        .quest_clocks
+        .contains(&(15, CELEBRITY, 0, trace.progress.len()))
+    {
+        let envelope = tokio::time::timeout(
+            deadline.saturating_duration_since(tokio::time::Instant::now()),
+            session.connection.read_packet("trace"),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("the title never expired: {trace:?}"))
+        .unwrap();
+        trace.observe(&envelope.packet);
+    }
+    assert!(
+        trace.quest_clocks.iter().all(|clock| clock.0 == 15),
+        "{trace:?}"
+    );
+}
+
 #[tokio::test]
 async fn celebrity_counts_fame_from_the_start_and_ends_with_the_medal() {
     let config = load_harness_config_or_fail().await;
@@ -67,7 +91,8 @@ async fn celebrity_counts_fame_from_the_start_and_ends_with_the_medal() {
     let mut session = visit(&config).await;
     assert_eq!(end(&mut session, &m).await, (None, vec![]));
 
-    // 1,000 more is, but not once the 30 days are over.
+    // 1,000 more is, but not once the 30 days are over: logging in after
+    // the end date gives the title up, and the chat log says so.
     drop(session);
     tokio::time::sleep(Duration::from_millis(500)).await;
     set_fame(id, 1040).await.unwrap();
@@ -76,8 +101,26 @@ async fn celebrity_counts_fame_from_the_start_and_ends_with_the_medal() {
         .unwrap()
         .unwrap();
     set_quest(id, CELEBRITY, 1, "20000101000000").await.unwrap();
-    let mut session = visit(&config).await;
-    assert_eq!(end(&mut session, &m).await, (None, vec![]));
+    let mut session = relogin(&config).await;
+    assert_eq!(session.quests.get(&CELEBRITY), None);
+    expires(&mut session).await;
+    assert_eq!(
+        integration_harness::database::quest_progress(id, CELEBRITY)
+            .await
+            .unwrap(),
+        None
+    );
+
+    // Nor in the game when the date passes.
+    drop(session);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let soon = std::time::SystemTime::now() + Duration::from_secs(3);
+    set_quest(id, CELEBRITY, 1, &game::quest::end_date(soon))
+        .await
+        .unwrap();
+    let mut session = relogin(&config).await;
+    assert_eq!(session.quests.get(&CELEBRITY), Some(&1));
+    expires(&mut session).await;
 
     drop(session);
     tokio::time::sleep(Duration::from_millis(500)).await;

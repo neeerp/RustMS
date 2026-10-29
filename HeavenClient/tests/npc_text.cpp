@@ -38,6 +38,13 @@ int main()
 			lookups, &images) == "\x01\\n\x01 3 Apple\\n\x01 and \x01#fnot an image#", "captured images leave placeholders");
 		require(images == Images{{'f', "UI/UIWindow.img/QuestIcon/4/0"}, {'v', "2010000"}, {'s', "1001"}, {'i', "2010009"}},
 			"captured images in order");
+		images.clear();
+		require(ms::NpcTextMarkup::expand("#Wbasic# 100 EXP #Wselect#", lookups, &images) == "\x01 100 EXP \x01", "#W keys are images");
+		require(images == Images{{'f', "UI/UIWindow.img/Quest/basic"}, {'f', "UI/UIWindow.img/Quest/select"}},
+			"in UIWindow.img/Quest");
+		require(expand("#L0#W#l #L1#Wait for me#l #L2#Wow#l") == "#L0#W#l #L1#Wait for me#l #L2#Wow#l",
+			"a choice's W is text");
+		require(expand("#W# and #Wtwo words#") == "#W# and #Wtwo words#", "an empty or spaced key is text");
 		using Links = std::vector<ms::NpcTextMarkup::Link>;
 		Links links;
 		require(ms::NpcTextMarkup::expand("See #b#p2000##k in #m10000#, not #m1#.", lookups, nullptr, &links) ==

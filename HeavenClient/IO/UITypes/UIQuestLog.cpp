@@ -94,6 +94,14 @@ namespace ms
 		constexpr int16_t TEXT_STEP = 18;
 		constexpr int16_t DETAIL_SLIDER_X = 283;
 		constexpr Range<int16_t> DETAIL_SLIDER = Range<int16_t>(123, 352);
+		// Over a summary (backgrnd4) the description takes 120 px, and the
+		// summary 108 px below it, with a scroll bar of its own (0x87c388,
+		// 0x87bae7).
+		constexpr Range<int16_t> SHORT_TEXT_VIEW = Range<int16_t>(123, 241);
+		constexpr Range<int16_t> SHORT_DETAIL_SLIDER = Range<int16_t>(123, 229);
+		constexpr Point<int16_t> SUMMARY_POS = Point<int16_t>(18, 251);
+		constexpr Range<int16_t> SUMMARY_VIEW = Range<int16_t>(249, 357);
+		constexpr Range<int16_t> SUMMARY_SLIDER = Range<int16_t>(249, 345);
 		constexpr Point<int16_t> HELPER_POS = Point<int16_t>(150, 372);
 		constexpr Point<int16_t> FORFEIT_POS = Point<int16_t>(242, 372);
 		constexpr Point<int16_t> FIND_NPC_POS = Point<int16_t>(217, 372);
@@ -229,7 +237,8 @@ namespace ms
 
 				if (close != std::string::npos && tag != 0
 					&& ((std::string("ptzomvis").find(tag) != std::string::npos && NpcTextMarkup::is_digits(number))
-						|| ((tag == 'f' || tag == 'F') && arg.find('/') != std::string::npos)))
+						|| ((tag == 'f' || tag == 'F') && arg.find('/') != std::string::npos)
+						|| (tag == 'W' && NpcTextMarkup::is_key(arg))))
 				{
 					out.append(text, i, close - i + 1);
 					i = close;
@@ -348,6 +357,7 @@ namespace ms
 
 		list_background = Quest["backgrnd"];
 		detail_background = Quest["backgrnd2"];
+		summary_background = Quest["backgrnd4"];
 
 		for (size_t i = 0; i < 3; i++)
 			notices[i] = Quest["notice" + std::to_string(i)];
@@ -381,6 +391,8 @@ namespace ms
 			[&](bool up) { scroll_list(list_offset + (up ? -1 : 1)); });
 		detail_slider = Slider(Slider::Type::CLASSIC, DETAIL_SLIDER, DETAIL_X + DETAIL_SLIDER_X, 1, 1,
 			[&](bool up) { scroll_details(detail_offset + (up ? -1 : 1)); });
+		summary_slider = Slider(Slider::Type::CLASSIC, SUMMARY_SLIDER, DETAIL_X + DETAIL_SLIDER_X, 1, 1,
+			[&](bool up) { scroll_summary(summary_offset + (up ? -1 : 1)); });
 
 		seen_revision = std::numeric_limits<uint64_t>::max();
 		change_tab(TAB0);
@@ -528,6 +540,7 @@ namespace ms
 	{
 		selected = id;
 		detail_offset = 0;
+		summary_offset = 0;
 
 		if (selected < 0)
 		{
@@ -601,10 +614,72 @@ namespace ms
 		description = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, text, TEXT_WIDTH);
 		images.set(tags, description);
 
-		int16_t view = TEXT_VIEW.length() - (TEXT_POS.y() - TEXT_VIEW.first());
-		int16_t steps = std::max<int16_t>(0, (description.height() - view + TEXT_STEP - 1) / TEXT_STEP);
-		detail_offset = std::min(detail_offset, steps);
-		detail_slider.setrows(detail_offset, 1, steps + 1);
+		// In progress, the summary's paragraphs, each on lines of its own:
+		// the "summary" heading, the summary, what the quest asks, then a
+		// gap, the "reward" heading and what it gives. The client builds
+		// none for the other tabs (0x881261).
+		std::vector<std::string> paragraphs;
+
+		if (tab == TAB1)
+		{
+			nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(selected)];
+
+			for (const char* key : { "summary", "demandSummary", "rewardSummary" })
+			{
+				std::string paragraph = info[key];
+
+				if (paragraph.empty())
+					continue;
+
+				if (std::string(key) == "rewardSummary")
+				{
+					paragraphs.push_back(" ");
+					paragraphs.push_back("#Wreward#");
+				}
+
+				paragraphs.push_back(paragraph);
+			}
+
+			if (!paragraphs.empty())
+				paragraphs.insert(paragraphs.begin(), "#Wsummary#");
+		}
+
+		std::string joined;
+
+		for (const std::string& paragraph : paragraphs)
+			joined += (joined.empty() ? "" : "\\n") + quest_counts(paragraph, selected);
+
+		std::vector<NpcTextMarkup::InlineImage> summary_tags;
+		has_summary = !paragraphs.empty();
+		summary = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+			NpcTextMarkup::expand(joined, lookups, &summary_tags), TEXT_WIDTH);
+		summary_images.set(summary_tags, summary);
+
+		detail_slider = Slider(Slider::Type::CLASSIC, has_summary ? SHORT_DETAIL_SLIDER : DETAIL_SLIDER,
+			DETAIL_X + DETAIL_SLIDER_X, 1, 1, [&](bool up) { scroll_details(detail_offset + (up ? -1 : 1)); });
+		detail_offset = std::min(detail_offset, detail_steps());
+		detail_slider.setrows(detail_offset, 1, detail_steps() + 1);
+		summary_offset = std::min(summary_offset, summary_steps());
+		summary_slider.setrows(summary_offset, 1, summary_steps() + 1);
+	}
+
+	Range<int16_t> UIQuestLog::text_view() const
+	{
+		return has_summary ? SHORT_TEXT_VIEW : TEXT_VIEW;
+	}
+
+	int16_t UIQuestLog::detail_steps() const
+	{
+		int16_t view = text_view().length() - (TEXT_POS.y() - text_view().first());
+
+		return std::max<int16_t>(0, (description.height() - view + TEXT_STEP - 1) / TEXT_STEP);
+	}
+
+	int16_t UIQuestLog::summary_steps() const
+	{
+		int16_t view = SUMMARY_VIEW.length() - (SUMMARY_POS.y() - SUMMARY_VIEW.first());
+
+		return std::max<int16_t>(0, (summary.height() - view + TEXT_STEP - 1) / TEXT_STEP);
 	}
 
 	void UIQuestLog::show_details(bool open)
@@ -631,9 +706,12 @@ namespace ms
 
 	void UIQuestLog::scroll_details(int16_t offset)
 	{
-		int16_t view = TEXT_VIEW.length() - (TEXT_POS.y() - TEXT_VIEW.first());
-		int16_t steps = std::max<int16_t>(0, (description.height() - view + TEXT_STEP - 1) / TEXT_STEP);
-		detail_offset = std::clamp<int16_t>(offset, 0, steps);
+		detail_offset = std::clamp<int16_t>(offset, 0, detail_steps());
+	}
+
+	void UIQuestLog::scroll_summary(int16_t offset)
+	{
+		summary_offset = std::clamp<int16_t>(offset, 0, summary_steps());
 	}
 
 	void UIQuestLog::draw(float alpha) const
@@ -696,18 +774,27 @@ namespace ms
 		{
 			Point<int16_t> detail = position + Point<int16_t>(DETAIL_X, 0);
 
-			detail_background.draw(detail);
+			(has_summary ? summary_background : detail_background).draw(detail);
 			portrait.draw(detail + PORTRAIT_POS, alpha);
 			title.draw(detail + TITLE_POS);
 			jobs.draw(detail + JOBS_POS);
 			levels.draw(detail + LEVELS_POS);
 
-			Range<int16_t> clip = Range<int16_t>(detail.y() + TEXT_VIEW.first(), detail.y() + TEXT_VIEW.second());
+			Range<int16_t> clip = Range<int16_t>(detail.y() + text_view().first(), detail.y() + text_view().second());
 			Point<int16_t> text = detail + TEXT_POS - Point<int16_t>(0, detail_offset * TEXT_STEP);
 
 			images.draw(description, text, clip);
 			description.draw(text, clip);
 			detail_slider.draw(position);
+
+			if (has_summary)
+			{
+				clip = Range<int16_t>(detail.y() + SUMMARY_VIEW.first(), detail.y() + SUMMARY_VIEW.second());
+				text = detail + SUMMARY_POS - Point<int16_t>(0, summary_offset * TEXT_STEP);
+				summary_images.draw(summary, text, clip);
+				summary.draw(text, clip);
+				summary_slider.draw(position);
+			}
 		}
 
 		UIElement::draw_buttons(alpha);
@@ -737,7 +824,7 @@ namespace ms
 		// An NPC's name in the text finds that NPC, and becomes the one
 		// FIND NPC finds; a map's name shows that map on the world map. This
 		// works on every tab.
-		if (!TEXT_VIEW.contains(cursorpos.y() - detail.y()))
+		if (!text_view().contains(cursorpos.y() - detail.y()))
 			return;
 
 		Point<int16_t> text = detail + TEXT_POS - Point<int16_t>(0, detail_offset * TEXT_STEP);
@@ -793,7 +880,9 @@ namespace ms
 
 	void UIQuestLog::send_scroll(double yoffset)
 	{
-		if (details_open && cursor_relative.x() >= DETAIL_X)
+		if (details_open && has_summary && cursor_relative.x() >= DETAIL_X && cursor_relative.y() >= SUMMARY_VIEW.first() - 1)
+			summary_slider.send_scroll(yoffset);
+		else if (details_open && cursor_relative.x() >= DETAIL_X)
 			detail_slider.send_scroll(yoffset);
 		else
 			list_slider.send_scroll(yoffset);
@@ -808,6 +897,10 @@ namespace ms
 
 		if (details_open)
 			if (Cursor::State state = detail_slider.send_cursor(cursor_relative, clicking))
+				return state;
+
+		if (details_open && has_summary)
+			if (Cursor::State state = summary_slider.send_cursor(cursor_relative, clicking))
 				return state;
 
 		int16_t x = cursor_relative.x();

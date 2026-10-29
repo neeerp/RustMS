@@ -138,21 +138,32 @@ namespace ms
 		Icon progress_icon(int16_t id) const;
 		void scroll_list(int16_t offset);
 		void scroll_details(int16_t offset);
+		void scroll_summary(int16_t offset);
+		// Where the description shows: shorter over a summary.
+		Range<int16_t> text_view() const;
+		int16_t detail_steps() const;
+		int16_t summary_steps() const;
 
 		const QuestLog &questlog;
 		uint16_t tab = TAB0;
 		ClassicTabs tabs;
-		Texture list_background, detail_background;
+		Texture list_background, detail_background, summary_background;
 		Texture notices[3];
 		Texture fold_boxes[2];
 		Texture available_icon, complete_icon;
 		Animation progress_animation, ready_animation;
-		Slider list_slider, detail_slider;
+		Slider list_slider, detail_slider, summary_slider;
 		std::vector<Row> rows;
 		std::set<int16_t> folded[3];
 		Animation portrait;
 		Text title, jobs, levels, description;
 		QuestTextImages images;
+		// An in-progress quest's summary, what it asks and gives, under
+		// the description (v83 FUN_008818df); empty for the rest.
+		Text summary;
+		QuestTextImages summary_images;
+		bool has_summary = false;
+		int16_t summary_offset = 0;
 		// The NPC and map names in `description`.
 		std::vector<NpcTextMarkup::Link> links;
 		std::vector<QuestObjective> shown_goals;

@@ -715,8 +715,13 @@ Diligent Explorer (29003) and Veteran Hunter (29400) 30 days, Donation King
 started record is the date they end, "yyyyMMddHHmmss" in UTC
 (`game::quest::end_date`, kept as it stands for `DATED_QUESTS`), which the
 server writes when the quest starts. The Quest Log counts down to it
-(`#Q` below). Nothing ends the quest when that date passes yet: the reference
-client's own handling of it is unknown.
+(`#Q` below). The client never ends the quest itself, so the server does,
+as Cosmic does: on login, a title whose date has passed is forfeited with
+the "expired" message (`build_quest_expired`, mode 15), and one still
+running gets a hidden clock (`QuestClock::shown` false) that forfeits it
+the same way when it runs out. Hidden clocks send no mode 7, and leaving a
+map, giving up timed quests or a party's handover leave them alone. A
+record that isn't a date is left as it is.
 
 ## Info strings
 
@@ -1092,7 +1097,7 @@ Two other tags read the timed titles' time (0x9a1189, 0x9a13cc), each
 
 | Token | Value |
 |---|---|
-| `#Qdaylimit#`, `#Qhourlimit#`, `#Qminlimit#`, `#Qseclimit#` | the time left until the end date in the quest's started record, never below 0, in whole days, then the hours, minutes and seconds past them. A record that isn't 14 characters counts as ending on 2079-01-01, the client's "never" |
+| `#Qdaylimit#`, `#Qhourlimit#`, `#Qminlimit#`, `#Qseclimit#` | the time left until the end date in the quest's started record, never below 0, in whole days, then the hours, minutes and seconds past them. Any 14 characters are read, each field by `atoi` into a WORD (0x7b903d), so `"2009 2 1233x1z"` is 2009-02-01 23:03:01. A record of another length, or whose fields make no date Windows would take (a 13th month, 29 February 2009, the 24th hour, a year before 1601), counts as ending on 2079-01-01, the client's "never" |
 | `#Dday#`, `#Dhour#`, `#Dmin#`, `#Dsec#` | the record's `PT`, the seconds played today, split the same way; once the record's `DONE` is set, all of `QuestInfo` `dailyPlayTime` |
 | `#Dminhour#` | `dailyPlayTime`'s hours: a key starting with "min" drops it and reads `dailyPlayTime` |
 | `#Dcount#`, `#Ddaylimit#` | the record's `CNT` and its need, as `perDays` |

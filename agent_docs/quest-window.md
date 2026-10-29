@@ -49,6 +49,17 @@ The detail panel shows:
   " Under Level 30" (with v83's leading space), both joined by two spaces,
   or "No limit" for a quest with no start check
 - the original `QuestInfo.img/<id>/<tab>` text
+- on In Progress, for a quest with a `summary`, `demandSummary` or
+  `rewardSummary` (121, 304 and 364 quests), a second scrolling box below
+  the text. The panel then uses `backgrnd4`, which has room for it, and the
+  text box shrinks from 243 to 120 px. The box holds the `summary` heading
+  image (`#Wsummary#`), the summary, the demand summary and, when there is
+  a reward summary, the `reward` heading and that summary, each paragraph on
+  a new line, as v83 builds them (`FUN_008818df`, drawn by `FUN_0087bae7`).
+  It is clipped to x 18-281, y 249-357, with its own scroll bar at (283, 248).
+  The summaries use `#Wbasic#`, `#Wselect#` and `#Wprob#` for their other
+  headings, and `#c` for counts. The mouse wheel scrolls whichever box it is
+  over.
 
 The text keeps its `#b`/`#k` colours and `#p`/`#m`/`#t`/`#o` names. `#c` and
 `#a` show live counts, and `#i`/`#v` item icons sit inline. `#k` returns to the
@@ -80,11 +91,9 @@ along the bottom depend on the tab:
   v83 does. A quest the quest alert offers is offered again once it is gone.
 
 The window has no Accept/Finish: v83 started and finished quests through NPC
-dialogue only. It also has no search, filters, Recommended tab, reward panel,
-or completion date, since the 2009 window had none. Several assets are left
-unused: `backgrnd4` (a detail panel with a reward box), `notice`'s region
-headings, `icon5` ("new"), `Gauge`, `prob`, `reward`, `select`, and `summary`.
-They may belong to later v83 revisions.
+dialogue only. It also has no search, filters, Recommended tab, or
+completion date, since the 2009 window had none. `notice`'s region
+headings, `icon5` ("new") and `Gauge` are left unused.
 
 Validation: build the native client and run CTest. The marker tests include
 available-quest filtering across jobs, prerequisites, and levels. For rendering

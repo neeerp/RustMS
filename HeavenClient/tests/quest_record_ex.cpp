@@ -108,7 +108,14 @@ int main()
 		using ms::QuestRecordEx::time_left;
 		require(expiry("20090213233130") == 1234567890, "the end, in UTC");
 		require(expiry("") == 3439756800, "no end is 2079");
-		require(expiry("2009021323313") == 3439756800, "an end needs 14 digits");
+		require(expiry("2009021323313") == 3439756800, "an end needs 14 characters");
+		require(expiry("2009 2 1233x1z") == expiry("20090201230301"),
+				"any 14 characters, each field read by atoi");
+		require(expiry("20090229000000") == 3439756800, "no 29 February in 2009");
+		require(expiry("20080229000000") == 1204243200, "but in 2008");
+		require(expiry("20091301000000") == 3439756800, "no 13th month");
+		require(expiry("20090101240000") == 3439756800, "no 24th hour");
+		require(expiry("16000101000000") == 3439756800, "nothing before 1601");
 		int64_t now = 1234567890;
 		int64_t end = now + 29 * 86400 + 5 * 3600 + 7 * 60 + 9;
 		require(time_left("daylimit", end, now) == "29", "the days left");
