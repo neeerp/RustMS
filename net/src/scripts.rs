@@ -297,6 +297,10 @@ pub const PAPULATUS_IN: &str = "Populatus00";
 /// which the client actor answers once it knows whether the player holds a
 /// White Essence and their party may go (`latanica_portal`).
 pub const LATANICA_IN: &str = "captinsg00";
+/// The door at the end of each of Neo City's eras but the first
+/// (`right00`), to the era's boss, which the client actor answers once the
+/// directory says whether the party may go (`neo_boss_portal`).
+pub const NEO_BOSS_IN: &str = "TD_Boss_enter";
 /// The way from the Trial Grounds' first map into their rooms (`in00`),
 /// which the client actor answers once it knows who else is on the map
 /// (`htpq_into_rooms`).
@@ -3333,6 +3337,43 @@ pub fn latanica_portal(entry: Option<crate::events::Entry>) -> Vec<Effect> {
     }
 }
 
+/// Neo City's era from 1 whose boss's door is on `map_id`, if any.
+pub fn neo_boss_era(map_id: i32) -> Option<u8> {
+    use crate::events::{neo_boss_door, NEO_BOSSES};
+    (1..=NEO_BOSSES.len() as u8).find(|&era| neo_boss_door(era) == map_id)
+}
+
+/// The door to era `era`'s boss, for a player whose party stands as
+/// `entry`: the leader takes it in, or is told in pink why not (Cosmic
+/// `TD_Boss_enter`).
+pub fn neo_boss_portal(era: u8, entry: crate::events::Entry) -> Vec<Effect> {
+    use crate::events::{Entry, EventKind};
+    let kind = EventKind::NeoBoss(era);
+    let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+    match entry {
+        Entry::NoParty => pink(keys::NEO_BOSS_NO_PARTY),
+        Entry::NotLeader => pink(keys::NEO_BOSS_NOT_LEADER),
+        Entry::NotEligible => {
+            let event = kind.event();
+            let (least, most, level) = (
+                event.least().to_string(),
+                event.team.end().to_string(),
+                event.levels.start().to_string(),
+            );
+            let vars = [
+                ("least", least.as_str()),
+                ("most", most.as_str()),
+                ("level", level.as_str()),
+            ];
+            vec![Effect::Pink(
+                content::text().get(keys::NEO_BOSS_NOT_ELIGIBLE, &vars),
+            )]
+        }
+        Entry::Busy => pink(keys::NEO_BOSS_BUSY),
+        Entry::Ready => vec![Effect::PortalSound, Effect::StartEvent(kind)],
+    }
+}
+
 /// The portals along the top of each level of Ola Ola's variant 1.
 pub const RAND_OLA: &str = "rand_ola";
 
@@ -3548,6 +3589,33 @@ mod tests {
         assert_eq!(
             latanica_portal(Some(Entry::Ready)),
             [Effect::PortalSound, Effect::StartEvent(EventKind::Latanica)]
+        );
+    }
+
+    #[test]
+    fn each_eras_door_lets_a_party_of_two_or_more_in_to_its_boss() {
+        use crate::events::Entry;
+        assert_eq!(neo_boss_era(240_070_202), Some(1));
+        assert_eq!(neo_boss_era(240_070_602), Some(5));
+        assert_eq!(neo_boss_era(240_070_102), None);
+        assert_eq!(neo_boss_era(240_070_203), None);
+        let text = |key, vars: &[(&str, &str)]| content::text().get(key, vars);
+        let vars = [("least", "2"), ("most", "6"), ("level", "70")];
+        let refused = [
+            (Entry::NoParty, text(keys::NEO_BOSS_NO_PARTY, &[])),
+            (Entry::NotLeader, text(keys::NEO_BOSS_NOT_LEADER, &[])),
+            (Entry::NotEligible, text(keys::NEO_BOSS_NOT_ELIGIBLE, &vars)),
+            (Entry::Busy, text(keys::NEO_BOSS_BUSY, &[])),
+        ];
+        for (entry, line) in refused {
+            assert_eq!(neo_boss_portal(3, entry), [Effect::Pink(line)]);
+        }
+        assert_eq!(
+            neo_boss_portal(3, Entry::Ready),
+            [
+                Effect::PortalSound,
+                Effect::StartEvent(EventKind::NeoBoss(3))
+            ]
         );
     }
 

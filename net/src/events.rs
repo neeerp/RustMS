@@ -144,6 +144,9 @@ pub enum EventKind {
     /// Guardian Nex's room for an era, 0 (Year 2021) to 5 (Year 2503),
     /// taken alone through the Tera Forest's `in00`.
     GuardianNex(u8),
+    /// An era's boss's room, 1 (Year 2099) to 5 (Year 2503), taken by a
+    /// party through the door at the end of the era's way.
+    NeoBoss(u8),
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -4113,6 +4116,52 @@ pub const GUARDIAN_NEX: [Event; 6] = [
     guardian_nex(5),
 ];
 
+/// Each era's boss, Year 2099 to 2503, by era from 1, whose death wins
+/// its room: Bergamot's last form, Dunas, Aufheben, Oberon and
+/// Nibelung's last (Map.nx keeps the first form once, `mobTime` -1, and
+/// each form's `revive` brings out the next), and the minutes a party
+/// has for each (Cosmic `TD_Battle1` to `TD_Battle5`).
+pub const NEO_BOSSES: [i32; 5] = [7220005, 8220010, 8220011, 8220012, 8220015];
+const NEO_BOSS_MINUTES: [u64; 5] = [10, 10, 15, 15, 20];
+/// The map at the end of era `era`'s way, whose `right00`
+/// (`TD_Boss_enter`) leads to its boss.
+pub const fn neo_boss_door(era: u8) -> i32 {
+    240_070_102 + 100 * era as i32
+}
+/// Era `era`'s boss's room.
+pub const fn neo_boss_room(era: u8) -> i32 {
+    neo_boss_door(era) + 1
+}
+
+/// Era `era`'s boss's room, 1 to 5 (Cosmic `TD_Battle`): the leader of a
+/// party of two to six, all of level 70 or more, on the door's map takes
+/// it in, one party at a time an era on a channel. The boss's death wins
+/// it with the clear effect and stops the clock; the party walks out by
+/// `left00` to the era's first map, and the time running out sends them
+/// back to the door. It ends once too few are left.
+const fn neo_boss(era: u8) -> Event {
+    let (door, room) = (neo_boss_door(era), neo_boss_room(era));
+    Event {
+        lobby: door,
+        maps: room..=room,
+        entry: room,
+        exit: door,
+        levels: 70..=u8::MAX,
+        team: 2..=6,
+        minutes: NEO_BOSS_MINUTES[era as usize - 1],
+        until_empty: false,
+        ..LATANICA
+    }
+}
+
+pub const NEO_BOSS: [Event; 5] = [
+    neo_boss(1),
+    neo_boss(2),
+    neo_boss(3),
+    neo_boss(4),
+    neo_boss(5),
+];
+
 /// Happyville (209000000), the Christmas town the Holiday PQ's lobbies
 /// lead back to.
 pub const HAPPYVILLE: i32 = 209_000_000;
@@ -4588,7 +4637,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 66] = [
+    pub const ALL: [EventKind; 71] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4655,6 +4704,11 @@ impl EventKind {
         EventKind::GuardianNex(3),
         EventKind::GuardianNex(4),
         EventKind::GuardianNex(5),
+        EventKind::NeoBoss(1),
+        EventKind::NeoBoss(2),
+        EventKind::NeoBoss(3),
+        EventKind::NeoBoss(4),
+        EventKind::NeoBoss(5),
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -4719,6 +4773,7 @@ impl EventKind {
             EventKind::Treasure => &TREASURE,
             EventKind::MonsterRiding => &MONSTER_RIDING,
             EventKind::GuardianNex(era) => &GUARDIAN_NEX[era as usize % GUARDIAN_NEX.len()],
+            EventKind::NeoBoss(era) => &NEO_BOSS[(era as usize).saturating_sub(1) % NEO_BOSS.len()],
         }
     }
 
@@ -6656,6 +6711,28 @@ mod tests {
         }
         assert_eq!(nex_room(5), 240_070_060);
         assert!(!event_map(TERA_FOREST));
+    }
+
+    #[test]
+    fn each_eras_boss_is_fought_by_a_party_from_its_door() {
+        let minutes = [10, 10, 15, 15, 20];
+        for era in 1..=5 {
+            let boss = EventKind::NeoBoss(era).event();
+            assert_eq!((boss.team.clone(), *boss.levels.start()), (2..=6, 70));
+            assert!(boss.runs == 1 && !boss.alone && !boss.lasts_until_empty());
+            let wanted = Duration::from_secs(minutes[usize::from(era) - 1] * 60);
+            assert_eq!(boss.duration(), scaled(wanted));
+            assert_eq!(
+                (boss.lobby, boss.exit),
+                (neo_boss_door(era), neo_boss_door(era))
+            );
+            assert!(event_map(neo_boss_room(era)) && !event_map(neo_boss_door(era)));
+            assert_eq!((boss.last_stage(), boss.clear_map), (1, None));
+        }
+        assert_eq!(
+            (neo_boss_door(1), neo_boss_room(5)),
+            (240_070_202, 240_070_603)
+        );
     }
 
     #[test]

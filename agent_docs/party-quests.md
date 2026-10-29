@@ -2011,6 +2011,34 @@ quests' are enough.
   time up or a death sends them to the forest. The Time Gate (2083006)
   then offers the era once its quest is done (`map-travel.md`).
 
+## Neo City's era bosses
+
+The map at the end of each era's way but the first's (240070202 to
+240070602, by hundreds; `net::events::neo_boss_door`) has a door,
+`right00` (`TD_Boss_enter`), to the era's boss. The boss is fought in the
+next map (240070203 to 240070603; Cosmic `TD_Battle1` to `TD_Battle5`). The
+event is `events::NEO_BOSS`, `EventKind::NeoBoss(era)` for eras 1 to 5.
+The client actor answers the door (`scripts::NEO_BOSS_IN`,
+`neo_boss_portal`) once the directory says whether the party may go.
+
+- The leader of a party of two to six takes it in. Everyone must be on the
+  door's map and of level 70 or more (Cosmic's; the eras' maps' `lvLimit`
+  runs 70 to 90). One at a time an era on a channel. Refusals are pink:
+  `neo_boss.no_party`, `neo_boss.not_leader`, `neo_boss.not_eligible`
+  (with `{least}`, `{most}` and `{level}`) and `neo_boss.busy`.
+- The minutes are 10, 10, 15, 15 and 20. The room's boss is in Map.nx,
+  out once (`mobTime` -1). Bergamot (7220003) and Nibelung (8220013) each
+  come back twice through their `revive`. The last form wins the event:
+  7220005, Dunas 8220010, Aufheben 8220011, Oberon 8220012, or Nibelung
+  8220015 (`NEO_BOSSES`). It wins with `boss_falls`'s clear effect and
+  sound, played once (the event's own is kept quiet), and the clock
+  stops. There is no reward from the event.
+- The room's `left00` leads to the era's first map. Walking out of a fight
+  not won leaves too few, which ends it and sends the rest to the door
+  (`until_empty: false`, Cosmic `isEventTeamLackingNow`). So does the time
+  running out. A death revives in the Tera Forest, the room's
+  `returnMap`.
+
 ## Kerning Square's Spirit of Rock
 
 For Blake's requests (2286-2288) and "Admission to the VIP Zone" (2291;

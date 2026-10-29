@@ -1010,6 +1010,10 @@ pub mod keys {
     pub const GUARDIAN_NEX_NO_WAY: &str = "guardian_nex.no_way";
     pub const GUARDIAN_NEX_FACED: &str = "guardian_nex.faced";
     pub const GUARDIAN_NEX_BUSY: &str = "guardian_nex.busy";
+    pub const NEO_BOSS_NO_PARTY: &str = "neo_boss.no_party";
+    pub const NEO_BOSS_NOT_LEADER: &str = "neo_boss.not_leader";
+    pub const NEO_BOSS_NOT_ELIGIBLE: &str = "neo_boss.not_eligible";
+    pub const NEO_BOSS_BUSY: &str = "neo_boss.busy";
 
     /// King Pepe's room in the Mushroom Castle: the tower's way in
     /// (`TD_MC_enterboss1`) while another player is in it, and its way out
@@ -4076,6 +4080,10 @@ mod tests {
                 keys::GUARDIAN_NEX_NO_WAY,
                 keys::GUARDIAN_NEX_FACED,
                 keys::GUARDIAN_NEX_BUSY,
+                keys::NEO_BOSS_NO_PARTY,
+                keys::NEO_BOSS_NOT_LEADER,
+                keys::NEO_BOSS_NOT_ELIGIBLE,
+                keys::NEO_BOSS_BUSY,
                 keys::KING_PEPE_BUSY,
                 keys::KING_PEPE_KEY,
                 keys::KING_PEPE_KEY_NO_ROOM,

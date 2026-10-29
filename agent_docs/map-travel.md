@@ -196,7 +196,9 @@ These NPCs warp straight off a menu choice, with no question after it
   it says to beat Guardian Nex first. Up on the `TD_neo` portal beside it
   (`TD_chat_enter`) opens the same conversation.
   The way to Guardian Nex is the forest's `in00` (`TD_neo_inTree`,
-  "Guardian Nex's rooms" in `party-quests.md`).
+  "Guardian Nex's rooms" in `party-quests.md`). Each era but the first
+  ends at a door to its boss, `right00` (`TD_Boss_enter`, "Neo City's era
+  bosses" there).
 
 Their keys (`statue.*`, `crumbling.ask`, `time_gate.*`) are `unsourced`;
 menu labels are map names (`#m<map id>#`). `statues_and_time_gate.rs` checks

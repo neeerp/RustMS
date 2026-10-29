@@ -82,6 +82,12 @@ impl ClientActor {
             (Some(script), Some(_)) if script == scripts::LATANICA_IN => {
                 Some(self.latanica_portal().await?)
             }
+            (Some(script), Some(_)) if script == scripts::NEO_BOSS_IN => {
+                match scripts::neo_boss_era(map_id) {
+                    Some(era) => Some(self.neo_boss_portal(era).await?),
+                    None => None,
+                }
+            }
             (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
                 match scripts::time_leap(&self.in_game()?.player) {
                     Some(effects) => Some(effects),

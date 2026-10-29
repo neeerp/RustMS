@@ -124,7 +124,8 @@ impl ClientActor {
             | EventKind::Dollhouse
             | EventKind::MechanicalParts
             | EventKind::MonsterRiding
-            | EventKind::GuardianNex(_) => return Ok(()),
+            | EventKind::GuardianNex(_)
+            | EventKind::NeoBoss(_) => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
             // Shuang registers guilds, not parties (`talk_to_shuang`).
@@ -1406,6 +1407,15 @@ impl ClientActor {
             .unwrap_or_default())
     }
 
+    /// The door to Neo City era `era`'s boss: the party is let in if the
+    /// directory says it may go.
+    pub(super) async fn neo_boss_portal(&mut self, era: u8) -> Result<Vec<Effect>, RuntimeError> {
+        let entry = self.event_entry(EventKind::NeoBoss(era)).await?;
+        Ok(entry
+            .map(|entry| scripts::neo_boss_portal(era, entry))
+            .unwrap_or_default())
+    }
+
     /// The states of the reactors named `names` on the player's map.
     pub(super) async fn reactor_states(
         &mut self,
@@ -2162,7 +2172,10 @@ impl ClientActor {
             || zakum
             || ticket.kind == EventKind::LudiMaze
             || ticket.kind == EventKind::MonsterRiding
-            || matches!(ticket.kind, EventKind::GuardianNex(_))
+            || matches!(
+                ticket.kind,
+                EventKind::GuardianNex(_) | EventKind::NeoBoss(_)
+            )
             || (ticket.kind == EventKind::Pirate && won)
             || (matches!(ticket.kind, EventKind::Magatia(_))
                 && stage == events::MAGATIA_ROPES_STAGE);
