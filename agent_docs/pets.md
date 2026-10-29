@@ -28,6 +28,11 @@ beside it.
   `PetData::new` named after its kind (String.nx `Pet.img/<id>/name`); a pet
   that was out before gets its stored row instead. Putting it back drops it
   from the list of pets out.
+- **From a script.** `Effect::GivePet` (the Rune Snail of quest 2230) makes
+  a new pet with `net::items::new_pet` and takes its cash serial from the
+  Cash Inventory's own sequence (`db::cash_shop::new_serial`), so that it may
+  go into the Cash Inventory later. The pet row is written when the
+  character is saved.
 - **The list.** `Player.pets` holds the summoned serials in the order the
   client lists them. The list closes up when one leaves, as the client's
   does, so the indexes in packets match. `game::pet::toggle` applies a
@@ -340,6 +345,8 @@ beside it.
   closeness, then gives it a cash food that suits it and one that doesn't.
   It renames the pet with a name tag, checks the 172 for the owner and the
   watcher, and that the watcher sees the new name after the relog.
+- `integration-harness/tests/mysterious_egg.rs` runs quest 2230 from the
+  egg to the Rune Snail and checks the saved pet row and its five hours.
 - `integration-harness/tests/pet_eggs.rs` hatches a Dragon Egg and a named
   Robo Egg, summons both babies, and checks they stay babies after a relog.
 - `integration-harness/tests/pet_evolution.rs` has Garnox refuse a Baby

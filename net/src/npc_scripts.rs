@@ -2873,6 +2873,7 @@ impl NpcScript {
             "q2218s" => informant(player, 2),
             "q2219s" => informant(player, 3),
             "q2228s" => Some(reef()),
+            "q2230e" => Some(mar_egg()),
             "q2238s" => Some(NpcScript::new(
                 MU_YOUNG,
                 vec![Page::Done(vec![Effect::StartQuest(2238)])],
@@ -3517,6 +3518,47 @@ fn trash_can(player: &Player, lost: bool, hour: u8) -> NpcScript {
 fn reef() -> NpcScript {
     let mut script = NpcScript::new(REEF, vec![Page::Say(text(keys::REEF_THANKS))]);
     script.on_end = vec![Effect::FinishQuest(2228), Effect::GainFame(8)];
+    script
+}
+
+const MYSTERIOUS_SMALL_EGG: i16 = 2230;
+const MYSTERIOUS_EGG: i32 = 4032086;
+/// A pet that lives only five hours and is never revived (`noRevive`).
+const RUNE_SNAIL: i32 = 5000054;
+
+/// `q2230e`, A Mysterious Small Egg: Mar the Fairy, whose egg the quest's
+/// start put in the player's pocket, tells of pets and their care and, once
+/// the player agrees, hatches it: the egg is taken, the quest completes and
+/// a Rune Snail comes out, living 5 hours (Cosmic `2230.js`, which first
+/// asks for a free Cash slot). The text is unsourced.
+fn mar_egg() -> NpcScript {
+    let mut talk: Vec<Page> = keys::MAR_EGG_TALK
+        .iter()
+        .map(|key| Page::Say(text(key)))
+        .collect();
+    talk.push(Page::Ask {
+        text: text(keys::MAR_EGG_ASK),
+        on_yes: Vec::new(),
+        on_no: None,
+    });
+    talk.push(Page::Say(text(keys::MAR_EGG_HATCHED)));
+    let menu = Page::Menu {
+        text: text(keys::MAR_EGG_GREETING),
+        choices: vec![(text(keys::MAR_EGG_CHOICE), talk)],
+    };
+    let mut script = NpcScript::new(MAR_THE_FAIRY, vec![menu]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: MYSTERIOUS_EGG,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(MYSTERIOUS_SMALL_EGG),
+        Effect::GivePet {
+            item_id: RUNE_SNAIL,
+            hours: 5,
+        },
+    ];
+    script.inventory_full = Some(text(keys::MAR_EGG_FULL));
     script
 }
 
@@ -15092,6 +15134,46 @@ mod tests {
             read_through(script),
             (REEF, vec![Effect::FinishQuest(2228), Effect::GainFame(8)])
         );
+    }
+
+    #[test]
+    fn mar_hatches_the_egg_into_a_rune_snail_for_five_hours() {
+        let player = with_quests(&[]);
+        let hatch = vec![
+            Effect::TakeItem {
+                item_id: MYSTERIOUS_EGG,
+                quantity: 1,
+            },
+            Effect::CompleteQuest(MYSTERIOUS_SMALL_EGG),
+            Effect::GivePet {
+                item_id: RUNE_SNAIL,
+                hours: 5,
+            },
+        ];
+        let mut script = NpcScript::for_quest("q2230e", &player).unwrap();
+        assert_eq!(script.npc_id(), MAR_THE_FAIRY);
+        assert!(script.begin().prompt.is_some());
+        assert!(script
+            .respond(ScriptInput::Select(0))
+            .unwrap()
+            .prompt
+            .is_some());
+        for _ in 0..4 {
+            assert!(script.respond(ScriptInput::Next).unwrap().prompt.is_some());
+        }
+        assert!(script.respond(ScriptInput::Yes).unwrap().prompt.is_some());
+        let end = script.respond(ScriptInput::Next).unwrap();
+        assert_eq!((end.prompt, end.effects), (None, hatch));
+        assert!(script.inventory_full().is_some());
+
+        // No to the hatching ends it with nothing applied.
+        let mut script = NpcScript::for_quest("q2230e", &player).unwrap();
+        script.respond(ScriptInput::Select(0)).unwrap();
+        for _ in 0..4 {
+            script.respond(ScriptInput::Next).unwrap();
+        }
+        let no = script.respond(ScriptInput::No).unwrap();
+        assert_eq!((no.prompt, no.effects), (None, vec![]));
     }
 
     #[test]

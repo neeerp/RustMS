@@ -607,6 +607,13 @@ pub enum Effect {
         item_id: i32,
         quantity: i16,
     },
+    /// A new pet of `item_id`, named after its kind, that lives `hours`
+    /// from now; it gets a new cash serial. Nothing is applied if the Cash
+    /// inventory is full.
+    GivePet {
+        item_id: i32,
+        hours: u64,
+    },
     /// One piece of equipment with its stats varied as a drop's are
     /// (`items::give_dropped`), as Mos forges with a stimulator.
     GiveVariedItem(i32),

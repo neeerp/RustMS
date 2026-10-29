@@ -1311,6 +1311,20 @@ pub mod keys {
     pub const PET_SECRET: [&str; 2] = ["pet_trainer.secret.0", "pet_trainer.secret.1"];
     pub const PET_SECRET_NO_SNACK: &str = "pet_trainer.secret.no_snack";
 
+    /// "A Mysterious Small Egg" (2230): Mar the Fairy's end script
+    /// (`q2230e`), which hatches the egg into a Rune Snail.
+    pub const MAR_EGG_GREETING: &str = "mar.egg.greeting";
+    pub const MAR_EGG_CHOICE: &str = "mar.egg.choice";
+    pub const MAR_EGG_TALK: [&str; 4] = [
+        "mar.egg.pets",
+        "mar.egg.care",
+        "mar.egg.rune_snail",
+        "mar.egg.short_life",
+    ];
+    pub const MAR_EGG_ASK: &str = "mar.egg.ask";
+    pub const MAR_EGG_HATCHED: &str = "mar.egg.hatched";
+    pub const MAR_EGG_FULL: &str = "mar.egg.full";
+
     /// Garnox's Rock of Evolution scripts (quests 8185, 4659 and 8189).
     pub const PET_EVOLUTION_ASK: &str = "pet_evolution.ask";
     pub const PET_EVOLUTION_DECLINE: &str = "pet_evolution.decline";
@@ -3942,6 +3956,11 @@ mod tests {
             keys::PET_NOTE_HELD,
             keys::PET_NOTE_NOTHING,
             keys::PET_SECRET_NO_SNACK,
+            keys::MAR_EGG_GREETING,
+            keys::MAR_EGG_CHOICE,
+            keys::MAR_EGG_ASK,
+            keys::MAR_EGG_HATCHED,
+            keys::MAR_EGG_FULL,
             keys::PET_EVOLUTION_ASK,
             keys::PET_EVOLUTION_DECLINE,
             keys::PET_EVOLUTION_DONE,
@@ -4228,6 +4247,7 @@ mod tests {
             .chain(&keys::JEWEL_NOTICE)
             .chain(&keys::MILK_COW_FILLS)
             .chain(&keys::PET_SECRET)
+            .chain(&keys::MAR_EGG_TALK)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)
             .chain(&keys::HPQ_GROWLIE_ABOUT_PAGES)
             .chain(&keys::ENGAGEMENT)

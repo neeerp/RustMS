@@ -319,6 +319,27 @@ impl ClientActor {
                     packets.push(inventory::build_inventory_operation(false, &changes)?);
                     packets.push(inventory::build_item_gain_in_chat(*item_id, 1)?);
                 }
+                Effect::GivePet { item_id, hours } => {
+                    let until = SystemTime::now() + Duration::from_secs(hours * 3600);
+                    let Some(pet) = net::items::new_pet(*item_id, until) else {
+                        warn!(item_id, "Script pet unknown; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    if next.inventory.clone().add(pet.clone(), 1).is_err() {
+                        return Ok(Applied::NoRoom);
+                    }
+                    let serial = spawn_db(db::cash_shop::new_serial).await?;
+                    let pet = game::Item {
+                        cash_serial: Some(serial),
+                        ..pet
+                    };
+                    let Ok(changes) = next.inventory.add(pet, 1) else {
+                        return Ok(Applied::NoRoom);
+                    };
+                    changed = true;
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
+                    packets.push(inventory::build_item_gain_in_chat(*item_id, 1)?);
+                }
                 Effect::TakeItem { item_id, quantity } => {
                     let Ok(changes) = next.inventory.remove(*item_id, *quantity) else {
                         warn!(item_id, "Script item no longer held; nothing applied");
