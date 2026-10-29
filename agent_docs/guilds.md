@@ -167,9 +167,9 @@ case (a unique index on `lower(name)`).
 ### Guild points
 
 - A guild's points (GP) are `guilds.points`, sent in the guild's record.
-  They rank the guild (above) and will come from the Guild Quest
-  ([guild-quest](./guild-quest.md)); for now
-  a GM's `!gp <amount>` and a script's `Effect::GainGuildPoints` add them
+  They rank the guild (above) and come from the Guild Quest's stages
+  ([guild-quest](./guild-quest.md)); a GM's `!gp <amount>` and a
+  script's `Effect::GainGuildPoints` add them too
   (`GuildRequest::GainPoints`, `gain_guild_points` in
   `runtime/src/actor/client/guilds.rs`). Nothing happens without a guild.
 - `db::guild::add_points` adds the amount under the guild's lock and never
@@ -558,8 +558,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- The Guild Quest's stages, so guild points have no source in play yet
-  ([guild-quest](./guild-quest.md)).
 - The alliance's rank panel slides no more than the guild's.
 - The Alliance tab's tooltips: the whole notice over its box, the online
   and total counts, "Sort thru" over the column heads, and "Unknown" over a

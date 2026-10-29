@@ -355,9 +355,11 @@ from `UI.nx`. Moved so far:
   alliance from CHAR_INFO, laid out from the background and the v83 client.
   Double-clicking someone else replaces the window. TAMING MOB, PET INFO, and
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
-  and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
-  RustMS has no mounts or monster book, and the pet and wish list pages are
-  not read. Excluded items are disabled. Family opens the player's own Family
+  and WISHLIST open `backgrnd4` and `backgrnd3` beside it. The pet page shows
+  the pets out and the taming page the mount worn, from CHAR_INFO; the
+  collection, item and wish list pages are empty, as the server sends an
+  empty wish list and monster book there and the client skips them.
+  Excluded items are disabled. Family opens the player's own Family
   window or someone else's Family Tree (`agent_docs/families.md`). REQ PARTY, greyed in the
   player's own window, invites the character when the player leads a party,
   and otherwise does nothing (v83 FUN_008ff5b0). TRADE, also greyed in the
@@ -605,10 +607,8 @@ on. Only one slider can be held at a time.
 
 ## What works and what is stubbed
 
-This is client-side capability only. The RustMS server currently implements
-login, character management, movement, chat, whispers, portals, channel
-changes, NPC dialogue, and a few quests; everything else below has no server
-side yet.
+This is client-side capability only; the server's side of each is in the
+doc named on its row.
 
 | Area | Status |
 | --- | --- |
@@ -655,7 +655,7 @@ side yet.
 | Cash weapons (`CashWeapon`, `CharEquips`) | Implemented, as v83 does (0x41272c, 0x412929, 0x460aa0): a cash weapon (1702xxx, worn at -111) is drawn in the regular weapon's place from `Weapon/<id>.img/<type>`, where the type is the regular weapon's id / 10000 % 100 (30-33, 37-49). A cash weapon with no art for that type, or worn with no regular weapon, shows no weapon at all. The regular weapon keeps its stances, sounds and speed. The player's, other characters' and the character select's avatars all draw it |
 | Set effects (`SetEffect`, `SetEffectRules`) | Implemented, as v83 does (FUN_005d925d, FUN_009393fc): a character, the player's or another's, who wears one of each of a set's groups in `Effect.nx SetEff.img` (sets by number, not by name order) shows its `effect`, looping, and its `backgrnd`, which fades out over 500 ms when they don't stand or attack, and comes back from its start after they have stood for 1.5 s. A group's items are looked for in the body parts of its first item, not in the part its name gives: group 0 is the hair, a ring is on any finger, and a cash weapon stands in for the weapon under it, so `CharLook` keeps it. The `multipet` sets need three listed pets out. A `cash` set wins over a plain one, and a plain one over a pets' one, though a second pets' set takes a plain one's place if no plain set came first; a morph or a ghost shows none, and so do the character select and the Cash Shop. The two pets' sets, 63 and 66, also put a `petBackgrnd` behind each pet, on its feet: a random one of the set's, each once before any again, mirrored as the character faced when it came. It hides and returns with the character's background, as another random one; a pet who takes a listed pet's place within the same set has none, as in v83 |
 | Boss HP bar (`UIMobGage`) | Implemented: FIELD_EFFECT mode 5 and `HPgaugeHide` mobs' hits show v83's bar right of the minimap, with the mob's name over its icon; see `combat.md` |
-| Map traps (`obstacle` objs) | Implemented: the client tests the traps' frame boxes each tick, rolls and reports the hit as TAKE_DAMAGE -3 with v83's push, and follows a `targetField`; trap damage to mobs is not done; see `combat.md` |
+| Map traps (`obstacle` objs) | Implemented: the client tests the traps' frame boxes each tick, rolls and reports the hit as TAKE_DAMAGE -3 with v83's push, and follows a `targetField`; traps with `mobdamage` hurt mobs once a second (`MapMobs::hit_traps`, FIELD_DAMAGE_MOB); see `combat.md` |
 | Field shake (`TrembleRules`) | Implemented, as v83's SetTremble does: FIELD_EFFECT mode 1, Zakum's body appearing, Zakum, Horntail and Balrog dying, mob attacks with `tremble`, and Shout, Dragon Roar, Bamboo Rain and Rage of Pharaoh shake the field's view but not the UI. Every 30 ms the view moves up to the force off the player in each direction, and the force fades by 0.92 a tick (0.85 for a heavy shake). Others' skills shake it less the further they are, to nothing at 400 px. The ShakeScreen option turns it off, except for Horntail's deaths |
 | Bamboo Rain and Rage of Pharaoh's black (`BlackoutRules`) | Implemented, as v83's FUN_004370cd: a black layer over the whole view, just behind the local player, fades in over 720 ms, stays 3200 ms and fades out over 520 ms, starting at the cast. One's own Bamboo Rain lays two layers at once, which are darker during the fades. One's own Rage of Pharaoh lays one, except the Evan copy 20011020, which lays none. Someone else's lays one. The ShakeScreen option does not turn it off |
 | Field effects (`FieldEffectRules`) | Implemented, as v83's FIELD_EFFECT handler does: mode 0 plays `Effect.nx Summon.img/<n>` at a point on the map and its `Sound.nx Summon.img/<n>` louder the nearer the player is; mode 3 plays `Map.nx Effect.img/<path>` once at (400, 260) of an 800x600 view, stacking, and above the windows when the node has a `z`; mode 4 plays `Sound.nx Field.img/<path>` once; mode 6 changes the BGM until the next map; mode 7 spins the reward roulette's three `miro` reels above the windows. A new BGM, a map's included, waits for the last one to fade out over 600 ms. Mode 2 shows a named map object; see "Named map objects" |
@@ -672,11 +672,14 @@ side yet.
 | Account grade (`AccountGrade`) | As v83 does (report b156): the login result's grade and sub-grade bytes are kept. A GM's account (grade bit 0) refuses trades and opening a store with the chat line "Not available with an Admin account." and sends its unknown `/` lines as chat; the admin account (grade 0x11) also refuses dropping items ("The admin can't drop items.") and mesos ("The Admin account can't throw away the money."); ADMIN_COMMAND 0x11 goes out on each map change only for the sub-grade's 0x80. Not done: the sub-grade 0x80's refusal of attacks ("MWLB"), which the server never sends |
 | GM slash commands (`GmCommand`, `GmCommands`) | As v83 does (report b175): for grade bit 0 or a sub-grade of 0x20, 0x40 or 0x80, and by the rank `AccountGrade::rank` gives as FUN_0052f031 does, the chat bar reads `/h N`, `/ch N`, `/u`, `/w NAME MSG` (a warning, so a GM's `/w` doesn't whisper), `/ban NAME`, `/uclip`, the twelve `/alert*`, `/notice*` and `/slide*` broadcasts with `/alertm` and `/noticem`, and `/slideax`, before the players' commands; each is followed by ADMIN_LOG with the line (see "The client's slash commands" in `server-architecture.md`). ADMIN_RESULT (144, `AdminResult`) shows the server's answers as v83's FUN_005352e9 does: lines for modes 4, 5, 6, 9, 0x13 (a hired merchant's map or channel, which reads 0x1d's byte after), 0x1d, 0x1e and 0x26, and the minimap off and on for 0x1b and 0x1c. Not done: `/flag`, `/block`'s dialog, `/c`, `/clip`, and `/u N` |
 | Raise items (`Character/Inventory/Raise.h`, `UIRaise`) | Implemented, as v83's `CUIRaise`: double-clicking a 4220 item with a record, art and grade opens its window, which sends 0xED and asks for its record with 0xEC; items dropped on it are fed with 0xEE, and quest record messages for its record grow it or close it. See "Raise items" in `inventory.md` |
-| Player shops, mini-games, memo/mail | No UI, no handlers |
-| Reactors | Spawning, swings, skills, touch, hits and breaking; no quest gates; see `combat.md` |
-| Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |
-| Mounts, summons | Partial or absent |
-| Party/guild/boss quests, events, MTS | Absent |
+| Personal shops, hired merchants (`UIPersonalShop`) | Implemented; see "Personal shops" and "Hired merchants" in `inventory.md` |
+| Mini-games (`UIMiniGameCreate`, `UIOmok`, `UIMatchCards`) | Omok and match cards, opened from an Etc game set; the server's side is `net::mini_game` |
+| Notes (`UIMemo`, `UIMemoSend`, `UIMemoNotice`) | Implemented; see `notes.md` |
+| Reactors | Spawning, swings, skills, touch, hits and breaking; a swing at a reactor whose `info/quest` isn't in progress is skipped; see `combat.md` |
+| Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food, hunger, name tags, equipment, looting, the exception list and auto potions; see `pets.md` |
+| Mounts, summons | Riding, with the mount's effects (`Player::change_ride`), and summons (`MapSummons`); see "Mounts" and "Summons" in `combat.md` |
+| Party quests, the Guild Quest, bosses, events | See the docs for each in the index of `AGENTS.md` |
+| MTS | Absent, client and server |
 
 93 outbound opcodes are defined (`Net/OutPacket.h`) and 120 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
@@ -990,16 +993,14 @@ the screen size.
 
 | System | Client status | Effort |
 | --- | --- | --- |
-| Guild | Window, founding, invitations, leaving and expelling, ranks, titles, the notice, growing and disbanding, the emblem maker, the board (reading, writing, editing, the notice, replying and deleting), the ranking | M |
-| Player shops | Nothing | L |
-| Cash shop | No charging or storage window | S |
-| Quest accept/complete UI flow | Partial | S |
-| Pets | Summon, follow, chat commands, food, cash food, name tags, equipment, looting, the exception list and auto potions | M |
-| Mounts | Partial rendering, no interaction | M |
-| Memo, mail, MTS | Nothing | M each |
-| Buddy whisper/find modes | Ignored | S |
-| Mini-dungeons | Copies load their body through `info/link`; the field clock shows the time limit | - |
-| Boss/event UI | Nothing | M |
+Most systems are done; each doc's "Not done" list has its smaller gaps.
+What is left that is larger:
+
+| System | Client status | Effort |
+| --- | --- | --- |
+| MTS | Nothing, client or server | L |
+| Cash shop | CHARGE does nothing | S |
+| Character info | The collection, item and wish list pages are empty | S |
 
 ## Protocol deviations fixed
 
