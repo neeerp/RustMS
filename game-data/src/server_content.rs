@@ -1059,6 +1059,7 @@ pub mod keys {
     pub const THIEF_DOOR_ASK: &str = "thief_door.ask";
     pub const THIEF_DOOR_WRONG: &str = "thief_door.wrong";
     pub const THIEF_DOOR_SHUT: &str = "thief_door.shut";
+    pub const FORGOTTEN_DARKNESS_FULL: &str = "forgotten_darkness.full";
 
     /// "Gathering Some Strange Information" (21733): the Puppeteer's call
     /// in Tru's name (1204007, `q21733s`), and Tru (1002104, `q21733e`) on
@@ -4076,6 +4077,7 @@ mod tests {
                 keys::THIEF_DOOR_ASK,
                 keys::THIEF_DOOR_WRONG,
                 keys::THIEF_DOOR_SHUT,
+                keys::FORGOTTEN_DARKNESS_FULL,
                 keys::FRANCIS_INTRUDER,
                 keys::FRANCIS_HIDEOUT_BUSY,
                 keys::FAKE_TRU_CALL,

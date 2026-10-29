@@ -524,6 +524,16 @@ const BERSERK_KEY: i32 = 4031475;
 /// The Cold Flame, which opens the way to the resurrection mound.
 const COLD_FLAME: i32 = 4001108;
 const TORNADO_PROOF: i32 = 4001110;
+/// Resurrection, the Bishop's fourth job quest, whose proof is taken on the
+/// way out of the Forgotten Darkness.
+const RESURRECTION_QUEST: i16 = 6134;
+const RESURRECTION_PROOF: i32 = 4031448;
+/// The Forgotten Darkness's way out, to the Hidden Tower's portal 3.
+const FORGOTTEN_DARKNESS_EXIT: (i32, u8) = (220070400, 3);
+/// Griffey's and Manon's Forests in Leafre and the Isolated Forest between.
+const ISOLATED_FOREST: i32 = 240020600;
+const GRIFFEY_FOREST: i32 = 240020101;
+const MANON_FOREST: i32 = 240020401;
 /// The shortcut between the Field Up North of Ellinia and Leafre's Minar
 /// Forest (`minar_elli`), which spends a Magic Seed each way.
 const FIELD_NORTH_OF_ELLINIA: i32 = 101010000;
@@ -1570,6 +1580,43 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             );
             out
         }
+        // The way out of the Forgotten Darkness, which gives a Bishop on
+        // Resurrection (6134) its proof when the Etc tab has room (Cosmic
+        // `s4resur_out`).
+        "s4resur_out" => {
+            let (map, at) = FORGOTTEN_DARKNESS_EXIT;
+            let mut out = through(Effect::WarpToPortal(map, at));
+            if quest(RESURRECTION_QUEST) == QuestState::Started {
+                if !crate::items::fits_until(&player.inventory, RESURRECTION_PROOF, 1, None) {
+                    return Some(refused(keys::FORGOTTEN_DARKNESS_FULL));
+                }
+                let proof = Effect::GiveItem {
+                    item_id: RESURRECTION_PROOF,
+                    quantity: 1,
+                };
+                out.effects.insert(0, proof);
+            }
+            out
+        }
+        // Griffey's and Manon's Forests lead into the Isolated Forest, and
+        // its two ways lead back (Cosmic `inNix1`, `inNix2`, `outNix1`,
+        // `outNix2`).
+        "inNix1" => through(Effect::WarpToPortal(
+            ISOLATED_FOREST,
+            named(ISOLATED_FOREST, "out00"),
+        )),
+        "inNix2" => through(Effect::WarpToPortal(
+            ISOLATED_FOREST,
+            named(ISOLATED_FOREST, "out01"),
+        )),
+        "outNix1" => through(Effect::WarpToPortal(
+            GRIFFEY_FOREST,
+            named(GRIFFEY_FOREST, "in00"),
+        )),
+        "outNix2" => through(Effect::WarpToPortal(
+            MANON_FOREST,
+            named(MANON_FOREST, "in00"),
+        )),
         "balogTemple" => through(Effect::WarpToPortal(
             UNDERGROUND_TEMPLE_STAIRS,
             named(UNDERGROUND_TEMPLE_STAIRS, "top00"),
@@ -4317,6 +4364,29 @@ mod tests {
             .insert(InventoryType::Etc, 1, game::Item::stack(4000000, 1));
         let refused = portal("balog_end", &full).unwrap().effects;
         let room = content::text().get(keys::BALROG_END_FULL, &[]);
+        assert_eq!(refused, [Effect::Pink(room)]);
+        assert_eq!(go("inNix1", &fresh), Some((ISOLATED_FOREST, 1)));
+        assert_eq!(go("inNix2", &fresh), Some((ISOLATED_FOREST, 2)));
+        assert_eq!(go("outNix1", &fresh), Some((GRIFFEY_FOREST, 3)));
+        assert_eq!(go("outNix2", &fresh), Some((MANON_FOREST, 3)));
+        let exit = [
+            Effect::PortalSound,
+            Effect::WarpToPortal(FORGOTTEN_DARKNESS_EXIT.0, FORGOTTEN_DARKNESS_EXIT.1),
+        ];
+        assert_eq!(portal("s4resur_out", &fresh).unwrap().effects, exit);
+        let bishop = player_with(&[(RESURRECTION_QUEST, QuestState::Started)]);
+        let proof = Effect::GiveItem {
+            item_id: RESURRECTION_PROOF,
+            quantity: 1,
+        };
+        let given = portal("s4resur_out", &bishop).unwrap().effects;
+        assert_eq!(given, [&[proof][..], &exit].concat());
+        let mut full = player_with(&[(RESURRECTION_QUEST, QuestState::Started)]);
+        full.inventory.set_slot_limit(InventoryType::Etc, 1);
+        full.inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4000000, 1));
+        let room = content::text().get(keys::FORGOTTEN_DARKNESS_FULL, &[]);
+        let refused = portal("s4resur_out", &full).unwrap().effects;
         assert_eq!(refused, [Effect::Pink(room)]);
         assert_eq!(
             go("enterNepenthes", &fresh),
