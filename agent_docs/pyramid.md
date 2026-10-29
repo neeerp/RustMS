@@ -11,6 +11,11 @@ and clocks, its tally and gauge, its blessings and uses of Rage of Pharaoh,
 its score, Duarte's medal, the Shades' gems and Pharaoh Yeti's Tomb are
 in.
 
+The Abandoned Subway's Dusty Platform, under Kerning City, is a run of the
+same kind, with its own section below (`EventKind::Subway`). The two are
+the Massacre runs (`EventKind::massacre`), and share the tally, the gauge,
+the blessings, the score and the packets.
+
 ## Maps
 
 - The lobby, 926010000, is reached from Ariant by Nett (`nets_in`), and
@@ -131,8 +136,8 @@ mode on a channel, as many as the maps have copies.
 
 - Dalair (9000066) starts 29932 from level 40 and ends it when record 7760
   is 50000 or more (`RECORD_QUESTS`). The quest's own Act gives nothing.
-- Every kill and cool kill a player makes in a run adds to their own 7760
-  (`ClientActor::count_protector_kills`, before the run hears of it), saved
+- Every kill and cool kill a player makes on a Pyramid stage adds to their own 7760
+  (`ClientActor::count_massacre_kills`, before the run hears of it), saved
   with the player and sent as a quest record. Misses don't count, and the
   count goes on after 50000.
 - Duarte's fifth choice gives the medal, 1142142
@@ -167,6 +172,48 @@ b161.
   (`reward_overrides.toml`).
 - The room's `out00` portal goes back to the lobby, which ends the event.
 - The words are placeholders (`pyramid.duarte.tomb*`, `shades_*`).
+
+## The Dusty Platform (`EventKind::Subway`)
+
+The RE is in v83ref `reports/b318-dusty-platform.md`. Cosmic has only Mr.
+Lim's script (`1052115.js`) and the Mirror's option; the run's rules are
+the Pyramid's, with guesses noted in v83ref `lanes/QUESTIONS.md` (b319).
+
+- The way in: the Dimensional Mirror's sixth place (Construction Site, 25
+  to 30) lands on the Abandoned Subway Station (910320000) by its `out00`,
+  saving the town as `DOJO_RETURN`. The Construction Site's own tunnel
+  (`102040000` `subway00`, `met_in`) leads there too. The station's `out00`
+  (`met_out`) goes back to the saved town, or else to the Construction
+  Site's portal 12. Its `metro00` opens Mr. Lim, and `chat00` shows the
+  `Direction2.img/metro/Im` effect.
+- Mr. Lim (1052115) on the station: a menu of entering and the medal.
+  The party's leader takes in the members of level 25 to 30 on the map,
+  one to six of them, in up to 5 runs at once on a channel.
+  Without a party, or as a member, one hears the terms. On a stage he lets
+  one leave for the station; on the result map (910320001) he sends one
+  there at once.
+- The run: three stages, 910320100, 910320200 and 910320300, of 3 minutes
+  each, each in the event's own copy (the NX's copies 1 to 4 are not
+  used). After the third, or once the gauge runs out, the run ends on
+  910320001, with PYRAMID_SCORE.
+- The score: outlasting the third stage's clock gives S at 1930 kills, A
+  at 1290, B at 964, C at 321, else D; with the gauge run out, C at 1290,
+  else D. EXP by rank: S 13500, A 9500, B 5400, C 2700, D 0, then 2 for a
+  kill and 10 for a cool kill (`pyramid::SUBWAY_RANKS`).
+- Honorary Subway Worker (quest 29931): Dalair (9000066) starts it from
+  level 25 and ends it when record 7662 is 10000 or more
+  (`RECORD_QUESTS`). Every kill and cool kill on a stage adds to the
+  player's 7662, and to 7762, which the quest's window shows
+  (`pyramid::kill_records`). Mr. Lim's second choice gives the Honorary
+  Employee Medal, 1142141, from 10000, as Duarte gives his: not to one who
+  holds it, nor with a full Equip bag. It ends 29931 too, starting it first
+  for one who never took it (`Effect::FinishQuest`).
+- The stages' own `mobMassacre`: a gauge of 100 losing 1 a second, 1 back
+  for a kill, 10 for a cool kill, 5 off for a miss; Power Buff Lv.1 and
+  Lv.2 (2022616, 2022617) at 100 and 300 kills; no Rage of Pharaoh, which
+  stays the Pyramid's; and `disableSkill`.
+- Not in: Train 999 and its bonus room (910320010), the Platform Pass
+  (4001321), and the 910330xxx set and its Last Platform.
 
 ## Stage rules (`FieldTemplate::massacre`)
 

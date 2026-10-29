@@ -81,10 +81,11 @@ const YULETE_LAB: i32 = 926130000;
 const YULETE_LAB_WAY_OUT: u8 = 2;
 /// How near a scripted item's portal the player must stand.
 const ITEM_REACH: f64 = 210.0;
-/// Kerning City's subway: Line 1's first area, and its second, where the
-/// construction site's tunnel comes out.
+/// Kerning City's subway: Line 1's first area.
 const LINE_1_AREA_1: i32 = 103000101;
-const LINE_1_AREA_2: i32 = 103000103;
+/// The construction site whose `subway00` (portal 12) leads down to the
+/// Abandoned Subway.
+const CONSTRUCTION_SITE: i32 = 102040000;
 /// Find Fresh Milk, whose bottles run empty to full; the stable's way out
 /// (`end_cow`) leads back to Tangyoon's kitchen once the bottle is full.
 pub(crate) const FRESH_MILK: i16 = 2180;
@@ -1555,7 +1556,30 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             named(LINE_1_AREA_1, "out00"),
         )),
         // The second of the area's spawn points, as in Cosmic.
-        "met_in" => through(Effect::WarpToPortal(LINE_1_AREA_2, 1)),
+        // Down to the Abandoned Subway's hub (Cosmic `met_in`'s commented
+        // line), and back up to where the Dimensional Mirror sent the
+        // player from, or else here (`met_out`); its `metro00` is a way to
+        // Mr. Lim (`metro_in00`), and `chat00` warns those of other levels
+        // off (`metro_Chat00`, whose `showWZEffect` Cosmic lacks).
+        "met_in" => through(Effect::WarpToPortal(
+            crate::events::SUBWAY_LOBBY,
+            crate::events::SUBWAY_ARRIVAL_PORTAL,
+        )),
+        "met_out" => {
+            let back = player.saved_locations.get(&DOJO_RETURN).copied();
+            go_back(
+                DOJO_RETURN,
+                back.map_or(Effect::WarpToPortal(CONSTRUCTION_SITE, 12), Effect::Warp),
+            )
+        }
+        "metro_in00" => opens(crate::npc_scripts::MR_LIM),
+        "metro_Chat00" => ScriptOutcome {
+            effects: vec![Effect::ScenePart(
+                "Effect/Direction2.img/metro/Im".to_string(),
+            )],
+            block: false,
+            occupied: None,
+        },
         "end_cow"
             if quest(FRESH_MILK) == QuestState::Started
                 && MILK_BOTTLES[..3]
@@ -4073,6 +4097,39 @@ mod tests {
     }
 
     #[test]
+    fn the_abandoned_subways_hub_leads_back_to_where_the_mirror_sent_one_from() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = crate::events::SUBWAY_LOBBY;
+        let back = |player: &Player| portal("met_out", player).unwrap().effects;
+        let forget = Effect::SaveLocation(DOJO_RETURN, None);
+        assert_eq!(
+            back(&player),
+            [
+                forget.clone(),
+                Effect::PortalSound,
+                Effect::WarpToPortal(CONSTRUCTION_SITE, 12)
+            ]
+        );
+        player.saved_locations.insert(DOJO_RETURN, 220000000);
+        assert_eq!(
+            back(&player),
+            [forget, Effect::PortalSound, Effect::Warp(220000000)]
+        );
+        assert_eq!(
+            portal("metro_in00", &player).unwrap().effects,
+            [Effect::OpenNpc(crate::npc_scripts::MR_LIM)]
+        );
+        let warned = portal("metro_Chat00", &player).unwrap();
+        assert_eq!(
+            warned.effects,
+            [Effect::ScenePart(
+                "Effect/Direction2.img/metro/Im".to_string()
+            )]
+        );
+        assert!(!warned.block);
+    }
+
+    #[test]
     fn the_subways_tunnels_and_the_halls_rooms_open_with_the_portal_sound() {
         let mut player = player_with(&[]);
         let warp = |script, player: &Player| match portal(script, player).unwrap().effects[..] {
@@ -4080,7 +4137,7 @@ mod tests {
             ref effects => panic!("{effects:?}"),
         };
         assert_eq!(warp("subway_in2", &player), (103000101, 3));
-        assert_eq!(warp("met_in", &player), (103000103, 1));
+        assert_eq!(warp("met_in", &player), (910320000, 2));
         assert_eq!(warp("inERShip", &player), (101000400, 2));
         assert_eq!(warp("enterPort", &player), (140020300, 1));
         for (hall, room, id) in [

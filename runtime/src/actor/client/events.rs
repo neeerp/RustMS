@@ -87,6 +87,7 @@ impl ClientActor {
             EventKind::PrimeMinister => NpcScript::blocked_entrance(entry),
             EventKind::Amoria => NpcScript::amos_lobby(entry),
             EventKind::Magatia(side) => NpcScript::magatia(side, entry),
+            EventKind::Subway => NpcScript::mr_lim(entry, &self.in_game()?.player),
             EventKind::Dojo => {
                 // He offers the run with a party too.
                 let Some(party) = self.event_entry(EventKind::DojoParty).await? else {
@@ -1697,9 +1698,10 @@ impl ClientActor {
     }
 
     /// The player's own kills and cool kills on a Nett's Pyramid stage
-    /// count toward Protector of Pharaoh (record 7760), whether or not its
-    /// quest has started.
-    pub(super) async fn count_protector_kills(
+    /// count toward Protector of Pharaoh (record 7760), and on a Dusty
+    /// Platform stage toward Honorary Subway Worker (7662, shown as 7762),
+    /// whether or not the quest has started.
+    pub(super) async fn count_massacre_kills(
         &mut self,
         hits: net::pyramid::Hits,
     ) -> Result<(), RuntimeError> {
@@ -1707,20 +1709,25 @@ impl ClientActor {
         if kills == 0 || self.game.is_none() {
             return Ok(());
         }
-        let player = &mut self.in_game_mut()?.player;
-        let count = net::pyramid::protector_kills(player).saturating_add(kills);
+        let game = self.in_game_mut()?;
+        let records = net::pyramid::kill_records(game.field.key.map_id);
+        let player = &mut game.player;
+        let count = net::pyramid::kills_in(player, records[0]).saturating_add(kills);
         let count = count.to_string();
-        player
-            .quests
-            .set_record(net::pyramid::PROTECTOR_KILLS, &count);
+        for &record in records {
+            player.quests.set_record(record, &count);
+        }
         player.mark_dirty();
-        let mut packet = build_quest_record(net::pyramid::PROTECTOR_KILLS, &count)?;
-        self.send(&mut packet).await
+        let mut packets = (records.iter())
+            .map(|&record| build_quest_record(record, &count))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.send_all(&mut packets).await
     }
 
-    /// A Nett's Pyramid run ended with `rank` and `exp`: a player its end
-    /// took to its result map, `exit`, sees them on the result screen and
-    /// gets the EXP (Cosmic `sendScore`, with no rates).
+    /// A Massacre run ended with `rank` and `exp`: a player its end took to
+    /// its result map, `exit`, sees them on the result screen and gets the
+    /// EXP (Cosmic `sendScore`, with no rates). A Pyramid run `cleared`
+    /// offers its mode's Tomb in the Shades.
     pub(super) async fn pyramid_score(
         &mut self,
         exit: i32,
@@ -1731,8 +1738,9 @@ impl ClientActor {
         if self.in_cash_shop || self.in_game()?.player.stats.map_id != exit {
             return Ok(());
         }
-        if cleared {
-            self.in_game_mut()?.player.pyramid_gem = Some(exit - events::PYRAMID_RESULT);
+        let gem = exit - events::PYRAMID_RESULT;
+        if cleared && (0..events::PyramidMode::ALL.len() as i32).contains(&gem) {
+            self.in_game_mut()?.player.pyramid_gem = Some(gem);
         }
         let mut packets = vec![build_pyramid_score(rank, exp)?];
         if exp > 0 {

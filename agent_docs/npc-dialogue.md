@@ -369,10 +369,11 @@ places this server runs:
 | 1 | Mu Lung Dojo | 25 and up | `DOJO_RETURN` | 925020000, portal 0 |
 | 2 | Monster Carnival | 30 to 50 | `CARNIVAL_RETURN` | 980000000, portal 3 |
 | 5 | Nett's Pyramid | 40 and up | `PYRAMID_RETURN` | 926010000, portal 4 |
+| 6 | Abandoned Subway (Construction Site) | 25 to 30 | `DOJO_RETURN` | 910320000, portal 2 |
 
 Each place's way out (`dojang_exit`, `mc_out`, `aMatchMove2`, the
-Pyramid lobby's `out00`) goes back to the saved town. A player who may go nowhere sees
-`#-1#` and the `mirror.nowhere` line. Cosmic's second Carnival (3) and its Construction Site (6) have no event here.
+Pyramid lobby's `out00`, `met_out`) goes back to the saved town. A player who may go nowhere sees
+`#-1#` and the `mirror.nowhere` line. Cosmic's second Carnival (3) has no event here.
 
 ## Assets and validation
 

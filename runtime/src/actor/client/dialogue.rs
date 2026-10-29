@@ -169,6 +169,9 @@ impl ClientActor {
         if npc_id == net::npc_scripts::DUARTE && player.stats.map_id == net::events::PYRAMID_LOBBY {
             return self.talk_to_duarte().await;
         }
+        if npc_id == net::npc_scripts::MR_LIM && player.stats.map_id == net::events::SUBWAY_LOBBY {
+            return self.talk_about_event(net::events::EventKind::Subway).await;
+        }
         if npc_id == net::npc_scripts::SPIEGELMANN
             && player.stats.map_id == net::carnival::CARNIVAL_LOBBY
         {

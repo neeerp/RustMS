@@ -352,8 +352,8 @@ pub struct FieldActor {
     /// On a copy of a Mu Lung Dojo floor, its boss until its challenger
     /// first arrives and it comes out (Cosmic `dojang_1st`).
     dojo_boss: Option<i32>,
-    /// A copy of a Nett's Pyramid stage, whose kills, cool kills and
-    /// misses its run counts.
+    /// A copy of a Massacre stage, Nett's Pyramid's or the Dusty
+    /// Platform's, whose kills, cool kills and misses its run counts.
     massacre: bool,
     /// A copy of a Monster Carnival battle field, whose kills earn CP.
     carnival: bool,
@@ -474,7 +474,7 @@ impl FieldActor {
             escort_fainted: false,
             jail: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
-            massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
+            massacre: net::events::massacre_stage(key.map_id) && key.instance_id != 0,
             carnival: net::carnival::battle_room(key.map_id).is_some() && key.instance_id != 0,
             guardians: Vec::new(),
             kites: KiteSet::default(),

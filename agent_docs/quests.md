@@ -795,6 +795,7 @@ Not supported: the quests reading another record that no script sets.
 | 6363 A New Revelation | 6364 to "2" | the past Papulatus (2043000) sending the Buccaneer back from 922020300 |
 | 6410 Mission Free the Monsters | 6411 to "p2" | the way out of Save Delli! (925010300) once Willi is saved |
 | 29932 Protector of Pharaoh | 7760, a count | each of the player's own kills and cool kills in Nett's Pyramid; Duarte (2103013) gives medal 1142142 at 50000 |
+| 29931 Honorary Subway Worker | 7662, a count, mirrored in 7762 for the quest window | each of the player's own kills and cool kills on the Dusty Platform; Mr. Lim (1052115) gives medal 1142141 at 10000 |
 | 3250 A Cute Baby Bird | 7067 to "3000" | Bird Feed (4031992) dropped on the Timer's Egg's raise window, 100 each (`world/raise.rs`, see "Raise items" in `inventory.md`) |
 | 21742 The Black Scroll | 21763 to "800" | Special Ink (4032342) dropped on Mr. Do's Hanging Scroll's (4220151) raise window, 100 each, likewise |
 

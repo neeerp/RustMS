@@ -1833,7 +1833,7 @@ impl ClientActor {
                     .await
             }
             ServerMessage::Massacre(hits) => {
-                self.count_protector_kills(hits).await?;
+                self.count_massacre_kills(hits).await?;
                 self.tell_event(net::events::EventCommand::Massacre(hits))
                     .await
             }

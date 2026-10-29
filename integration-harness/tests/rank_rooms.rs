@@ -1,6 +1,7 @@
 //! Portals that open with the portal sound and no condition: the job halls'
-//! rooms (`rankRoom`), and Kerning City's subway tunnels from the ticketing
-//! booth (`subway_in2`) and the construction site (`met_in`).
+//! rooms (`rankRoom`), Kerning City's subway tunnels from the ticketing
+//! booth (`subway_in2`), and the construction site's way down to the
+//! Abandoned Subway Station (`met_in`).
 
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{step, warp, Trace};
@@ -51,6 +52,6 @@ async fn halls_rooms_and_subway_tunnels_open_to_anyone() {
     );
     assert_eq!(
         through(&mut player, 102040000, "subway00").await,
-        (103000103, 1)
+        (910320000, 2)
     );
 }
