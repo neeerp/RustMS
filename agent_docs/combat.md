@@ -970,8 +970,9 @@ entries' `prop` weights (they add up to 100) in their order
 (`use_item::random_morph`; no reference server picks one, report c041).
 The Maplemas Party Potion (2212000) has the same pool but morphs another
 player named in v83's Transform dialog (send 0xA0, reply 0x77; see the
-Party Potion above). Not done anywhere: the mini-game
-and hired merchant refusals, which wait on those rooms.
+Party Potion above). Any morph also refuses opening a mini-game
+(`UIMiniGameCreate::open`) or a hired merchant (`UIPersonalShop::create`,
+v83's FUN_00a1dd99) with the same check.
 
 ### Item auras
 

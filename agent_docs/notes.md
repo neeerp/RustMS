@@ -54,5 +54,6 @@ them. The reverse-engineering notes for the v83 client are in report 204m.
 ## Not implemented
 
 - Wedding invitations (flag 3): the client checks for a free Etc slot for
-  each, but the server has no weddings and never sends one.
+  each, but the server sends invitations as items (`marriage.md`, "Inviting
+  guests") and never a note with that flag.
 - The window positions are assumed to be centred; v83's default is unknown.
