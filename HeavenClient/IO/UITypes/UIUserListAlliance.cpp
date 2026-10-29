@@ -109,6 +109,7 @@ namespace ms
 		// without a mark, which it takes from the guild tab's.
 		union_header = GuildUnion["guildinfo0"];
 		union_columns = GuildUnion["guildinfo2"];
+		union_sorted = GuildUnion["guildinfo7"];
 		union_row = GuildUnion["guildinfo3"];
 		union_end = GuildUnion["guildinfo4"];
 		union_notice_box = GuildUnion["guildinfo6"];
@@ -217,6 +218,8 @@ namespace ms
 		for (const GuildMember& member : data.members)
 			if (member.online)
 				members.push_back(&member);
+
+		guild_sort::sort(members, section.order, true);
 
 		int16_t count = static_cast<int16_t>(members.size());
 
@@ -352,6 +355,18 @@ namespace ms
 
 			art(union_columns, 0, section.first - COLUMNS);
 
+			if (guild_sort::Column column = section.order.column)
+			{
+				int16_t top = section.first - COLUMNS + guild_sort::TOP;
+				int16_t from = std::max<int16_t>(0, view_top - top);
+				int16_t to = std::min<int16_t>(guild_sort::BOTTOM - guild_sort::TOP, view_bottom - top);
+				int16_t left = guild_sort::EDGES[column - 1];
+
+				if (from < to)
+					union_sorted.draw(list + Point<int16_t>(1, top),
+									  Rectangle<int16_t>(left - 1, guild_sort::EDGES[column] - 1, from, to));
+			}
+
 			if (section.rows.empty())
 			{
 				art(union_row, 0, section.first);
@@ -484,7 +499,23 @@ namespace ms
 					if (y >= row.y && y < row.y + ROW)
 						picked = row.id;
 
-		if (picked != alliance_picked)
+		// Then a click on a section's headings sorts it (0x915456).
+		bool sorted = false;
+
+		for (AllianceSection& section : alliance_sections)
+		{
+			if (!section.shown || !section.expanded)
+				continue;
+
+			if (guild_sort::Column column = guild_sort::column_at(x, y - (section.first - COLUMNS)))
+			{
+				section.order.click(column);
+				sorted = true;
+				break;
+			}
+		}
+
+		if (picked != alliance_picked || sorted)
 		{
 			alliance_picked = picked;
 			rebuild_alliance();

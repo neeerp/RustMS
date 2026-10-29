@@ -33,6 +33,7 @@
 #include "../../Character/FriendGroups.h"
 #include "../../Character/Guild.h"
 #include "../../Character/GuildMark.h"
+#include "../../Character/GuildSort.h"
 #include "../../Character/Party.h"
 
 #include "../../Graphics/Geometry.h"
@@ -220,6 +221,8 @@ namespace ms
 			int16_t pages = 1;
 			int16_t top = 0;
 			std::vector<GuildRow> rows;
+			// The column its members are sorted by, if any.
+			guild_sort::Sort order;
 			// The page's first row, or "none" in its place, and the end line.
 			int16_t first = 0;
 			int16_t end = 0;
@@ -239,6 +242,7 @@ namespace ms
 			int16_t pages = 1;
 			int16_t top = 0;
 			std::vector<GuildRow> rows;
+			guild_sort::Sort order;
 			int16_t first = 0;
 			int16_t end = 0;
 		};
@@ -372,7 +376,7 @@ namespace ms
 		int16_t friend_scroll = 0;
 		int32_t shown_location = -1;
 
-		Texture guild_frame, notice_box, guild_columns, guild_row, guild_end;
+		Texture guild_frame, notice_box, guild_columns, guild_sorted, guild_row, guild_end;
 		Text guild_name, no_guild, notice_label, notice;
 		GuildMark emblem;
 		bool emblem_marked = false;
@@ -396,7 +400,7 @@ namespace ms
 		Text grade_points;
 		std::array<Text, 5> grade_ranks, grade_title_texts, grade_labels;
 
-		Texture union_header, union_columns, union_row, union_end, union_notice_box;
+		Texture union_header, union_columns, union_sorted, union_row, union_end, union_notice_box;
 		Text alliance_name, no_alliance, union_notice_label, union_notice;
 		std::array<AllianceSection, 5> alliance_sections;
 		AllianceData shown_alliance;

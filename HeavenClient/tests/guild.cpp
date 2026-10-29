@@ -1,5 +1,6 @@
 #include "../Character/Guild.h"
 #include "../Character/GuildEmblemRules.h"
+#include "../Character/GuildSort.h"
 #include "../Net/Handlers/Helpers/AllianceNews.h"
 #include "../Net/Handlers/Helpers/GuildParser.h"
 #include <array>
@@ -524,6 +525,73 @@ int main()
 			union_.store(mine, guild_data(20, "Twenty", { { 3, "Carol", 0, 10, 1, true, 2 } }));
 			require(union_.check_title(mine, working, 5, "") == Guild::Title::OK, "an empty rank may lose its title");
 			require(union_.check_title(mine, working, 5, "Fifth") == Guild::Title::OK, "a title");
+		}
+
+		// The headings a click sorts by (0x911701), and the sort (0x911fb6).
+		{
+			using namespace guild_sort;
+
+			require(column_at(1, 1) == NAME && column_at(95, 16) == NAME, "NAME spans 1 to 95");
+			require(column_at(96, 8) == JOB && column_at(165, 8) == LEVEL && column_at(279, 8) == TITLE,
+					"the other headings");
+			require(column_at(0, 8) == NONE && column_at(280, 8) == NONE, "nothing past the edges");
+			require(column_at(50, 0) == NONE && column_at(50, 17) == NONE, "nothing above or below");
+
+			Sort order;
+			require(order.column == NONE, "the server's order at first");
+			order.click(LEVEL);
+			require(order.column == LEVEL && order.ascending, "a first click sorts up");
+			order.click(LEVEL);
+			require(!order.ascending, "the next sorts down");
+			order.click(NAME);
+			require(order.column == NAME && order.ascending, "another heading sorts up again");
+
+			std::vector<GuildMember> people(4);
+			people[0].name = "delta";
+			people[0].level = 30;
+			people[0].job = 100;
+			people[0].rank = 3;
+			people[0].alliance_rank = 2;
+			people[1].name = "Bravo";
+			people[1].level = 50;
+			people[1].job = 200;
+			people[1].rank = 1;
+			people[1].alliance_rank = 4;
+			people[2].name = "charlie";
+			people[2].level = 30;
+			people[2].job = 100;
+			people[2].rank = 3;
+			people[2].alliance_rank = 1;
+			people[3].name = "alpha";
+			people[3].level = 10;
+			people[3].job = 0;
+			people[3].rank = 2;
+			people[3].alliance_rank = 3;
+
+			auto names = [&](Sort sort, bool alliance)
+			{
+				std::vector<const GuildMember*> members;
+
+				for (const GuildMember& member : people)
+					members.push_back(&member);
+
+				guild_sort::sort(members, sort, alliance);
+				std::string text;
+
+				for (const GuildMember* member : members)
+					text += member->name + " ";
+
+				return text;
+			};
+
+			require(names(Sort(), false) == "delta Bravo charlie alpha ", "no sort keeps the order");
+			require(names({ NAME, true }, false) == "alpha Bravo charlie delta ", "names ignore case");
+			require(names({ NAME, false }, false) == "delta charlie Bravo alpha ", "names turn about");
+			require(names({ LEVEL, true }, false) == "alpha charlie delta Bravo ", "levels up, ties by name");
+			require(names({ LEVEL, false }, false) == "Bravo charlie delta alpha ", "levels down, ties still by name");
+			require(names({ JOB, true }, false) == "alpha charlie delta Bravo ", "jobs by id");
+			require(names({ TITLE, true }, false) == "Bravo alpha charlie delta ", "titles by rank");
+			require(names({ TITLE, true }, true) == "charlie delta alpha Bravo ", "the alliance's by its rank");
 		}
 
 		std::cout << "Guild passed\n";
