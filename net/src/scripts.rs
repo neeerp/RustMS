@@ -2089,6 +2089,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(map, portal))
         }
         "enterDollcave" => opens(crate::npc_scripts::PUPPETEER_DOOR),
+        "thief_in1" => opens(crate::npc_scripts::THIEF_DOOR),
         "tutorialNPC" => {
             let stats = &player.stats;
             match TUTORIAL_INSTRUCTORS
@@ -5236,6 +5237,19 @@ mod tests {
             portal("enterDollcave", &started),
             Some(opens(crate::npc_scripts::PUPPETEER_DOOR))
         );
+    }
+
+    #[test]
+    fn the_red_scorpions_door_asks_for_the_password() {
+        let data = crate::get_game_data().unwrap();
+        let door = data.field(260010401).unwrap().portal_by_name("center00");
+        assert_eq!(door.unwrap().script.as_deref(), Some("thief_in1"));
+        assert_eq!(
+            portal("thief_in1", &player_with(&[])),
+            Some(opens(crate::npc_scripts::THIEF_DOOR))
+        );
+        // The door lands by the hideout's way back out (portal 1).
+        assert_eq!(named(260010402, "west00"), 1);
     }
 
     #[test]

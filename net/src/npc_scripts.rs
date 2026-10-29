@@ -1084,6 +1084,8 @@ pub enum OnText {
     SecretPassage { password: String, through: Effect },
     /// The Puppeteer's door lets one who is `hunting` him through.
     PuppeteerDoor { hunting: bool },
+    /// The Red Scorpions' door lets one who is `told` of it in.
+    ThiefDoor { told: bool },
     /// The Sealed Shrine's pillar lets one `hunting` its Shadow Knight in.
     ShrinePillar { hunting: bool },
     /// The lobby's Cesar opens Ariant arena `arena` for as many as typed.
@@ -1099,6 +1101,7 @@ impl OnText {
                 secret_passage_opens(text == password, through)
             }
             OnText::PuppeteerDoor { hunting } => puppeteer_door_opens(text, *hunting),
+            OnText::ThiefDoor { told } => thief_door_opens(text, *told),
             OnText::ShrinePillar { hunting } => shrine_pillar_opens(text, *hunting),
             OnText::AriantCap { arena } => ariant_open(text, *arena),
         }
@@ -2580,6 +2583,7 @@ impl NpcScript {
                 return Some(black_shadow(npc_id, player));
             }
             PUPPETEER_DOOR => return Some(puppeteer_door(player)),
+            THIEF_DOOR => return Some(thief_door(player)),
             FRANCIS => return Some(francis()),
             CAVE_FRANCIS => return Some(cave_francis(player)),
             PACK_WOLF if retakes_the_wolves_test(player) => {
@@ -5412,6 +5416,53 @@ fn puppeteer_door_opens(text_given: &str, hunting: bool) -> Vec<Page> {
     vec![Page::Done(vec![
         Effect::PortalSound,
         Effect::WarpToPortal(FRANCIS_ROOM, 1),
+    ])]
+}
+
+/// The mysterious voice at the Red Scorpions' door in the Scorching Desert
+/// (260010401), which its `thief_in1` portal opens too (Cosmic
+/// `ThiefPassword`, which speaks as the Puppeteer's door).
+pub const THIEF_DOOR: i32 = 2103008;
+/// The password: Sirin says only that the player knows it already
+/// (True or False, 3925), as Cosmic has it.
+const THIEF_PASSWORD: &str = "Open Sesame";
+const THIEF_PASSWORD_MAX: i16 = 20;
+/// True or False (3925), which tells of the door, and the hideout behind it,
+/// where the Red Scorpions' Treasure Box (2103007) starts 3926.
+const TRUE_OR_FALSE: i16 = 3925;
+const RED_SCORPION_HIDEOUT: (i32, u8) = (260010402, 1);
+
+/// The Red Scorpions' door asks for the password. The text is unsourced.
+fn thief_door(player: &Player) -> NpcScript {
+    NpcScript::new(
+        THIEF_DOOR,
+        vec![Page::AskText {
+            text: text(keys::THIEF_DOOR_ASK),
+            min: 1,
+            max: THIEF_PASSWORD_MAX,
+            on_text: OnText::ThiefDoor {
+                told: player.quests.state(TRUE_OR_FALSE) == QuestState::Completed,
+            },
+        }],
+    )
+}
+
+/// The right password, in any case and with or without its "!", lets one
+/// who has done True or False into the hideout; anyone else hears it's
+/// right but the door stays shut, in pink.
+fn thief_door_opens(text_given: &str, told: bool) -> Vec<Page> {
+    let given = text_given.trim();
+    let given = given.strip_suffix('!').unwrap_or(given).trim_end();
+    if !given.eq_ignore_ascii_case(THIEF_PASSWORD) {
+        return vec![Page::Say(text(keys::THIEF_DOOR_WRONG))];
+    }
+    if !told {
+        return vec![Page::Done(vec![Effect::Pink(text(keys::THIEF_DOOR_SHUT))])];
+    }
+    let (map, portal) = RED_SCORPION_HIDEOUT;
+    vec![Page::Done(vec![
+        Effect::PortalSound,
+        Effect::WarpToPortal(map, portal),
     ])]
 }
 
@@ -16397,6 +16448,36 @@ mod tests {
                     Effect::CompleteQuest(A_CUTE_BABY_BIRD),
                 ]
             )
+        );
+    }
+
+    #[test]
+    fn the_red_scorpions_door_opens_on_the_password_after_true_or_false() {
+        let answer = |player: &Player, given: &str| {
+            let mut door = NpcScript::for_npc(THIEF_DOOR, player).unwrap();
+            assert!(matches!(door.begin().prompt, Some(Prompt::AskText { .. })));
+            door.respond(ScriptInput::Text(given.into())).unwrap()
+        };
+        let mut told = traveller(30, 0, false);
+        told.quests.upsert(game::QuestRecord {
+            quest_id: TRUE_OR_FALSE,
+            status: QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        for given in ["Open Sesame", "open sesame!", " OPEN SESAME ! "] {
+            assert_eq!(
+                answer(&told, given).effects,
+                [Effect::PortalSound, Effect::WarpToPortal(260010402, 1)],
+                "{given}"
+            );
+        }
+        let wrong = answer(&told, "Open Barley");
+        assert_eq!(page_text(&wrong), text(keys::THIEF_DOOR_WRONG));
+        assert!(wrong.effects.is_empty());
+        assert_eq!(
+            answer(&traveller(30, 0, false), "Open Sesame").effects,
+            [Effect::Pink(text(keys::THIEF_DOOR_SHUT))]
         );
     }
 
