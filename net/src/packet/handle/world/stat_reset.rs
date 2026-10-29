@@ -2,12 +2,15 @@
 //! USE_CASH_ITEM with where the point goes and where it comes from: STAT_CHANGED
 //! mask bits for AP, skill ids for SP (v83 FUN_00a0a63f, types 0x17 and 0x18;
 //! report 195). Both change together and the item is used up; a refusal, or a
-//! dead player, keeps it and only unlocks the client.
+//! dead player, keeps it and only unlocks the client. A skill reset to
+//! nothing leaves the macros that held it, and the client gets the list
+//! again (as Cosmic's UseCashItemHandler; the client has no check of its own).
 
 use super::spend_points::{ap_stat, stat_value};
 use crate::handler::{HandlerResult, WorldContext, WorldResult};
 use crate::packet::build::world::inventory::build_inventory_operation;
 use crate::packet::build::world::skill::build_update_skills;
+use crate::packet::build::world::skill_macro::build_skill_macros;
 use crate::packet::build::world::stat::{build_stat_update, StatUpdate};
 use crate::skills;
 use game::sp_reset::SkillRule;
@@ -83,8 +86,12 @@ pub fn sp_reset(
     };
     ctx.player.skills = book;
     ctx.player.mark_dirty();
-    Ok(HandlerResult::reply(build_update_skills(&changed)?)
-        .with_reply(build_inventory_operation(true, &changes)?))
+    let mut result = HandlerResult::reply(build_update_skills(&changed)?)
+        .with_reply(build_inventory_operation(true, &changes)?);
+    if ctx.player.skills.level(from) == 0 && ctx.player.skill_macros.forget(from) {
+        result = result.with_reply(build_skill_macros(&ctx.player.skill_macros)?);
+    }
+    Ok(result)
 }
 
 fn refuse() -> WorldResult {
@@ -94,9 +101,10 @@ fn refuse() -> WorldResult {
 #[cfg(test)]
 mod tests {
     use crate::handler::{WorldAction, WorldContext, WorldHandler};
+    use crate::packet::build::world::skill_macro::build_skill_macros;
     use crate::packet::handle::world::UseCashItemHandler;
     use crate::packet::op::RecvOpcode;
-    use game::{InventoryType, Item, Player, SkillRecord};
+    use game::{InventoryType, Item, Player, SkillMacro, SkillMacros, SkillRecord};
     use packet::{io::write::PktWrite, Packet};
 
     const AP_RESET: i32 = 5050000;
@@ -229,6 +237,44 @@ mod tests {
             (4, 19)
         );
         assert_eq!((left(&player), player.stats.sp), (0, 1));
+    }
+
+    #[test]
+    fn a_skill_reset_to_nothing_leaves_the_macros() {
+        let Some(mut player) = skill_holder() else {
+            return;
+        };
+        let holding = |skills| SkillMacro {
+            name: "hits".into(),
+            silent: false,
+            skills,
+        };
+        player.skill_macros = SkillMacros::new(vec![holding([SLASH_BLAST, 0, SLASH_BLAST])]);
+        player.skills.set(SkillRecord {
+            skill_id: POWER_STRIKE,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
+        // Slash Blast down to 2: the macro keeps it.
+        let replies = use_reset(&mut player, SP_RESET, POWER_STRIKE, SLASH_BLAST);
+        assert_eq!(replies.len(), 2);
+        assert_eq!(player.skills.level(SLASH_BLAST), 2);
+        // Down to 1, then to nothing.
+        let mut replies = vec![];
+        for _ in 0..2 {
+            player
+                .inventory
+                .insert(InventoryType::Cash, 3, Item::stack(SP_RESET, 1));
+            replies = use_reset(&mut player, SP_RESET, POWER_STRIKE, SLASH_BLAST);
+        }
+        assert_eq!(player.skills.level(SLASH_BLAST), 0);
+        assert_eq!(replies.len(), 3);
+        assert_eq!(player.skill_macros.macros(), [holding([0, 0, 0])]);
+        assert_eq!(
+            replies[2],
+            build_skill_macros(&player.skill_macros).unwrap().bytes
+        );
     }
 
     #[test]
