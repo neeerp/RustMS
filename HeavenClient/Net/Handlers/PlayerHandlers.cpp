@@ -24,6 +24,7 @@
 #include "../../Character/QuestCatalog.h"
 #include "../../Character/MountRules.h"
 #include "../../Gameplay/Combat/DojoEnergy.h"
+#include "../../Gameplay/Combat/Massacre.h"
 
 #include "../Packets/LoginPackets.h"
 #include "../Packets/PlayerPackets.h"
@@ -665,6 +666,8 @@ namespace ms
 
 		if (key == "energy")
 			dojo_energy::session().energy = std::atoi(value.c_str());
+		else
+			massacre::store(massacre::session(), key, std::atoi(value.c_str()));
 	}
 
 	void FieldSetVariableHandler::handle(InPacket& recv) const

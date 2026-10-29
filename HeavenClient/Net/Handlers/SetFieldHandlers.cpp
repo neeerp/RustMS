@@ -34,6 +34,7 @@
 
 #include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Combat/DojoEnergy.h"
+#include "../../Gameplay/Combat/Massacre.h"
 #include "../../Gameplay/OxQuizRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
@@ -55,6 +56,8 @@
 #include "../../IO/UITypes/UIMemoNotice.h"
 #include "../../IO/UITypes/UIMiniMap.h"
 #include "../../IO/UITypes/UIMobGage.h"
+#include "../../IO/UITypes/UIPyramidHud.h"
+#include "../../IO/UITypes/UIPyramidResult.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../../IO/UITypes/UIMiniGame.h"
@@ -82,6 +85,9 @@ namespace ms
 		UI::get().remove(UIElement::Type::COCONUT);
 		ariant::enter_field(fieldtype);
 		UI::get().remove(UIElement::Type::ARIANT);
+		massacre::enter_field(massacre::session(), fieldtype);
+		UI::get().remove(UIElement::Type::PYRAMIDHUD);
+		UI::get().remove(UIElement::Type::PYRAMIDRESULT);
 
 		Window::get().fadeout(
 			[mapid, portalid, chase]()
@@ -96,6 +102,9 @@ namespace ms
 				UICoconut::show_on(Stage::get().get_mapinfo().get_fieldtype());
 				// And the Battle Arena's board.
 				UIAriant::show_on(Stage::get().get_mapinfo().get_fieldtype());
+				// And a Pyramid stage's.
+				UIPyramidHud::show_on(Stage::get().get_mapinfo().get_fieldtype());
+				UIPyramidResult::show_waiting();
 
 				UI::get().enable();
 				Timer::get().start();
@@ -257,8 +266,9 @@ namespace ms
 
 		Stage::get().loadplayer(entry);
 
-		// The Dojo's energy starts over with the character.
+		// The Dojo's energy starts over with the character, as do the Pyramid's counts.
 		dojo_energy::session() = {};
+		massacre::session() = {};
 
 		// The server lists this character's notes, if it has any.
 		Memos::Inbox::get().listed({});
@@ -390,6 +400,15 @@ namespace ms
 		if (coconut::on_field())
 		{
 			coconut::state().end = coconut::clock_end(coconut::now(), recv.read_int());
+
+			return;
+		}
+
+		// A Pyramid stage heeds only kind 2, which sets its own clock (0x560389).
+		if (massacre::session().field == massacre::FIELD_STAGE)
+		{
+			if (kind == 2)
+				massacre::start_clock(massacre::session(), UIDojoHud::now(), recv.read_int());
 
 			return;
 		}

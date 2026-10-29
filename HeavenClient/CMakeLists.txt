@@ -233,6 +233,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME pq_skills COMMAND pq_skills_tests)
     add_executable(dojo_energy_tests tests/dojo_energy.cpp)
     add_test(NAME dojo_energy COMMAND dojo_energy_tests)
+    add_executable(massacre_tests tests/massacre.cpp)
+    add_test(NAME massacre COMMAND massacre_tests)
     add_executable(no_skill_tests tests/no_skill.cpp)
     add_test(NAME no_skill COMMAND no_skill_tests)
     add_executable(swim_area_tests tests/swim_area.cpp)
@@ -1000,6 +1002,10 @@ add_executable(HeavenClient
     IO/UITypes/UIFieldClock.h
     IO/UITypes/UIDojoHud.cpp
     IO/UITypes/UIDojoHud.h
+    IO/UITypes/UIPyramidHud.cpp
+    IO/UITypes/UIPyramidHud.h
+    IO/UITypes/UIPyramidResult.cpp
+    IO/UITypes/UIPyramidResult.h
     IO/UITypes/UIAvatarMegaphone.cpp
     IO/UITypes/UIAvatarMegaphone.h
     IO/UITypes/UIQuickSlotConfig.cpp
@@ -1213,6 +1219,8 @@ add_executable(HeavenClient
     Net/Handlers/CarnivalHandlers.h
     Net/Handlers/AriantHandlers.cpp
     Net/Handlers/AriantHandlers.h
+    Net/Handlers/PyramidHandlers.cpp
+    Net/Handlers/PyramidHandlers.h
     Net/Handlers/CoconutHandlers.cpp
     Net/Handlers/CoconutHandlers.h
     Net/Handlers/SnowballHandlers.cpp
