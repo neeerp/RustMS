@@ -5,7 +5,7 @@
 //! hands the dungeon's Charles fifteen of them, which clears the stage.
 //! Milla lets a member back out to the lobby. In the cave the rock brings
 //! out MV, whose fall wins the run and takes the team on to the treasure
-//! room, on its own clock, and then out. The world runs events 60 times
+//! room, on its own clock, whose chests spray their loot, and then out. The world runs events 60 times
 //! as fast (`RUSTMS_EVENT_SCALE`).
 
 use integration_harness::database::{
@@ -23,6 +23,7 @@ use net::events::{
 };
 use net::npc_scripts::CHARLES;
 use net::packet::op::RecvOpcode;
+use net::reactors::TREASURE_CHEST;
 use packet::io::write::PktWrite;
 use packet::Packet;
 use tokio::time::Duration;
@@ -248,9 +249,44 @@ async fn charles_takes_140s_in_whose_letters_open_the_tunnel_and_mvs_fall_wins()
     assert!(!seen.gains.iter().any(|&exp| exp >= 100_000), "{seen:?}");
     assert!(!seen.warps.contains(&TREASURE_ROOM), "{seen:?}");
 
-    // Once its time is up, out to the lobby.
+    // A chest there sprays its loot with mesos.
     let (player, trace) = (&mut team[0], &mut traces[0]);
-    trace.warps.clear();
+    until(&mut player.connection, trace, |t| {
+        t.field
+            .reactors
+            .iter()
+            .any(|r| r.reactor_id == TREASURE_CHEST)
+    })
+    .await;
+    let chest = *trace
+        .field
+        .reactors
+        .iter()
+        .find(|r| r.reactor_id == TREASURE_CHEST)
+        .unwrap();
+    // Drop ids start over on each map, so the dungeon's would mix in.
+    trace.field.drops.clear();
+    let c = &mut player.connection;
+    send(c, walk_to(chest.x, chest.y)).await;
+    for _ in 0..8 {
+        if trace
+            .field
+            .reactors_removed
+            .iter()
+            .any(|r| r.0 == chest.object_id)
+        {
+            break;
+        }
+        send(c, hit_reactor(chest.object_id)).await;
+        read_for(c, trace, 300).await;
+    }
+    until(c, trace, |t| {
+        let sprayed = &t.field.drops;
+        sprayed.len() >= 15 && sprayed.iter().any(|d| d.meso)
+    })
+    .await;
+
+    // Once its time is up, out to the lobby (this trace has not been there).
     until(&mut player.connection, trace, |t| {
         t.warps.contains(&TREASURE_LOBBY)
     })

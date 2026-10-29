@@ -1819,8 +1819,12 @@ own skill's. MV's fall wins the run (`cleared_by_boss` stage 2, which any
 member may clear): the clear effect and 100,000 EXP for everyone in the
 event, wherever they are. Ten seconds on (`Bonus::after`, Cosmic
 `warpBonus`) the team goes to the treasure room for ten minutes, and
-then out to the lobby (picks in QUESTIONS b308). The treasure room's
-chests come in a later slice.
+then out to the lobby (picks in QUESTIONS b308). Its ten chests
+(`reactors::TREASURE_CHEST`, 6742014) spray at least fifteen drops with
+mesos (5 to 24 a pile), from Cosmic's 44-row table in
+`reward_overrides.toml` (its Persimmons and Chestnuts, quest items, as
+ordinary drops), and its own MV (9400748) drops Cosmic's four hats
+at 4% each (b309). Its other mobs drop nothing.
 
 ## Jr. Balrog's room
 

@@ -1030,7 +1030,8 @@ take 4/5 of the table amount plus up to 2/5 more (OrionAlpha's
 what scales them). A mob worth no EXP still drops and
 counts for quests. Quest drops are the entries
 the overrides tag with a quest, and quest items (`info/quest`) that only one
-quest's completion check (`Check.img/<quest>/1/item`) asks for. For a
+quest's completion check (`Check.img/<quest>/1/item`) asks for, unless an
+override says `quest = 0`. For a
 player out of a party they roll only while that quest is started and the
 player holds fewer than the check asks for (any number if it doesn't name the
 item); in a party they roll anyway, as Cosmic's do, for the members who need

@@ -127,7 +127,7 @@ fn friendly_from(entries: &[RewardEntry], rng: &mut impl Rng) -> Vec<Loot> {
     let mut loot = Vec::new();
     for entry in entries {
         if rng.gen_bool(entry.prob.clamp(0.0, 1.0)) {
-            let quest = entry.quest.or_else(|| entry.item.and_then(quest_for));
+            let quest = quest_of(entry);
             loot.extend(loot_of(entry, quest, 1.0, rng));
         }
     }
@@ -153,7 +153,7 @@ fn roll_at(
         // fewer than it needs. In a party quest items roll anyway, as
         // Cosmic's do, for the members who need them: only those who do see
         // them (`QuestNeeds`).
-        let quest = entry.quest.or_else(|| entry.item.and_then(quest_for));
+        let quest = quest_of(entry);
         if let Some(quest) = quest {
             let needed = entry
                 .item
@@ -214,12 +214,7 @@ pub fn steal(mob_id: i32, player: &Player, now: SystemTime, rng: &mut impl Rng) 
 fn steal_from(entries: &[RewardEntry], mesos: f64, rng: &mut impl Rng) -> Option<Loot> {
     let pool: Vec<&RewardEntry> = entries
         .iter()
-        .filter(|entry| {
-            entry
-                .quest
-                .or_else(|| entry.item.and_then(quest_for))
-                .is_none()
-        })
+        .filter(|entry| quest_of(entry).is_none())
         .filter(|entry| entry.prob > 0.0)
         .collect();
     let total: f64 = pool.iter().map(|entry| entry.prob).sum();
@@ -235,6 +230,16 @@ fn steal_from(entries: &[RewardEntry], mesos: f64, rng: &mut impl Rng) -> Option
         })
         .unwrap_or(&pool[pool.len() - 1]);
     loot_of(entry, None, mesos, rng)
+}
+
+/// The quest `entry` drops for: its own, or that of a quest item it holds.
+/// An override's `quest = 0` makes it an ordinary drop anyway.
+fn quest_of(entry: &RewardEntry) -> Option<i16> {
+    match entry.quest {
+        Some(0) => None,
+        Some(quest) => Some(quest),
+        None => entry.item.and_then(quest_for),
+    }
 }
 
 /// The quest a quest item (`info/quest`) the drop table doesn't tag drops
@@ -436,6 +441,31 @@ mod tests {
             .add(game::Item::stack(4031802, 1), 100)
             .unwrap();
         assert!(roll_entries(&shellpiece, &player, &mut rng).is_empty());
+    }
+
+    #[test]
+    fn quest_zero_makes_a_quest_item_an_ordinary_drop() {
+        // Persimmons are a quest item that only quest 9330 asks for.
+        if quest_for(2022055).is_none() {
+            return;
+        }
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let player = crate::codec::stats::sample_player();
+        let inferred = [entry(Some(2022055), None, 1.0, None)];
+        assert!(roll_entries(&inferred, &player, &mut rng).is_empty());
+        let ordinary = [entry(Some(2022055), None, 1.0, Some(0))];
+        let persimmon = Loot::Item {
+            item_id: 2022055,
+            quantity: 1,
+            quest: None,
+        };
+        assert_eq!(
+            roll_entries(&ordinary, &player, &mut rng),
+            [persimmon.clone()]
+        );
+        assert_eq!(friendly_from(&ordinary, &mut rng), [persimmon]);
+        assert!(steal_from(&ordinary, 1.0, &mut rng).is_some());
+        assert!(steal_from(&inferred, 1.0, &mut rng).is_none());
     }
 
     #[test]
