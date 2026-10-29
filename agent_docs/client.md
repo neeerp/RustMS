@@ -993,8 +993,17 @@ the screen size.
   birthday code, NX Prepaid against the price, the message, then "ITEM (PRICE
   NX) Will you buy this item as a gift for 'NAME'?", and Yes sends 0x04. v83
   sends packages as 0x1F, which the server doesn't take, so they go as 0x04
-  too. As in the other gift dialogs here, an empty message only puts the
-  cursor back rather than v83's "Please enter the message.".
+  too. The message page of a present or a ring is v83's dialog (7e4cf7) on
+  `CSNotice/2`, whose art carries "Enter your message here,"; it is covered
+  while a field has the keys or the message has text (7e5467). Its OK
+  (7e5863) refuses, leaving the dialog open, a name not 4 to 12 characters
+  long ("Please enter the name of the receiving character."), the player's
+  own ("You cannot send gifts to yourself."), cursing in either field
+  ("Cursing is not allowed."), an empty message ("Please enter the
+  message.") and one over 72 characters ("The message can be no longer than
+  72 characters long."); once the notice closes, the field at fault has the
+  keys. The plain gift dialog on `CSGift` still only puts the cursor back on
+  an empty field.
 - **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
   "Are you sure you want to leave the Cash Shop?", as v83 does
   (`FUN_004bcc86`).

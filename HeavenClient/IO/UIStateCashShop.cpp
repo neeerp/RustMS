@@ -165,13 +165,16 @@ namespace ms
 		if (auto element = get(focused); element && element->is_active())
 			return element;
 
-		// Once a notice over the name dialog closes, the name dialog has the
-		// keys again.
-		if (auto entry = get(UIElement::Type::NAMECHANGE); entry && entry->is_active())
+		// Once a notice over the name or gift dialog closes, that dialog has
+		// the keys again.
+		for (UIElement::Type type : { UIElement::Type::NAMECHANGE, UIElement::Type::CASHGIFT })
 		{
-			focused = UIElement::Type::NAMECHANGE;
+			if (auto entry = get(type); entry && entry->is_active())
+			{
+				focused = type;
 
-			return entry;
+				return entry;
+			}
 		}
 
 		return nullptr;

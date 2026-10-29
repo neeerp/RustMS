@@ -29,6 +29,8 @@
 #include "../../Character/Marriage.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
+#include "../../Graphics/Geometry.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -45,6 +47,19 @@ namespace ms
 		const Rectangle<int16_t> TO_BOX = Rectangle<int16_t>(84, 241, 45, 64);
 		const Rectangle<int16_t> MESSAGE_BOX = Rectangle<int16_t>(26, 240, 71, 104);
 		const Rectangle<int16_t> BIRTHDAY_BOX = Rectangle<int16_t>(22, 242, 48, 67);
+		// The ring and present dialog (v83 7e4cf7) is CSNotice/2, whose
+		// boxes sit 27 pixels higher.
+		Rectangle<int16_t> on_notice(Rectangle<int16_t> box)
+		{
+			box.shift(Point<int16_t>(0, -27));
+
+			return box;
+		}
+		// CSNotice/2 has "Enter your message here," in its message box,
+		// which v83 (7e5467) covers while a field has the keys or the
+		// message has text.
+		const Point<int16_t> HINT_AT = Point<int16_t>(64, 48);
+		const ColorBox HINT_COVER = ColorBox(138, 14, Color::Name::WHITE, 1.0f);
 		// The client keeps names to 12 characters and messages to 73.
 		constexpr size_t NAME_LIMIT = 12;
 		constexpr size_t MESSAGE_LIMIT = 73;
@@ -124,6 +139,11 @@ namespace ms
 		}
 		else
 		{
+			bool typing = to.get_state() == Textfield::State::FOCUSED || message.get_state() == Textfield::State::FOCUSED;
+
+			if (ring && (typing || !message.empty()))
+				HINT_COVER.draw(position + HINT_AT);
+
 			to.draw(position);
 			message.draw(position);
 		}
@@ -249,6 +269,34 @@ namespace ms
 		birthday.set_state(Textfield::State::FOCUSED);
 	}
 
+	std::pair<const char*, bool> UICashGift::gift_refusal(const std::string& name, const std::string& note)
+	{
+		if (name.size() < 4 || name.size() > NAME_LIMIT)
+			return { "Please enter the name of the receiving character.", true };
+
+		if (name == Stage::get().get_player().get_name())
+			return { "You cannot send gifts to yourself.", true };
+
+		if (!CurseData::valid(name))
+			return { "Cursing is not allowed.", true };
+
+		if (!CurseData::valid(note))
+			return { "Cursing is not allowed.", false };
+
+		if (note.empty())
+			return { "Please enter the message.", false };
+
+		if (note.size() > 72)
+			return { "The message can be no longer than 72 characters long.", false };
+
+		return { nullptr, false };
+	}
+
+	void UICashGift::refocus(bool name)
+	{
+		(name && !preset ? to : message).set_state(Textfield::State::FOCUSED);
+	}
+
 	void UICashGift::confirm_ring()
 	{
 		if (asking_birthday)
@@ -266,7 +314,9 @@ namespace ms
 			birthday.set_state(Textfield::State::DISABLED);
 
 			asking_birthday = false;
-			background = NxFiles::ui_classic["CashShop.img"]["CSGift"]["backgrnd"];
+			background = NxFiles::ui_classic["CashShop.img"]["CSNotice"]["2"]["backgrnd"];
+			to.set_bounds(on_notice(TO_BOX));
+			message.set_bounds(on_notice(MESSAGE_BOX));
 			place();
 
 			(preset ? message : to).set_state(Textfield::State::FOCUSED);
@@ -274,16 +324,15 @@ namespace ms
 			return;
 		}
 
-		if (to.empty())
+		// v83 7e5863 checks the name, then the message, and each refusal
+		// leaves the dialog open.
+		if (auto [refusal, name] = gift_refusal(to.get_text(), message.get_text()); refusal)
 		{
-			to.set_state(Textfield::State::FOCUSED);
-
-			return;
-		}
-
-		if (message.empty())
-		{
-			message.set_state(Textfield::State::FOCUSED);
+			UI::get().emplace<UIOk>(refusal, [name = name](bool)
+			{
+				if (auto gift = UI::get().get_element<UICashGift>())
+					gift->refocus(name);
+			});
 
 			return;
 		}

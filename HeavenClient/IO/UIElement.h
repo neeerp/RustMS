@@ -156,6 +156,7 @@ namespace ms
 			PYRAMIDHUD,
 			PYRAMIDRESULT,
 			RAISE,
+			CASHGIFT,
 			NUM_TYPES
 		};
 

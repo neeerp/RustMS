@@ -24,6 +24,7 @@
 #include "../../Data/CashCatalog.h"
 
 #include <optional>
+#include <utility>
 
 namespace ms
 {
@@ -35,7 +36,7 @@ namespace ms
 	class UICashGift : public UIElement
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::NOTICE;
+		static constexpr Type TYPE = UIElement::Type::CASHGIFT;
 		static constexpr bool FOCUSED = true;
 		static constexpr bool TOGGLED = false;
 
@@ -56,6 +57,9 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// A refusal's notice closed: the field at fault takes the keys.
+		void refocus(bool name);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -68,6 +72,9 @@ namespace ms
 		// A ring's steps after each page: the price check, then the
 		// question and the BUY dialog.
 		void confirm_ring();
+		// What v83 says to a ring's or present's receiver and message, or nullptr,
+		// and whether it is about the name.
+		static std::pair<const char*, bool> gift_refusal(const std::string& name, const std::string& note);
 
 		void close();
 

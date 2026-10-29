@@ -528,4 +528,9 @@ namespace ms
 			bounds.get_right_bottom() + parentpos
 			);
 	}
+
+	void Textfield::set_bounds(Rectangle<int16_t> bounds)
+	{
+		this->bounds = bounds;
+	}
 }
