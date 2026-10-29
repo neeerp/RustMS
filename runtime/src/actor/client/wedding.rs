@@ -89,9 +89,12 @@ fn invitation_text(key: &str, invitation: &Invitation) -> String {
 /// line saying when.
 fn booked_packets(reservation: &Reservation) -> Result<Vec<Packet>, RuntimeError> {
     let line = npc_scripts::wedding_text(keys::WEDDING_DONE_CHAT, reservation, SystemTime::now());
+    // The priest asks for wedding clothes (`game::wedding::WEDDING_CLOTHES`).
+    let dress = net::content::text().get(keys::WEDDING_DRESS_CHAT, &[]);
     Ok(vec![
         build_wedding_notice(WeddingNotice::Reserved)?,
         build_broadcast(Broadcast::Pink, &line)?,
+        build_broadcast(Broadcast::Pink, &dress)?,
     ])
 }
 

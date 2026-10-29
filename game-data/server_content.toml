@@ -749,6 +749,7 @@ unsourced = [
     "wedding.reserve.error",
     "wedding.reserve.done",
     "wedding.reserve.done_chat",
+    "wedding.reserve.dress_chat",
     "wedding.assist.choice_guest",
     "wedding.assist.choice_extra",
     "wedding.guest.not_invited",

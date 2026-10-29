@@ -142,13 +142,14 @@ async fn nicole_books_an_engaged_couple_for_a_ticket() {
         [(CATHEDRAL_TICKET, -1), (CATHEDRAL_INVITATION, 15)]
     );
     assert_eq!(at.marriage, [result(RESERVED)]);
-    assert_eq!(at.broadcasts.len(), 1, "{:?}", at.broadcasts);
+    // When, and a reminder of the wedding clothes.
+    assert_eq!(at.broadcasts.len(), 2, "{:?}", at.broadcasts);
     let mut bt = Trace::default();
     until(&mut b.connection, &mut bt, |t| !t.marriage.is_empty()).await;
     read_for(&mut b.connection, &mut bt, 300).await;
     assert_eq!(bt.items, [(CATHEDRAL_INVITATION, 15)]);
     assert_eq!(bt.marriage, [result(RESERVED)]);
-    assert_eq!(bt.broadcasts.len(), 1, "{:?}", bt.broadcasts);
+    assert_eq!(bt.broadcasts.len(), 2, "{:?}", bt.broadcasts);
 
     // Booked, the couple hears when, on this login and the next, and may
     // not break off.

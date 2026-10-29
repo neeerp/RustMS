@@ -179,7 +179,10 @@ trip through the directory:
    invitations too.
 
 Both partners get `MARRIAGE_RESULT` 16 ("Congratulations! Your
-reservation was successfully made!") and a pink line saying when. A
+reservation was successfully made!"), a pink line saying when, and one
+reminding them of the wedding clothes the priest asks for
+(`wedding.reserve.dress_chat`), as Cosmic's "Get dressed and don't be
+late!". The assistant's own line names the Wedding Tuxedo and Dress. A
 partner who misses step 4 (offline by then, out of Etc room, or in the
 Cash Shop, where it arrives on leaving) still has the booking. Only a
 partner offline or full goes without invitations; the booker's 15 serve
@@ -705,12 +708,6 @@ For crush and friendship rings:
   has none). The content pack gives the keys and the
   chests a `period`, which RustMS ignores: the chests it grants don't
   expire (review b083).
-- A hint, after booking, about the couple's wedding clothes. Report b066
-  (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the
-  guests' suits and dresses ("Groomsman's", "Bridesmaid's"). The couple's
-  own are 1050113 and 1051114 (Wedding Tuxedo and Dress), 1050135 (Beau
-  Tuxedo) and 1051154-55 (Princess Isis, Queen Mary); the priest takes
-  any of these or the guests' sets (`game::wedding::WEDDING_CLOTHES`).
 - Sending `MARRIAGE_RESULT` 31 ("The reservation has been canceled...")
   when a no-show's booking goes unstarted. A wedding that fails sends it.
 
