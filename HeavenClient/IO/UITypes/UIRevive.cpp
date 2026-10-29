@@ -35,6 +35,8 @@ namespace ms
 		if (wheel)
 		{
 			UseDeathItemPacket(WHEEL_OF_DESTINY, player.get_position()).dispatch();
+			// The wheel's tomb, seen by the map through 195 (FUN_0095af8e).
+			stage.show_ground_effect(nl::nx::effect["BasicEff.img"]["TombUpgrade"], player.get_position());
 
 			sprites.emplace_back(notice["2"]);
 			buttons[Buttons::YES] = std::make_unique<MapleButton>(basic["BtYes2"], YES_AT);

@@ -132,6 +132,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Play a Wheel of Destiny's tomb where another character lies (FUN_00983e40)
+	// Opcode: SHOW_UPGRADE_TOMB_EFFECT(195)
+	class ShowUpgradeTombEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Show another character sitting on a portable chair, or getting up with 0
 	// Opcode: SHOW_CHAIR(196)
 	class ShowChairHandler : public PacketHandler

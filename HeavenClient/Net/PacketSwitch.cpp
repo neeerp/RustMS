@@ -209,6 +209,7 @@ namespace ms
 
 		FACIAL_EXPRESSION = 193,
 		SHOW_ITEM_EFFECT = 194,
+		SHOW_UPGRADE_TOMB_EFFECT = 195,
 		SHOW_CHAIR = 196,
 		CANCEL_CHAIR = 205,
 		UPDATE_CHARLOOK = 197,
@@ -410,6 +411,7 @@ namespace ms
 		emplace<CHAR_MOVED, CharMovedHandler>();
 		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
 		emplace<SHOW_ITEM_EFFECT, ShowItemEffectHandler>();
+		emplace<SHOW_UPGRADE_TOMB_EFFECT, ShowUpgradeTombEffectHandler>();
 		emplace<SHOW_CHAIR, ShowChairHandler>();
 		emplace<CANCEL_CHAIR, CancelChairHandler>();
 		emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();

@@ -27,6 +27,7 @@ mod guild_bbs;
 mod hammer;
 mod hired_merchant;
 mod incubator;
+mod death_item;
 mod item_effect;
 mod item_guard;
 mod item_move;
@@ -128,6 +129,7 @@ pub use self::hammer::UseHammerHandler;
 pub use self::hired_merchant::{
     EntrustedShopRequestHandler, RemoteShopRequestHandler, StoreBankRequestHandler,
 };
+pub use self::death_item::UseDeathItemHandler;
 pub use self::item_effect::UseItemEffectHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
