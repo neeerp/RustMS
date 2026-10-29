@@ -190,7 +190,7 @@ const RANK_ROOMS: [(i32, i32, &str); 8] = [
     (140010100, 140010110, "out00"),
 ];
 /// Portals that just let the player through, and where to (Cosmic's).
-const PLAIN_WARPS: [(&str, i32, Portal); 17] = [
+const PLAIN_WARPS: [(&str, i32, Portal); 19] = [
     // Two of the Bottom of the Temple's ways back up the stairway; the
     // other (`OutPerrion_1`) says it's a shortcut.
     ("OutPerrion_2", UNDERGROUND_TEMPLE_STAIRS, Portal::Id(0)),
@@ -218,7 +218,35 @@ const PLAIN_WARPS: [(&str, i32, Portal); 17] = [
     ("party3_room4", 920010500, Portal::Id(3)),
     ("party3_room5", 920010600, Portal::Id(17)),
     ("party3_room6", 920010700, Portal::Id(23)),
+    // The hidden way between Crimsonwood Mountain's Cavern of Fear and
+    // Cavern of Valor.
+    ("Masteria_CC1_A", 610020015, Portal::Named("CC6_A")),
+    ("Masteria_CC6_A", 610020010, Portal::Named("CC1_A")),
 ];
+/// The Phantom Forest's hidden paths, open to a holder of its map, and the
+/// Valley of Heroes' statues, which carry a holder of the Marker of
+/// Heroism on up: the script, the item, and where to (Cosmic's
+/// `Masteria_U2_1` and the rest). Anyone else is not let through.
+const MASTERIA_WAYS: [(&str, i32, i32, &str); 16] = [
+    ("Masteria_U2_1", PHANTOM_FOREST_MAP, 610010004, "U5_1"),
+    ("Masteria_U3_1", PHANTOM_FOREST_MAP, 610010201, "sB2_1"),
+    ("Masteria_U5_1", PHANTOM_FOREST_MAP, 610010001, "sU2_1"),
+    ("Masteria_U5_2", PHANTOM_FOREST_MAP, 610010004, "U5_1"),
+    ("Masteria_U6_1", PHANTOM_FOREST_MAP, 610010002, "sU3_1"),
+    ("Masteria_B1_1", PHANTOM_FOREST_MAP, 610010005, "sU6_1"),
+    ("Masteria_B2_1", PHANTOM_FOREST_MAP, 610010005, "sU6_1"),
+    ("Masteria_B3_1", PHANTOM_FOREST_MAP, 610010005, "sU6_1"),
+    ("Masteria_CM1_A", MARKER_OF_HEROISM, 610020000, "CM1_B"),
+    ("Masteria_CM1_B", MARKER_OF_HEROISM, 610020000, "CM1_C"),
+    ("Masteria_CM1_C", MARKER_OF_HEROISM, 610020000, "CM1_D"),
+    ("Masteria_CM1_D", MARKER_OF_HEROISM, 610020000, "CM1_E"),
+    ("Masteria_CM2_B", MARKER_OF_HEROISM, 610020001, "CM2_C"),
+    ("Masteria_CM2_C", MARKER_OF_HEROISM, 610020001, "CM2_D"),
+    ("Masteria_CM2_D", MARKER_OF_HEROISM, 610020001, "CM2_E"),
+    ("Masteria_CM2_E", MARKER_OF_HEROISM, 610020001, "CM2_F"),
+];
+const PHANTOM_FOREST_MAP: i32 = 3_992_040;
+const MARKER_OF_HEROISM: i32 = 3_992_039;
 /// Where each room off the Tower of Goddess's hub lets out on it (Cosmic
 /// `party3_roomout`): the room, and the hub's portal. The storage is the
 /// seventh; anywhere else lets out at the hub's portal 0, as in Cosmic.
@@ -1957,6 +1985,14 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         // A Holiday PQ exit map's way back to its lobby.
         "08_xmas_out" if crate::events::holiday_lobby(player.stats.map_id - 2).is_some() => {
             through(Effect::WarpToPortal(player.stats.map_id - 2, 0))
+        }
+        script if MASTERIA_WAYS.iter().any(|&(name, ..)| name == script) => {
+            let &(_, item, map, to_portal) =
+                MASTERIA_WAYS.iter().find(|&&(name, ..)| name == script)?;
+            if player.inventory.count(item) == 0 {
+                return Some(ScriptOutcome::default());
+            }
+            through(to(map, Portal::Named(to_portal)))
         }
         script if PLAIN_WARPS.iter().any(|&(name, _, _)| name == script) => {
             let &(_, map, portal) = PLAIN_WARPS.iter().find(|&&(name, _, _)| name == script)?;
@@ -4736,6 +4772,24 @@ mod tests {
         }
         player.stats.map_id = crate::events::ZENUMIST_LOBBY;
         assert!(portal("rnj3_in0", &player).is_none());
+    }
+
+    #[test]
+    fn the_masteria_ways_let_through_only_the_holders_of_their_item() {
+        let fresh = player_with(&[]);
+        for (script, item, map, name) in MASTERIA_WAYS {
+            assert_ne!(named(map, name), 0, "{script}");
+            let shut = portal(script, &fresh).unwrap();
+            assert!(shut.effects.is_empty(), "{script}");
+            let mut holder = player_with(&[]);
+            (holder.inventory).insert(InventoryType::Setup, 1, game::Item::stack(item, 1));
+            let open = portal(script, &holder).unwrap();
+            assert_eq!(
+                open.effects,
+                [Effect::PortalSound, to(map, Portal::Named(name))],
+                "{script}"
+            );
+        }
     }
 
     #[test]
