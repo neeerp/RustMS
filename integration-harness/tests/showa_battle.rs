@@ -12,7 +12,7 @@ use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{
     grant_stack, replace_item, set_job, set_str, set_weapon_attack,
 };
-use integration_harness::events::{cleared, said, talk, throw_down, told};
+use integration_harness::events::{cleared, clears, said, talk, throw_down, told};
 use integration_harness::hunting::{attack, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
@@ -116,6 +116,8 @@ async fn win(leader: &mut WorldSession, lt: &mut Trace) {
         beat(c, &name, lt, oid).await;
     }
     until(c, lt, cleared).await;
+    read_for(c, lt, 1_000).await;
+    assert_eq!(clears(lt), 1, "{lt:?}");
 }
 
 /// `player` takes Konpei's prize after the win, and goes on to the clear

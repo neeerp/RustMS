@@ -12,7 +12,7 @@ use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{
     grant_stack, replace_item, set_job, set_str, set_weapon_attack, start_quest,
 };
-use integration_harness::events::{cleared, said};
+use integration_harness::events::{cleared, clears, said};
 use integration_harness::events::{party, party_of_one, talk, throw_down, told, waiting_in};
 use integration_harness::hunting::{attack, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -185,6 +185,7 @@ async fn the_white_essence_brings_out_latanica_whose_death_wins_the_fight() {
     until(m, &mut mt, cleared).await;
     tokio::time::sleep(Duration::from_secs(11)).await;
     barrier(m, &member.character_name, &mut mt).await;
+    assert_eq!(clears(&mt), 1, "{mt:?}");
     assert!(!mt.arrivals.iter().any(|a| a.0 == PEACEFUL_SHIP), "{mt:?}");
 
     // Bob takes the winners up to the Peaceful Ship; the last one out ends

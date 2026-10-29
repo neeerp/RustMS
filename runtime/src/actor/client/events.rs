@@ -2165,17 +2165,14 @@ impl ClientActor {
                 EventKind::Horntail | EventKind::Htpq | EventKind::Delli
             );
         // The maze's win, the Pirate Ship's and the Watch Hog's room's have
-        // no effect or sound (Cosmic `clearPQ`), only their EXP; Guardian
-        // Nex's room has shown its own as the Nex fell (`boss_falls`).
+        // no effect or sound (Cosmic `clearPQ`), only their EXP; a boss's
+        // room has shown its own as the boss fell (`boss_falls`).
         let won = stage == event.last_stage();
         let quiet = zpq
             || zakum
             || ticket.kind == EventKind::LudiMaze
             || ticket.kind == EventKind::MonsterRiding
-            || matches!(
-                ticket.kind,
-                EventKind::GuardianNex(_) | EventKind::NeoBoss(_)
-            )
+            || (ticket.kind.boss_falls() && won)
             || (ticket.kind == EventKind::Pirate && won)
             || (matches!(ticket.kind, EventKind::Magatia(_))
                 && stage == events::MAGATIA_ROPES_STAGE);
