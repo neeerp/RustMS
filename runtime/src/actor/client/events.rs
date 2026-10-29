@@ -117,11 +117,13 @@ impl ClientActor {
             EventKind::Tristan | EventKind::RockSpirit | EventKind::RockSpiritVip => return Ok(()),
             // The East Castle Tower's portal takes the player in, and the
             // Wedding Hall's door likewise; Olson's own talk the dollhouse
-            // room's, and Cheng's the Toy Factory's Sector 4.
+            // room's, Cheng's the Toy Factory's Sector 4 and Kenta's the
+            // Watch Hog's room.
             EventKind::KingPepe
             | EventKind::WeddingHall
             | EventKind::Dollhouse
-            | EventKind::MechanicalParts => return Ok(()),
+            | EventKind::MechanicalParts
+            | EventKind::MonsterRiding => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
             // Shuang registers guilds, not parties (`talk_to_shuang`).
@@ -1974,9 +1976,12 @@ impl ClientActor {
         let Some(game) = self.game.as_mut() else {
             return Ok(());
         };
-        // A battle's jewels stay for Areda once it has its results.
+        // A battle's jewels stay for Areda once it has its results, and the
+        // Watch Hog's room's items with one who won it (Cosmic `clearPQ`
+        // unregisters them first).
         let (changes, worn) = match ticket.kind {
             EventKind::Ariant(_) if game.player.ariant_tier.is_some() => Default::default(),
+            EventKind::MonsterRiding if ticket.won() => Default::default(),
             kind => kind.event().take_items(&mut game.player),
         };
         let refit = worn && game.player.fit_hp_mp();
@@ -2148,12 +2153,13 @@ impl ClientActor {
                 ticket.kind,
                 EventKind::Horntail | EventKind::Htpq | EventKind::Delli
             );
-        // The maze's win and the Pirate Ship's have no effect or sound
-        // (Cosmic `clearPQ`), only their EXP.
+        // The maze's win, the Pirate Ship's and the Watch Hog's room's have
+        // no effect or sound (Cosmic `clearPQ`), only their EXP.
         let won = stage == event.last_stage();
         let quiet = zpq
             || zakum
             || ticket.kind == EventKind::LudiMaze
+            || ticket.kind == EventKind::MonsterRiding
             || (ticket.kind == EventKind::Pirate && won)
             || (matches!(ticket.kind, EventKind::Magatia(_))
                 && stage == events::MAGATIA_ROPES_STAGE);

@@ -205,6 +205,12 @@ const EXPIRE_TRIES: u32 = 12;
 /// a recommended default in `v83ref/lanes/QUESTIONS.md`, row 180).
 const BUNNY_SICK_HITS: u32 = 6;
 
+/// The Watchhog's guard is told to protect it when it lost more than
+/// `HOG_HURT` HP in `HOG_WATCH` (Cosmic `3rdJob_mount`'s `checkHogHealth`,
+/// every ten seconds; here at the first hit after each ten seconds).
+const HOG_WATCH: Duration = Duration::from_secs(10);
+const HOG_HURT: i32 = 1000;
+
 /// How long an item lies on a reactor before the reactor takes it
 /// (Cosmic's `ActivateItemReactor`).
 const ITEM_TAKEN_AFTER: Duration = Duration::from_secs(5);
@@ -305,6 +311,8 @@ pub struct FieldActor {
     /// rice cakes it made.
     bunny_hits: u32,
     bunny_cakes: u32,
+    /// The Watchhog's HP when its guard last heard how it fares, and when.
+    hog_watch: Option<(Instant, i32)>,
     /// When, after a friendly mob in an event's copy went, its party is
     /// sent off.
     lost_at: Option<Instant>,
@@ -451,6 +459,7 @@ impl FieldActor {
             trapped: HashMap::new(),
             bunny_hits: 0,
             bunny_cakes: 0,
+            hog_watch: None,
             lost_at: None,
             salion: None,
             pots: 0,
@@ -4149,6 +4158,9 @@ impl FieldActor {
         let bunny = hit.mob_id == reactors::MOON_BUNNY;
         let text = net::content::text();
         if !hit.gone {
+            if hit.mob_id == net::events::WATCH_HOG {
+                self.watch_hog(hit.hp + hit.damage, hit.hp, now);
+            }
             self.bunny_hits += u32::from(bunny);
             if self.bunny_hits >= BUNNY_SICK_HITS {
                 self.bunny_hits = 0;
@@ -4185,6 +4197,20 @@ impl FieldActor {
             self.fail_event();
         }
         self.snowman_melted(hit.mob_id);
+    }
+
+    /// The Watchhog had `before` HP and now has `hp`: once ten seconds have
+    /// passed since its guard last heard, they hear to protect it if it
+    /// lost too much since.
+    fn watch_hog(&mut self, before: i32, hp: i32, now: Instant) {
+        let (since, was) = *self.hog_watch.get_or_insert((now, before));
+        if now.duration_since(since) < HOG_WATCH {
+            return;
+        }
+        if was - hp > HOG_HURT {
+            self.item_line(&net::content::text().get(keys::KENTA_HOG_PROTECT, &[]));
+        }
+        self.hog_watch = Some((now, hp));
     }
 
     /// The Snow Spirit brings out a Holiday arena's snowman in its first

@@ -2049,6 +2049,9 @@ impl NpcScript {
                 Some(konpei_arena(player, won, &mut rand::thread_rng()))
             }
             BALROG_KEEPER if player.stats.map_id == events::BALROG_TOMB => Some(balrog_keeper(won)),
+            KENTA_HOG_ROOM if player.stats.map_id == events::HOG_ROOM => {
+                Some(kenta_hog_room(player))
+            }
             BOB if player.stats.map_id == events::ENGINE_ROOM => Some(bob(won)),
             TEMPLE_KEEPER if events::PINK_BEAN.holds(player.stats.map_id) => {
                 Some(temple_keeper(won))
@@ -2193,6 +2196,9 @@ impl NpcScript {
         }
         if npc_id == CHENG {
             return cheng(player, &mut rand::thread_rng());
+        }
+        if npc_id == KENTA {
+            return Some(kenta(player));
         }
         if npc_id == DIMENSIONAL_MIRROR {
             return Some(dimensional_mirror(player));
@@ -5242,6 +5248,60 @@ fn cheng(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
         ],
     };
     Some(NpcScript::new(CHENG, vec![thanks, leave]))
+}
+
+/// Kenta in the Aquarium's zoo (230000003), and his double in the Watch
+/// Hog's room (923010000).
+const KENTA: i32 = 2060005;
+const KENTA_HOG_ROOM: i32 = 9060000;
+
+/// Whether the player holds the five Pheromones and five reports Monster
+/// Riding (6002) wants.
+fn holds_hog_items(player: &Player) -> bool {
+    let held = |item_id| player.inventory.count(item_id) >= events::HOG_ITEMS_WANTED;
+    held(events::PHEROMONE) && held(events::KENTAS_REPORT)
+}
+
+/// Kenta (Cosmic `2060005`): takes a player on Monster Riding (6002) alone
+/// into the Watch Hog's room, unless they hold what it wants; thanks one
+/// who does or is done; tells anyone else only a few may guard the hog.
+fn kenta(player: &Player) -> NpcScript {
+    let page = match player.quests.state(events::MONSTER_RIDING_QUEST) {
+        QuestState::Completed => Page::Say(text(keys::KENTA_THANKS)),
+        QuestState::Started if holds_hog_items(player) => Page::Say(text(keys::KENTA_THANKS)),
+        QuestState::Started => {
+            let start = Page::Done(vec![Effect::StartEvent(EventKind::MonsterRiding)]);
+            let mut script = NpcScript::new(KENTA, vec![start]);
+            script.refused = Some(text(keys::KENTA_BUSY));
+            return script;
+        }
+        _ => Page::Say(text(keys::KENTA_FEW)),
+    };
+    NpcScript::new(KENTA, vec![page])
+}
+
+/// Kenta's double in the Watch Hog's room (Cosmic `9060000`): one holding
+/// five of each item wins the room, keeping them, and goes on to the room
+/// past it; anyone else may give up and go there without them.
+fn kenta_hog_room(player: &Player) -> NpcScript {
+    let back = Page::Say(text(keys::KENTA_HOG_BACK));
+    let pages = if holds_hog_items(player) {
+        let won = Effect::EventCommand(EventCommand::ClearStage(1));
+        vec![
+            Page::Say(text(keys::KENTA_HOG_DONE)),
+            back,
+            Page::Done(vec![won]),
+        ]
+    } else {
+        let leave = Page::Ask {
+            text: text(keys::KENTA_HOG_LEAVE),
+            on_yes: Vec::new(),
+            on_no: None,
+        };
+        let out = Effect::WarpToPortal(events::HOG_ROOM_EXIT, 0);
+        vec![leave, back, Page::Done(vec![out])]
+    };
+    NpcScript::new(KENTA_HOG_ROOM, pages)
 }
 
 /// The Spirit of Snow Statue, broken, in the Valley of Snowmen (211040102).
@@ -17771,6 +17831,47 @@ mod tests {
         assert!(ask.effects.is_empty());
         let yes = script.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [back]);
+    }
+
+    #[test]
+    fn kenta_sends_a_player_on_6002_to_the_watch_hog_and_his_double_lets_them_out() {
+        let says = |player: &Player, key| {
+            let mut script = NpcScript::for_npc(KENTA, player).unwrap();
+            assert_eq!(page_text(&script.begin()), text(key));
+        };
+        says(&with_quests(&[]), keys::KENTA_FEW);
+        says(&with_quests(&[(6002, true)]), keys::KENTA_THANKS);
+        let mut on_it = with_quests(&[(6002, false)]);
+        let mut script = NpcScript::for_npc(KENTA, &on_it).unwrap();
+        let start = [Effect::StartEvent(EventKind::MonsterRiding)];
+        assert_eq!(script.begin().effects, start);
+        assert_eq!(script.refused, Some(text(keys::KENTA_BUSY)));
+
+        // In the room, without five of each: give up and go out.
+        on_it.stats.map_id = events::HOG_ROOM;
+        assert!(NpcScript::in_event(KENTA_HOG_ROOM, &with_quests(&[]), true, false).is_none());
+        let mut script = NpcScript::in_event(KENTA_HOG_ROOM, &on_it, true, false).unwrap();
+        assert_eq!(question(&script.begin()), text(keys::KENTA_HOG_LEAVE));
+        let back = script.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(page_text(&back), text(keys::KENTA_HOG_BACK));
+        let out = Effect::WarpToPortal(events::HOG_ROOM_EXIT, 0);
+        assert_eq!(script.respond(ScriptInput::Next).unwrap().effects, [out]);
+
+        // With them: the room is won.
+        let stack = |item_id| game::Item::stack(item_id, 5);
+        let etc = game::InventoryType::Etc;
+        on_it.inventory.insert(etc, 1, stack(events::PHEROMONE));
+        let mut script = NpcScript::in_event(KENTA_HOG_ROOM, &on_it, true, false).unwrap();
+        assert_eq!(question(&script.begin()), text(keys::KENTA_HOG_LEAVE));
+        on_it.inventory.insert(etc, 2, stack(events::KENTAS_REPORT));
+        let mut script = NpcScript::in_event(KENTA_HOG_ROOM, &on_it, true, false).unwrap();
+        assert_eq!(page_text(&script.begin()), text(keys::KENTA_HOG_DONE));
+        let back = script.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&back), text(keys::KENTA_HOG_BACK));
+        let won = Effect::EventCommand(EventCommand::ClearStage(1));
+        assert_eq!(script.respond(ScriptInput::Next).unwrap().effects, [won]);
+        on_it.stats.map_id = events::AQUARIUM_ZOO;
+        says(&on_it, keys::KENTA_THANKS);
     }
 
     #[test]

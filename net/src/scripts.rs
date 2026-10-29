@@ -1598,6 +1598,30 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             }
             out
         }
+        // The way out past the Watch Hog's room, back to Kenta: one on
+        // Monster Riding (6002) with five of each item keeps five of each,
+        // anyone else none (Cosmic `tamepig_out2`).
+        "tamepig_out2" => {
+            use crate::events::{HOG_ITEMS_WANTED, KENTAS_REPORT, PHEROMONE};
+            let zoo = crate::events::AQUARIUM_ZOO;
+            let mut out = through(Effect::WarpToPortal(zoo, named(zoo, "out00")));
+            let held = |item_id| player.inventory.count(item_id);
+            let done = quest(crate::events::MONSTER_RIDING_QUEST) == QuestState::Started
+                && held(PHEROMONE) >= HOG_ITEMS_WANTED
+                && held(KENTAS_REPORT) >= HOG_ITEMS_WANTED;
+            let kept = if done { HOG_ITEMS_WANTED } else { 0 };
+            for item_id in [KENTAS_REPORT, PHEROMONE] {
+                let extra = i16::try_from(held(item_id) - kept).unwrap_or(i16::MAX);
+                if extra > 0 {
+                    let take = Effect::TakeItem {
+                        item_id,
+                        quantity: extra,
+                    };
+                    out.effects.insert(0, take);
+                }
+            }
+            out
+        }
         // Griffey's and Manon's Forests lead into the Isolated Forest, and
         // its two ways lead back (Cosmic `inNix1`, `inNix2`, `outNix1`,
         // `outNix2`).
@@ -4365,6 +4389,38 @@ mod tests {
         let refused = portal("balog_end", &full).unwrap().effects;
         let room = content::text().get(keys::BALROG_END_FULL, &[]);
         assert_eq!(refused, [Effect::Pink(room)]);
+        // Past the Watch Hog's room: five of each kept for Monster Riding,
+        // none without it or without five of both.
+        use crate::events::{AQUARIUM_ZOO, KENTAS_REPORT, PHEROMONE};
+        let zoo = [Effect::PortalSound, Effect::WarpToPortal(AQUARIUM_ZOO, 2)];
+        let holding = |quests: &[(i16, QuestState)], pheromones, reports| {
+            let mut player = player_with(quests);
+            let etc = InventoryType::Etc;
+            let stack = |item_id, count| game::Item::stack(item_id, count);
+            player
+                .inventory
+                .insert(etc, 1, stack(PHEROMONE, pheromones));
+            player
+                .inventory
+                .insert(etc, 2, stack(KENTAS_REPORT, reports));
+            portal("tamepig_out2", &player).unwrap().effects
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let on_it = [(6002, QuestState::Started)];
+        assert_eq!(holding(&on_it, 5, 5), zoo);
+        assert_eq!(
+            holding(&on_it, 7, 6),
+            [&[take(PHEROMONE, 2), take(KENTAS_REPORT, 1)][..], &zoo].concat()
+        );
+        assert_eq!(
+            holding(&on_it, 5, 4),
+            [&[take(PHEROMONE, 5), take(KENTAS_REPORT, 4)][..], &zoo].concat()
+        );
+        assert_eq!(
+            holding(&[], 5, 5),
+            [&[take(PHEROMONE, 5), take(KENTAS_REPORT, 5)][..], &zoo].concat()
+        );
+        assert_eq!(portal("tamepig_out2", &fresh).unwrap().effects, zoo);
         assert_eq!(go("inNix1", &fresh), Some((ISOLATED_FOREST, 1)));
         assert_eq!(go("inNix2", &fresh), Some((ISOLATED_FOREST, 2)));
         assert_eq!(go("outNix1", &fresh), Some((GRIFFEY_FOREST, 3)));

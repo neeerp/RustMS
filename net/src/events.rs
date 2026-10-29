@@ -138,6 +138,9 @@ pub enum EventKind {
     /// MV's Lair (Cosmic `TreasurePQ`), started at Charles (9220018) in
     /// its lobby off New Leaf City.
     Treasure,
+    /// The Watch Hog's room for Monster Riding (6002), taken alone from
+    /// Kenta (2060005) in the Aquarium's zoo.
+    MonsterRiding,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -3897,6 +3900,48 @@ pub const PARTS_QUEST: i16 = 3239;
 /// 2202001), ten of which Cheng takes.
 pub const MACHINE_PART: i32 = 4_031_092;
 
+/// The Aquarium's zoo, 230000003, where Kenta (2060005) keeps the way to
+/// the Watch Hog's room.
+pub const AQUARIUM_ZOO: i32 = 230000003;
+/// The room where the Watch Hog is kept, 923010000, and the one it lets
+/// out to, 923010100 (its `forcedReturn`, and its own), whose only way out
+/// is `tamepig_out2`.
+pub const HOG_ROOM: i32 = 923010000;
+pub const HOG_ROOM_EXIT: i32 = 923010100;
+/// Monster Riding (6002), the third job's quest for the Monster Rider.
+pub const MONSTER_RIDING_QUEST: i16 = 6002;
+/// The Watchhog the aliens come for, which now and then drops a
+/// Pheromone, and the reports the room's boxes hold: five of each are
+/// wanted.
+pub const WATCH_HOG: i32 = 9_300_102;
+pub const PHEROMONE: i32 = 4_031_507;
+pub const KENTAS_REPORT: i32 = 4_031_508;
+pub const HOG_ITEMS_WANTED: i32 = 5;
+
+/// The Watch Hog's room (Cosmic `3rdJob_mount`): Kenta takes a player on
+/// Monster Riding alone into their own copy for five minutes, up to seven
+/// at a time on a channel (its lobbies), where aliens come for the
+/// Watchhog. Kenta's double (9060000) there wins it for one holding five
+/// of each item, which they keep; leaving any other way, the Watchhog's
+/// going or the time running out sends them out without them.
+pub const MONSTER_RIDING: Event = Event {
+    lobby: AQUARIUM_ZOO,
+    maps: HOG_ROOM..=HOG_ROOM,
+    entry: HOG_ROOM,
+    exit: HOG_ROOM_EXIT,
+    levels: 70..=u8::MAX,
+    team: 1..=1,
+    exp_per_stage: &[0],
+    stride: 1,
+    member_clears: &[],
+    items: &[PHEROMONE, KENTAS_REPORT],
+    clear_map: Some(HOG_ROOM_EXIT),
+    until_empty: false,
+    survive: Some(WATCH_HOG),
+    runs: 7,
+    ..DOJO
+};
+
 /// Sector 4: Cheng takes a player on The Missing Mechanical Parts alone into
 /// their own copy for twenty minutes, one at a time on a channel (Server.NX
 /// `FieldSet.img/Ludi020`: `timeOut` 1200, `shuffle` 1; Cosmic `q3239`).
@@ -4499,7 +4544,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 59] = [
+    pub const ALL: [EventKind; 60] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4559,6 +4604,7 @@ impl EventKind {
         EventKind::Ariant(2),
         EventKind::Ariant(3),
         EventKind::Treasure,
+        EventKind::MonsterRiding,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -4621,6 +4667,7 @@ impl EventKind {
             EventKind::Holiday(level) => &HOLIDAY[usize::from(level.clamp(1, 3) - 1)],
             EventKind::Ariant(arena) => &ARIANT[usize::from(arena.clamp(1, 3) - 1)],
             EventKind::Treasure => &TREASURE,
+            EventKind::MonsterRiding => &MONSTER_RIDING,
         }
     }
 
@@ -6543,6 +6590,19 @@ mod tests {
         assert_eq!(check_jail(0, &[false; 7]), JailCheck::Open);
         let up = [true, true, false, false, true, false, true];
         assert_eq!(check_jail(0, &up), JailCheck::Open);
+    }
+
+    #[test]
+    fn the_watch_hogs_room_is_taken_alone_for_five_minutes_and_keeps_the_hog() {
+        assert!(MONSTER_RIDING.solo() && MONSTER_RIDING.runs == 7);
+        assert_eq!(
+            MONSTER_RIDING.duration(),
+            scaled(Duration::from_secs(5 * 60))
+        );
+        assert!(event_map(HOG_ROOM) && !event_map(HOG_ROOM_EXIT));
+        assert!(protected(WATCH_HOG));
+        assert_eq!(MONSTER_RIDING.last_stage(), 1);
+        assert_eq!(MONSTER_RIDING.clear_map, Some(HOG_ROOM_EXIT));
     }
 
     #[test]

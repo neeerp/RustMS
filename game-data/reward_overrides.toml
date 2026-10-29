@@ -33,6 +33,13 @@ replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 # Check.img/6192/1/item), each time he drops (net::events::TYLUS_DROP_PERIOD).
 replace = [{ item = 4031495, prob = 1.0, quest = 6192 }]
 
+[mobs.9300102]
+# The Watchhog in the room it is guarded in (Map.nx 923010000) makes the
+# Pheromone 4031507 that Monster Riding (6002) checks for five of (Quest.nx
+# Check.img/6002/1/item), each time it drops (its dropItemPeriod; Cosmic's
+# drop data has it every time).
+replace = [{ item = 4031507, prob = 1.0, quest = 6002 }]
+
 [mobs.9001001]
 replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 
@@ -231,6 +238,13 @@ quest_items = { 4031145 = 3230 }
 # the Machine Parts 4031092 Cheng the Assistant takes ten of for The Missing
 # Mechanical Parts (3239). Its two look-alikes (2208000) drop nothing.
 quest_items = { 4031092 = 3239 }
+
+[reactors.2302005]
+# The Watch Hog's room's four boxes (Map.nx 923010000; Reactor.nx 2302005,
+# "research report", linked to 2302000) drop Kenta's Report 4031508, five of
+# which Monster Riding (6002) checks for (Cosmic's reactor drops: every time,
+# for 6002).
+replace = [{ item = 4031508, prob = 1.0, quest = 6002 }]
 
 [reactors.6741015]
 # MV's Lair's dungeon (Map.nx 674030000): the seven Guy Fawkes dolls that
