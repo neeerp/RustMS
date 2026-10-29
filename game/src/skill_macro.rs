@@ -61,6 +61,19 @@ impl SkillMacros {
         self.0 = macros;
         Ok(())
     }
+
+    /// Empty every slot holding `skill_id`, as when an SP Reset takes its
+    /// last level. Whether any slot held it.
+    pub fn forget(&mut self, skill_id: i32) -> bool {
+        let mut held = false;
+        for skill in self.0.iter_mut().flat_map(|m| m.skills.iter_mut()) {
+            if *skill == skill_id {
+                *skill = 0;
+                held = true;
+            }
+        }
+        held
+    }
 }
 
 /// Whether a macro may hold `skill_id` (v83 FUN_004fb292): not a passive
@@ -110,6 +123,18 @@ mod tests {
         );
         assert_eq!(macros.replace(vec![named("twelve bytes")]), Ok(()));
         assert_eq!(SkillMacros::new(vec![named("a"); 7]).macros().len(), 5);
+    }
+
+    #[test]
+    fn a_forgotten_skill_leaves_every_slot() {
+        let holding = |skills| SkillMacro {
+            skills,
+            ..named("a")
+        };
+        let mut macros = SkillMacros::new(vec![holding([7, 8, 7]), holding([8, 0, 0])]);
+        assert!(macros.forget(7));
+        assert_eq!(macros.macros(), [holding([0, 8, 0]), holding([8, 0, 0])]);
+        assert!(!macros.forget(7), "none left");
     }
 
     #[test]

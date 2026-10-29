@@ -238,7 +238,9 @@ from `UI.nx`. Moved so far:
   stars out curse words in the name. A macro's icon is dragged onto a key in Key Config or
   a quick slot, which then shows it (`Macroicon/<n>/icon`). Hovering the icon,
   or such a key in Key Config, shows the macro's tooltip (`MacroTooltip`). The
-  buttons have no tooltips.
+  buttons have no tooltips. An SP Reset that takes a skill's last level
+  empties the slots that held it, and the server sends the list again
+  (MACRO_SYS_DATA_INIT, as Cosmic does).
 - **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
   (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
   scroll bar, and the mesos, laid out from period footage. BtFull widens it to
