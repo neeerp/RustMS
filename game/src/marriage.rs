@@ -35,6 +35,29 @@ pub fn is_wedding_ring(item_id: i32) -> bool {
     WEDDING_RINGS.contains(&item_id)
 }
 
+/// Take every wedding ring, worn or in the bags, from a player whose
+/// couple is over. v83's client refuses to drop one (report b054), so the
+/// break-up takes both partners' (RustMS's pick), and a partner away
+/// meanwhile loses theirs on the next login.
+pub fn take_wedding_rings(player: &mut crate::Player) -> Vec<crate::InventoryChange> {
+    let held: Vec<(crate::InventoryType, i16)> = player
+        .inventory
+        .all()
+        .filter(|(_, _, item)| is_wedding_ring(item.item_id))
+        .map(|(kind, slot, _)| (kind, slot))
+        .collect();
+    let mut changes = Vec::new();
+    for (kind, slot) in held {
+        changes.extend(
+            player
+                .inventory_mut()
+                .take(kind, slot, 1)
+                .unwrap_or_default(),
+        );
+    }
+    changes
+}
+
 /// The empty boxes and rings a couple holds. The client lets a player drop
 /// one only to break off (report b054).
 pub fn is_token(item_id: i32) -> bool {
@@ -168,5 +191,30 @@ mod tests {
         let rings: Vec<i32> = (2240000..=2240003).map(|b| record(b).ring_id()).collect();
         assert_eq!(rings, WEDDING_RINGS);
         assert!(rings.iter().all(|&ring| is_wedding_ring(ring)));
+    }
+
+    #[test]
+    fn a_couple_over_takes_the_wedding_rings_worn_or_not() {
+        use crate::{Inventory, Item, Keymap, Player, QuestLog, SkillBook};
+        let mut player = Player::new(
+            1,
+            0,
+            crate::character::test_stats(),
+            0,
+            Inventory::default(),
+            SkillBook::default(),
+            Keymap::default(),
+            QuestLog::default(),
+        );
+        let ring = |item_id| Item::equipment(item_id, Default::default());
+        let inventory = player.inventory_mut();
+        inventory.insert(crate::InventoryType::Equipped, -12, ring(1112803));
+        inventory.insert(crate::InventoryType::Equip, 1, ring(1112806));
+        inventory.insert(crate::InventoryType::Equip, 2, ring(1112000));
+        let changes = take_wedding_rings(&mut player);
+        assert_eq!(changes.len(), 2);
+        assert_eq!(player.inventory.all().count(), 1);
+        assert_eq!(player.inventory.count(1112000), 1);
+        assert!(take_wedding_rings(&mut player).is_empty());
     }
 }

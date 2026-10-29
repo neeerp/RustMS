@@ -875,6 +875,10 @@ impl ClientActor {
         if game::wedding::wedding_map(player.stats.map_id) {
             game::wedding::take_keys(&mut player);
         }
+        // A couple that broke up meanwhile took the wedding ring with it.
+        if player.marriage.is_none() {
+            game::marriage::take_wedding_rings(&mut player);
+        }
         ships::leave_forced_return_map(&mut player);
         // Nor does a logout or a channel change end a jailing.
         self.jailed_until = jailed_until;
