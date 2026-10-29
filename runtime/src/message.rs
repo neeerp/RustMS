@@ -1153,6 +1153,17 @@ pub enum DirectoryMessage {
         channel_id: u8,
         map_id: i32,
     },
+    /// What the Ariant Coliseum's lobby shows `from` of the arenas on
+    /// their channel.
+    AriantLobby {
+        from: ClientId,
+        reply: tokio::sync::oneshot::Sender<net::ariant::Lobby>,
+    },
+    /// What `from` finds of the arena whose entrance they stand at.
+    AriantHost {
+        from: ClientId,
+        reply: tokio::sync::oneshot::Sender<net::ariant::Host>,
+    },
     /// What `from` finds of the Monster Carnival's rooms on their channel.
     CarnivalRooms {
         from: ClientId,

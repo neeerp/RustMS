@@ -131,6 +131,10 @@ pub enum EventKind {
     /// an expedition gathered at its last gate (2141001)
     /// (`crate::squads`).
     PinkBean,
+    /// A battle in one of the Ariant Coliseum's arenas (1 to 3), gathered
+    /// by its host at Cesar (2101014) in the Coliseum's lobby
+    /// (`crate::ariant`).
+    Ariant(u8),
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -3993,6 +3997,56 @@ const fn holiday(level: u8) -> Event {
 /// The Holiday PQ by difficulty, easy first.
 pub const HOLIDAY: [Event; 3] = [holiday(1), holiday(2), holiday(3)];
 
+/// A battle in the Ariant Coliseum's arena `arena`, 1 to 3 (Cosmic
+/// `AriantColiseum`): two to seven of levels 20 to 30, as many as its
+/// host let in and none in a party, go from its entrance into its battle
+/// map for ten minutes, then to the King's Room. Fewer than two left end
+/// it, sending the rest back to the lobby. The defaults are in
+/// `v83ref/lanes/QUESTIONS.md` b302.
+const fn ariant(arena: u8) -> Event {
+    let battle = crate::ariant::battle(arena);
+    Event {
+        lobby: crate::ariant::entrance(arena),
+        entrances: &[],
+        maps: battle..=battle,
+        entry: battle,
+        entries: 1,
+        exit: crate::ariant::KINGS_ROOM,
+        levels: 20..=30,
+        spread: None,
+        team: 2..=7,
+        married: false,
+        minutes: 10,
+        exp_per_stage: &[],
+        meso_per_stage: &[],
+        stride: 1,
+        stage_maps: &[],
+        talk_clears: &[],
+        member_clears: &[],
+        clear_portals: &[],
+        stage_copies: &[],
+        gated: &[],
+        puzzles: 1..=0,
+        areas_taken: 0,
+        items: &[],
+        passes: 0,
+        hand_ins: &[],
+        gates: false,
+        clear_map: None,
+        bonus: None,
+        blessings: &[],
+        squad: true,
+        gate: &[],
+        until_empty: false,
+        survive: None,
+        runs: 1,
+        alone: false,
+    }
+}
+
+/// The Ariant Coliseum's arenas, 1 first.
+pub const ARIANT: [Event; 3] = [ariant(1), ariant(2), ariant(3)];
+
 /// The EXP of the Holiday PQ's two stages, the snowman whole and Scrooge
 /// beaten, by difficulty, easy first (Cosmic's).
 const HOLIDAY_EXP: [[i32; 2]; 3] = [[210, 620], [500, 1400], [950, 2200]];
@@ -4354,7 +4408,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 55] = [
+    pub const ALL: [EventKind; 58] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4410,6 +4464,9 @@ impl EventKind {
         EventKind::Holiday(1),
         EventKind::Holiday(2),
         EventKind::Holiday(3),
+        EventKind::Ariant(1),
+        EventKind::Ariant(2),
+        EventKind::Ariant(3),
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -4470,6 +4527,7 @@ impl EventKind {
             EventKind::Latanica => &LATANICA,
             EventKind::PinkBean => &PINK_BEAN,
             EventKind::Holiday(level) => &HOLIDAY[usize::from(level.clamp(1, 3) - 1)],
+            EventKind::Ariant(arena) => &ARIANT[usize::from(arena.clamp(1, 3) - 1)],
         }
     }
 

@@ -12,6 +12,7 @@ use packet::Packet;
 
 const HENESYS: i32 = 100_000_000;
 const PYRAMID_LOBBY: i32 = 926_010_000;
+const ARIANT_LOBBY: i32 = 980_010_000;
 
 /// CHANGE_MAP_SPECIAL: press Up on the scripted portal `portal`.
 fn enter(portal: &str) -> Packet {
@@ -51,8 +52,24 @@ async fn the_mirror_slides_to_the_pyramid_and_the_way_out_comes_back() {
 }
 
 #[tokio::test]
-async fn under_level_25_the_mirror_has_nowhere_to_send_anyone() {
+async fn from_level_20_the_mirror_slides_to_the_ariant_coliseum_and_back() {
     let mut player = waiting_in(HENESYS, 22, &[]).await;
+    let menu = told(&mut player, talk(HENESYS, DIMENSIONAL_MIRROR)).await;
+    let expected = format!("#0#{}", text(keys::MIRROR_ARIANT));
+    assert_eq!(menu.prompt_texts, [expected]);
+
+    let went = told(&mut player, answer(14, 1, Some(0))).await;
+    assert!(
+        matches!(went.arrivals[..], [(ARIANT_LOBBY, 3, _)]),
+        "{went:?}"
+    );
+    let back = told(&mut player, enter("out00")).await;
+    assert!(matches!(back.arrivals[..], [(HENESYS, _, _)]), "{back:?}");
+}
+
+#[tokio::test]
+async fn under_level_20_the_mirror_has_nowhere_to_send_anyone() {
+    let mut player = waiting_in(HENESYS, 15, &[]).await;
     let menu = told(&mut player, talk(HENESYS, DIMENSIONAL_MIRROR)).await;
     assert_eq!(menu.prompts, [(DIMENSIONAL_MIRROR, 14)], "{menu:?}");
     let nowhere = format!("#-1#{}", text(keys::MIRROR_NOWHERE));

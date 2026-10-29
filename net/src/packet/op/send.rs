@@ -136,6 +136,8 @@ pub enum SendOpcode {
     ContiMove = 0x94,
     ContiState = 0x95,
     StopClock = 0x9A,
+    /// The Ariant Coliseum's results banner, with no body (v83 FUN_0053ef95).
+    AriantResult = 0x9B,
     PyramidGauge = 0x9D,
     PyramidScore = 0x9E,
     QuickSlotInit = 0x9F,
@@ -262,6 +264,9 @@ pub enum SendOpcode {
     CarnivalDied = 0x126,
     /// How a battle ended, for the chat log (296; Cosmic never sends it).
     CarnivalResult = 0x128,
+    /// The Ariant Coliseum's ranking of its players' Spirit Jewels (297;
+    /// v83 FUN_0053e5e1).
+    AriantScore = 0x129,
     /// How long Horntail's Cave stays open (302; v83 FUN_005335a3).
     HorntailCave = 0x12E,
     /// How long the Zakum Shrine stays open (303; v83 FUN_0053347c).

@@ -365,14 +365,14 @@ places this server runs:
 
 | Id | Place | Levels | Saved for the way back | Lands on |
 |---|---|---|---|---|
+| 0 | Ariant Coliseum | 20 to 30 | `DOJO_RETURN` | 980010000, portal 3 |
 | 1 | Mu Lung Dojo | 25 and up | `DOJO_RETURN` | 925020000, portal 0 |
 | 2 | Monster Carnival | 30 to 50 | `CARNIVAL_RETURN` | 980000000, portal 3 |
 | 5 | Nett's Pyramid | 40 and up | `PYRAMID_RETURN` | 926010000, portal 4 |
 
-Each place's way out (`dojang_exit`, `mc_out`, the Pyramid lobby's
-`out00`) goes back to the saved town. A player who may go nowhere sees
-`#-1#` and the `mirror.nowhere` line. Cosmic's Ariant Coliseum (0), its
-second Carnival (3) and its Construction Site (6) have no event here.
+Each place's way out (`dojang_exit`, `mc_out`, `aMatchMove2`, the
+Pyramid lobby's `out00`) goes back to the saved town. A player who may go nowhere sees
+`#-1#` and the `mirror.nowhere` line. Cosmic's second Carnival (3) and its Construction Site (6) have no event here.
 
 ## Assets and validation
 

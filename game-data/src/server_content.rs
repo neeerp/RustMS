@@ -2743,6 +2743,7 @@ pub mod keys {
     pub const DOJO_BOARD_DECLINE: &str = "dojo.board.decline";
     /// The Dimensional Mirror's labels, under its icons, and its one line
     /// when nothing is open to the player.
+    pub const MIRROR_ARIANT: &str = "mirror.ariant";
     pub const MIRROR_DOJO: &str = "mirror.dojo";
     pub const MIRROR_CARNIVAL: &str = "mirror.carnival";
     pub const MIRROR_PYRAMID: &str = "mirror.pyramid";
@@ -2843,6 +2844,41 @@ pub mod keys {
     pub const CARNIVAL_SPIEGELMANN_NOT_LEADER: &str = "carnival.spiegelmann.not_leader";
     pub const CARNIVAL_SPIEGELMANN_TERMS: &str = "carnival.spiegelmann.terms";
     pub const CARNIVAL_SPIEGELMANN_BUSY: &str = "carnival.spiegelmann.busy";
+    pub const ARIANT_TOO_HIGH: &str = "ariant_arena.too_high";
+    pub const ARIANT_ARENAS: &str = "ariant_arena.arenas";
+    pub const ARIANT_EMPTY: &str = "ariant_arena.empty";
+    pub const ARIANT_GATHERING: &str = "ariant_arena.gathering";
+    pub const ARIANT_OCCUPIED: &str = "ariant_arena.occupied";
+    pub const ARIANT_ASK_CAP: &str = "ariant_arena.ask_cap";
+    pub const ARIANT_NOT_A_NUMBER: &str = "ariant_arena.not_a_number";
+    pub const ARIANT_TOO_FEW: &str = "ariant_arena.too_few";
+    pub const ARIANT_CREATED: &str = "ariant_arena.created";
+    pub const ARIANT_ALREADY: &str = "ariant_arena.already";
+    pub const ARIANT_FULL: &str = "ariant_arena.full";
+    pub const ARIANT_BANNED: &str = "ariant_arena.banned";
+    pub const ARIANT_LOBBY_REFUSED: &str = "ariant_arena.lobby_refused";
+    pub const ARIANT_HOST_MENU: &str = "ariant_arena.host_menu";
+    pub const ARIANT_HOST_VIEW: &str = "ariant_arena.host_view";
+    pub const ARIANT_HOST_BAN: &str = "ariant_arena.host_ban";
+    pub const ARIANT_HOST_START: &str = "ariant_arena.host_start";
+    pub const ARIANT_HOST_LEAVE: &str = "ariant_arena.host_leave";
+    pub const ARIANT_MEMBERS: &str = "ariant_arena.members";
+    pub const ARIANT_ALONE: &str = "ariant_arena.alone";
+    pub const ARIANT_BAN_WHOM: &str = "ariant_arena.ban_whom";
+    pub const ARIANT_MEMBER: &str = "ariant_arena.member";
+    pub const ARIANT_BANNED_NAME: &str = "ariant_arena.banned_name";
+    pub const ARIANT_HOST_IN_PARTY: &str = "ariant_arena.host_in_party";
+    pub const ARIANT_COUNT: &str = "ariant_arena.count";
+    pub const ARIANT_AWAY: &str = "ariant_arena.away";
+    pub const ARIANT_IN_PARTY: &str = "ariant_arena.in_party";
+    pub const ARIANT_LEVELS: &str = "ariant_arena.levels";
+    pub const ARIANT_BUSY: &str = "ariant_arena.busy";
+    pub const ARIANT_HOST_LEFT: &str = "ariant_arena.host_left";
+    pub const ARIANT_NO_ROSTER: &str = "ariant_arena.no_roster";
+    pub const ARIANT_KIT_GIVEN: &str = "ariant_arena.kit_given";
+    pub const ARIANT_KIT_TAKEN: &str = "ariant_arena.kit_taken";
+    pub const ARIANT_KIT_FULL: &str = "ariant_arena.kit_full";
+    pub const ARIANT_ABOUT: &str = "ariant_arena.about";
     pub const CARNIVAL_SPIEGELMANN_GO: &str = "carnival.spiegelmann.go";
     pub const CARNIVAL_GUIDE_BACK: &str = "carnival.guide.back";
     pub const CARNIVAL_SPIEGELMANN_WAITING: &str = "carnival.spiegelmann.waiting";
@@ -4396,6 +4432,7 @@ mod tests {
                 keys::DOJO_BOARD_NOTICE_1,
                 keys::DOJO_BOARD_ASK,
                 keys::DOJO_BOARD_DECLINE,
+                keys::MIRROR_ARIANT,
                 keys::MIRROR_DOJO,
                 keys::MIRROR_CARNIVAL,
                 keys::MIRROR_PYRAMID,
@@ -4494,6 +4531,41 @@ mod tests {
                 keys::CARNIVAL_SPIEGELMANN_NOT_LEADER,
                 keys::CARNIVAL_SPIEGELMANN_TERMS,
                 keys::CARNIVAL_SPIEGELMANN_BUSY,
+                keys::ARIANT_TOO_HIGH,
+                keys::ARIANT_ARENAS,
+                keys::ARIANT_EMPTY,
+                keys::ARIANT_GATHERING,
+                keys::ARIANT_OCCUPIED,
+                keys::ARIANT_ASK_CAP,
+                keys::ARIANT_NOT_A_NUMBER,
+                keys::ARIANT_TOO_FEW,
+                keys::ARIANT_CREATED,
+                keys::ARIANT_ALREADY,
+                keys::ARIANT_FULL,
+                keys::ARIANT_BANNED,
+                keys::ARIANT_LOBBY_REFUSED,
+                keys::ARIANT_HOST_MENU,
+                keys::ARIANT_HOST_VIEW,
+                keys::ARIANT_HOST_BAN,
+                keys::ARIANT_HOST_START,
+                keys::ARIANT_HOST_LEAVE,
+                keys::ARIANT_MEMBERS,
+                keys::ARIANT_ALONE,
+                keys::ARIANT_BAN_WHOM,
+                keys::ARIANT_MEMBER,
+                keys::ARIANT_BANNED_NAME,
+                keys::ARIANT_HOST_IN_PARTY,
+                keys::ARIANT_COUNT,
+                keys::ARIANT_AWAY,
+                keys::ARIANT_IN_PARTY,
+                keys::ARIANT_LEVELS,
+                keys::ARIANT_BUSY,
+                keys::ARIANT_HOST_LEFT,
+                keys::ARIANT_NO_ROSTER,
+                keys::ARIANT_KIT_GIVEN,
+                keys::ARIANT_KIT_TAKEN,
+                keys::ARIANT_KIT_FULL,
+                keys::ARIANT_ABOUT,
                 keys::CARNIVAL_SPIEGELMANN_GO,
                 keys::CARNIVAL_GUIDE_BACK,
                 keys::CARNIVAL_SPIEGELMANN_WAITING,

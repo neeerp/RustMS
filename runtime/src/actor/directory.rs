@@ -1,3 +1,4 @@
+mod ariant;
 mod carnival;
 mod family;
 mod guild_quest;
@@ -392,6 +393,12 @@ impl WorldDirectory {
                         *left += 1;
                     }
                 }
+            }
+            DirectoryMessage::AriantLobby { from, reply } => {
+                let _ = reply.send(self.ariant_lobby(from));
+            }
+            DirectoryMessage::AriantHost { from, reply } => {
+                let _ = reply.send(self.ariant_host(from));
             }
             DirectoryMessage::CarnivalRooms { from, reply } => {
                 let _ = reply.send(self.carnival_rooms(from));

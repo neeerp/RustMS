@@ -4,6 +4,7 @@
 //! pack (`crate::content`), with committed placeholders. Lua is deferred;
 //! these keep the effect-returning shape a scripting runtime would have.
 
+use crate::ariant::{self, Arena, CapRefusal, Host, Lobby, StartRefusal};
 use crate::carnival;
 use crate::content;
 use crate::conti::{self, Route, State};
@@ -1081,6 +1082,8 @@ pub enum OnText {
     PuppeteerDoor { hunting: bool },
     /// The Sealed Shrine's pillar lets one `hunting` its Shadow Knight in.
     ShrinePillar { hunting: bool },
+    /// The lobby's Cesar opens Ariant arena `arena` for as many as typed.
+    AriantCap { arena: u8 },
 }
 
 impl OnText {
@@ -1093,6 +1096,7 @@ impl OnText {
             }
             OnText::PuppeteerDoor { hunting } => puppeteer_door_opens(text, *hunting),
             OnText::ShrinePillar { hunting } => shrine_pillar_opens(text, *hunting),
+            OnText::AriantCap { arena } => ariant_open(text, *arena),
         }
     }
 }
@@ -1896,6 +1900,24 @@ impl NpcScript {
             Some(Refusal::Full) => text(keys::CARNIVAL_SPIEGELMANN_FULL),
         };
         NpcScript::new(SPIEGELMANN, vec![Page::Say(text)])
+    }
+
+    /// Cesar in the Ariant Coliseum's lobby, to `player`, who finds its
+    /// arenas as `lobby` shows them.
+    pub fn ariant_lobby(lobby: &Lobby, player: &Player) -> Self {
+        ariant_lobby(lobby, player)
+    }
+
+    /// Cesar at Ariant arena `arena`'s entrance, to a player who finds it
+    /// as `host`.
+    pub fn ariant_host(arena: u8, host: &Host) -> Self {
+        ariant_host(arena, host)
+    }
+
+    /// Cesar in an Ariant battle, to a player who may have `taken` their
+    /// bombs and rocks already on this run, or anywhere else (`None`).
+    pub fn ariant_battle(taken: Option<bool>) -> Self {
+        ariant_battle(taken)
     }
 
     /// `challenger`'s party challenges the one the player leads in a
@@ -12545,6 +12567,203 @@ fn spiegelmann(
     script
 }
 
+/// Cesar, the Royal Guard Captain, in the Ariant Coliseum's lobby
+/// (Cosmic `2101014`), and at its arenas' entrances and in their battles
+/// (`2101017`).
+pub const ARIANT_CESAR: i32 = 2101014;
+pub const ARIANT_HOST: i32 = 2101017;
+
+/// Cesar in the lobby: a player of level 30 or under opens an empty arena
+/// for as many as they say, or joins one gathering, and goes to its
+/// entrance. Arenas whose battle is on aren't shown.
+fn ariant_lobby(lobby: &Lobby, player: &Player) -> NpcScript {
+    if player.stats.level > *ariant::ARIANT_LEVELS.end() {
+        return NpcScript::new(ARIANT_CESAR, vec![Page::Say(text(keys::ARIANT_TOO_HIGH))]);
+    }
+    let choice = |(arena, view): (u8, &Arena)| {
+        let number = arena.to_string();
+        let (label, page) = match view {
+            Arena::Busy => return None,
+            Arena::Empty => (
+                content::text().get(keys::ARIANT_EMPTY, &[("arena", &number)]),
+                Page::AskText {
+                    text: text(keys::ARIANT_ASK_CAP),
+                    min: 1,
+                    max: 3,
+                    on_text: OnText::AriantCap { arena },
+                },
+            ),
+            Arena::Gathering { names, view } => {
+                let host = names.first().map_or("", String::as_str);
+                let label = content::text().get(
+                    keys::ARIANT_GATHERING,
+                    &[
+                        ("arena", &number),
+                        ("host", host),
+                        ("names", &names.join(", ")),
+                    ],
+                );
+                let page = match view {
+                    SquadView::Joinable => Page::Done(vec![
+                        Effect::Squad {
+                            kind: EventKind::Ariant(arena),
+                            command: SquadCommand::Join,
+                        },
+                        Effect::WarpToPortal(ariant::entrance(arena), 0),
+                    ]),
+                    SquadView::Full => Page::Say(text(keys::ARIANT_FULL)),
+                    SquadView::Banned { .. } => Page::Say(text(keys::ARIANT_BANNED)),
+                    _ => Page::Say(text(keys::ARIANT_ALREADY)),
+                };
+                (label, page)
+            }
+        };
+        // Cosmic lets nobody on a roster in again, gathering or not.
+        let page = match lobby.registered {
+            true => Page::Say(text(keys::ARIANT_ALREADY)),
+            false => page,
+        };
+        Some((label, vec![page]))
+    };
+    let choices: Vec<_> = (1..).zip(&lobby.arenas).filter_map(choice).collect();
+    let page = match choices.is_empty() {
+        true => Page::Say(text(keys::ARIANT_OCCUPIED)),
+        false => Page::Menu {
+            text: text(keys::ARIANT_ARENAS),
+            choices,
+        },
+    };
+    let mut script = NpcScript::new(ARIANT_CESAR, vec![page]);
+    // The arena filled, was taken or went since he checked.
+    script.refused = Some(text(keys::ARIANT_LOBBY_REFUSED));
+    script
+}
+
+/// What the lobby's Cesar makes of the number typed for arena `arena`:
+/// it opens for that many, the host's clock counting down, and they go to
+/// its entrance.
+fn ariant_open(typed: &str, arena: u8) -> Vec<Page> {
+    match ariant::cap(typed) {
+        Err(CapRefusal::NotANumber) => vec![Page::Say(text(keys::ARIANT_NOT_A_NUMBER))],
+        Err(CapRefusal::TooFew) => vec![Page::Say(text(keys::ARIANT_TOO_FEW))],
+        Ok(cap) => vec![Page::Done(vec![
+            Effect::Squad {
+                kind: EventKind::Ariant(arena),
+                command: SquadCommand::OpenFor(cap),
+            },
+            Effect::WarpToPortal(ariant::entrance(arena), 0),
+            Effect::Pink(text(keys::ARIANT_CREATED)),
+        ])],
+    }
+}
+
+/// Cesar at an arena's entrance: its host sees who is in it, turns one
+/// away, takes them into battle or leaves it; the others see who is in it.
+/// With no roster there, he offers the way back to the lobby (Cosmic has
+/// none; b302).
+fn ariant_host(arena: u8, host: &Host) -> NpcScript {
+    let squad = |command| Effect::Squad {
+        kind: EventKind::Ariant(arena),
+        command,
+    };
+    let members = |names: &[&str]| {
+        let names = names.join(", ");
+        Page::Say(content::text().get(keys::ARIANT_MEMBERS, &[("names", &names)]))
+    };
+    let page = match host {
+        Host::None => Page::Ask {
+            text: text(keys::ARIANT_NO_ROSTER),
+            on_yes: vec![Effect::WarpToPortal(ariant::ARIANT_LOBBY, 0)],
+            on_no: None,
+        },
+        Host::Member(names) => members(&names.iter().map(String::as_str).collect::<Vec<_>>()),
+        Host::Leading {
+            members: roster,
+            start,
+        } => {
+            let names: Vec<_> = roster.iter().map(|(_, name)| name.as_str()).collect();
+            let ban = match roster.split_first() {
+                Some(((_, host), others)) if !others.is_empty() => Page::Menu {
+                    text: content::text().get(keys::ARIANT_BAN_WHOM, &[("host", host)]),
+                    choices: (2..)
+                        .zip(others)
+                        .map(|(number, (id, name))| {
+                            let number = number.to_string();
+                            let params = [("number", number.as_str()), ("name", name)];
+                            let banned =
+                                content::text().get(keys::ARIANT_BANNED_NAME, &[("name", name)]);
+                            let act = Page::Act {
+                                text: banned,
+                                effects: vec![squad(SquadCommand::Expel(*id))],
+                            };
+                            (content::text().get(keys::ARIANT_MEMBER, &params), vec![act])
+                        })
+                        .collect(),
+                },
+                _ => Page::Say(text(keys::ARIANT_ALONE)),
+            };
+            let start = match start {
+                Ok(()) => Page::Done(vec![squad(SquadCommand::Start)]),
+                Err(refusal) => Page::Say(ariant_refusal(*refusal)),
+            };
+            Page::Menu {
+                text: text(keys::ARIANT_HOST_MENU),
+                choices: vec![
+                    (text(keys::ARIANT_HOST_VIEW), vec![members(&names)]),
+                    (text(keys::ARIANT_HOST_BAN), vec![ban]),
+                    (text(keys::ARIANT_HOST_START), vec![start]),
+                    (
+                        text(keys::ARIANT_HOST_LEAVE),
+                        vec![Page::Done(vec![squad(SquadCommand::Stop)])],
+                    ),
+                ],
+            }
+        }
+    };
+    let mut script = NpcScript::new(ARIANT_HOST, vec![page]);
+    // Someone left, came or moved since he checked.
+    script.refused = Some(text(keys::ARIANT_LOBBY_REFUSED));
+    script
+}
+
+/// Why the host may not take their arena into battle, as Cesar says it.
+fn ariant_refusal(refusal: StartRefusal) -> String {
+    match refusal {
+        StartRefusal::HostInParty => text(keys::ARIANT_HOST_IN_PARTY),
+        StartRefusal::Count { least, most } => content::text().get(
+            keys::ARIANT_COUNT,
+            &[("least", &least.to_string()), ("most", &most.to_string())],
+        ),
+        StartRefusal::Away => text(keys::ARIANT_AWAY),
+        StartRefusal::InParty => text(keys::ARIANT_IN_PARTY),
+        StartRefusal::Levels => text(keys::ARIANT_LEVELS),
+        StartRefusal::Busy => text(keys::ARIANT_BUSY),
+    }
+}
+
+/// Cesar in a battle gives each player its bombs and rocks once a run, if
+/// they all fit (Cosmic's `gotBomb` and `canHoldAll`); anywhere else he
+/// tells of the arena.
+fn ariant_battle(taken: Option<bool>) -> NpcScript {
+    let page = match taken {
+        None => Page::Say(text(keys::ARIANT_ABOUT)),
+        Some(true) => Page::Say(text(keys::ARIANT_KIT_TAKEN)),
+        Some(false) => {
+            let mut effects: Vec<_> = (ariant::KIT.iter())
+                .map(|&(item_id, quantity)| Effect::GiveItem { item_id, quantity })
+                .collect();
+            effects.push(Effect::EventCommand(EventCommand::PrizeTaken));
+            Page::Act {
+                text: text(keys::ARIANT_KIT_GIVEN),
+                effects,
+            }
+        }
+    };
+    let mut script = NpcScript::new(ARIANT_HOST, vec![page]);
+    script.inventory_full = Some(text(keys::ARIANT_KIT_FULL));
+    script
+}
+
 /// Spiegelmann in town (Cosmic `2042000`): he takes a player of levels 30
 /// to 50 to the Carnival Field, keeping where they were for its way out.
 fn spiegelmann_away(player: &Player) -> NpcScript {
@@ -13025,9 +13244,9 @@ fn dojo_board(player: &Player) -> NpcScript {
 
 /// The Dimensional Mirror (Cosmic `9010022`): a slide menu of the places
 /// open at the player's level, each saving the town for the way back
-/// before going. Cosmic's Ariant Coliseum (0), second Carnival (3) and
-/// Construction Site (6) have no event here, so they aren't offered; its
-/// Pyramid (5), stubbed there, is.
+/// before going. Cosmic's second Carnival (3) and Construction Site (6)
+/// have no event here, so they aren't offered; its Pyramid (5), stubbed
+/// there, is.
 fn dimensional_mirror(player: &Player) -> NpcScript {
     let level = player.stats.level;
     let here = player.stats.map_id;
@@ -13038,6 +13257,12 @@ fn dimensional_mirror(player: &Player) -> NpcScript {
         ])]
     };
     let places = [
+        (
+            0,
+            ariant::ARIANT_LEVELS.contains(&level),
+            keys::MIRROR_ARIANT,
+            go(DOJO_RETURN, ariant::ARIANT_LOBBY, ariant::LOBBY_PORTAL),
+        ),
         (
             1,
             level >= 25,
@@ -20815,7 +21040,9 @@ mod tests {
         );
         assert!(NpcScript::squad(EventKind::Kpq, SquadView::None, &at(100)).is_none());
         for kind in EventKind::ALL {
-            assert_eq!(kind.event().squad, recruiter(kind).is_some(), "{kind:?}");
+            // Cesar opens the Ariant arenas (`ariant_lobby`).
+            let recruited = kind.event().squad && !matches!(kind, EventKind::Ariant(_));
+            assert_eq!(recruited, recruiter(kind).is_some(), "{kind:?}");
         }
     }
 
@@ -22857,6 +23084,179 @@ mod tests {
     }
 
     #[test]
+    fn the_ariant_lobbys_cesar_opens_and_joins_arenas() {
+        let mut player = player(50);
+        player.stats.level = 25;
+        player.stats.map_id = ariant::ARIANT_LOBBY;
+        let gathering = |view| Arena::Gathering {
+            names: vec!["Ann".into(), "Bo".into()],
+            view,
+        };
+        let lobby = |second, registered| Lobby {
+            arenas: vec![Arena::Busy, gathering(second), Arena::Empty],
+            registered,
+        };
+        let open = |lobby: &Lobby| {
+            let script = NpcScript::ariant_lobby(lobby, &player);
+            let menu = menu_text(&script.begin()).to_owned();
+            (script, menu)
+        };
+        let label = |key, params: &[(&str, &str)]| content::text().get(key, params);
+        let (mut script, menu) = open(&lobby(SquadView::Joinable, false));
+        // A battle's arena isn't shown.
+        assert!(!menu.contains(&label(keys::ARIANT_EMPTY, &[("arena", "1")])));
+        let second = [("arena", "2"), ("host", "Ann"), ("names", "Ann, Bo")];
+        assert!(menu.contains(&label(keys::ARIANT_GATHERING, &second)));
+        assert!(menu.contains(&label(keys::ARIANT_EMPTY, &[("arena", "3")])));
+        let squad = |arena, command| Effect::Squad {
+            kind: EventKind::Ariant(arena),
+            command,
+        };
+        assert_eq!(
+            script.respond(ScriptInput::Select(0)).unwrap().effects,
+            [
+                squad(2, SquadCommand::Join),
+                Effect::WarpToPortal(980010200, 0)
+            ]
+        );
+
+        // An empty arena opens for as many as typed.
+        let typed = |typed: &str| {
+            let (mut script, _) = open(&lobby(SquadView::Joinable, false));
+            let asked = script.respond(ScriptInput::Select(1)).unwrap();
+            assert_eq!(kind(&asked), Some(2));
+            script.respond(ScriptInput::Text(typed.into())).unwrap()
+        };
+        assert_eq!(
+            typed("4").effects,
+            [
+                squad(3, SquadCommand::OpenFor(4)),
+                Effect::WarpToPortal(980010300, 0),
+                Effect::Pink(text(keys::ARIANT_CREATED)),
+            ]
+        );
+        assert_eq!(page_text(&typed("1")), text(keys::ARIANT_TOO_FEW));
+        assert_eq!(page_text(&typed("x")), text(keys::ARIANT_NOT_A_NUMBER));
+
+        // Who may not join is told why.
+        for (view, registered, key) in [
+            (SquadView::Full, false, keys::ARIANT_FULL),
+            (
+                SquadView::Banned {
+                    leader: "Ann".into(),
+                },
+                false,
+                keys::ARIANT_BANNED,
+            ),
+            (SquadView::Joinable, true, keys::ARIANT_ALREADY),
+        ] {
+            let (mut script, _) = open(&lobby(view, registered));
+            let said = script.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&said), text(key));
+        }
+        let busy = Lobby {
+            arenas: vec![Arena::Busy, Arena::Busy, Arena::Busy],
+            registered: false,
+        };
+        let said = NpcScript::ariant_lobby(&busy, &player).begin();
+        assert_eq!(page_text(&said), text(keys::ARIANT_OCCUPIED));
+        player.stats.level = 31;
+        let said = NpcScript::ariant_lobby(&busy, &player).begin();
+        assert_eq!(page_text(&said), text(keys::ARIANT_TOO_HIGH));
+    }
+
+    #[test]
+    fn cesar_lets_an_arenas_host_ban_start_or_leave() {
+        let members = vec![
+            (1, "Ann".to_owned()),
+            (2, "Bo".to_owned()),
+            (3, "Cy".to_owned()),
+        ];
+        let leading = |members: &[(crate::ClientId, String)], start| Host::Leading {
+            members: members.to_vec(),
+            start,
+        };
+        let squad = |command| Effect::Squad {
+            kind: EventKind::Ariant(2),
+            command,
+        };
+        let pick = |host: &Host, choice| {
+            let mut script = NpcScript::ariant_host(2, host);
+            script.begin();
+            (script.respond(ScriptInput::Select(choice)).unwrap(), script)
+        };
+        let all = content::text().get(keys::ARIANT_MEMBERS, &[("names", "Ann, Bo, Cy")]);
+        let host = leading(&members, Ok(()));
+        assert_eq!(page_text(&pick(&host, 0).0), all);
+        let (list, mut script) = pick(&host, 1);
+        let menu = menu_text(&list);
+        assert!(menu.contains(&content::text().get(keys::ARIANT_BAN_WHOM, &[("host", "Ann")])));
+        let third = [("number", "3"), ("name", "Cy")];
+        assert!(menu.contains(&content::text().get(keys::ARIANT_MEMBER, &third)));
+        let banned = script.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(
+            page_text(&banned),
+            content::text().get(keys::ARIANT_BANNED_NAME, &[("name", "Cy")])
+        );
+        assert_eq!(banned.effects, [squad(SquadCommand::Expel(3))]);
+        assert_eq!(pick(&host, 2).0.effects, [squad(SquadCommand::Start)]);
+        assert_eq!(pick(&host, 3).0.effects, [squad(SquadCommand::Stop)]);
+        let few = leading(&members, Err(StartRefusal::Count { least: 2, most: 3 }));
+        let count = [("least", "2"), ("most", "3")];
+        assert_eq!(
+            page_text(&pick(&few, 2).0),
+            content::text().get(keys::ARIANT_COUNT, &count)
+        );
+        let alone = leading(
+            &members[..1],
+            Err(StartRefusal::Count { least: 2, most: 7 }),
+        );
+        assert_eq!(page_text(&pick(&alone, 1).0), text(keys::ARIANT_ALONE));
+
+        // The others only see who is in it; with nobody's arena there,
+        // Cesar offers the way back to the lobby.
+        let names = vec!["Ann".to_owned(), "Bo".to_owned(), "Cy".to_owned()];
+        let said = NpcScript::ariant_host(2, &Host::Member(names)).begin();
+        assert_eq!(page_text(&said), all);
+        let mut script = NpcScript::ariant_host(2, &Host::None);
+        assert_eq!(question(&script.begin()), text(keys::ARIANT_NO_ROSTER));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(ariant::ARIANT_LOBBY, 0)]
+        );
+    }
+
+    #[test]
+    fn cesar_gives_the_bombs_and_rocks_once_a_battle() {
+        let given = NpcScript::ariant_battle(Some(false)).begin();
+        assert_eq!(page_text(&given), text(keys::ARIANT_KIT_GIVEN));
+        assert_eq!(
+            given.effects,
+            [
+                Effect::GiveItem {
+                    item_id: 2270002,
+                    quantity: 50
+                },
+                Effect::GiveItem {
+                    item_id: 2100067,
+                    quantity: 5
+                },
+                Effect::EventCommand(EventCommand::PrizeTaken),
+            ]
+        );
+        let mut full = NpcScript::ariant_battle(Some(false));
+        full.begin();
+        assert_eq!(
+            page_text(&full.inventory_full().unwrap()),
+            text(keys::ARIANT_KIT_FULL)
+        );
+        let taken = NpcScript::ariant_battle(Some(true)).begin();
+        assert_eq!(page_text(&taken), text(keys::ARIANT_KIT_TAKEN));
+        let about = NpcScript::ariant_battle(None).begin();
+        assert_eq!(page_text(&about), text(keys::ARIANT_ABOUT));
+    }
+
+    #[test]
     fn spiegelmann_shows_the_rooms_and_puts_challenges() {
         let entries: Vec<_> = (1..=6)
             .map(|room| (EventKind::Carnival(room), Entry::Busy))
@@ -23567,7 +23967,8 @@ mod tests {
             let mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
             slide(&mirror.begin())
         };
-        let [dojo, carnival, pyramid] = [
+        let [ariant, dojo, carnival, pyramid] = [
+            keys::MIRROR_ARIANT,
             keys::MIRROR_DOJO,
             keys::MIRROR_CARNIVAL,
             keys::MIRROR_PYRAMID,
@@ -23575,9 +23976,10 @@ mod tests {
         .map(text);
         let nowhere = format!("#-1#{}", text(keys::MIRROR_NOWHERE));
         assert_eq!(menu(19), nowhere);
-        assert_eq!(menu(24), nowhere);
-        assert_eq!(menu(25), format!("#1#{dojo}"));
-        assert_eq!(menu(30), format!("#1#{dojo}#2#{carnival}"));
+        assert_eq!(menu(24), format!("#0#{ariant}"));
+        assert_eq!(menu(25), format!("#0#{ariant}#1#{dojo}"));
+        assert_eq!(menu(30), format!("#0#{ariant}#1#{dojo}#2#{carnival}"));
+        assert_eq!(menu(31), format!("#1#{dojo}#2#{carnival}"));
         assert_eq!(menu(40), format!("#1#{dojo}#2#{carnival}#5#{pyramid}"));
         assert_eq!(menu(51), format!("#1#{dojo}#5#{pyramid}"));
     }
@@ -23608,6 +24010,14 @@ mod tests {
         for id in [-1, 0, 3, 6] {
             assert_eq!(pick(id), None);
         }
+        // The Coliseum, to levels 20 to 30, lands by the lobby's way out.
+        traveller.stats.level = 25;
+        let mut mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
+        mirror.begin();
+        assert_eq!(
+            mirror.respond(ScriptInput::Select(0)),
+            went(DOJO_RETURN, ariant::ARIANT_LOBBY, 3)
+        );
         let prompt = Prompt::Slide {
             npc_id: DIMENSIONAL_MIRROR,
             set: 0,
