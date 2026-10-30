@@ -62,7 +62,9 @@ skills' stat checks leave the rest out. The lookup lives in `net::items`
 (`can_wear`, HeavenClient's `Inventory::would_count`) tries the item on in
 place of what it replaces, as v83's tooltips do (0x4f1782), so gloves' STR can
 let a weapon on but the weapon being replaced can't. HeavenClient also checks
-gender. It doesn't draw v83's red mark on worn items that don't count.
+gender. As v83's equip window does (0x7fef95), its window marks a worn item
+that doesn't count with the red of a closed cell, over the icon; with a cash
+item over it, the cash item's count decides.
 
 ## Expiry
 

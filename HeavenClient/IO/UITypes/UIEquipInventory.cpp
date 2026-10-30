@@ -239,9 +239,16 @@ namespace ms
 		if (is_unavailable(EquipSlot::Id::TAMEDMOB))
 			unavailable.draw(position + cell_position(MOB_EQUIP.x(), MOB_EQUIP.y()));
 
+		// Worn but not counted, the shown item is marked over its icon
+		// (0x7fef95).
 		for (EquipSlot::Id slot : cells())
 			if (auto &icon = icons[slot])
+			{
 				icon->draw(position + iconpositions[slot] + ICON);
+
+				if (!inventory.counts(inventory.shown_equip(slot)))
+					unavailable.draw(position + iconpositions[slot]);
+			}
 
 		UIElement::draw_buttons(alpha);
 	}
