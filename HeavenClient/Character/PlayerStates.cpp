@@ -206,6 +206,12 @@ namespace ms
 
 	void PlayerFallState::update(Player &player) const
 	{
+		// Landed mid-attack: the state stays FALL until the attack ends
+		// (Player::set_state), but the feet are down, so the attack holds
+		// them as it does a walk.
+		if (player.get_phobj().onground && player.is_attacking())
+			return;
+
 		if (player.is_key_down(KeyAction::Id::LEFT))
 			player.get_phobj().walkdir = -1;
 		else if (player.is_key_down(KeyAction::Id::RIGHT))
