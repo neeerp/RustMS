@@ -24,6 +24,10 @@ The rules are in `net::ariant`, the rosters in
   event takes everyone at the entrance into the battle map.
 - A battle ends once fewer than two are left in it, and the rest go back to
   the lobby.
+- The battle's Scorpions (`9300157`) drop Bombs and the items that work when
+  picked up (`game-data/reward_overrides.toml`): the Power Punch, the Wing of
+  the Wind, and the Crazy Skull (`2022268`), which confuses everyone else in
+  the battle (`agent_docs/combat.md`).
 
 ## Scores
 

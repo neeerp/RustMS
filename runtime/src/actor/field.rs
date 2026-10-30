@@ -1174,6 +1174,16 @@ impl FieldActor {
                     inflict,
                 } => self.handle_mob_debuff(from, skill_id, level, origin, &mobs, &inflict),
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
+                FieldRequest::DiseaseOthers(disease) => {
+                    let map_id = self.key.map_id;
+                    for (&id, occupant) in &self.occupants {
+                        if id != from {
+                            occupant
+                                .handle
+                                .send(ServerMessage::Diseased { disease, map_id });
+                        }
+                    }
+                }
                 FieldRequest::Weather { item_id, message } => self.blow_weather(item_id, message),
                 FieldRequest::Kite { item_id, message } => self.fly_kite(from, item_id, message),
                 FieldRequest::CoconutHit { index } => self.hit_coconut(from, index),
