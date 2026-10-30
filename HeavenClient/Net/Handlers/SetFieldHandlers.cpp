@@ -28,6 +28,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Character/Carnival.h"
+#include "../../Character/Inventory/ItemExpiry.h"
 #include "../../Character/Ariant.h"
 #include "../../Character/Coconut.h"
 #include "../../Configuration.h"
@@ -73,6 +74,14 @@ namespace ms
 	namespace
 	{
 		std::optional<CharEntry> cached_player_entry;
+
+		// SET_FIELD ends with the server's time; v83 keeps how far it is
+		// from ours (0x529366).
+		void server_time(InPacket& recv)
+		{
+			if (recv.length() >= 8)
+				item_expiry::server_offset() = recv.read_long() - item_expiry::now();
+		}
 	}
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
@@ -168,6 +177,8 @@ namespace ms
 			auto y = static_cast<int16_t>(recv.read_int());
 			chase = Point<int16_t>(x, y);
 		}
+
+		server_time(recv);
 
 		// Respawning after death restores some HP.
 		Stage::get().get_player().get_stats().set_stat(MapleStat::Id::HP, hp);
@@ -292,6 +303,9 @@ namespace ms
 		CharacterParser::parse_monsterbook(recv, player.get_monsterbook());
 		CharacterParser::parse_nyinfo(recv);
 		CharacterParser::parse_areainfo(recv, player.get_quests());
+		// The character data ends with a short read nowhere here.
+		recv.skip(2);
+		server_time(recv);
 
 		player.recalc_stats();
 		// Logging in or changing channel starts Berserk over (0x7763a9).

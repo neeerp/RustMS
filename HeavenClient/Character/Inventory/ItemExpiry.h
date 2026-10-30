@@ -24,6 +24,20 @@ namespace ms::item_expiry
 		return UNIX_EPOCH + ticks;
 	}
 
+	// How far the server's clock is ahead of ours, from the time each
+	// SET_FIELD ends with (v83 keeps it with the field, 0x529366).
+	inline int64_t& server_offset()
+	{
+		static int64_t offset = 0;
+		return offset;
+	}
+
+	// The server's time now as a FILETIME.
+	inline int64_t server_now()
+	{
+		return now() + server_offset();
+	}
+
 	struct Time
 	{
 		int32_t year;
