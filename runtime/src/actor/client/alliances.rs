@@ -46,7 +46,7 @@ impl ClientActor {
                     })
                     .await
             }
-            AllianceRequest::Deny { inviter } => {
+            AllianceRequest::Deny { inviter, refusal } => {
                 let Some(tag) = self.in_game()?.player.guild.as_ref() else {
                     return Ok(());
                 };
@@ -56,6 +56,7 @@ impl ClientActor {
                         from: cid,
                         inviter,
                         guild_name,
+                        refusal,
                     })
                     .await;
             }

@@ -122,6 +122,7 @@ unsourced = [
     "alliance.invite.busy",
     "alliance.invite.full",
     "alliance.invite.denied",
+    "alliance.invite.blocking",
     "alliance.left",
     "alliance.expelled",
     "alliance.master",

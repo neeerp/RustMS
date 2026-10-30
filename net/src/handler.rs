@@ -320,7 +320,35 @@ pub enum AllianceRequest {
     /// Say something to the alliance's members online.
     Chat { text: String },
     /// Turn down the invitation `inviter` sent (`DENY_ALLIANCE_REQUEST`).
-    Deny { inviter: String },
+    Deny {
+        inviter: String,
+        refusal: AllianceRefusal,
+    },
+}
+
+/// Why an alliance invitation was turned down, as the invitee's client
+/// sends it in `DENY_ALLIANCE_REQUEST`. The client shows none of the three
+/// lines it keeps for these (StringPool 0x115f to 0x1161, never pushed), so
+/// the server tells the inviter.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AllianceRefusal {
+    /// Alliance invitations switched off in the Game Options.
+    Blocking = 0x14,
+    /// Another alliance card already showing.
+    AnotherInvitation = 0x15,
+    /// The card's X.
+    Declined = 0x16,
+}
+
+impl AllianceRefusal {
+    pub fn from_code(code: u8) -> Option<Self> {
+        match code {
+            0x14 => Some(Self::Blocking),
+            0x15 => Some(Self::AnotherInvitation),
+            0x16 => Some(Self::Declined),
+            _ => None,
+        }
+    }
 }
 
 /// A family request (report b039), carried out by the client's actor.

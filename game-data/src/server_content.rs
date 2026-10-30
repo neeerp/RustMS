@@ -132,6 +132,8 @@ pub mod keys {
     /// `{guild}`.
     pub const ALLIANCE_DENIED: &str = "alliance.invite.denied";
     /// `{guild}`.
+    pub const ALLIANCE_BLOCKING: &str = "alliance.invite.blocking";
+    /// `{guild}`.
     pub const ALLIANCE_LEFT: &str = "alliance.left";
     /// `{guild}`.
     pub const ALLIANCE_EXPELLED: &str = "alliance.expelled";
@@ -3534,6 +3536,7 @@ mod tests {
             keys::ALLIANCE_BUSY,
             keys::ALLIANCE_FULL,
             keys::ALLIANCE_DENIED,
+            keys::ALLIANCE_BLOCKING,
             keys::ALLIANCE_LEFT,
             keys::ALLIANCE_EXPELLED,
             keys::ALLIANCE_MASTER,

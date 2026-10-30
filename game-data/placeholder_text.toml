@@ -84,6 +84,7 @@
 "alliance.invite.busy" = "[placeholder] The master of {guild} is answering another invitation."
 "alliance.invite.full" = "[placeholder] Your alliance has no room for another guild."
 "alliance.invite.denied" = "[placeholder] {guild} turned down the invitation."
+"alliance.invite.blocking" = "[placeholder] {guild} isn't taking alliance invitations."
 "duey.gm_refused" = "[placeholder] GMs of your level can't send parcels."
 "alliance.left" = "[placeholder] {guild} left the alliance."
 "alliance.expelled" = "[placeholder] {guild} was expelled from the alliance."

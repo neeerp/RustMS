@@ -1,5 +1,6 @@
 use crate::handler::{
-    AllianceRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
+    AllianceRefusal, AllianceRequest, HandlerResult, WorldAction, WorldContext, WorldHandler,
+    WorldResult,
 };
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -55,18 +56,24 @@ impl WorldHandler for AllianceOperationHandler {
 
 /// `DENY_ALLIANCE_REQUEST`: the invited guild's master turned the card
 /// down, or their client did (invitations switched off, or another card
-/// showing). The inviter hears the same either way.
+/// showing). The inviter hears which.
 pub struct DenyAllianceRequestHandler;
 
 impl WorldHandler for DenyAllianceRequestHandler {
     fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
-        // Why: 0x14 switched off, 0x15 another card, 0x16 declined.
-        reader.read_byte()?;
+        let Some(refusal) = AllianceRefusal::from_code(reader.read_byte()?) else {
+            return Ok(HandlerResult::empty());
+        };
         // The invitee's guild's name follows.
         let inviter = reader.read_str_with_length()?;
-        Ok(HandlerResult::empty().with(WorldAction::Alliance(AllianceRequest::Deny { inviter })))
+        Ok(
+            HandlerResult::empty().with(WorldAction::Alliance(AllianceRequest::Deny {
+                inviter,
+                refusal,
+            })),
+        )
     }
 }
 
@@ -183,8 +190,36 @@ mod tests {
         assert_eq!(
             request(&DenyAllianceRequestHandler, &packet),
             Some(AllianceRequest::Deny {
-                inviter: "Alice".into()
+                inviter: "Alice".into(),
+                refusal: AllianceRefusal::Declined,
             })
         );
+    }
+
+    #[test]
+    fn reads_why_a_denial_came() {
+        let deny = |code: u8| {
+            let mut packet = Packet::new_empty();
+            packet
+                .write_short(RecvOpcode::DenyAllianceRequest as i16)
+                .unwrap();
+            packet.write_byte(code).unwrap();
+            packet.write_str_with_length("Alice").unwrap();
+            packet.write_str_with_length("Mine").unwrap();
+            request(&DenyAllianceRequestHandler, &packet)
+        };
+        for (code, refusal) in [
+            (0x14, AllianceRefusal::Blocking),
+            (0x15, AllianceRefusal::AnotherInvitation),
+        ] {
+            assert_eq!(
+                deny(code),
+                Some(AllianceRequest::Deny {
+                    inviter: "Alice".into(),
+                    refusal,
+                })
+            );
+        }
+        assert_eq!(deny(0x37), None, "a guild code isn't an alliance one");
     }
 }
