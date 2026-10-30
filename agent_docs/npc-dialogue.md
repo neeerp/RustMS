@@ -356,6 +356,8 @@ the last label needs no closing `#`. The client
 (`UISlideMenu`, `IO/UITypes/SlideMenu.h`) sorts the choices by id and
 shows three icons (`BtMain/<id>`) at a time, the middle one framed and
 labelled, starting from the second choice when there are two or more. The
+icons either side are disabled and drawn in grey, as v83 draws a disabled
+button with its flag at +0x5a0 set (`MapleButton::grey_when_disabled`). The
 arrows, Left and Right slide along. MOVE, Enter or the middle icon answers
 `0E 01 i32` with its id; CANCEL or Escape answers `0E 00`. An id of -1
 means nowhere to go: alone, it shows its label with no icons and MOVE

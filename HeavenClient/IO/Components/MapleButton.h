@@ -48,6 +48,10 @@ namespace ms
 		// For a button on a window that fades in and out.
 		void set_opacity(float value);
 
+		// Draw the disabled look in shades of grey, as v83 does for a button
+		// with its flag at +0x5a0 set (4c086e).
+		void grey_when_disabled();
+
 		Cursor::State send_cursor(bool, Point<int16_t>)
 		{ return Cursor::State::IDLE; }
 
@@ -57,5 +61,6 @@ namespace ms
 		// Drawn over the state's texture while the button has key focus.
 		Texture focus;
 		float opacity = 1.0f;
+		bool greyed = false;
 	};
 }
