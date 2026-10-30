@@ -142,23 +142,26 @@ namespace ms
 			return src["BtMain"][std::to_string(menu.entries[entry].id)];
 		};
 
-		// The icons either side only show what comes next: v83 disables them, and their disabled look is
-		// their normal one.
+		// The icons either side only show what comes next: v83 disables them and draws them in grey
+		// (76c2ab).
 		if (!menu.empty)
 		{
 			buttons[Buttons::MIDDLE] = std::make_unique<MapleButton>(icon(shown), MIDDLE_AT);
 
-			if (before)
+			auto beside = [&](size_t entry, Point<int16_t> at)
 			{
-				buttons[Buttons::BEFORE] = std::make_unique<MapleButton>(icon(shown - 1), BEFORE_AT);
-				buttons[Buttons::BEFORE]->set_state(Button::State::DISABLED);
-			}
+				auto button = std::make_unique<MapleButton>(icon(entry), at);
+				button->set_state(Button::State::DISABLED);
+				button->grey_when_disabled();
+
+				return button;
+			};
+
+			if (before)
+				buttons[Buttons::BEFORE] = beside(shown - 1, BEFORE_AT);
 
 			if (after)
-			{
-				buttons[Buttons::AFTER] = std::make_unique<MapleButton>(icon(shown + 1), AFTER_AT);
-				buttons[Buttons::AFTER]->set_state(Button::State::DISABLED);
-			}
+				buttons[Buttons::AFTER] = beside(shown + 1, AFTER_AT);
 		}
 
 		label.change_text(shown < count ? menu.entries[shown].label : "");

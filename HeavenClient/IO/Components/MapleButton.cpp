@@ -48,8 +48,11 @@ namespace ms
 	{
 		if (active)
 		{
-			textures[state].draw(DrawArgument(position + parentpos, opacity));
-			animations[state].draw(DrawArgument(position + parentpos, opacity), 1.0f);
+			DrawArgument args = greyed && state == Button::State::DISABLED
+				? DrawArgument(position + parentpos, Color::grayscale(opacity))
+				: DrawArgument(position + parentpos, opacity);
+			textures[state].draw(args);
+			animations[state].draw(args, 1.0f);
 
 			if (focused)
 				focus.draw(position + parentpos);
@@ -65,6 +68,11 @@ namespace ms
 	void MapleButton::set_opacity(float value)
 	{
 		opacity = value;
+	}
+
+	void MapleButton::grey_when_disabled()
+	{
+		greyed = true;
 	}
 
 	Rectangle<int16_t> MapleButton::bounds(Point<int16_t> parentpos) const
