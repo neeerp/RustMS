@@ -591,7 +591,18 @@ namespace ms
 			phobj.move();
 
 			if (!canfly)
+			{
+				// The path carries the foothold it is on. A curve a hair
+				// off the line would otherwise lose it and be pulled back
+				// to the foothold's end for a tick (#535).
+				if (now.fh > 0)
+				{
+					phobj.fhid = now.fh;
+					phobj.onground = true;
+				}
+
 				physics.get_fht().update_fh(phobj);
+			}
 		} else
 		{
 			phobj.normalize();
