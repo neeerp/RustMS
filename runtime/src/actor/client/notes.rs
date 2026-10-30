@@ -2,12 +2,13 @@ use super::fame::FAME_LIMIT;
 use super::ClientActor;
 use crate::{db::spawn_db, error::RuntimeError, message::DirectoryMessage};
 use game::InventoryType;
-use net::packet::build::world::inventory::build_inventory_operation;
+use net::packet::build::world::inventory::{build_inventory_operation, build_item_gain_in_chat};
 use net::packet::build::world::note::{
     build_note_arrived, build_note_list, build_note_not_sent, build_note_sent, NotSent, MAX_LISTED,
 };
 use net::packet::build::world::stat::{build_stat_update, StatUpdate};
 use net::NoteRequest;
+use std::time::SystemTime;
 use tokio::sync::oneshot;
 
 /// The most notes waiting for one character before more are refused
@@ -116,11 +117,41 @@ impl ClientActor {
         self.send_all(&mut packets).await
     }
 
-    /// The player read these notes, which are now gone; each thank-you
-    /// among them raises their fame by one.
+    /// The player read these notes, which are now gone. Each thank-you
+    /// among them raises their fame by one, and each invitation brings its
+    /// item while it has not expired and they are still on the list; an
+    /// invitation without room for its item stays, as the client keeps it.
     async fn read_notes(&mut self, ids: Vec<i32>) -> Result<(), RuntimeError> {
-        let cid = self.client_id;
-        let flags = spawn_db(move || db::note::delete(cid, &ids)).await?;
+        let (cid, now) = (self.client_id, SystemTime::now());
+        let notes = spawn_db(move || db::note::find(cid, &ids)).await?;
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        let mut read = Vec::new();
+        for note in &notes {
+            let marriage_id = db::note::invitation_of(&note.message);
+            let reservation = match marriage_id.filter(|_| note.flag == db::note::INVITATION) {
+                Some(id) => spawn_db(move || db::wedding::invited_to(cid, id, now)).await?,
+                None => None,
+            };
+            if let Some(reservation) = reservation {
+                let item_id = reservation.venue.received_invitation();
+                let until = Some(reservation.invitation_expiry());
+                let Ok(changes) = net::items::give_until(&mut next.inventory, item_id, 1, until)
+                else {
+                    continue;
+                };
+                packets.push(build_inventory_operation(false, &changes)?);
+                packets.push(build_item_gain_in_chat(item_id, 1)?);
+            }
+            read.push(note.id);
+        }
+        let flags = spawn_db(move || db::note::delete(cid, &read)).await?;
+        if !packets.is_empty() {
+            if self.commit_player(next, None, &mut packets).await? {
+                self.send_all(&mut packets).await?;
+            }
+            self.save_if_dirty().await?;
+        }
         let thanks = flags.iter().filter(|&&flag| flag == db::note::FAME).count() as i16;
         if thanks == 0 {
             return Ok(());

@@ -1,6 +1,7 @@
 //! Notes (memos): short messages left for a character, who sees each once,
 //! since reading them deletes them. A thank-you for a Cash Shop gift is a
-//! note too, flagged `FAME`, which raises its reader's fame.
+//! note too, flagged `FAME`, which raises its reader's fame, and so is a
+//! wedding invitation, flagged `INVITATION`, which brings its item.
 
 use crate::schema::{cash_items, characters, gift_replies, notes};
 use diesel::prelude::*;
@@ -12,6 +13,10 @@ diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql
 pub const PLAIN: i16 = 0;
 /// A gift's thank-you, which raises its reader's fame by one.
 pub const FAME: i16 = 1;
+/// A wedding invitation, whose text ends in `_` and the couple's marriage
+/// id. The client shows the text before the `_` and, on reading it, sends
+/// the id back while it has an Etc slot free for the invitation.
+pub const INVITATION: i16 = 3;
 
 #[derive(Clone, Debug, PartialEq, Eq, Queryable)]
 pub struct Note {
@@ -59,6 +64,29 @@ pub fn character(name: &str) -> crate::Result<Option<(i32, String)>> {
 /// Leave `receiver` a plain note from `sender`, unless they already have
 /// `limit` waiting. Whether it was left.
 pub fn send(receiver: i32, sender: &str, message: &str, limit: i64) -> crate::Result<bool> {
+    leave(receiver, sender, message, PLAIN, limit)
+}
+
+/// Leave `receiver` an invitation from `sender` to the wedding of the
+/// couple `marriage_id`, as `send` does. `message` loses any `_`, which
+/// would cut what the client shows short.
+pub fn invite(
+    receiver: i32,
+    sender: &str,
+    message: &str,
+    marriage_id: i32,
+    limit: i64,
+) -> crate::Result<bool> {
+    let message = format!("{}_{marriage_id}", message.replace('_', " "));
+    leave(receiver, sender, &message, INVITATION, limit)
+}
+
+/// The marriage id at the end of an invitation's `message`.
+pub fn invitation_of(message: &str) -> Option<i32> {
+    message.rsplit_once('_')?.1.parse().ok()
+}
+
+fn leave(receiver: i32, sender: &str, message: &str, flag: i16, limit: i64) -> crate::Result<bool> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
         // Two notes sent at once can't both take the last place.
@@ -79,7 +107,7 @@ pub fn send(receiver: i32, sender: &str, message: &str, limit: i64) -> crate::Re
                 receiver_id: receiver,
                 sender,
                 message,
-                flag: PLAIN,
+                flag,
             })
             .execute(conn)?;
         Ok(true)
@@ -132,6 +160,22 @@ pub fn thank(
             .execute(conn)?;
         Ok(Some(receiver))
     })?)
+}
+
+/// `receiver`'s notes among `ids`.
+pub fn find(receiver: i32, ids: &[i32]) -> crate::Result<Vec<Note>> {
+    Ok(notes::table
+        .filter(notes::receiver_id.eq(receiver))
+        .filter(notes::id.eq_any(ids))
+        .order(notes::id)
+        .select((
+            notes::id,
+            notes::sender,
+            notes::message,
+            notes::sent_at,
+            notes::flag,
+        ))
+        .load(&mut crate::connection()?)?)
 }
 
 /// Delete `receiver`'s notes among `ids`, returning the flags of those

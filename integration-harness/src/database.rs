@@ -1555,6 +1555,69 @@ pub async fn fill_parcels(receiver_id: i32, count: i32) -> Result<(), HarnessErr
     Ok(())
 }
 
+/// The notes waiting for `receiver_id`, oldest first: each one's id,
+/// sender, flag and text.
+pub async fn notes_waiting(
+    receiver_id: i32,
+) -> Result<Vec<(i32, String, i16, String)>, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Note {
+        #[diesel(sql_type = Integer)]
+        id: i32,
+        #[diesel(sql_type = Text)]
+        sender: String,
+        #[diesel(sql_type = SmallInt)]
+        flag: i16,
+        #[diesel(sql_type = Text)]
+        message: String,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read notes",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT id, sender, flag, message FROM notes WHERE receiver_id = $1 ORDER BY id",
+        )
+        .bind::<Integer, _>(receiver_id)
+        .load::<Note>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)
+    .map(|notes| {
+        notes
+            .into_iter()
+            .map(|n| (n.id, n.sender, n.flag, n.message))
+            .collect()
+    })
+}
+
+/// Leave `receiver_id` `count` plain notes.
+pub async fn fill_notes(receiver_id: i32, count: i32) -> Result<(), HarnessError> {
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "fill an inbox",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "INSERT INTO notes (receiver_id, sender, message) \
+             SELECT $1, 'filler', 'hello' FROM generate_series(1, $2)",
+        )
+        .bind::<Integer, _>(receiver_id)
+        .bind::<Integer, _>(count)
+        .execute(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(())
+}
+
 /// Make coupon `code` (upper case) giving `rewards`, each `(kind, item_id,
 /// quantity)` with kind 0 an item, 1 NX Credit, 2 Maple Points, 3 NX
 /// Prepaid and 4 mesos; already expired if `expired`.
