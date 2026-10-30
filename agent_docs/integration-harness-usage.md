@@ -108,7 +108,9 @@ The harness reads endpoints from environment variables:
 - `HARNESS_LOGIN_ADDR`
 - `HARNESS_WORLD_ADDR` (channel 1; channel `n` is this port + `n`)
 
-`harnessctl test` sets these automatically.
+`harnessctl test` sets these automatically. Unset, they default to
+`harnessctl`'s ports (`127.0.0.1:18484` and `18485`), never the dev servers'
+8484/8485, so a plain `cargo test` can't reach a server someone is playing on.
 
 Tests that need state the protocol can't create, such as an NX balance, use
 `integration_harness::database` (`set_nx_credit`). It connects to

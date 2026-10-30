@@ -21,11 +21,17 @@ pub async fn load_multi_harness_config_or_fail() -> MultiHarnessConfig {
 
 async fn assert_servers_reachable(login_addr: SocketAddr, world_addr: SocketAddr) {
     if !endpoint_reachable(login_addr).await {
-        panic!("integration precondition failed: login server at {login_addr} is not reachable");
+        panic!(
+            "integration precondition failed: login server at {login_addr} is not reachable; \
+             run `harnessctl test`, or `harnessctl up` and set HARNESS_LOGIN_ADDR/HARNESS_WORLD_ADDR"
+        );
     }
 
     if !endpoint_reachable(world_addr).await {
-        panic!("integration precondition failed: world server at {world_addr} is not reachable");
+        panic!(
+            "integration precondition failed: world server at {world_addr} is not reachable; \
+             run `harnessctl test`, or `harnessctl up` and set HARNESS_LOGIN_ADDR/HARNESS_WORLD_ADDR"
+        );
     }
 }
 
