@@ -3,8 +3,11 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::net::SocketAddr;
 
-const DEFAULT_LOGIN_ADDR: &str = "127.0.0.1:8484";
-const DEFAULT_WORLD_ADDR: &str = "127.0.0.1:8485";
+// harnessctl's default ports, which only a harness stack listens on. The
+// dev servers' 8484/8485 would let a stray `cargo test` log into a server
+// someone is playing on (#252).
+const DEFAULT_LOGIN_ADDR: &str = "127.0.0.1:18484";
+const DEFAULT_WORLD_ADDR: &str = "127.0.0.1:18485";
 
 #[derive(Debug, Clone)]
 pub struct HarnessConfig {
