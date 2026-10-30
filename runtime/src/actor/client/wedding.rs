@@ -8,7 +8,6 @@
 use super::ClientActor;
 use crate::message::{DirectoryMessage, WeddingNews};
 use crate::{db::spawn_db, error::RuntimeError};
-use db::parcel::{NewParcel, Sent};
 use db::wedding::{Booking, Invite};
 use game::marriage::ENGAGED;
 use game::wedding::{
@@ -21,6 +20,7 @@ use net::npc_scripts::{self, NpcScript, WeddingView};
 use net::packet::build::world::inventory;
 use net::packet::build::world::marriage::{build_invitation, build_wedding_notice, WeddingNotice};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
+use net::packet::build::world::note::build_note_arrived;
 use net::packet::build::world::stat::build_stat_update;
 use net::ClientId;
 use packet::Packet;
@@ -402,8 +402,8 @@ impl ClientActor {
     }
 
     /// The player is invited to a wedding: take the invitation, which
-    /// expires a slot after the wedding starts, or find it at Duey without
-    /// room for it. In the Cash Shop, the player sees it on leaving.
+    /// expires a slot after the wedding starts, or find it among their notes
+    /// without room for it. In the Cash Shop, the player sees it on leaving.
     async fn invited(&mut self, invitation: Invitation) -> Result<(), RuntimeError> {
         let reservation = &invitation.reservation;
         let item_id = reservation.venue.received_invitation();
@@ -420,8 +420,9 @@ impl ClientActor {
         };
         let key = if taken {
             keys::WEDDING_INVITED
-        } else if leave_at_duey(&invitation).await {
+        } else if leave_invitation_note(&invitation).await {
             packets.clear();
+            packets.push(build_note_arrived()?);
             keys::WEDDING_INVITED_NOTE
         } else {
             return self
@@ -524,46 +525,22 @@ impl ClientActor {
     }
 }
 
-/// Leave `invitation` at Duey for its guest, with a note saying so. Failing
-/// that (their Duey inbox full), the guest goes off the list again, so
-/// that the couple may send another; false then.
-pub(crate) async fn leave_at_duey(invitation: &Invitation) -> bool {
-    let reservation = &invitation.reservation;
-    let item_id = reservation.venue.received_invitation();
-    let (guest, marriage_id) = (invitation.guest, reservation.marriage_id);
-    let left = match net::items::create(item_id, 1) {
-        Some(mut item) => {
-            item.expiration = Some(reservation.invitation_expiry());
-            let note = invitation_text(keys::WEDDING_INVITED_NOTE, invitation);
-            let from = invitation.from.clone();
-            spawn_db(move || {
-                let parcel = NewParcel {
-                    receiver_id: guest,
-                    sender: &from,
-                    mesos: 0,
-                    message: None,
-                    quick: false,
-                    sent_at: SystemTime::now(),
-                    item: Some(&item),
-                };
-                let sent = db::parcel::leave(&parcel, net::duey::INBOX_LIMIT as i64)?;
-                if !matches!(sent, Sent::Sent(_)) {
-                    return Ok(false);
-                }
-                // The note only points to the parcel.
-                if !db::note::send(guest, &from, &note, super::notes::INBOX_LIMIT)? {
-                    warn!(guest, "No room for the invitation's note");
-                }
-                Ok::<_, db::Error>(true)
-            })
-            .await
-        }
-        None => Ok(false),
-    };
+/// Leave `invitation` among its guest's notes, as v83's invitation note
+/// (flag 3), which brings the invitation when read. Failing that (their
+/// inbox full), the guest goes off the list again, so that the couple may
+/// send another; false then.
+pub(crate) async fn leave_invitation_note(invitation: &Invitation) -> bool {
+    let (guest, marriage_id) = (invitation.guest, invitation.reservation.marriage_id);
+    let text = invitation_text(keys::WEDDING_INVITED_NOTE, invitation);
+    let from = invitation.from.clone();
+    let left = spawn_db(move || {
+        db::note::invite(guest, &from, &text, marriage_id, super::notes::INBOX_LIMIT)
+    })
+    .await;
     match left {
         Ok(true) => return true,
-        Ok(false) => warn!(guest, item_id, "No room at Duey for an invitation"),
-        Err(error) => warn!(guest, %error, "Invitation not left at Duey"),
+        Ok(false) => warn!(guest, "No room among the notes for an invitation"),
+        Err(error) => warn!(guest, %error, "Invitation note not left"),
     }
     if let Err(error) = spawn_db(move || db::wedding::uninvite(marriage_id, guest)).await {
         warn!(guest, marriage_id, %error, "A guest without an invitation stays invited");

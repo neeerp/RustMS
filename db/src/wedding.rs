@@ -256,6 +256,25 @@ pub fn uninvite(marriage_id: i32, guest_id: i32) -> crate::Result<()> {
     Ok(())
 }
 
+/// The wedding of the couple `marriage_id`, if `guest_id` is on its list
+/// and their invitation has not expired by `now`.
+pub fn invited_to(
+    guest_id: i32,
+    marriage_id: i32,
+    now: SystemTime,
+) -> crate::Result<Option<Reservation>> {
+    let mut conn = crate::connection()?;
+    let row = wedding_guests::table
+        .inner_join(wedding_reservations::table)
+        .filter(wedding_guests::guest_id.eq(guest_id))
+        .filter(wedding_guests::marriage_id.eq(marriage_id))
+        .filter(wedding_reservations::starts_at.gt(now - SLOT))
+        .select(columns())
+        .first::<Row>(&mut conn)
+        .optional()?;
+    Ok(row.and_then(reservation_of))
+}
+
 /// The soonest wedding at `venue` that `guest_id` is invited to and that
 /// guests may still come to at `now`, with its couple.
 pub fn guest_of(

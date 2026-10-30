@@ -1257,7 +1257,7 @@
 "wedding.invite.returned" = "[placeholder] Your invitation could not reach '{name}' and came back to you."
 "wedding.victoria.info" = "[placeholder] Planning a wedding at the Cathedral? Come to Nicole together, on the same channel, with an engagement ring and a Cathedral Wedding Ticket from the Cash Shop. She books the next free hour and gives you both invitations: double-click one in your Etc tab to invite a guest before the wedding starts."
 "wedding.guest.invited" = "[placeholder] {groom} and {bride} invited you to their wedding, in {minutes} minutes on channel {channel}. Check your Etc tab."
-"wedding.guest.note" = "[placeholder] {groom} and {bride} invited you to their wedding on channel {channel}. Your invitation waits at Duey."
+"wedding.guest.note" = "[placeholder] {groom} and {bride} invited you to their wedding on channel {channel}. Your invitation comes with their note."
 "wedding.start.intro" = "[placeholder] I begin the weddings booked at the Chapel. When your hour comes, come to me together, dressed for it, and we'll begin."
 "wedding.start.not_booked" = "[placeholder] You don't have a wedding booked at the Chapel. Bonnie takes the bookings."
 "wedding.start.channel" = "[placeholder] Your wedding was booked on channel {channel}. Please meet me there."

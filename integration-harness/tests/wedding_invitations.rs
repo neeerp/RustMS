@@ -1,14 +1,15 @@
 //! Wedding invitations (report b066): a partner of a booked couple sends an
 //! invitation from the Etc tab to a guest by name (RING_ACTION 5). A guest
 //! online with room takes a received invitation; one offline, or without
-//! room, finds it at Duey with a note. The invitation goes only once the
-//! guest is on the list. A guest opening theirs (RING_ACTION 6) sees the
-//! couple's names (MARRIAGE_RESULT 15), or "not valid" (34) uninvited.
-//! An invitation that fits nowhere, with the guest's Duey inbox full, goes
-//! back to its sender and the guest off the list.
+//! room, finds an invitation note (flag 3), which brings it once read with
+//! room for it. The invitation goes only once the guest is on the list. A
+//! guest opening theirs (RING_ACTION 6) sees the couple's names
+//! (MARRIAGE_RESULT 15), or "not valid" (34) uninvited. An invitation that
+//! fits nowhere, with the guest's inbox full, goes back to its sender and
+//! the guest off the list.
 
 use integration_harness::database::{
-    book_wedding, engage, fill_parcels, grant_stack, parcels_and_notes, set_gender, set_job,
+    book_wedding, engage, fill_notes, grant_stack, notes_waiting, set_gender, set_job,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, step, until, Trace};
@@ -28,6 +29,7 @@ const SNAIL_SHELL: i32 = 4000000;
 const PINK: u8 = 5;
 
 const INVITATION: u8 = 15;
+const INVITATION_NOTE: i16 = 3;
 const NOT_VALID: u8 = 34;
 
 fn invite(guest: &str, marriage_id: i32, slot: i32) -> Packet {
@@ -46,6 +48,18 @@ fn open(slot: i32, item_id: i32) -> Packet {
     p.write_byte(6).unwrap();
     p.write_int(slot).unwrap();
     p.write_int(item_id).unwrap();
+    p
+}
+
+/// Close the inbox having read the invitation note `id`, as the client does
+/// with an Etc slot free (FUN_0064aa57).
+fn read_invitation(id: i32, marriage_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::NoteAction as i16).unwrap();
+    p.write_bytes(&[1, 1, 1, 1]).unwrap();
+    p.write_int(id).unwrap();
+    p.write_byte(INVITATION_NOTE as u8).unwrap();
+    p.write_int(marriage_id).unwrap();
     p
 }
 
@@ -112,7 +126,7 @@ async fn a_partner_invites_guests_online_and_offline() {
             .await
             .expect("shell");
     }
-    fill_parcels(stuffed, 10).await.expect("parcels");
+    fill_notes(stuffed, 20).await.expect("notes");
     let mut a = relogin(&configs[0]).await;
     let groom_name = a.character_name.clone();
     let mut c = relogin(&configs[2]).await;
@@ -171,7 +185,7 @@ async fn a_partner_invites_guests_online_and_offline() {
     assert_eq!(t.quantities, []);
     assert_eq!(t.broadcasts, []);
 
-    // A guest offline, and one without room, find it at Duey.
+    // A guest offline, and one without room, find it among their notes.
     let t = send_invitation(&mut a, &away_name, marriage_id).await;
     assert_eq!(t.quantities, [(ETC as u8, 1, 13)]);
     let t = send_invitation(&mut a, &full_name, marriage_id).await;
@@ -179,12 +193,46 @@ async fn a_partner_invites_guests_online_and_offline() {
     let mut et = Trace::default();
     read_for(&mut e.connection, &mut et, 1000).await;
     assert_eq!(et.items, []);
-    assert_eq!(et.broadcasts.len(), 1, "told it waits at Duey");
+    assert_eq!(et.broadcasts.len(), 1, "told of the note");
+    let mut notes = Vec::new();
     for guest in [away, full] {
-        let (parcels, notes) = parcels_and_notes(guest).await.expect("waiting");
-        assert_eq!(parcels, [(groom_name.clone(), Some(RECEIVED_INVITATION))]);
-        assert_eq!(notes, [groom_name.clone()]);
+        let waiting = notes_waiting(guest).await.expect("waiting");
+        let [(id, from, INVITATION_NOTE, text)] = &waiting[..] else {
+            panic!("one invitation note: {waiting:?}");
+        };
+        assert_eq!(from, &groom_name);
+        assert!(text.ends_with(&format!("_{marriage_id}")), "{text}");
+        notes.push(*id);
     }
+
+    // Read without room, the note stays.
+    let t = step(
+        &mut e.connection,
+        "read without room",
+        read_invitation(notes[1], marriage_id),
+    )
+    .await;
+    assert_eq!(t.items, []);
+    assert_eq!(notes_waiting(full).await.expect("kept").len(), 1);
+
+    // Read with room, it brings the invitation and goes.
+    let mut d = relogin(&configs[3]).await;
+    let t = step(
+        &mut d.connection,
+        "read the invitation",
+        read_invitation(notes[0], marriage_id),
+    )
+    .await;
+    assert_eq!(t.items, [(RECEIVED_INVITATION, 1)]);
+    assert_eq!(t.added, [(ETC as u8, 1, RECEIVED_INVITATION)]);
+    assert_eq!(notes_waiting(away).await.expect("read"), []);
+    let t = step(
+        &mut d.connection,
+        "read again",
+        read_invitation(notes[0], marriage_id),
+    )
+    .await;
+    assert_eq!(t.items, []);
 
     // Nowhere to put it: it comes back, and the guest may be sent another.
     for left in [11, 10] {
@@ -208,7 +256,7 @@ async fn a_partner_invites_guests_online_and_offline() {
         );
         assert_ne!(t.broadcasts[0].1, t.broadcasts[1].1);
     }
-    let (parcels, notes) = parcels_and_notes(stuffed).await.expect("full inbox");
-    assert_eq!(parcels.len(), 10);
-    assert_eq!(notes, Vec::<String>::new());
+    let waiting = notes_waiting(stuffed).await.expect("full inbox");
+    assert_eq!(waiting.len(), 20);
+    assert!(waiting.iter().all(|(_, _, flag, _)| *flag == 0));
 }

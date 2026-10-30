@@ -45,7 +45,7 @@ mod wedding;
 mod wedding_day;
 mod wedding_gift;
 
-pub(crate) use wedding::leave_at_duey;
+pub(crate) use wedding::leave_invitation_note;
 
 use crate::actor::field_merchants::MerchantRequest;
 use crate::actor::registry::FieldRegistry;

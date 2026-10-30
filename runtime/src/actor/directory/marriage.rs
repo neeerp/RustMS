@@ -4,7 +4,7 @@
 //! an invitation to its guest.
 
 use super::WorldDirectory;
-use crate::actor::client::leave_at_duey;
+use crate::actor::client::leave_invitation_note;
 use crate::actor::wedding::{WeddingMessage, WeddingStart, WeddingTicket, WEDDING_QUEUE_CAPACITY};
 use crate::db::spawn_db;
 use crate::message::{DirectoryMessage, ServerMessage, WeddingNews};
@@ -304,7 +304,7 @@ impl WorldDirectory {
     }
 
     /// Hand `invitation` to its guest if they are online. Otherwise leave
-    /// it at Duey here, in the background, so that it gets there even if
+    /// it among their notes here, in the background, so that it gets there even if
     /// its sender leaves meanwhile.
     pub(super) fn deliver_invitation(&self, invitation: Invitation) {
         let guest = invitation.guest;
@@ -320,7 +320,7 @@ impl WorldDirectory {
             .get(&invitation.sender)
             .map(|entry| entry.handle.clone());
         tokio::spawn(async move {
-            if !leave_at_duey(&invitation).await {
+            if !leave_invitation_note(&invitation).await {
                 if let Some(sender) = sender {
                     sender.send(ServerMessage::Wedding(WeddingNews::Returned(invitation)));
                 }

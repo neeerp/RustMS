@@ -28,8 +28,18 @@ them. The reverse-engineering notes for the v83 client are in report 204m.
     It then stores the note and uses up one Memo.
   - A thank-you for a gift is stored with flag 1, and the receiver is told at
     once if they are online.
+  - A wedding invitation the guest has no room for, or one sent while they
+    are offline, is stored with flag 3 (`db::note::invite`). Its text ends
+    in `_` and the couple's marriage id; the client shows only what comes
+    before the `_` (`marriage.md`, "Inviting guests").
   - Reading deletes the notes. Each flag-1 note raises the reader's fame by
-    one, up to the fame limit.
+    one, up to the fame limit. Each flag-3 note brings the guest's
+    invitation, which expires a slot after the wedding starts, while they
+    are still on the list and it has not expired; the marriage id comes from
+    the stored text, not the id the client sends back. One without an Etc
+    slot for its item stays, as the client keeps it too: v83 sends
+    invitations only while it has Etc slots free, and says "Your Etc slot is
+    full…" for the rest.
 
 ## Client
 
@@ -50,10 +60,5 @@ them. The reverse-engineering notes for the v83 client are in report 204m.
   - the Friend tab's Note button, addressed to the picked buddy;
   - a double-click on an offline buddy (an online buddy gets a whisper
     instead).
-
-## Not implemented
-
-- Wedding invitations (flag 3): the client checks for a free Etc slot for
-  each, but the server sends invitations as items (`marriage.md`, "Inviting
-  guests") and never a note with that flag.
-- The window positions are assumed to be centred; v83's default is unknown.
+- Both windows open centred on the screen, as v83's CreateDlg (0x4edaef)
+  places every dialog it makes, these included (0x649e38, 0x7dc27e).

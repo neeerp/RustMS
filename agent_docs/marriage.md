@@ -235,12 +235,13 @@ A guest on the list costs the sender one invitation (Cosmic takes it on
 "already invited" too) and gets a received invitation (Cathedral 4031407,
 Chapel 4031406) that expires a slot after the wedding starts. The
 directory hands it to the guest's actor if they are online
-(`WeddingNews::Invited`). Without room there, or offline, it goes to
-Duey as a parcel from the sender, with a note saying whose wedding it is
-(`client::wedding::leave_at_duey`). For a guest offline the directory
-does this itself, in the background, so the sender may leave meanwhile.
-A guest online is told in pink chat either way. With the guest's Duey
-inbox full too, the guest goes off the list again and the invitation
+(`WeddingNews::Invited`). Without room there, or offline, it waits as
+v83's invitation note (flag 3) from the sender, saying whose wedding it
+is (`client::wedding::leave_invitation_note`); reading the note brings
+the invitation (`notes.md`). For a guest offline the directory does this
+itself, in the background, so the sender may leave meanwhile. A guest
+online is told in pink chat either way, and of the note. With the
+guest's inbox full (20 notes), the guest goes off the list again and the invitation
 goes back to its sender (`WeddingNews::Returned`, through
 `DirectoryMessage::ReturnInvitation` from a guest online), who is told
 in pink chat and may send another; a sender gone by then loses it. An
