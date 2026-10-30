@@ -308,8 +308,9 @@ closes the conversation. It sends no box text.
 
 Types 7 and 8 are a choice of styles: after the text come `u8 count` and
 that many `i32` style ids. The client shows the v83 `UtilDlgEx_Avatar`
-window (`UIAvatarSelect`) instead of the usual dialog: the NPC, the text,
-and the player wearing one style at a time, a face if the first id / 10000
+window (`UIAvatarSelect`) instead of the usual dialog: the NPC, the text
+(typed out as the usual dialog's is, since v83 builds the same dialog, never
+compact, 0x747206), and the player wearing one style at a time, a face if the first id / 10000
 is 2, a hairstyle if 3, otherwise a skin. BACK and NEXT go round the
 styles, TAKE OFF ALL shows the player without equipment and DEFAULT
 SETTINGS brings it back. OK or Enter answers `07 01 u8` (the style's index);

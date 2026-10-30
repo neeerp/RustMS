@@ -131,6 +131,15 @@ namespace ms
 		// The image a tag names, sized for the layout.
 		static InlineImage inline_image(const NpcTextMarkup::InlineImage &tag);
 
+		// The [first, last) ranges each #w shows at once (FUN_0099dd54).
+		static std::vector<std::pair<size_t, size_t>> instant_ranges(const std::string &text);
+
+		// One step of text typing out (FUN_009a4eca): `typed` goes on a
+		// character every 28 ms, past what shows at once. False once all of
+		// `length` is out.
+		static bool type_on(size_t &typed, uint16_t &timestep, size_t length,
+							const std::vector<std::pair<size_t, size_t>> &instant);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
