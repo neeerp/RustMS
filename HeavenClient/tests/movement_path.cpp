@@ -149,6 +149,7 @@ void mob()
 	require(path.ready() && path.flush().idle, "a path the same as the last is idle");
 
 	Player shown({ 0, 0, 0, 0, 7, 2 });
+	ms::move_path::Player::State now;
 	ms::Movement rise = at(100, -50, 100, -500, 0, 6);
 	rise.duration = 500;
 	ms::Movement land = at(150, 0, 100, 0, 7, 2);
@@ -158,13 +159,36 @@ void mob()
 	shown.receive({ rise, land, on });
 	shown.step(100);
 	shown.land(false);
-	require(shown.end().x == 150 && shown.end().fh == 7, "landing stops at the first foothold ahead");
-	shown.step(900);
-	require(!shown.playing() && shown.get_state().x == 150, "and plays only up to it");
+	require(shown.end().x == 150 && shown.end().fh == 7, "landing in the air stops at the first foothold ahead");
+	shown.step(30);
+	require(!shown.playing() && shown.get_state().x == 150, "and jumps to it from the element before it");
+
+	// The air before the element ahead of the landing still plays.
+	Player falling({ 0, 0, 0, 0, 0, 6 });
+	ms::Movement drop = at(150, 50, 100, 500, 0, 6);
+	drop.duration = 500;
+	falling.receive({ rise, drop, land, on });
+	falling.step(100);
+	falling.land(false);
+	require(falling.end().x == 150 && falling.end().y == 0, "a longer fall ends where the landing does");
+	falling.step(300);
+	require(falling.playing() && falling.get_state().x < 100, "after the air playing now");
+	falling.step(200);
+	require(!falling.playing() && falling.get_state().x == 150, "then jumps to the landing");
+
+	// A walker stops where it is shown, not at the end of its walk (#536).
+	Player walker({ 0, 0, 0, 0, 7, 2 });
+	ms::Movement stroll = at(100, 0, 0, 0, 7, 2);
+	stroll.duration = 1000;
+	walker.receive({ stroll });
+	walker.step(200);
+	now = walker.get_state();
+	walker.land(false);
+	require(!walker.playing() && walker.end().x == now.x && now.x < 50, "a walker stops where it is (#536)");
 
 	shown.receive({ rise });
 	shown.step(100);
-	ms::move_path::Player::State now = shown.get_state();
+	now = shown.get_state();
 	shown.land(false);
 	require(!shown.playing() && shown.end().x == now.x, "with no foothold ahead it stops where it is");
 }

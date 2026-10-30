@@ -262,14 +262,16 @@ namespace ms
 				state.stance = head.newstate;
 			}
 
-			// Stop at the first element on a foothold from the one playing
-			// now, dropping the rest. A flier, or one with none ahead,
-			// stops where it is (FUN_0068b16f).
+			// Stop where it is. A walker or jumper in the air that lands
+			// ahead plays the air up to the element before the landing,
+			// then jumps to where the landing ends (FUN_0068b16f).
 			void land(bool flying)
 			{
-				auto stop = flying ? queue.end() : std::find_if(queue.begin(), queue.end(), grounded);
+				auto foot = flying || queue.empty() || grounded(queue.front())
+								? queue.end()
+								: std::find_if(queue.begin() + 1, queue.end(), grounded);
 
-				if (stop == queue.end())
+				if (foot == queue.end())
 				{
 					queue.clear();
 					from = state;
@@ -279,10 +281,25 @@ namespace ms
 					return;
 				}
 
-				for (auto element = stop + 1; element != queue.end(); ++element)
-					queued -= element->duration * TICK;
+				Movement snap = *foot;
+				snap.command = 0;
+				snap.duration = 0;
 
-				queue.erase(stop + 1, queue.end());
+				auto cut = foot - 1;
+
+				if (cut == queue.begin())
+				{
+					from = state;
+					elapsed = 0;
+				}
+
+				queue.erase(cut, queue.end());
+				queue.push_back(snap);
+
+				queued = -elapsed;
+
+				for (const Movement &element : queue)
+					queued += element.duration * TICK;
 			}
 
 			// Where the queued paths end, or the state with none.

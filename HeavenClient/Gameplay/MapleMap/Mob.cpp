@@ -658,9 +658,9 @@ namespace ms
 
 	void Mob::flinch_body(const Physics &physics)
 	{
-		// v83 stops what it shows at the next foothold and starts the AI
-		// again from there (FUN_0068b16f, FUN_009bbd3d). Only walkers and
-		// jumpers go on to one.
+		// v83 stops what it shows where it is, or for a walker or jumper
+		// in the air, where it lands, and starts the AI again from there
+		// (FUN_0068b16f, FUN_009bbd3d).
 		shown.land(canfly || !canmove);
 		seat_body(physics);
 
