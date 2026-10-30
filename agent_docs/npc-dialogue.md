@@ -229,7 +229,8 @@ sit on the bottom bar. A server menu's `#L` choices stay in the text where
 the script puts them, each with a dot. The client's own quest menus list
 their choices in 32 px rows under the question instead (`UINpcTalk::Menu`).
 The text types out at about 35 characters a second, but a menu's choices
-show at once, as in footage.
+show at once, as in footage. As in v83, whose dialog adds a character a
+tick until the text ends (0x9a4eca), a click doesn't hurry it.
 
 The first choice starts selected (red arrow, dotted underline), and Up and
 Down move the selection. Clicking a choice or pressing Enter answers with
@@ -296,7 +297,10 @@ i32 max`, and a box text (13) `str default, i16 cols, i16 rows`. The
 client checks a text's trimmed length and a number's range, shows v83's
 notice and stays open when they are wrong, and answers `02 01 str`,
 `03 01 i32` or `0D 01 str`. A non-empty default in a text or number
-prompt comes selected, so the first key typed replaces it. The server
+prompt comes selected, so the first key typed replaces it. In a box
+text, as in v83's multi-line edit, Enter breaks the line with a lone
+`\r` rather than answering, and lines past its rows scroll; only its
+cols × rows bytes limit it. The server
 sends text prompts (`Page::AskText`, Lenario's alliance name) and number
 prompts (`Page::AskNumber`, the refiners in `agent_docs/inventory.md`),
 and checks the answer against the bounds it sent: a number out of range
