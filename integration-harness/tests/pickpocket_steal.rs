@@ -2,7 +2,7 @@
 //! anyone's at once, and Steal takes one item from a mob, once.
 
 use integration_harness::database::{
-    grant_skill, replace_item, set_job, set_str, set_weapon_attack,
+    grant_skill, replace_item, set_dex, set_job, set_luk, set_str, set_weapon_attack,
 };
 use integration_harness::hunting::{
     cancel_buff, skill_attack, skill_attack_lines, use_skill, MapDrop,
@@ -39,6 +39,10 @@ async fn pickpocket_shakes_out_mesos_and_steal_takes_one_item() {
         .expect("give a dagger");
     set_weapon_attack(id, 500).await.expect("hit hard");
     set_str(id, 999).await.expect("strong");
+    // The dagger asks for 25 DEX and LUK; under them it wouldn't count, and
+    // its attack with it.
+    set_dex(id, 25).await.expect("dagger's DEX");
+    set_luk(id, 25).await.expect("dagger's LUK");
 
     let mut session = relogin(&config).await;
     let c = &mut session.connection;
