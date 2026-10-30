@@ -1137,7 +1137,12 @@ Without `target`, using the item puts that skill's disease on the player
 Russellon's Pills (2022198, Poison 125/7) and Russellon's Potions
 (2022225-27, among 3314's rewards).
 The give-buff names the mob skill | level << 16, and the map sees it as a
-mob's disease. Crazy Skull (2022268, 132/1) has `target` and isn't read.
+mob's disease. With `target` (`ConsumeSpec::mob_skill_on_others`), as the
+Ariant Coliseum's Crazy Skull (2022268, Confuse 132/1) has, it works on
+everyone else on the map instead, as in Cosmic: picking it up (its
+`consumeOnPickup` is under `specEx`) sends the field
+`FieldRequest::DiseaseOthers`, and each other player catches the disease as
+from a mob (`ServerMessage::Diseased`). The picker gets nothing.
 
 ## Monster Book cards
 

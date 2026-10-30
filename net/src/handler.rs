@@ -904,6 +904,9 @@ pub enum FieldRequest {
     /// Show everyone else on the map who sees the player this packet,
     /// about them: a hidden GM's goes only to GMs.
     Broadcast(Packet),
+    /// The player picked up an item that puts a mob skill's disease on
+    /// everyone else here (the Crazy Skull 2022268).
+    DiseaseOthers(game::Disease),
     /// Show everyone else on the map this packet, which is about the map,
     /// whoever sees the player.
     BroadcastAll(Packet),

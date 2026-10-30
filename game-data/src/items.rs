@@ -300,7 +300,8 @@ pub struct ConsumeSpec {
     /// add up to 100).
     pub morph_random: Vec<(i16, i32)>,
     /// Whether picking it up applies it at once instead of bagging it
-    /// (`consumeOnPickup`): the fruits 2022086-88, Carnival and Dojo items.
+    /// (`consumeOnPickup`, or under `specEx`): the fruits 2022086-88,
+    /// Carnival, Coliseum and Dojo items.
     pub consume_on_pickup: bool,
     /// Whether picking it up applies it to every living party member on
     /// the map too (`party`): the Carnival and Dojo party potions
@@ -321,6 +322,10 @@ pub struct ConsumeSpec {
     /// Pills (2022198) and Potions (2022225-27), which poison, curse or
     /// weaken.
     pub mob_skill: Option<(i32, i32)>,
+    /// The mob skill and level that using it puts on everyone else on the
+    /// map (`specEx/0` with a `target`, as Cosmic's `StatEffect.applyTo`
+    /// reads it): the Ariant Coliseum's Crazy Skull 2022268, which confuses.
+    pub mob_skill_on_others: Option<(i32, i32)>,
 }
 
 impl ConsumeSpec {
@@ -628,18 +633,20 @@ impl ItemData {
                     morph_random.push((i16::try_from(morph).unwrap_or(0), prop));
                 }
             }
-            let mut mob_skill = None;
-            if let Some(entry) = nx
-                .child_by_name(node, "specEx")?
+            let (mut mob_skill, mut mob_skill_on_others) = (None, None);
+            let spec_ex = nx.child_by_name(node, "specEx")?;
+            if let Some(entry) = spec_ex
                 .map(|ex| nx.child_by_name(ex, "0"))
                 .transpose()?
                 .flatten()
             {
-                if let (Some(skill), None) = (
-                    nx.int_child(entry, "mobSkill")?,
-                    nx.int_child(entry, "target")?,
-                ) {
-                    mob_skill = Some((skill, nx.int_child(entry, "level")?.unwrap_or(1)));
+                if let Some(skill) = nx.int_child(entry, "mobSkill")? {
+                    let cast = Some((skill, nx.int_child(entry, "level")?.unwrap_or(1)));
+                    if nx.int_child(entry, "target")?.unwrap_or(0) > 0 {
+                        mob_skill_on_others = cast;
+                    } else {
+                        mob_skill = cast;
+                    }
                 }
             }
             info.spec = Some(ConsumeSpec {
@@ -672,12 +679,21 @@ impl ItemData {
                 exp: nx.int_child(spec, "exp")?.unwrap_or(0),
                 inc_fatigue: nx.int_child(spec, "incFatigue")?.unwrap_or(0),
                 morph_random,
-                consume_on_pickup: nx.int_child(spec, "consumeOnPickup")?.unwrap_or(0) != 0,
+                // The Crazy Skull keeps it under `specEx`, where Cosmic
+                // reads it too.
+                consume_on_pickup: nx.int_child(spec, "consumeOnPickup")?.unwrap_or(0) != 0
+                    || spec_ex
+                        .map(|ex| nx.int_child(ex, "consumeOnPickup"))
+                        .transpose()?
+                        .flatten()
+                        .unwrap_or(0)
+                        != 0,
                 party: nx.int_child(spec, "party")?.unwrap_or(0) != 0,
                 cp: nx.int_child(spec, "cp")?.unwrap_or(0),
                 nuff_skill: nx.int_child(spec, "nuffSkill")?,
                 script: nx.string_child(spec, "script")?,
                 mob_skill,
+                mob_skill_on_others,
             });
         }
         if item_id / 10_000 == 210 {
@@ -1235,9 +1251,10 @@ mod tests {
         assert_eq!(spec(2022198).mob_skill, Some((125, 7)));
         assert!(spec(2022198).has_effect());
         assert_eq!(spec(2022226).mob_skill, Some((124, 8)));
-        // The Carnival's confusing item targets the other side.
-        let carnival = data.info(2022268).unwrap().unwrap().spec;
-        assert_eq!(carnival.and_then(|spec| spec.mob_skill), None);
+        // The Coliseum's Crazy Skull confuses everyone else.
+        assert_eq!(spec(2022268).mob_skill, None);
+        assert_eq!(spec(2022268).mob_skill_on_others, Some((132, 1)));
+        assert!(spec(2022268).consume_on_pickup);
         assert_eq!(spec(2000000).mob_skill, None);
     }
 

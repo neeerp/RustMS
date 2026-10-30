@@ -342,6 +342,22 @@ impl ClientActor {
             self.send(&mut stat::build_stat_update(true, &[])?).await?;
             return Ok(true);
         }
+        if let Some((skill, level)) = spec.mob_skill_on_others {
+            // Everyone else here catches it, as from a mob, and the picker
+            // nothing (Cosmic `StatEffect.applyTo` with `target`).
+            let disease = net::mobs::skill_level(skill, level)
+                .and_then(|data| game::mob_skill::inflicted(skill, level, data.x, data.duration));
+            let Some(disease) = disease else {
+                return Ok(false);
+            };
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::DiseaseOthers(disease),
+            })
+            .await?;
+            self.send(&mut stat::build_stat_update(true, &[])?).await?;
+            return Ok(true);
+        }
         if !self.take_item_effect(item_id, true).await? {
             return Ok(false);
         }
