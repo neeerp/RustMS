@@ -607,6 +607,18 @@ pub async fn set_dex(character_id: i32, dex: i16) -> Result<(), HarnessError> {
     .await
 }
 
+/// Set the logged-out character `character_id`'s LUK, e.g. to meet a
+/// dagger's requirements.
+pub async fn set_luk(character_id: i32, luk: i16) -> Result<(), HarnessError> {
+    change_one_row("set luk", move |conn| {
+        diesel::sql_query("UPDATE characters SET luk = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(luk)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Give the logged-out character `character_id` `meso` mesos.
 pub async fn set_sp(character_id: i32, sp: i16) -> Result<(), HarnessError> {
     change_one_row("set sp", move |conn| {
