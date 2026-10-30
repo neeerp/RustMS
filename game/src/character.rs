@@ -436,6 +436,15 @@ impl Player {
             .filter_map(|((_, item), _)| item.equip.as_ref())
     }
 
+    /// Whether something is worn at `position` and counts.
+    pub fn counts(&self, position: i16) -> bool {
+        let worn = self.worn_items();
+        let counts = crate::requirements::counted_worn(&self.stats, self.maple_warrior(), &worn);
+        worn.iter()
+            .zip(counts)
+            .any(|((at, _), counts)| *at == position && counts)
+    }
+
     /// What the player wears, by position, but a pendant in a shut second
     /// pendant slot.
     pub fn worn_items(&self) -> Vec<(i16, &Item)> {

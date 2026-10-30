@@ -56,7 +56,9 @@ follow it:
   a counted shield.
 
 `Player::worn_equips` gives only what counts, so damage, max HP and MP and the
-skills' stat checks leave the rest out. The lookup lives in `net::items`
+skills' stat checks leave the rest out. A pirate whose weapon doesn't count
+gets the bare hands' attack, as v83's SetFrom reads the counted weapon cell
+(0x77f894). The lookup lives in `net::items`
 (`requirements`, cached), which the world registers at start
 (`game::requirements::register`); without it everything counts. Equipping
 (`can_wear`, HeavenClient's `Inventory::would_count`) tries the item on in

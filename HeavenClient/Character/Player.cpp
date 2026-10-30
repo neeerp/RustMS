@@ -334,7 +334,8 @@ namespace ms
 			}
 		}
 
-		if (look.get_equips().get_weapon() == 0)
+		// Bare hands are a weapon that doesn't count too (0x77f894).
+		if (!inventory.counts(EquipSlot::Id::WEAPON))
 			stats.add_value(EquipStat::Id::WATK,
 							secondary_stat::bare_hands_attack(job, stats.get_stat(MapleStat::Id::LEVEL)));
 
