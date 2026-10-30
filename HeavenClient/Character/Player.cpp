@@ -2353,7 +2353,8 @@ namespace ms
 	{
 		auto done = questlog.completed_quests().find(quest.id);
 
-		int64_t now = item_expiry::now();
+		// On the server's clock (0x529366), the weekday on the PC's.
+		int64_t now = item_expiry::server_now();
 
 		if (now < quest.start_time || now > quest.end_time)
 			return false;

@@ -27,6 +27,7 @@
 
 #include "../../Constants.h"
 #include "../../Character/QuestRequirements.h"
+#include "../../Character/Inventory/ItemExpiry.h"
 #include "../../Character/QuestCatalog.h"
 #include "../../Character/QuestMarker.h"
 #include "../../Character/QuestRecordEx.h"
@@ -195,7 +196,10 @@ namespace ms
 				auto started = quests.started_quests().find(quest_id);
 				std::string progress = started == quests.started_quests().end() ? std::string() : started->second;
 
-				return QuestRecordEx::time_left(key, QuestRecordEx::expiry(progress), static_cast<int64_t>(std::time(nullptr)));
+				// The server's clock, as v83 counts it (0x529366).
+				int64_t now = (item_expiry::server_now() - item_expiry::UNIX_EPOCH) / item_expiry::TICKS_PER_SECOND;
+
+				return QuestRecordEx::time_left(key, QuestRecordEx::expiry(progress), now);
 			}
 
 			return QuestRecordEx::play_time(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); },

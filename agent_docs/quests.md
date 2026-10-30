@@ -715,7 +715,9 @@ Diligent Explorer (29003) and Veteran Hunter (29400) 30 days, Donation King
 started record is the date they end, "yyyyMMddHHmmss" in UTC
 (`game::quest::end_date`, kept as it stands for `DATED_QUESTS`), which the
 server writes when the quest starts. The Quest Log counts down to it
-(`#Q` below). The client never ends the quest itself, so the server does,
+(`#Q` below) on the server's clock: SET_FIELD ends with the server's time,
+and the client keeps how far it is from its own (0x529366,
+`item_expiry::server_offset`), as it does for `start` and `end` above. The client never ends the quest itself, so the server does,
 as Cosmic does: on login, a title whose date has passed is forfeited with
 the "expired" message (`build_quest_expired`, mode 15), and one still
 running gets a hidden clock (`QuestClock::shown` false) that forfeits it
