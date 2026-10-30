@@ -348,7 +348,11 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     accepts it: everyone gets 0x12 (the client prints its
     own line, so the server adds none), and the guild's members are
     tagged again. `DENY_ALLIANCE_REQUEST` (recv 0x90) tells the inviter in
-    pink.
+    pink why: invitations switched off (0x14, `alliance.invite.blocking`),
+    another card showing (0x15, `alliance.invite.busy`, as when the server
+    holds one back) or declined (0x16, `alliance.invite.denied`). v83's
+    client keeps a line for each (StringPool 0x115f to 0x1161) but pushes
+    none of them, so its server sent the text.
   - op 2 takes a guild master's own guild out, and op 6 has the master
     expel another guild. The remaining members and the guild get 0x10, and
     the remaining members a pink line.
@@ -613,8 +617,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
 
 - A joining guild's members, and new members of an allied guild, always
   start at alliance rank 5, even while rank 5 has no title.
-- The deny's reason (invitations switched off, another card showing,
-  declined) is not told apart: the inviter hears the same line.
 - The board's page selector art: the labels are drawn as text, 32 px apart,
   with "<" and ">" for other groups of ten. The original's pitch and arrows
   are unknown.

@@ -16,6 +16,7 @@ use game::alliance::Alliance;
 use game::family::{FamilyBuff, Relatives};
 use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::events::{Entry, EventKind};
+use net::handler::AllianceRefusal;
 use net::maple_tv::MapleTv;
 use net::packet::build::world::door::DoorView;
 use net::packet::build::world::guild::InviteRefusal;
@@ -1491,6 +1492,7 @@ pub enum DirectoryMessage {
         from: ClientId,
         inviter: String,
         guild_name: String,
+        refusal: AllianceRefusal,
     },
     /// The alliance is gone; its invitations no longer stand.
     AllianceDisbanded {

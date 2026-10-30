@@ -22,6 +22,7 @@ use game_data::server_content::keys;
 use net::conti::Portal;
 use net::dungeons::Refusal;
 use net::events::{self, Candidate, EventKind};
+use net::handler::AllianceRefusal;
 use net::maple_tv::MapleTv;
 use net::owl::Searches;
 use net::packet::build::world::alliance;
@@ -621,14 +622,19 @@ impl WorldDirectory {
                 from,
                 inviter,
                 guild_name,
+                refusal,
             } => {
                 let Some(&inviter) = self.names.get(&inviter) else {
                     // Gone offline: no one to tell, but the card is answered.
                     return self.alliance_invites.forget(from);
                 };
                 if self.alliance_invites.decline(from, inviter) {
-                    let text = net::content::text()
-                        .get(keys::ALLIANCE_DENIED, &[("guild", guild_name.as_str())]);
+                    let key = match refusal {
+                        AllianceRefusal::Blocking => keys::ALLIANCE_BLOCKING,
+                        AllianceRefusal::AnotherInvitation => keys::ALLIANCE_BUSY,
+                        AllianceRefusal::Declined => keys::ALLIANCE_DENIED,
+                    };
+                    let text = net::content::text().get(key, &[("guild", guild_name.as_str())]);
                     self.send_packet(inviter, build_broadcast(Broadcast::Pink, &text));
                 }
             }
@@ -3103,12 +3109,29 @@ mod tests {
         assert!(packets(&mut bobby_rx).is_empty(), "the card still shows");
         assert!(packets(&mut alice).is_empty());
 
-        directory.handle(DirectoryMessage::AllianceDeny {
-            from: 2,
-            inviter: "Alice".into(),
-            guild_name: "Rivals".into(),
-        });
-        assert_eq!(packets(&mut alice), [pink(keys::ALLIANCE_DENIED, "Rivals")]);
+        // The inviter hears why: Bobby's client may turn the card down itself.
+        let deny = |directory: &mut WorldDirectory, refusal| {
+            directory.handle(DirectoryMessage::AllianceDeny {
+                from: 2,
+                inviter: "Alice".into(),
+                guild_name: "Rivals".into(),
+                refusal,
+            })
+        };
+        deny(&mut directory, AllianceRefusal::Blocking);
+        assert_eq!(
+            packets(&mut alice),
+            [pink(keys::ALLIANCE_BLOCKING, "Rivals")]
+        );
+        for (refusal, key) in [
+            (AllianceRefusal::AnotherInvitation, keys::ALLIANCE_BUSY),
+            (AllianceRefusal::Declined, keys::ALLIANCE_DENIED),
+        ] {
+            invite(&mut directory, 1, 7, 2);
+            packets(&mut bobby_rx);
+            deny(&mut directory, refusal);
+            assert_eq!(packets(&mut alice), [pink(key, "Rivals")]);
+        }
         directory.handle(DirectoryMessage::AllianceAccept {
             from: 2,
             alliance_id: 7,
