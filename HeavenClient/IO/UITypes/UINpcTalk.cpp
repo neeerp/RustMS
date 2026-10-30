@@ -533,18 +533,9 @@ namespace ms
 			return Cursor::State::CANCLICK;
 		}
 
-		if (clicked && draw_text && Rectangle<int16_t>(text_x(), text_x() + TEXT_WIDTH, TOP, TOP + height).contains(cursor_relative))
-		{
-			draw_text = false;
-			return Cursor::State::IDLE;
-		}
-
-		Cursor::State estate = UIElement::send_cursor(clicked, cursorpos);
-
-		if (estate == Cursor::State::CLICKING && clicked && draw_text)
-			draw_text = false;
-
-		return estate;
+		// A click doesn't hurry the text, which v83 types out to the end
+		// (9a4eca); nothing in its dialog skips it.
+		return UIElement::send_cursor(clicked, cursorpos);
 	}
 
 	void UINpcTalk::send_key(int32_t keycode, bool pressed, bool escape)
@@ -1048,8 +1039,10 @@ namespace ms
 			field = Textfield(font, Text::Alignment::LEFT, Color::Name::BLACK,
 							  Rectangle<int16_t>(FIELD_X + 4, FIELD_X + size.x() - 4, top, top + size.y()), limit);
 
+			// A box text is v83's multi-line edit: Enter breaks the line with a
+			// lone "\r" (4d3b02), and lines past its rows scroll (4d4bbe).
 			if (box_text)
-				field.set_wrap(6 * prompt.cols + 2);
+				field.set_lines(6 * prompt.cols + 2, prompt.rows, line_height(BOX_FONT));
 			else
 				field.set_enter_callback([this](std::string) { submit_field(); });
 
