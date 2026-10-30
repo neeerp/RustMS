@@ -82,6 +82,12 @@ namespace ms
 		Texture shadow;
 		Texture name_tag;
 		Text prompt;
+		// The question types out as the dialogue's does: the characters out,
+		// the time toward the next, and what shows at once (#w).
+		size_t prompt_length;
+		size_t typed;
+		uint16_t timestep;
+		std::vector<std::pair<size_t, size_t>> prompt_instant;
 		// The question's images (#i, #v, #f and #s), laid out as its boxes.
 		std::vector<UINpcTalk::InlineImage> prompt_images;
 		// A question taller than its box scrolls, a step at a time.

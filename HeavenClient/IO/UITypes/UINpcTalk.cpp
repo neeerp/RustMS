@@ -297,22 +297,43 @@ namespace ms
 			field.update(position);
 
 		if (draw_text)
+			draw_text = type_on(formatted_text_pos, timestep, formatted_text.size(), instant_text);
+	}
+
+	bool UINpcTalk::type_on(size_t &typed, uint16_t &timestep, size_t length,
+							const std::vector<std::pair<size_t, size_t>> &instant)
+	{
+		timestep += Constants::TIMESTEP;
+
+		for (; timestep >= TYPE_MS && typed < length; timestep -= TYPE_MS)
 		{
-			timestep += Constants::TIMESTEP;
+			typed++;
 
-			for (; timestep >= TYPE_MS && formatted_text_pos < formatted_text.size(); timestep -= TYPE_MS)
-			{
-				formatted_text_pos++;
-
-				// What already shows is not typed again.
-				for (const auto &range : instant_text)
-					if (formatted_text_pos >= range.first && formatted_text_pos < range.second)
-						formatted_text_pos = range.second;
-			}
-
-			if (formatted_text_pos >= formatted_text.size())
-				draw_text = false;
+			// What already shows is not typed again.
+			for (const auto &range : instant)
+				if (typed >= range.first && typed < range.second)
+					typed = range.second;
 		}
+
+		return typed < length;
+	}
+
+	std::vector<std::pair<size_t, size_t>> UINpcTalk::instant_ranges(const std::string &text)
+	{
+		std::vector<std::pair<size_t, size_t>> ranges;
+
+		// Each #w turns showing at once on or off, as for the rewards under
+		// a quest's last page.
+		for (size_t on = text.find("#w"); on != std::string::npos;)
+		{
+			size_t off = text.find("#w", on + 2);
+			size_t end = off == std::string::npos ? text.size() : off + 2;
+
+			ranges.emplace_back(on, end);
+			on = off == std::string::npos ? off : text.find("#w", end);
+		}
+
+		return ranges;
 	}
 
 	Button::State UINpcTalk::button_pressed(uint16_t buttonid)
@@ -860,16 +881,8 @@ namespace ms
 			}
 		}
 
-		// Each #w turns showing at once on or off (FUN_0099dd54), as for the
-		// rewards under a quest's last page.
-		for (size_t on = formatted_text.find("#w"); on != std::string::npos;)
-		{
-			size_t off = formatted_text.find("#w", on + 2);
-			size_t end = off == std::string::npos ? formatted_text.size() : off + 2;
-
-			instant_text.emplace_back(on, end);
-			on = off == std::string::npos ? off : formatted_text.find("#w", end);
-		}
+		for (const auto &range : instant_ranges(formatted_text))
+			instant_text.push_back(range);
 
 		std::sort(instant_text.begin(), instant_text.end());
 

@@ -55,7 +55,7 @@ namespace ms
 
 	UIAvatarSelect::UIAvatarSelect(int32_t npcid, int8_t mt, const std::string &text, std::vector<int32_t> s)
 			: UIElement(Point<int16_t>(), Point<int16_t>(WIDTH, HEIGHT)), msgtype(mt), styles(std::move(s)),
-			  shown(0), bare(false), scrolls(false), scroll(0)
+			  shown(0), bare(false), prompt_length(0), typed(0), timestep(0), scrolls(false), scroll(0)
 	{
 		switch (styles.front() / 10000)
 		{
@@ -101,6 +101,8 @@ namespace ms
 		}
 
 		prompt = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted, PROMPT_WIDTH);
+		prompt_length = formatted.size();
+		prompt_instant = UINpcTalk::instant_ranges(formatted);
 		prompt.set_boxes(boxes);
 
 		if (int16_t overflow = prompt.height() - PROMPT_ROWS; overflow > 0)
@@ -142,7 +144,8 @@ namespace ms
 				image.texture.draw(box + image.anchor);
 		}
 
-		prompt.draw(origin, clip);
+		// The question types out; its images show at once, as the dialogue's do.
+		prompt.draw(origin, clip, typed, prompt_instant);
 
 		if (scrolls)
 			slider.draw(position);
@@ -165,6 +168,11 @@ namespace ms
 		UIElement::update();
 
 		look.update(Constants::TIMESTEP);
+
+		// The avatar dialogue is the same one, never compact (0x747206), so
+		// its question types out too.
+		if (typed < prompt_length)
+			UINpcTalk::type_on(typed, timestep, prompt_length, prompt_instant);
 	}
 
 	void UIAvatarSelect::update_screen(int16_t new_width, int16_t new_height)
