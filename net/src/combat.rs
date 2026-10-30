@@ -307,8 +307,8 @@ fn ammo_attack(attack: &Attack, player: &Player, weapon: i32) -> i32 {
         .map_or(0, |info| info.pad)
 }
 
-/// What a pirate's bare hands add to attack (SetFrom, 0x77f89e): 10 and
-/// 0.7 a level, at most 31.
+/// What a pirate's bare hands add to attack (SetFrom, 0x77f89e, which reads
+/// the weapon cell of what counts): 10 and 0.7 a level, at most 31.
 fn bare_hands_attack(job: i32, level: i32) -> i32 {
     if job % 1000 / 100 != 5 {
         0
@@ -322,11 +322,12 @@ fn bare_hands_attack(job: i32, level: i32) -> i32 {
 /// The most one hit of an attack can do before its skill, its orbs, and a
 /// critical (FUN_0078df87): the weapon's stats with what the player wears,
 /// times the attack of their equipment, buffs, expert mastery, and the ammo
-/// a shot throws, over 100; a pirate with no weapon has its bare hands'.
+/// a shot throws, over 100; a pirate with no weapon that counts has its
+/// bare hands'.
 pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
     let weapon = weapon(player);
     let job = i32::from(player.stats.job);
-    let bare_hands = if weapon == 0 {
+    let bare_hands = if !player.counts(equip_slot::WEAPON) {
         bare_hands_attack(job, i32::from(player.stats.level))
     } else {
         0
@@ -1722,6 +1723,35 @@ mod tests {
     }
 
     #[test]
+    fn a_pirate_s_weapon_that_doesn_t_count_leaves_its_bare_hands() {
+        game::requirements::register(crate::items::requirements);
+        let mut player = crate::codec::stats::sample_player();
+        (player.stats.str, player.stats.dex) = (12, 5);
+        (player.stats.job, player.stats.level) = (500, 70);
+        // A Cutlass is a warrior's, so it adds nothing in a pirate's hands.
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(
+                1302004,
+                EquipStats {
+                    watk: 40,
+                    ..EquipStats::default()
+                },
+            ),
+        );
+        if crate::items::requirements(1302004).is_none() {
+            return;
+        }
+        assert!(!player.counts(equip_slot::WEAPON));
+        // The sword's stats with bare hands' 31: ceil((4.0 * 12 + 5) / 100 * 31) = 17.
+        assert_eq!(
+            max_base_damage(&player, &parse_close_attack(&attack_packet(1, 0)).unwrap()),
+            17
+        );
+    }
+
+    #[test]
     fn echo_of_hero_raises_whole_attack_and_magic() {
         let mut player = crate::codec::stats::sample_player();
         (player.stats.str, player.stats.dex, player.stats.int) = (12, 5, 200);
@@ -1755,6 +1785,8 @@ mod tests {
             ),
         );
         (player.stats.str, player.stats.dex, player.stats.luk) = (30, 60, 150);
+        // A GM, whose dagger counts though it's a thief's.
+        (player.stats.job, player.stats.level) = (900, 30);
         let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
         // ceil((4.0 * 30 + 60) / 100 * 27) = 49
         assert_eq!(max_base_damage(&player, &basic), 49);
@@ -1781,7 +1813,7 @@ mod tests {
             ),
         );
         (player.stats.str, player.stats.dex, player.stats.luk) = (30, 60, 150);
-        player.stats.job = 422;
+        (player.stats.job, player.stats.level) = (422, 120);
         player.stats.mp = 40;
         learn(&mut player, ASSASSINATE, 30);
         let strike = |player: &Player, display, damage| {
@@ -1841,7 +1873,8 @@ mod tests {
                 },
             ),
         );
-        player.stats.dex = 100;
+        // A bow counts in a bowman's hands.
+        (player.stats.dex, player.stats.job) = (100, 312);
         // ceil((3.4 * 100 + 12) / 100 * 50) = 176
         assert_eq!(max_base_damage(&player, &shot(1)), 176);
         // Bow Expert's level 30 adds 10: ceil(352 / 100 * 60) = 212.
