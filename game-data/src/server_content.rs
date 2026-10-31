@@ -260,6 +260,8 @@ pub mod keys {
     pub const FLORINA_LEAVE: &str = "florina.leave";
     pub const FLORINA_LEAVE_ASK: &str = "florina.leave_ask";
     pub const FLORINA_LEAVE_DECLINE: &str = "florina.leave_decline";
+    pub const ROONEY_HAPPYVILLE_ASK: &str = "rooney.happyville_ask";
+    pub const RUPI_LEAVE_ASK: &str = "rupi.leave_ask";
     pub const AMORIA_TO_AMORIA: &str = "amoria.to_amoria";
     pub const AMORIA_TO_HENESYS: &str = "amoria.to_henesys";
     pub const AMORIA_DECLINE: &str = "amoria.decline";
@@ -3876,6 +3878,8 @@ mod tests {
             keys::FLORINA_LEAVE,
             keys::FLORINA_LEAVE_ASK,
             keys::FLORINA_LEAVE_DECLINE,
+            keys::ROONEY_HAPPYVILLE_ASK,
+            keys::RUPI_LEAVE_ASK,
             keys::AMORIA_TO_AMORIA,
             keys::AMORIA_TO_HENESYS,
             keys::AMORIA_DECLINE,

@@ -35,6 +35,22 @@ const EXTRA_NPCS: &[(i32, MapNpcTemplate)] = &[(
     },
 )];
 
+/// Rooney (`go_xmas`), who takes players to Happyville from 23 towns.
+pub const ROONEY: i32 = 1_022_101;
+
+/// Whether Happyville is open, so that Rooney stands in the towns: unless
+/// `RUSTMS_HAPPYVILLE=0`. Rupi, its way out, stays either way, since
+/// Happyville returns players to itself.
+pub fn happyville_open() -> bool {
+    static OPEN: OnceLock<bool> = OnceLock::new();
+    *OPEN.get_or_init(|| std::env::var("RUSTMS_HAPPYVILLE").map_or(true, |value| value != "0"))
+}
+
+/// Whether `npc_id`, placed on a map by its data, stands there.
+pub fn npc_stands(npc_id: i32) -> bool {
+    npc_id != ROONEY || happyville_open()
+}
+
 /// The NPCs the server adds to `map_id`, after those of its data.
 pub fn extra_npcs(map_id: i32) -> impl Iterator<Item = &'static MapNpcTemplate> {
     EXTRA_NPCS

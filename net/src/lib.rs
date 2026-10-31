@@ -82,5 +82,5 @@ pub use self::handler::{
     WorldAction, WorldContext, WorldHandler, WorldRoute,
 };
 pub use self::io::error;
-pub use self::npc_data::extra_npcs;
 pub use self::npc_data::get as get_npc_dialogue_data;
+pub use self::npc_data::{extra_npcs, npc_stands};

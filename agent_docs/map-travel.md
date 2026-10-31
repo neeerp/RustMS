@@ -78,6 +78,8 @@ way back outlasts a relogin; going back clears it. The fares are Cosmic's.
 | Spinel (`9000020`, `world_trip`) | Victoria Island's five towns, Orbis, Ludibrium, Leafre, Mu Lung, Ariant, Boat Quay Town, Amoria and the Mushroom Shrine (`800000000`) | From a town to the Mushroom Shrine, portal 0, for 3000; from Boat Quay Town (`541000000`) to Trend Zone Metropolis (`550000000`), portal 0, for 10000. Saved as kind 1 (`WORLD_TOUR_RETURN`). At the shrine, a menu: back to the saved map, else Lith Harbor, or stay |
 | Pason (`1002002`), Shuri (`2010005`), Nara (`2040048`), `florina2` | Lith Harbor, Orbis, Ludibrium | Menu: to Florina Beach (`110000000`, `st00`, id 4) for 1500, 2000 or 1800, or by showing the VIP Ticket to Florina Beach (`4031134`), which is kept; or two pages about the ticket. Saved as kind 2 (`FLORINA_RETURN`) |
 | Pison (`1081001`, `florina1`) | Florina Beach | Back to the saved map, else Lith Harbor |
+| Rooney (`1022101`, `go_xmas`) | 23 towns, from Victoria Island's five to the Mushroom Shrine | A Yes or No, free, to Happyville (`209000000`), portal 0. Saved as kind 7 (`HAPPYVILLE_RETURN`). Rooney stands only while Happyville is open: unless `RUSTMS_HAPPYVILLE=0` |
+| Rupi (`2002000`, `go_victoria`) | Happyville | A Yes or No: back to the saved map, else Ellinia. Rupi stays when Happyville is closed, since Happyville returns players to itself |
 | Thomas Swift (`9201022`) | Henesys, Amoria | Free, to Amoria's portal 0 or back to Henesys's portal 5. Saves nothing |
 | Audrey (`9201135`, `Malay_Warp2`) | The CBD (`540000000`, where the plane lands), Trend Zone Metropolis, Kampung Village (`551000000`) | Menu, then a Yes or No on the fare: from the CBD to Trend Zone, portal 0, for 42000, saved as kind 1; from Trend Zone to Kampung Village, portal 2, for 10000; from Kampung Village to Trend Zone, portal 4, for 10000. From Trend Zone also free back to the saved map, else Boat Quay Town, at portal 4 |
 
@@ -87,9 +89,9 @@ Spinel doesn't stand in Malaysia; Audrey does, and shares Spinel's kind,
 so a tour of Malaysia begun with either ends with her. Only the CBD and
 Boat Quay Town are saved on the way there; any other saved map is warped
 to without a portal. All of this text is `unsourced` placeholder text
-(`world_trip.*`, `florina.*`, `amoria.*`, `malaysia.*`). `world_tour.rs`
-checks the tour over a relogin, Florina Beach both ways, Thomas Swift and
-Audrey's rides.
+(`world_trip.*`, `florina.*`, `amoria.*`, `malaysia.*`, `rooney.*`,
+`rupi.*`). `world_tour.rs` checks the tour over a relogin, Florina Beach
+both ways, Thomas Swift, Happyville and Audrey's rides.
 
 ## Guards
 

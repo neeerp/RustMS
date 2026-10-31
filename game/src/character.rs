@@ -39,6 +39,9 @@ pub const CARNIVAL_RETURN: i16 = 5;
 /// The `saved_locations` key of the map an Event Assistant took the player
 /// to a GM's event from (Cosmic `EVENT`).
 pub const EVENT_RETURN: i16 = 6;
+/// The `saved_locations` key of the town Rooney took the player to
+/// Happyville from (Cosmic `HAPPYVILLE`).
+pub const HAPPYVILLE_RETURN: i16 = 7;
 
 /// A stat `SPEND_AP` can raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
