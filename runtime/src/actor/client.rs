@@ -22,6 +22,7 @@ mod hazard;
 mod hired_merchant;
 mod jail;
 mod later;
+mod lie_detector;
 mod loot;
 mod marriage;
 mod mini_game;
@@ -71,6 +72,7 @@ use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::maple_tv::TvRefusal;
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::packet::build::world::pet::PetGone;
+use net::packet::handle::world::lie_detector as lie_detector_rules;
 use net::packet::handle::world::{
     spend_avatar_megaphone, spend_maple_tv, to_character, Rock, Whereabouts,
 };
@@ -174,6 +176,11 @@ pub struct ClientActor {
     locker_expiry: HashMap<i64, SystemTime>,
     /// Until when a GM jailed the player (`jail`), if they still are.
     jailed_until: Option<SystemTime>,
+    /// When the player last attacked, which makes them one to test with a
+    /// Lie Detector for a while.
+    last_attack: Option<Instant>,
+    /// The Lie Detector test the player is taking.
+    lie_test: Option<lie_detector::LieTest>,
     /// Until when a GM blocked the account from chatting (`chat_block`), if
     /// still so.
     chat_blocked_until: Option<SystemTime>,
@@ -279,6 +286,8 @@ impl ClientActor {
             gift_lookup: None,
             locker_expiry: HashMap::new(),
             jailed_until: None,
+            last_attack: None,
+            lie_test: None,
             chat_blocked_until: None,
             coupon_strikes: 0,
             maple_tv_waiting: false,
@@ -331,6 +340,7 @@ impl ClientActor {
             let family_buff_due = self.family_buff_due();
             let quests_due = self.quest_clocks_due();
             let jail_due = self.jail_due();
+            let lie_due = self.lie_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -375,6 +385,9 @@ impl ClientActor {
                 }
                 _ = sleep_until(jail_due.unwrap_or_else(Instant::now)), if jail_due.is_some() => {
                     self.end_jail().await
+                }
+                _ = sleep_until(lie_due.unwrap_or_else(Instant::now)), if lie_due.is_some() => {
+                    self.fail_lie_test().await
                 }
             };
             if let Err(error) = step {
@@ -442,6 +455,18 @@ impl ClientActor {
         }
         if self.chat_blocked() && net::chat_block::is_chat(&packet) {
             return self.refuse_chat().await;
+        }
+        if lie_detector_rules::is_attack(opcode) {
+            self.last_attack = Some(Instant::now());
+        }
+        // The client keeps a player in a Lie Detector test from leaving the
+        // channel (report c025); so does the server.
+        if self.lie_test.is_some()
+            && (opcode == RecvOpcode::ChangeChannel as i16
+                || opcode == RecvOpcode::EnterCashShop as i16)
+        {
+            debug!(opcode, "Ignoring a way out of a Lie Detector test");
+            return Ok(());
         }
         // Checked before the handler moves the player.
         if opcode == RecvOpcode::ChangeMap as i16 {
@@ -757,6 +782,16 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::LieDetect(test) => {
+                let field = self.in_game()?.field.key;
+                self.send_to_directory(DirectoryMessage::LieDetect {
+                    from: self.client_id,
+                    test,
+                    field,
+                })
+                .await?
+            }
+            WorldAction::LieDetectorAnswer(typed) => Box::pin(self.answer_lie_test(typed)).await?,
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
@@ -2030,6 +2065,16 @@ impl ClientActor {
                 });
                 morphed?;
             }
+            ServerMessage::LieDetect {
+                reply_to,
+                test,
+                field,
+                tester,
+            } => self.lie_detect(reply_to, test, field, tester).await?,
+            ServerMessage::LieDetected { test, outcome } => {
+                self.lie_detected(test, outcome).await?
+            }
+            ServerMessage::LieDetectorFine { fine } => self.lie_detector_fine(fine).await?,
             ServerMessage::MapleTvPartner { tv, reply } => {
                 // Not in game (yet): the dropped reply refuses it.
                 if let Ok(in_game) = self.in_game() {
@@ -2344,6 +2389,7 @@ impl ClientActor {
             if let Err(error) = self.leave_hired_merchant().await {
                 warn!(self.client_id, %error, "Failed to leave hired merchant");
             }
+            self.leave_lie_test().await;
             if !self.in_cash_shop {
                 let _ = self
                     .send_to_field(FieldMessage::Leave {

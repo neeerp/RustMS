@@ -1,0 +1,275 @@
+//! The Lie Detector (2190000, report c025): a player uses it on someone on
+//! their map who is fighting, and the server shows that player a picture
+//! of a few letters to type back within a minute. A right answer earns
+//! them 5000 mesos; a wrong one, or none, costs them up to 7000, which go
+//! to the tester.
+
+use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
+use crate::packet::build::world::anti_macro::{build_anti_macro_result, AntiMacroResult};
+use crate::packet::build::world::inventory::build_inventory_operation;
+use crate::packet::build::world::stat::{build_stat_update, StatUpdate};
+use crate::packet::op::RecvOpcode;
+use game::{InventoryType, Player};
+use packet::{io::read::PktRead, Packet};
+use std::io::Cursor;
+use std::time::Duration;
+
+/// How long a tested player has to answer; the client counts the same.
+pub const TEST_TIME: Duration = Duration::from_secs(60);
+/// How recently a player must have attacked to be tested.
+pub const ATTACK_WINDOW: Duration = Duration::from_secs(10);
+/// How long after a test the same player can't be tested again.
+pub const TESTED_FOR: Duration = Duration::from_secs(60 * 60);
+/// What a pass earns.
+pub const PASS_REWARD: i32 = 5000;
+/// The most a fail costs, given to the tester.
+pub const FAIL_FINE: i32 = 7000;
+
+/// A Lie Detector in use, while the server looks for the character named.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LieDetectorUse {
+    pub slot: i16,
+    pub item_id: i32,
+    pub name: String,
+}
+
+/// Whether `item_id` is a Lie Detector, of USE class 219.
+pub fn is_lie_detector(item_id: i32) -> bool {
+    item_id / 10_000 == 219
+}
+
+/// Whether `opcode` is an attack, which makes a player one to test: up
+/// close, ranged, magic, by touch or by a summon.
+pub fn is_attack(opcode: i16) -> bool {
+    [
+        RecvOpcode::CloseRangeAttack,
+        RecvOpcode::RangedAttack,
+        RecvOpcode::MagicAttack,
+        RecvOpcode::TouchMonsterAttack,
+        RecvOpcode::SummonAttack,
+    ]
+    .into_iter()
+    .any(|attack| attack as i16 == opcode)
+}
+
+fn reply(result: AntiMacroResult) -> WorldResult {
+    Ok(HandlerResult::reply(build_anti_macro_result(&result)?))
+}
+
+/// `USE_LIE_DETECTOR` (0x67, v83 FUN_00a262d9): the name typed, the slot
+/// in the USE bag and the item. The client keeps the item for the server
+/// to take, refuses it in a town or where the map forbids it, and names
+/// only a character on its map.
+pub struct UseLieDetectorHandler;
+
+impl WorldHandler for UseLieDetectorHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let name = reader.read_str_with_length()?;
+        let slot = reader.read_short()?;
+        let item_id = reader.read_int()?;
+        let player = &*ctx.player;
+        let held = player
+            .inventory
+            .get(InventoryType::Use, slot)
+            .is_some_and(|item| item.item_id == item_id);
+        let allowed = crate::get_game_data()
+            .ok()
+            .and_then(|data| data.field(player.stats.map_id))
+            .is_some_and(|field| field.may_lie_detect());
+        if player.stats.hp <= 0 || !held || !is_lie_detector(item_id) || !allowed {
+            return Ok(HandlerResult::empty());
+        }
+        if name.is_empty() || name.eq_ignore_ascii_case(player.name()) {
+            return reply(AntiMacroResult::NotFound);
+        }
+        let test = LieDetectorUse {
+            slot,
+            item_id,
+            name,
+        };
+        Ok(HandlerResult::empty().with(WorldAction::LieDetect(test)))
+    }
+}
+
+/// `ANSWER_LIE_DETECTOR` (0x69, v83 0x7e76b2 and 0x7e872f): the text typed
+/// in the challenge's box. The client closes the challenge as it sends it,
+/// so every answer must be judged.
+pub struct AnswerLieDetectorHandler;
+
+impl WorldHandler for AnswerLieDetectorHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let answer = reader.read_str_with_length()?;
+        Ok(HandlerResult::empty().with(WorldAction::LieDetectorAnswer(answer)))
+    }
+}
+
+/// Why the player can't be tested now, if they can't: elsewhere than the
+/// tester, already in a test, or not fighting within `ATTACK_WINDOW`.
+pub fn refusal(
+    same_field: bool,
+    in_test: bool,
+    since_attack: Option<Duration>,
+) -> Option<AntiMacroResult> {
+    if !same_field {
+        Some(AntiMacroResult::NotFound)
+    } else if in_test {
+        Some(AntiMacroResult::InTest)
+    } else if !since_attack.is_some_and(|since| since <= ATTACK_WINDOW) {
+        Some(AntiMacroResult::NotAttacking)
+    } else {
+        None
+    }
+}
+
+/// The tester's side once a test began: the Lie Detector used up, if it is
+/// still where it was.
+pub fn spend_detector(player: &mut Player, test: &LieDetectorUse) -> WorldResult {
+    let held = player
+        .inventory
+        .get(InventoryType::Use, test.slot)
+        .is_some_and(|item| item.item_id == test.item_id);
+    let changes = if held {
+        player
+            .inventory_mut()
+            .take(InventoryType::Use, test.slot, 1)
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    if changes.is_empty() {
+        return Ok(HandlerResult::empty());
+    }
+    Ok(HandlerResult::reply(build_inventory_operation(
+        true, &changes,
+    )?))
+}
+
+fn with_meso(player: &mut Player, meso: i32, result: AntiMacroResult) -> WorldResult {
+    player.meso = meso;
+    player.mark_dirty();
+    Ok(
+        HandlerResult::reply(build_stat_update(true, &[StatUpdate::Meso(meso)])?)
+            .with_reply(build_anti_macro_result(&result)?),
+    )
+}
+
+/// The tested player passed: `PASS_REWARD` mesos, as far as they can hold.
+pub fn passed(player: &mut Player) -> WorldResult {
+    let meso = player.meso.saturating_add(PASS_REWARD);
+    with_meso(player, meso, AntiMacroResult::Passed)
+}
+
+/// The tested player failed: up to `FAIL_FINE` of their mesos taken, the
+/// amount returned for the tester.
+pub fn failed(
+    player: &mut Player,
+) -> Result<(HandlerResult<WorldAction>, i32), crate::error::NetworkError> {
+    let fine = FAIL_FINE.min(player.meso.max(0));
+    let meso = player.meso - fine;
+    Ok((with_meso(player, meso, AntiMacroResult::Failed)?, fine))
+}
+
+/// The tester's share of a failed test: `fine` mesos, as far as they can
+/// hold, with "The user has failed..." even when the fine was nothing.
+pub fn fine_received(player: &mut Player, fine: i32) -> WorldResult {
+    let meso = player.meso.saturating_add(fine);
+    with_meso(player, meso, AntiMacroResult::FineReceived)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use packet::io::write::PktWrite;
+
+    fn replies(result: &HandlerResult<WorldAction>) -> Vec<Vec<u8>> {
+        result
+            .actions
+            .iter()
+            .filter_map(|action| match action {
+                WorldAction::Reply(packet) => Some(packet.bytes.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn only_a_fighter_on_the_testers_field_out_of_a_test_is_tested() {
+        let fought = Some(Duration::from_secs(3));
+        assert_eq!(refusal(true, false, fought), None);
+        assert_eq!(
+            refusal(false, false, fought),
+            Some(AntiMacroResult::NotFound)
+        );
+        assert_eq!(refusal(true, true, fought), Some(AntiMacroResult::InTest));
+        let long_ago = Some(Duration::from_secs(11));
+        assert_eq!(
+            refusal(true, false, long_ago),
+            Some(AntiMacroResult::NotAttacking)
+        );
+        assert_eq!(
+            refusal(true, false, None),
+            Some(AntiMacroResult::NotAttacking)
+        );
+    }
+
+    #[test]
+    fn a_pass_pays_5000_and_a_fail_takes_up_to_7000_for_the_tester() {
+        let mut player = crate::codec::stats::sample_player();
+        player.meso = 100;
+        let result = passed(&mut player).unwrap();
+        assert_eq!(player.meso, 5100);
+        assert_eq!(replies(&result)[1], [0x2B, 0, 9, 1]);
+
+        let (result, fine) = failed(&mut player).unwrap();
+        assert_eq!((fine, player.meso), (5100, 0));
+        assert_eq!(replies(&result)[1], [0x2B, 0, 7, 1]);
+        player.meso = 10_000;
+        let (_, fine) = failed(&mut player).unwrap();
+        assert_eq!((fine, player.meso), (7000, 3000));
+
+        let mut tester = crate::codec::stats::sample_player();
+        tester.meso = i32::MAX - 10;
+        let result = fine_received(&mut tester, fine).unwrap();
+        assert_eq!(tester.meso, i32::MAX);
+        assert_eq!(replies(&result)[1], [0x2B, 0, 11, 1]);
+    }
+
+    #[test]
+    fn a_detector_not_held_does_nothing() {
+        let mut player = crate::codec::stats::sample_player();
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::UseLieDetector as i16).unwrap();
+        p.write_str_with_length("").unwrap();
+        p.write_short(1).unwrap();
+        p.write_int(2190000).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let result = UseLieDetectorHandler.handle(&mut p, &mut ctx).unwrap();
+        assert!(result.actions.is_empty());
+    }
+
+    #[test]
+    fn an_answer_is_passed_on() {
+        let mut player = crate::codec::stats::sample_player();
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::AnswerLieDetector as i16).unwrap();
+        p.write_str_with_length("ak47").unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let result = AnswerLieDetectorHandler.handle(&mut p, &mut ctx).unwrap();
+        assert!(matches!(
+            result.actions.as_slice(),
+            [WorldAction::LieDetectorAnswer(answer)] if answer == "ak47"
+        ));
+    }
+}

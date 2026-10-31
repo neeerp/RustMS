@@ -18,10 +18,11 @@ use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::events::{Entry, EventKind};
 use net::handler::AllianceRefusal;
 use net::maple_tv::MapleTv;
+use net::packet::build::world::anti_macro::AntiMacroResult;
 use net::packet::build::world::door::DoorView;
 use net::packet::build::world::guild::InviteRefusal;
 use net::packet::build::world::maple_tv::TvRefusal;
-use net::packet::handle::world::{PartyPotion, Rock, Whereabouts};
+use net::packet::handle::world::{LieDetectorUse, PartyPotion, Rock, Whereabouts};
 use net::{
     BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
     WhisperDelivery,
@@ -263,6 +264,24 @@ pub enum ServerMessage {
     MorphedAnother {
         potion: PartyPotion,
         morphed: bool,
+    },
+    /// `tester`, on `field`, used a Lie Detector on this player: test them
+    /// and say whether the test began.
+    LieDetect {
+        reply_to: ClientHandle,
+        test: LieDetectorUse,
+        field: FieldKey,
+        tester: String,
+    },
+    /// Whether the test this player's Lie Detector `test` began, or why
+    /// not.
+    LieDetected {
+        test: LieDetectorUse,
+        outcome: Result<(), AntiMacroResult>,
+    },
+    /// The player this player tested failed and was fined `fine` mesos.
+    LieDetectorFine {
+        fine: i32,
     },
     /// Someone's Maple TV message names this player: hand it back to the
     /// world's line with this player's look.
@@ -1076,6 +1095,18 @@ pub enum DirectoryMessage {
     MorphAnother {
         from: ClientId,
         potion: PartyPotion,
+    },
+    /// Find the character a Lie Detector names on the sender's channel, to
+    /// test them; the sender stands on `field`.
+    LieDetect {
+        from: ClientId,
+        test: LieDetectorUse,
+        field: FieldKey,
+    },
+    /// A Lie Detector test of the sender ended; another may not begin for
+    /// `TESTED_FOR`.
+    LieTested {
+        client_id: ClientId,
     },
     Broadcast {
         from: ClientId,

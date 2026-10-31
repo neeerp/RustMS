@@ -14,7 +14,7 @@ use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::actor::party_search::{PartySearches, Wanted};
 use crate::message::{
-    AllianceNews, ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage,
+    AllianceNews, ClientHandle, DirectoryMessage, FieldKey, ListedBuddy, Presence, ServerMessage,
 };
 use game::alliance::Alliance;
 use game::{AvatarLook, Guild};
@@ -26,6 +26,7 @@ use net::handler::AllianceRefusal;
 use net::maple_tv::MapleTv;
 use net::owl::Searches;
 use net::packet::build::world::alliance;
+use net::packet::build::world::anti_macro::AntiMacroResult;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
 use net::packet::build::world::guild::{
@@ -44,7 +45,8 @@ use net::packet::build::world::party::{
     build_party_member_hp, build_party_search_invite, build_party_status, build_party_update,
     Departure, PartyMemberView, PartyStatus, PartyView,
 };
-use net::packet::handle::world::{DoorExit, PartyPotion, Rock};
+use net::packet::handle::world::lie_detector::TESTED_FOR;
+use net::packet::handle::world::{DoorExit, LieDetectorUse, PartyPotion, Rock};
 use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
 use std::cmp::Reverse;
@@ -175,6 +177,9 @@ pub struct WorldDirectory {
     gm_events: HashMap<u8, (i32, u16, u16)>,
     /// Each channel's Guild Quest line.
     guild_quests: HashMap<u8, guild_quest::GuildQuestLine>,
+    /// When each player's last Lie Detector test ended, until `TESTED_FOR`
+    /// has passed.
+    lie_tested: HashMap<ClientId, std::time::Instant>,
     /// What the directory starts events with when no client asks, as a
     /// Guild Quest's next guild's turn (`WorldDirectory::with_events`).
     event_spawner: Option<(
@@ -212,6 +217,7 @@ impl WorldDirectory {
             owl_searches: Searches::default(),
             gm_events: HashMap::new(),
             guild_quests: HashMap::new(),
+            lie_tested: HashMap::new(),
             event_spawner: None,
         }
     }
@@ -278,6 +284,10 @@ impl WorldDirectory {
                 self.rock_locate(from, &name, rock)
             }
             DirectoryMessage::MorphAnother { from, potion } => self.morph_another(from, potion),
+            DirectoryMessage::LieDetect { from, test, field } => self.lie_detect(from, test, field),
+            DirectoryMessage::LieTested { client_id } => {
+                self.lie_tested.insert(client_id, std::time::Instant::now());
+            }
             DirectoryMessage::Broadcast {
                 from,
                 scope,
@@ -1191,6 +1201,48 @@ impl WorldDirectory {
                 morphed: false,
             });
         }
+    }
+
+    /// Hand a Lie Detector to the character it names, if they are on the
+    /// user's channel and weren't tested in the last `TESTED_FOR`;
+    /// otherwise tell the user why not.
+    fn lie_detect(&mut self, from: ClientId, test: LieDetectorUse, field: FieldKey) {
+        self.lie_tested
+            .retain(|_, ended| ended.elapsed() < TESTED_FOR);
+        let Some(user) = self.clients.get(&from) else {
+            return;
+        };
+        let target = self
+            .names
+            .get(&test.name)
+            .and_then(|id| self.clients.get(id))
+            .filter(|target| {
+                target.channel_id == user.channel_id
+                    && !target.in_cash_shop
+                    && target.found_by(user)
+            });
+        let refused = match target {
+            None => AntiMacroResult::NotFound,
+            Some(target) if self.lie_tested.contains_key(&target.handle.client_id) => {
+                AntiMacroResult::TestedBefore
+            }
+            Some(target) => {
+                let reached = target.handle.send(ServerMessage::LieDetect {
+                    reply_to: user.handle.clone(),
+                    test: test.clone(),
+                    field,
+                    tester: user.presence.name.clone(),
+                });
+                if reached {
+                    return;
+                }
+                AntiMacroResult::NotFound
+            }
+        };
+        user.handle.send(ServerMessage::LieDetected {
+            test,
+            outcome: Err(refused),
+        });
     }
 
     fn messenger(&mut self, from: ClientId, request: MessengerRequest) {

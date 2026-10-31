@@ -8,6 +8,7 @@ pub mod aran_combo;
 pub mod ariant;
 pub mod beacon;
 pub mod berserk;
+pub mod captcha;
 pub mod carnival;
 pub mod cash_shop;
 pub mod charge;
