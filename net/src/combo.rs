@@ -156,6 +156,7 @@ mod tests {
             charge: 0,
             ammo_slot: 0,
             explosion: None,
+            grenade: None,
         }
     }
 

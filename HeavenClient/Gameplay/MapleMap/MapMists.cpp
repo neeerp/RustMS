@@ -73,8 +73,10 @@ namespace ms
 		}
 
 		Randomizer random;
-		std::vector<MistCloud> layout = layout_mist(left, top, right, bottom, heights,
-													[&](int32_t n) { return random.next_int(n); });
+		std::vector<MistCloud> layout = mist::single(skillid)
+											? layout_single(left, right, bottom, heights)
+											: layout_mist(left, top, right, bottom, heights,
+														  [&](int32_t n) { return random.next_int(n); });
 
 		// The clouds draw in order of their z; layers of the same z in the
 		// order they were made.

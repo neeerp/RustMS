@@ -79,6 +79,17 @@ namespace ms
 		return clouds;
 	}
 
+	// Flame Gear's mist and 22161003's are one cloud instead (FUN_00432a1e):
+	// the first tile, at the middle of the area's bottom.
+	inline std::vector<MistCloud>
+	layout_single(int32_t left, int32_t right, int32_t bottom, const std::vector<int16_t> &heights)
+	{
+		if (heights.empty())
+			return {};
+
+		return { { 0, (left + right) / 2, bottom, 0, false } };
+	}
+
 	// What a mist does to the player standing in it.
 	namespace mist
 	{
@@ -90,6 +101,13 @@ namespace ms
 			SMOKE = 2,
 			ITEM = 3
 		};
+
+		// The skills whose mist is one cloud, not a diamond of them: Flame
+		// Gear and 22161003 (0x431d5c).
+		constexpr bool single(int32_t skillid)
+		{
+			return skillid == 12111005 || skillid == 22161003;
+		}
 
 		// The mob skills whose mist hurts by their level's `x`: 130 and
 		// Poison Mist (FUN_00431a63).

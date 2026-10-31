@@ -919,6 +919,9 @@ pub enum FieldRequest {
         skill_id: i32,
         level: i32,
         left: bool,
+        /// Where the cloud goes, if not where the player stands: Poison
+        /// Bomb's grenade.
+        at: Option<(i16, i16)>,
         inflict: crate::skills::Inflict,
     },
     /// The player used the cash mist item `item_id`: its cloud covers

@@ -113,6 +113,9 @@ pub struct Attack {
     pub hits: Vec<AttackHit>,
     /// What Meso Explosion sends after its targets.
     pub explosion: Option<Explosion>,
+    /// Where Poison Bomb's grenade went off, which it sends after where
+    /// the player stands (0x952b89); `None` without it.
+    pub grenade: Option<(i16, i16)>,
 }
 
 /// CLOSE_RANGE_ATTACK body (after the opcode), as the v83 client sends it.
@@ -192,6 +195,17 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
     } else {
         None
     };
+    // A body cut short only loses the grenade: its mist then falls where
+    // the player stands.
+    let grenade = if skill == skills::POISON_BOMB {
+        (|| {
+            r.read_bytes(4)?;
+            Ok::<_, NetworkError>((r.read_short()?, r.read_short()?))
+        })()
+        .ok()
+    } else {
+        None
+    };
     Ok(Attack {
         kind,
         skill,
@@ -204,6 +218,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         ammo_slot,
         hits,
         explosion,
+        grenade,
     })
 }
 
@@ -1116,6 +1131,47 @@ mod tests {
             (attack.display, attack.action, attack.speed),
             (3, 0x8005, 4)
         );
+    }
+
+    /// Poison Bomb's attack, held for 500 ms, with `tail` after its one
+    /// target.
+    fn poison_bomb_packet(tail: &[i16]) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(0x2C).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_byte(0x11).unwrap();
+        p.write_int(skills::POISON_BOMB).unwrap();
+        p.write_bytes(&[0; 8]).unwrap();
+        p.write_int(500).unwrap(); // the charge
+        p.write_byte(0).unwrap();
+        p.write_short(5).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_byte(4).unwrap();
+        p.write_bytes(&[0; 4]).unwrap();
+        p.write_int(7).unwrap();
+        p.write_bytes(&[0; 14]).unwrap();
+        p.write_int(100).unwrap();
+        p.write_bytes(&[0; 4]).unwrap();
+        for &value in tail {
+            p.write_short(value).unwrap();
+        }
+        p
+    }
+
+    #[test]
+    fn poison_bomb_names_where_its_grenade_went_off() {
+        let attack = parse_close_attack(&poison_bomb_packet(&[10, 20, 300, 40])).unwrap();
+        assert_eq!((attack.charge, attack.hits.len()), (500, 1));
+        assert_eq!(attack.grenade, Some((300, 40)));
+        // Without its tail it is still an attack.
+        let attack = parse_close_attack(&poison_bomb_packet(&[10, 20])).unwrap();
+        assert_eq!((attack.grenade, attack.hits.len()), (None, 1));
+        // Another skill's trailing bytes are no grenade.
+        let mut other = skill_attack_packet(0, 7, 9);
+        for value in [10, 20, 300, 40] {
+            other.write_short(value).unwrap();
+        }
+        assert_eq!(parse_close_attack(&other).unwrap().grenade, None);
     }
 
     #[test]

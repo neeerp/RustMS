@@ -1020,6 +1020,12 @@ pub const POISON_MIST: i32 = 2111003;
 /// Smokescreen: smoke around the caster where mobs can't hurt them or
 /// their party, which the v83 client works out itself (FUN_0043193a).
 pub const SMOKESCREEN: i32 = 4221006;
+/// The Night Walker's Poison Bomb, whose poison cloud is left where its
+/// grenade goes off.
+pub const POISON_BOMB: i32 = 14111006;
+/// The Blaze Wizard's Flame Gear, a cloud of fire at the caster that burns
+/// like poison.
+pub const FLAME_GEAR: i32 = 12111005;
 
 /// What the mist a skill leaves puts on the mobs in it, each with the
 /// skill's chance, for as long as the mist's `time`; None for a skill that
@@ -1027,7 +1033,7 @@ pub const SMOKESCREEN: i32 = 4221006;
 /// server's (OdinMS-family: Poison Mist poisons, Smokescreen nothing).
 pub fn mist(skill: &Learned) -> Option<Inflict> {
     match skill.skill_id {
-        POISON_MIST => Some(Inflict::new(
+        POISON_MIST | POISON_BOMB | FLAME_GEAR => Some(Inflict::new(
             skill,
             vec![(
                 MobStat::Poison,
@@ -1040,6 +1046,20 @@ pub fn mist(skill: &Learned) -> Option<Inflict> {
         SMOKESCREEN => Some(Inflict::new(skill, Vec::new())),
         _ => None,
     }
+}
+
+/// The farthest a grenade's cloud may fall from the thrower. The client
+/// sets no bound on the throw; this one only keeps a forged spot out.
+const GRENADE_REACH: i32 = 1000;
+
+/// Where a mist goes: at `at` (Poison Bomb's grenade) when it is near the
+/// player, else where the player stands, as Cosmic does.
+pub fn mist_origin(player: (i16, i16), at: Option<(i16, i16)>) -> (i16, i16) {
+    let near = |(x, y): (i16, i16)| {
+        (i32::from(x) - i32::from(player.0)).abs() <= GRENADE_REACH
+            && (i32::from(y) - i32::from(player.1)).abs() <= GRENADE_REACH
+    };
+    at.filter(|&spot| near(spot)).unwrap_or(player)
 }
 
 /// The kind of mist a skill leaves: smoke for Smokescreen, else poison.
@@ -1171,7 +1191,7 @@ pub const KEYDOWN: [i32; 16] = [
     5201002,  // Grenade
     5221004,  // Rapid Fire
     13111002, // Hurricane (Wind Archer)
-    14111006, // Poison Bomb
+    POISON_BOMB,
     15101003, // Corkscrew Blow (Thunder Breaker)
     22121000, // Evan
     22151001, // Evan
@@ -1194,7 +1214,7 @@ pub fn is_magnet(skill_id: i32) -> bool {
 
 /// Grenade and Poison Bomb: held, then thrown, going off where they land
 /// (0x95efc5).
-pub const THROWS: [i32; 2] = [5201002, 14111006];
+pub const THROWS: [i32; 2] = [5201002, POISON_BOMB];
 
 pub fn throws(skill_id: i32) -> bool {
     THROWS.contains(&skill_id)
@@ -1650,6 +1670,7 @@ mod tests {
             charge: 0,
             ammo_slot: 0,
             explosion: None,
+            grenade: None,
         };
         let mut player = knowing(&[(PICKPOCKET, 20)]);
         let lines = vec![10_000, 0, 1, 50_000, -5];
@@ -1867,6 +1888,46 @@ mod tests {
     fn smokescreen_leaves_smoke_and_poison_mist_poison() {
         assert_eq!(mist_kind(SMOKESCREEN), MistKind::Smoke);
         assert_eq!(mist_kind(POISON_MIST), MistKind::Poison);
+        assert_eq!(mist_kind(POISON_BOMB), MistKind::Poison);
+        assert_eq!(mist_kind(FLAME_GEAR), MistKind::Poison);
+    }
+
+    #[test]
+    fn poison_bomb_and_flame_gear_leave_poison() {
+        if data().is_err() {
+            return;
+        }
+        for skill_id in [POISON_BOMB, FLAME_GEAR] {
+            let skill = at_level(skill_id, 20).unwrap();
+            let mist = mist(&skill).unwrap();
+            assert_eq!(
+                mist.statuses,
+                [(
+                    MobStat::Poison,
+                    Amount::Poison {
+                        level: 20,
+                        bonus: 0
+                    }
+                )]
+            );
+            assert_eq!(
+                mist.duration,
+                Duration::from_secs(skill.effect.duration as u64)
+            );
+        }
+        let bomb = at_level(POISON_BOMB, 30).unwrap().effect;
+        assert_eq!(
+            area_box(&bomb, mist_origin((0, 0), Some((300, 40))), false),
+            (200, -42, 400, 123)
+        );
+    }
+
+    #[test]
+    fn a_mist_far_from_the_player_falls_on_them() {
+        assert_eq!(mist_origin((10, 20), None), (10, 20));
+        assert_eq!(mist_origin((10, 20), Some((-990, 1020))), (-990, 1020));
+        assert_eq!(mist_origin((10, 20), Some((1011, 20))), (10, 20));
+        assert_eq!(mist_origin((10, 20), Some((10, -981))), (10, 20));
     }
 
     #[test]

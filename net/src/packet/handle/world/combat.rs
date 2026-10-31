@@ -264,6 +264,7 @@ impl WorldHandler for AttackHandler {
                 skill_id: skill.skill_id,
                 level: skill.level,
                 left: attack.action & 0x8000 != 0,
+                at: attack.grenade,
                 inflict: skills::mist(skill)?,
             })
         });
@@ -1132,6 +1133,7 @@ mod tests {
                 damage: vec![1],
             }],
             explosion: None,
+            grenade: None,
         };
         let (first, second) = (strike(0, 7), strike(combat::SECOND_STRIKE, 7));
         assert!(!assassinate(&first, &mut player, now));

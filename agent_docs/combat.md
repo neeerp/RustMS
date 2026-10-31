@@ -1261,6 +1261,13 @@ rolling `prop`, and lasts the skill's `time`. AFFECTED_AREA_CREATED (0x111)
 shows it to the map and to players who join; AFFECTED_AREA_REMOVED (0x112)
 lifts it. The reach interval and the 800 ms come from OdinMS-family servers.
 
+A Night Walker's Poison Bomb (14111006) and a Blaze Wizard's Flame Gear
+(12111005) leave the same poisoning cloud. Flame Gear's sits around the
+caster like Poison Mist's. Poison Bomb's falls where the grenade went off:
+its attack ends with that spot after where the player stands (v83
+0x952b89, `Attack::grenade`), and `skills::mist_origin` centres the box
+there unless it is more than 1000 px from the thrower.
+
 A Shadower's Smokescreen (4221006) is a USE_SKILL that asks the field for
 a type 2 (smoke) mist around the caster that puts nothing on mobs. The
 v83 client shelters itself from mob attacks while it stands in its own or
@@ -1270,7 +1277,8 @@ Cash mists (Passed Gas 5281000, Floral Scent 5281001) are type 3 mists
 that do nothing to anyone; see `inventory.md`.
 
 HeavenClient's `MapMists` lays the skill's `tile` clouds over the area as
-v83 does (`MistLayout.h`, a diamond of random tiles), draws them above the
+v83 does (`MistLayout.h`, a diamond of random tiles; Flame Gear's is its
+one tile at the middle of the area's bottom), draws them above the
 map's objects, and fades them out over a second when the mist lifts.
 `v83ref` report 160 has the client's detail.
 

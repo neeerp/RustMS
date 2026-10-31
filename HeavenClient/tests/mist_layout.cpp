@@ -85,6 +85,14 @@ int main()
 		require(!mist::item_busy(smokes, 7, 4221006, 0, 0), "a smoke screen is no cash mist");
 		gas[0].started = false;
 		require(!mist::item_busy(gas, 7, 5281000, 0, 0), "nor is one not started yet");
+
+		// Flame Gear's mist is its one tile at the middle of the bottom.
+		require(mist::single(12111005) && mist::single(22161003), "Flame Gear's is one cloud");
+		require(!mist::single(2111003) && !mist::single(14111006), "Poison Mist's and Poison Bomb's are not");
+		clouds = layout_single(-200, 200, 30, { 266 });
+		want = { { 0, 0, 30, 0, false } };
+		require(clouds == want, "one cloud at the middle of the bottom");
+		require(layout_single(-200, 200, 30, {}).empty(), "none without a tile");
 	}
 	catch (const std::exception& e)
 	{
