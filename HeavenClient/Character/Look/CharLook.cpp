@@ -783,7 +783,7 @@ namespace ms
 
 		std::string attack = is_superman() ? morph::superman_action(acstr) : "";
 
-		if (Stance::Id ac_stance = Stance::by_string(acstr))
+		if (Stance::Id ac_stance = Stance::find(acstr))
 		{
 			set_stance(ac_stance);
 		} else if (!attack.empty() && MorphTemplate::get(morph).count(attack) > 0)
@@ -907,6 +907,11 @@ namespace ms
 	Stance::Id CharLook::get_stance() const
 	{
 		return stance.get();
+	}
+
+	const std::string &CharLook::get_actionstr() const
+	{
+		return actionstr;
 	}
 
 	std::string CharLook::get_action_name() const

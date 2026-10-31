@@ -86,6 +86,11 @@ namespace ms
 		// at its `level`; no Flash Jump follows it in the air.
 		void recoil_shot(int32_t level);
 
+		// Whether Combat Step may go now, where the map `allowed` it, and its slide along the ground at the
+		// level's `x` (FUN_0096d95e).
+		bool may_combat_step(bool allowed) const;
+		void combat_step(int32_t x);
+
 		// Whether Wings may go now, and its jump, gliding down at the level's `x` for up to `seconds`
 		// (FUN_00957a1f).
 		bool may_wings() const;
@@ -242,6 +247,9 @@ namespace ms
 
 		// Return the character's level
 		uint16_t get_level() const override;
+
+		// Return the character's job.
+		int16_t get_job() const override;
 
 		// Return the character's level of a skill.
 		int32_t get_skilllevel(int32_t skillid) const override;
@@ -602,6 +610,8 @@ namespace ms
 		// Whether the player has Flash Jumped since last on the ground or a
 		// rope (+0x2b58).
 		bool flash_jumped = false;
+		// When Combat Step may go again (+0x3158).
+		int64_t step_ready_at = 0;
 		// How long Wings may still glide, in milliseconds (+0x3130).
 		int32_t wings_left = 0;
 		// The Energy Charge gauge, 0 to 10000.

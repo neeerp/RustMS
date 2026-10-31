@@ -33,6 +33,7 @@
 #include "PointBlank.h"
 #include "PqSkills.h"
 #include "Prepare.h"
+#include "CombatStep.h"
 #include "RecoilShot.h"
 #include "RemoteShot.h"
 #include "RemoteSpell.h"
@@ -3062,6 +3063,11 @@ namespace ms
 	void Combat::show_recoil_shot(Char &user)
 	{
 		get_move(recoil_shot::ID).apply_useeffects(user);
+	}
+
+	void Combat::show_combat_step(Char &user)
+	{
+		get_move(combat_step::ID).apply_useeffects(user);
 	}
 
 	void Combat::show_player_affected(int32_t skillid)

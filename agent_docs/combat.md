@@ -771,10 +771,8 @@ A few skills do more than buff:
   the `Player`, and ends it 3 seconds on with CANCEL_BUFF; a combo skill
   used ends it at once. `UIAranCombo` draws the count at the top right
   (report b361): digits from `Effect/BasicEff.img/Combo/<tier>`, the word
-  under them, and the ComboCommand at 30, 100 and 200. v83 picks the combo
-  skills through key sequences (its combo commands, not yet in
-  HeavenClient); HeavenClient lets a key use one only once the combo
-  allows it. Stat 68 adds Combo Ability's attack in `Player::recalc_stats`,
+  under them, and the ComboCommand at 30, 100 and 200. A key bound to a
+  combo skill uses it only once the combo allows it. Stat 68 adds Combo Ability's attack in `Player::recalc_stats`,
   so the stat window shows it, and Combo Critical's rate (its `y` percent
   for every ten up to `x` tens, plus 10) and damage come after Stun
   Mastery's in the mob's critical roll (`physical_damage::aran_critical`).
@@ -789,6 +787,38 @@ A few skills do more than buff:
   server takes 0xA3 on trust and doesn't hold Body Pressure to once a
   second, Body Pressure's `prop` status isn't modelled, and Combo Drain
   shares Drain's cap of half max HP.
+- **The Aran's key sequences** (HeavenClient `aran_combo::Commands`,
+  reports b364 to b366) turn arrows and the attack key, pressed in order
+  and in time, into commands. A command waits up to a second (two for
+  Final Charge, Blow and Toss) and is tried each frame while the player is
+  alive and not attacking. While one waits, the keys that act are dropped.
+  - Attack, attack is Double Swing, and a third attack is Triple Swing.
+    Left or Right then attack is Final Charge, Down then attack is Final
+    Blow, and Up then attack is Final Toss. Each goes only on the swing
+    before it, or after it while it waits: Double Swing on a plain polearm
+    swing, Triple Swing on a Double Swing, and the three finishers on a
+    Triple Swing. On their own, Final Blow and Toss take the attack key,
+    which then does nothing.
+  - Up, Up, attack is Rolling Spin. Down then Left or Right then attack,
+    and Down, Down, attack, use the best combo skill the count allows
+    (b362). Down, Up, attack is Rage of Pharaoh for any job, with a use
+    left in the Pyramid (`pyramid.md`); the rest are the Aran's alone.
+  - Left, Left or Right, Right is Combat Step (21001001). The client
+    slides the player along the ground at the level's `x`
+    (`Player::combat_step`), only on a foothold, where the map allows
+    movement skills (or for a GM), and a second apart. A jump down holds
+    it off 200 ms, and no jump is allowed during the step. The path gets
+    element 20, from which others see the step's effect
+    (`OtherChar::send_movement`). The server announces no skill effect for
+    it (`skills::COMBAT_STEP`).
+  - An Aran's plain attack with a polearm plays one of `swingT2PoleArm`,
+    `swingP1PoleArm` and `swingP2PoleArm` at random
+    (`aran_combo::polearm_swing`). Double Swing waits on those. Others see
+    the plain swing of the same name, since HeavenClient's wire stance is
+    its own list.
+  - Not modelled: Full Swing and Over Swing turning Double and Triple
+    Swing into their hidden skills, and the portal kinds Combat Step
+    refuses.
 - **Berserk** (`net::berserk`, 1320006) is a Dark Knight's passive. The
   client keeps the state: Berserk is on while HP is at most `x` percent
   of max HP, rechecked when HP changes and anew on entering the game. Each

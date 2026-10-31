@@ -119,6 +119,9 @@ namespace ms
 		// (0x980104).
 		void show_recoil_shot(Char &user);
 
+		// Likewise Combat Step's, when the path shows its slide (0x980308).
+		void show_combat_step(Char &user);
+
 		// Show a skill's `special` animation on a user or the player (0x936528): the skill that
 		// dodged a hit, Guardian or Shadow Shifter, or Dragon Blood drinking HP (user effect 5).
 		void show_special(int32_t cid, int32_t skillid);

@@ -131,6 +131,9 @@ namespace ms
 
 		Stance::Id get_stance() const;
 
+		// The action playing, or "" for none.
+		const std::string &get_actionstr() const;
+
 		// The body action playing, or else the stance, by name.
 		std::string get_action_name() const;
 

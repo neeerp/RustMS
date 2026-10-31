@@ -96,6 +96,9 @@ namespace ms
 		// Return the character's level.
 		virtual uint16_t get_level() const = 0;
 
+		// Return the character's job.
+		virtual int16_t get_job() const = 0;
+
 		// Return the character's level.
 		virtual int32_t get_skilllevel(int32_t skillid) const = 0;
 

@@ -57,11 +57,19 @@ namespace ms
 
 	Stance::Id Stance::by_string(const std::string &name)
 	{
+		if (Id id = find(name))
+			return id;
+
+		std::cout << "Unknown Stance::Id name: [" << name << "]" << std::endl;
+
+		return NONE;
+	}
+
+	Stance::Id Stance::find(const std::string &name)
+	{
 		for (auto iter : names)
 			if (iter.second == name)
 				return iter.first;
-
-		std::cout << "Unknown Stance::Id name: [" << name << "]" << std::endl;
 
 		return NONE;
 	}

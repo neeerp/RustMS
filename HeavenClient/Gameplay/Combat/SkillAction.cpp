@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SkillAction.h"
 
+#include "AranCombo.h"
+
 #include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
 
@@ -38,6 +40,15 @@ namespace ms
 			default:
 				degenerate = false;
 				break;
+		}
+
+		if (auto swing = aran_combo::polearm_swing(target.get_job(), weapontype, Randomizer().next_int(3)))
+		{
+			target.attack(degenerate, swing->stance);
+			// As a std::string: a bare const char* would pick attack(bool).
+			target.attack(std::string(swing->action));
+
+			return "";
 		}
 
 		target.attack(degenerate);

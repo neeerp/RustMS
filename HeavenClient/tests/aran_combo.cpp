@@ -1,5 +1,7 @@
 #include "../Gameplay/Combat/AranCombo.h"
+#include "../Gameplay/Combat/CombatStep.h"
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -93,6 +95,24 @@ int main()
 				"no polearm or no Aran, no command");
 		require(enabled(TO_THE_LEFT, 2000, POLEARM, all), "a Legend too");
 
+		auto step = knows({ 21001001 });
+		require(enabled(STEP_LEFT, 2100, 130, step) && !enabled(STEP_RIGHT, 2100, 130, smash)
+				&& !enabled(STEP_LEFT, 1100, POLEARM, step), "Combat Step with any weapon, for an Aran who knows it");
+		require(enabled(DOUBLE_SWING, 2100, POLEARM, knows({ 20000014 }))
+				&& enabled(DOUBLE_SWING, 2000, POLEARM, knows({ 21000002 }))
+				&& !enabled(DOUBLE_SWING, 2100, 130, knows({ 21000002 })),
+				"either Double Swing, with a polearm");
+		require(enabled(CHARGE_LEFT, 2110, POLEARM, knows({ 21100002 }))
+				&& !enabled(FINAL_TOSS, 2111, POLEARM, knows({ 21100002 })), "each its own skill");
+		require(enabled(RAGE, 100, 130, smash) && enabled(RAGE, 2200, 0, smash), "Rage of Pharaoh for anyone");
+
+		require(skill(DOUBLE_SWING, 2000) == 20000014 && skill(DOUBLE_SWING, 2100) == 21000002
+				&& skill(TRIPLE_SWING, 2000) == 20000015 && skill(FINAL_BLOW, 2000) == 20000016
+				&& skill(FINAL_BLOW, 2112) == 21120005, "the Legend's copies");
+		require(skill(RAGE, 100) == 1020 && skill(RAGE, 1100) == 10001020 && skill(RAGE, 2112) == 20001020
+				&& skill(RAGE, 2200) == 20011020 && skill(RAGE, 2001) == 20011020,
+				"Rage of Pharaoh's copy for each family");
+
 		require(pick(TO_THE_LEFT, 29, all) == 0 && pick(TO_THE_LEFT, 30, all) == 21100004, "Smash from 30");
 		require(pick(TO_THE_RIGHT, 150, all) == 21110004 && pick(TO_THE_RIGHT, 200, all) == 21120006,
 				"Penril from 100, Tempest from 200");
@@ -105,12 +125,72 @@ int main()
 				"each turns its way");
 		require(faces_right(TO_THE_RIGHT, true) == false && faces_right(TO_THE_LEFT, true) == true,
 				"the other way while confused");
-		require(!faces_right(DOWN_TWICE, false), "down twice doesn't turn");
+		require(faces_right(CHARGE_LEFT, false) == false && faces_right(STEP_RIGHT, false) == true
+				&& faces_right(STEP_RIGHT, true) == false, "Final Charge and Combat Step too");
+		require(!faces_right(DOWN_TWICE, false) && !faces_right(FINAL_BLOW, false), "the rest don't turn");
 
-		auto yes = [](int32_t) { return true; };
-		auto press = [&](Commands& c, Key key, bool down, int64_t now, int64_t code = -1)
+		require(doing("swingP1PoleArm") == Doing::SWING && doing("swingP1") == Doing::OTHER
+				&& doing("overSwingDouble") == Doing::DOUBLE && doing("fullSwingTriple") == Doing::TRIPLE
+				&& doing("") == Doing::OTHER, "what the body is doing");
+		require(std::string(polearm_swing(2112, POLEARM, 0)->action) == "swingT2PoleArm"
+					&& polearm_swing(2000, POLEARM, 4)->stance == ms::Stance::Id::SWINGP1
+					&& std::string(polearm_swing(2100, POLEARM, 2)->action) == "swingP2PoleArm"
+					&& !polearm_swing(2112, 130, 0) && !polearm_swing(1100, POLEARM, 0),
+				"an Aran's polearm swings");
+
+		auto waiting = [](Outcome o) { return o.waits; };
+		require(waiting(outcome(DOUBLE_SWING, true, Doing::SWING, std::nullopt))
+				&& !waiting(outcome(DOUBLE_SWING, true, Doing::OTHER, std::nullopt))
+				&& !waiting(outcome(DOUBLE_SWING, true, Doing::SWING, TO_THE_LEFT))
+				&& !waiting(outcome(DOUBLE_SWING, false, Doing::SWING, std::nullopt)),
+				"Double Swing on an attack with the polearm, before any other");
+		require(waiting(outcome(TRIPLE_SWING, true, Doing::DOUBLE, std::nullopt))
+				&& waiting(outcome(TRIPLE_SWING, true, Doing::OTHER, DOUBLE_SWING))
+				&& !waiting(outcome(TRIPLE_SWING, true, Doing::DOUBLE, ROLLING_SPIN))
+				&& !waiting(outcome(TRIPLE_SWING, true, Doing::SWING, std::nullopt)),
+				"Triple Swing on or after a Double Swing");
+		require(waiting(outcome(CHARGE_RIGHT, true, Doing::TRIPLE, std::nullopt))
+				&& waiting(outcome(FINAL_TOSS, true, Doing::OTHER, TRIPLE_SWING))
+				&& !waiting(outcome(FINAL_BLOW, true, Doing::DOUBLE, std::nullopt)),
+				"the finals on or after a Triple Swing");
+		require(!outcome(CHARGE_LEFT, true, Doing::TRIPLE, std::nullopt).takes
+				&& outcome(FINAL_BLOW, true, Doing::OTHER, std::nullopt).takes
+				&& !outcome(FINAL_BLOW, false, Doing::OTHER, std::nullopt).takes,
+				"Final Blow takes the key even when it doesn't wait, if known");
+		require(waiting(outcome(ROLLING_SPIN, true, Doing::OTHER, DOUBLE_SWING))
+				&& outcome(STEP_LEFT, true, Doing::OTHER, std::nullopt).takes
+				&& outcome(RAGE, true, Doing::OTHER, std::nullopt).takes
+				&& !outcome(TO_THE_LEFT, true, Doing::OTHER, std::nullopt).takes,
+				"the rest always wait");
+
+		auto only = [](std::vector<int32_t> ids)
 		{
-			return c.feed(code < 0 ? static_cast<int64_t>(key) : code, key, down, now, yes);
+			return [ids](int32_t id)
+			{
+				for (int32_t allowed : ids)
+					if (allowed == id)
+						return true;
+
+				return false;
+			};
+		};
+		auto combos = only({ TO_THE_LEFT, TO_THE_RIGHT, DOWN_TWICE });
+		auto every = [](int32_t) { return true; };
+		std::vector<int32_t> made;
+		auto feed = [&](Commands& c, auto enabled, Key key, bool down, int64_t now)
+		{
+			made.clear();
+			c.feed(static_cast<int64_t>(key), key, down, now, enabled, [&](int32_t id)
+			{
+				made.push_back(id);
+				return false;
+			});
+
+			return made.empty() ? 0 : made.back();
+		};
+		auto press = [&](Commands& c, Key key, bool down, int64_t now)
+		{
+			return feed(c, combos, key, down, now);
 		};
 
 		Commands c;
@@ -145,15 +225,15 @@ int main()
 		press(c, Key::DOWN, false, 5300);
 		require(press(c, Key::DOWN, true, 6000) == 0 && press(c, Key::DOWN, false, 6100) == 0
 				&& press(c, Key::DOWN, true, 6200) == 0 && press(c, Key::LEFT, true, 6300) == 0,
-				"one begun down twice keeps the sideways ones from beginning again");
-		require(press(c, Key::ATTACK, true, 6400) == 0, "so it has to be Down, a side, attack from the start");
+				"Down pressed again doesn't break the sideways ones");
+		require(press(c, Key::ATTACK, true, 6400) == TO_THE_LEFT, "so they still match");
 
 		Commands refused;
-		auto smash_only = [](int32_t id) { return id != DOWN_TWICE; };
-		refused.feed(1, Key::DOWN, true, 0, smash_only);
-		refused.feed(1, Key::DOWN, false, 50, smash_only);
-		refused.feed(1, Key::DOWN, true, 100, smash_only);
-		require(refused.feed(2, Key::ATTACK, true, 150, smash_only) == 0, "one not enabled never begins");
+		auto smash_only = only({ TO_THE_LEFT, TO_THE_RIGHT });
+		feed(refused, smash_only, Key::DOWN, true, 0);
+		feed(refused, smash_only, Key::DOWN, false, 50);
+		feed(refused, smash_only, Key::DOWN, true, 100);
+		require(feed(refused, smash_only, Key::ATTACK, true, 150) == 0, "one not enabled never begins");
 
 		Commands dead;
 		press(dead, Key::DOWN, true, 0);
@@ -161,14 +241,113 @@ int main()
 		dead.clear();
 		require(press(dead, Key::ATTACK, true, 100) == 0, "cleared, it begins again");
 
+		auto key = [&](Commands& k, Key which, bool down, int64_t now)
+		{
+			return feed(k, every, which, down, now);
+		};
+
+		Commands swings;
+		require(key(swings, Key::ATTACK, true, 0) == 0 && key(swings, Key::ATTACK, false, 100) == 0
+				&& key(swings, Key::ATTACK, true, 300) == DOUBLE_SWING, "the attack key twice");
+		require(key(swings, Key::ATTACK, false, 400) == 0 && key(swings, Key::ATTACK, true, 899) == TRIPLE_SWING,
+				"three times, within 900 ms of the first");
+
+		Commands late;
+		key(late, Key::ATTACK, true, 0);
+		key(late, Key::ATTACK, false, 100);
+		require(key(late, Key::ATTACK, true, 481) == 0, "the second within 480 ms");
+
+		Commands later;
+		key(later, Key::ATTACK, true, 0);
+		key(later, Key::ATTACK, false, 100);
+		key(later, Key::ATTACK, true, 300);
+		key(later, Key::ATTACK, false, 400);
+		require(key(later, Key::ATTACK, true, 901) == 0, "the third within 900 ms");
+
+		Commands no_triple;
+		auto doubles = only({ DOUBLE_SWING });
+		feed(no_triple, doubles, Key::ATTACK, true, 0);
+		feed(no_triple, doubles, Key::ATTACK, false, 100);
+		feed(no_triple, doubles, Key::ATTACK, true, 300);
+		feed(no_triple, doubles, Key::ATTACK, false, 400);
+		require(feed(no_triple, doubles, Key::ATTACK, true, 500) == DOUBLE_SWING,
+				"no Triple Swing unknown, but the second and third presses are another Double Swing");
+
+		Commands charge;
+		require(key(charge, Key::LEFT, true, 0) == 0 && key(charge, Key::LEFT, false, 50) == 0
+				&& key(charge, Key::ATTACK, true, 600) == CHARGE_LEFT, "Left, then attack, within 600 ms");
+		key(charge, Key::ATTACK, false, 700);
+		key(charge, Key::RIGHT, true, 1000);
+		require(key(charge, Key::ATTACK, true, 1601) == 0, "not later");
+
+		Commands finals;
+		require(key(finals, Key::DOWN, true, 0) == 0 && key(finals, Key::ATTACK, true, 300) == FINAL_BLOW,
+				"Down, then attack");
+		key(finals, Key::ATTACK, false, 350);
+		key(finals, Key::DOWN, false, 350);
+		require(key(finals, Key::UP, true, 1000) == 0 && key(finals, Key::ATTACK, true, 1100) == FINAL_TOSS,
+				"Up, then attack");
+		key(finals, Key::ATTACK, false, 1200);
+		key(finals, Key::UP, false, 1200);
+		require(key(finals, Key::UP, true, 2000) == 0 && key(finals, Key::ATTACK, true, 2301) == 0,
+				"within 300 ms");
+
+		Commands spin;
+		require(key(spin, Key::UP, true, 0) == 0 && key(spin, Key::UP, false, 100) == 0
+				&& key(spin, Key::UP, true, 200) == 0 && key(spin, Key::ATTACK, true, 650) == ROLLING_SPIN,
+				"Up, Up, attack, within 700 ms");
+		key(spin, Key::ATTACK, false, 700);
+		key(spin, Key::UP, false, 700);
+		key(spin, Key::UP, true, 1000);
+		key(spin, Key::UP, false, 1100);
+		key(spin, Key::UP, true, 1200);
+		require(key(spin, Key::ATTACK, true, 1701) == 0, "not later");
+
+		Commands steps;
+		require(key(steps, Key::LEFT, true, 0) == 0 && key(steps, Key::LEFT, false, 100) == 0
+				&& key(steps, Key::LEFT, true, 300) == STEP_LEFT, "a double tap within 300 ms");
+		key(steps, Key::LEFT, false, 400);
+		key(steps, Key::RIGHT, true, 1000);
+		key(steps, Key::RIGHT, false, 1100);
+		require(key(steps, Key::RIGHT, true, 1301) == 0, "not later");
+
+		Commands rage;
+		key(rage, Key::DOWN, true, 0);
+		key(rage, Key::UP, true, 100);
+		key(rage, Key::ATTACK, true, 200);
+		require(std::find(made.begin(), made.end(), RAGE) != made.end(), "Down, Up, attack");
+
+		Commands taking;
+		taking.feed(1, Key::DOWN, true, 0, every, [](int32_t) { return false; });
+		require(taking.feed(2, Key::ATTACK, true, 100, every, [](int32_t id) { return id == FINAL_BLOW; }),
+				"a command takes the key");
+
 		Queue q;
-		require(!q.due(0) && q.empty(), "nothing waits");
+		require(!q.due(0) && q.empty() && !q.last(), "nothing waits");
 		q.push(TO_THE_LEFT, 100);
 		require(!q.empty() && q.due(1099) == TO_THE_LEFT, "a command waits");
 		require(!q.due(1100) && q.empty(), "for a second at most");
-		q.push(DOWN_TWICE, 2000);
+		q.push(DOUBLE_SWING, 2000);
+		q.push(TRIPLE_SWING, 2000);
+		require(q.last() == TRIPLE_SWING, "the last waiting");
+		q.pop();
 		q.pop();
 		require(q.empty(), "and goes once used");
+		q.push(FINAL_BLOW, 3000);
+		require(q.due(4999) == FINAL_BLOW && !q.due(5000), "Final Blow waits two seconds");
+
+		{
+			using namespace ms::combat_step;
+
+			require(impulse(650, false).vx == 650.0 && impulse(1000, true).vx == -1000.0 && impulse(800, false).vy == 0.0,
+					"Combat Step pushes the level's x forward and none up");
+			require(may_step(true, false, true, 1000, 1000, false), "from a foothold once ready");
+			require(!may_step(false, false, true, 1000, 0, false) && !may_step(true, true, true, 1000, 0, false),
+					"not in the air or on a rope");
+			require(!may_step(true, false, false, 1000, 0, false), "not where the map forbids it");
+			require(!may_step(true, false, true, 999, 1000, false) && !may_step(true, false, true, 1000, 0, true),
+					"not too soon, nor while pushed");
+		}
 	}
 	catch (const std::exception& e)
 	{

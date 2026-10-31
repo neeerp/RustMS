@@ -42,6 +42,7 @@
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/EnergyCharge.h"
 #include "../Gameplay/Combat/FlashJump.h"
+#include "../Gameplay/Combat/CombatStep.h"
 #include "../Gameplay/Combat/RecoilShot.h"
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Combat/MagicDamage.h"
@@ -211,7 +212,14 @@ namespace ms
 	void Player::send_action(KeyAction::Id action, bool down)
 	{
 		const PlayerState *pst = get_state(state);
-		bool refused = action == KeyAction::Id::JUMP && !disease::can_jump(get_diseases());
+		// Nor does it jump mid Combat Step (0x94f58c).
+		bool refused = action == KeyAction::Id::JUMP &&
+					   (!disease::can_jump(get_diseases()) || look.get_actionstr() == combat_step::ACTION);
+
+		// The jump key holds Combat Step back a while, even cutting short
+		// the wait after one (0x94f5c7).
+		if (action == KeyAction::Id::JUMP && down && !refused)
+			step_ready_at = now_ms() + combat_step::JUMP_DELAY;
 
 		if (pst && !refused)
 			pst->send_action(*this, action, down);
@@ -597,6 +605,22 @@ namespace ms
 		record_move(recoil_shot::MOVE);
 		Physics::knockback(phobj, push.vx, push.vy);
 		flash_jumped = true;
+	}
+
+	bool Player::may_combat_step(bool allowed) const
+	{
+		return combat_step::may_step(phobj.onground, is_climbing(), allowed, now_ms(), step_ready_at, phobj.impact);
+	}
+
+	// Element 0x14 marks the step in the path, before the push lands on
+	// the next step (report b366).
+	void Player::combat_step(int32_t x)
+	{
+		flash_jump::Impulse push = combat_step::impulse(x, !facing_right);
+
+		record_move(combat_step::MOVE);
+		Physics::knockback(phobj, push.vx, push.vy);
+		step_ready_at = now_ms() + combat_step::REUSE_DELAY;
 	}
 
 	bool Player::may_wings() const
@@ -1684,6 +1708,11 @@ namespace ms
 	uint16_t Player::get_level() const
 	{
 		return stats.get_stat(MapleStat::Id::LEVEL);
+	}
+
+	int16_t Player::get_job() const
+	{
+		return static_cast<int16_t>(stats.get_job().get_id());
 	}
 
 	int32_t Player::get_skilllevel(int32_t skillid) const
