@@ -1186,6 +1186,25 @@ pub mod keys {
     ];
     pub const LILIN_NEW_BEGINNINGS_DECLINED: &str = "lilin.new_beginnings.declined";
     pub const LILIN_NEW_BEGINNINGS_FULL: &str = "lilin.new_beginnings.full";
+    /// The Aran's first job: Lilin's The Five Heroes (`q21100s`) and the
+    /// Polearm in the ice (1201001, `q21101s`/`e`).
+    pub const LILIN_FIVE_HEROES: [&str; 8] = [
+        "lilin.five_heroes.records",
+        "lilin.five_heroes.forgot",
+        "lilin.five_heroes.weapon",
+        "lilin.five_heroes.which",
+        "lilin.five_heroes.found",
+        "lilin.five_heroes.saw",
+        "lilin.five_heroes.ask",
+        "lilin.five_heroes.go",
+    ];
+    pub const LILIN_FIVE_HEROES_DECLINED: &str = "lilin.five_heroes.declined";
+    pub const POLEARM_TOUCHED: [&str; 2] = ["polearm.touched.ask", "polearm.touched.memories"];
+    pub const POLEARM_NOT_YET: &str = "polearm.touched.declined";
+    pub const POLEARM_HERO: [&str; 2] = ["polearm.hero.ask", "polearm.hero.remember"];
+    pub const POLEARM_HERO_DECLINED: &str = "polearm.hero.declined";
+    pub const POLEARM_HERO_FULL: &str = "polearm.hero.full";
+    pub const POLEARM_SILENT: &str = "polearm.hero.silent";
     pub const PUO_TARGET_PIGS: [&str; 3] = [
         "puo.target_pigs.lesson",
         "puo.target_pigs.ask",
@@ -4359,6 +4378,23 @@ mod tests {
                 keys::LILIN_NEW_BEGINNINGS[3],
                 keys::LILIN_NEW_BEGINNINGS_DECLINED,
                 keys::LILIN_NEW_BEGINNINGS_FULL,
+                keys::LILIN_FIVE_HEROES[0],
+                keys::LILIN_FIVE_HEROES[1],
+                keys::LILIN_FIVE_HEROES[2],
+                keys::LILIN_FIVE_HEROES[3],
+                keys::LILIN_FIVE_HEROES[4],
+                keys::LILIN_FIVE_HEROES[5],
+                keys::LILIN_FIVE_HEROES[6],
+                keys::LILIN_FIVE_HEROES[7],
+                keys::LILIN_FIVE_HEROES_DECLINED,
+                keys::POLEARM_TOUCHED[0],
+                keys::POLEARM_TOUCHED[1],
+                keys::POLEARM_NOT_YET,
+                keys::POLEARM_HERO[0],
+                keys::POLEARM_HERO[1],
+                keys::POLEARM_HERO_DECLINED,
+                keys::POLEARM_HERO_FULL,
+                keys::POLEARM_SILENT,
                 keys::PUO_TARGET_PIGS[0],
                 keys::PUO_TARGET_PIGS[1],
                 keys::PUO_TARGET_PIGS[2],
