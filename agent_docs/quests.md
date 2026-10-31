@@ -1096,6 +1096,21 @@ At level 70 a 2110 takes the third:
   (1142131). Cosmic also teaches Full Swing behind a setting, which is
   left out.
 
+At level 120 a 2111 takes the fourth:
+
+- Lilin's Weapon Starts a Fight... with His Owner? (21400, `q21400s`)
+  starts by itself and sends the Aran to Maha, who ends it from the data.
+- Maha's Taming the Polearm (21401, `q21401s`) starts it and sends the
+  Aran into Maha's battle (914020000), one player at a time, with ten
+  minutes on the clock. The map's `mobTime -1` Maha (9001014) comes back
+  for the next player, since it is a solo map. Its `out00` (`outMaha`)
+  leads back to Rien. Until it is beaten, talking to Maha offers the way
+  in again; Cosmic has no way back in. Cosmic gives each try its own copy
+  of the map; here there is one.
+- Maha's end (`q21401e`) makes the Aran a 2112 (`Player::take_fourth_job`;
+  the skills with a master level are taught at level 0) with the Aran in
+  Hope medal (1142132) and a Maple Hero book (2280003).
+
 Some titles go with medals won elsewhere: the job medals at level 180
 (29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor
 medals (29916 to 29921 and 29933). Each quest's start needs the medal held,
