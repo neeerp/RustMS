@@ -225,6 +225,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME combo COMMAND combo_tests)
     add_executable(energy_charge_tests tests/energy_charge.cpp)
     add_test(NAME energy_charge COMMAND energy_charge_tests)
+    add_executable(aran_combo_tests tests/aran_combo.cpp)
+    add_test(NAME aran_combo COMMAND aran_combo_tests)
     add_executable(combo_orbs_tests tests/combo_orbs.cpp)
     add_test(NAME combo_orbs COMMAND combo_orbs_tests)
     add_executable(final_attack_tests tests/final_attack.cpp)
@@ -1012,6 +1014,8 @@ add_executable(HeavenClient
     IO/UITypes/UIFieldClock.h
     IO/UITypes/UIDojoHud.cpp
     IO/UITypes/UIDojoHud.h
+    IO/UITypes/UIAranCombo.cpp
+    IO/UITypes/UIAranCombo.h
     IO/UITypes/UIPyramidHud.cpp
     IO/UITypes/UIPyramidHud.h
     IO/UITypes/UIPyramidResult.cpp

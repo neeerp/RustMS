@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Combat.h"
 
+#include "AranCombo.h"
 #include "Assassinate.h"
 #include "ChainLightning.h"
 #include "Combo.h"
@@ -370,6 +371,10 @@ namespace ms
 			use_skill_at_reactors(move_id);
 		}
 
+		// A combo skill spends the whole combo at once, before the server answers (0x9693b5).
+		if (used && aran_combo::needs(move_id) > 0)
+			player.end_aran_combo();
+
 		return true;
 	}
 
@@ -481,6 +486,11 @@ namespace ms
 	{
 		// v83 takes no other move while a skill is held (0x96a86e).
 		if (preparing || !player.can_attack())
+			return false;
+
+		// v83's combo commands pick a combo skill only once the combo allows it, silently (0x74d314); without
+		// them the key is refused short of it.
+		if (player.get_aran_combo() < aran_combo::needs(move.get_id()))
 			return false;
 
 		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
@@ -2087,6 +2097,12 @@ namespace ms
 
 		const SpecialMove &move = get_move(effect.move_id);
 		mobs.apply_damage(effect.target_oid, effect.damage, effect.toleft, effect.user, move);
+
+		// Each of the Aran's polearm hits that lands counts toward the combo the server keeps (0x668c11).
+		int32_t ability = player.get_skills().get_level(aran_combo::ability(player.get_stats().get_job().get_id()));
+
+		if (aran_combo::counts(effect.user.own, effect.damage, ability, player.get_weapontype()))
+			AranComboCounterPacket().dispatch();
 	}
 
 	void Combat::body_attack(int32_t oid)
@@ -2282,7 +2298,8 @@ namespace ms
 				result.stance,
 				range,
 				physical_damage::charge_element(user.get_charge()),
-				&user == &player && !damage_layout::provokes(move.get_id())
+				&user == &player && !damage_layout::provokes(move.get_id()),
+				&user == &player
 		};
 
 		bool chain = chain_lightning::chains(result.skill);

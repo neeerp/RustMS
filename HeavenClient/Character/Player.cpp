@@ -37,6 +37,7 @@
 #include "../Data/PetData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Combat/AranCombo.h"
 #include "../Gameplay/Combat/Combo.h"
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/EnergyCharge.h"
@@ -49,6 +50,7 @@
 #include "../Gameplay/Stage.h"
 #include "../IO/Messages.h"
 #include "../IO/UI.h"
+#include "../IO/UITypes/UIAranCombo.h"
 
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
@@ -513,6 +515,11 @@ namespace ms
 		}
 
 		update_recovery();
+
+		// The combo goes 3 seconds after the server last showed it (0x94bdba).
+		if (aran_combo::idle(aran_combo, aran_combo_shown, now_ms()) &&
+			skillbook.get_level(aran_combo::ability(stats.get_job().get_id())) > 0)
+			end_aran_combo();
 
 		// A readied MP potion is checked each update, dead or alive (0x94b9b6).
 		if (auto_mp_armed)
@@ -1516,6 +1523,30 @@ namespace ms
 	bool Player::energy_full() const
 	{
 		return energy >= energy::FULL && skillbook.get_level(energy::skill(stats.get_job().get_id())) > 0;
+	}
+
+	void Player::show_aran_combo(int32_t count)
+	{
+		aran_combo = count;
+		aran_combo_shown = now_ms();
+
+		aran_combo::Command command = aran_combo::command(count);
+		bool first = command.index > 0 && skillbook.get_level(command.first) > 0;
+		bool second = command.index > 0 && skillbook.get_level(command.second) > 0;
+		UIAranCombo::show(count, first, second);
+	}
+
+	int32_t Player::get_aran_combo() const
+	{
+		return aran_combo;
+	}
+
+	void Player::end_aran_combo()
+	{
+		aran_combo = 0;
+		aran_combo_shown = now_ms();
+		UIAranCombo::show(0, false, false);
+		CancelBuffPacket(aran_combo::ability(stats.get_job().get_id())).dispatch();
 	}
 
 	void Player::update_berserk(bool reset)

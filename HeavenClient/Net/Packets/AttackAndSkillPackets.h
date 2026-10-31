@@ -483,6 +483,14 @@ namespace ms
 		}
 	};
 
+	// One of the Aran's polearm hits landed (FUN_009602f3).
+	// Opcode: ARAN_COMBO_COUNTER(163)
+	class AranComboCounterPacket : public OutPacket
+	{
+	public:
+		AranComboCounterPacket() : OutPacket(OutPacket::Opcode::ARAN_COMBO_COUNTER) {}
+	};
+
 	// Ends one of the player's item buffs, as right-clicking its icon does
 	// (FUN_00a096af). The id is the buff's, minus the item id.
 	// Opcode: CANCEL_ITEM_EFFECT(73)

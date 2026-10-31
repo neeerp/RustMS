@@ -889,6 +889,7 @@ namespace ms
 					UIElement::Type::TIMEDQUESTS,
 					UIElement::Type::MOBGAGE,
 					UIElement::Type::ENERGYBAR,
+					UIElement::Type::ARANCOMBO,
 					UIElement::Type::DOJOHUD,
 					UIElement::Type::MONSTERCARNIVAL,
 					UIElement::Type::COCONUT,

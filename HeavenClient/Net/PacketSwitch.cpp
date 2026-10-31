@@ -101,6 +101,7 @@ namespace ms
 		DISABLE_UI = 222,
 		SPAWN_GUIDE = 223,
 		TALK_GUIDE = 224,
+		SHOW_COMBO = 225,
 		MESSAGE_BOX = 232,
 		OPEN_UI_STRING_LIST = 233,
 
@@ -621,6 +622,7 @@ namespace ms
 		emplace<DISABLE_UI, DisableUiHandler>();
 		emplace<SPAWN_GUIDE, SpawnGuideHandler>();
 		emplace<TALK_GUIDE, TalkGuideHandler>();
+		emplace<SHOW_COMBO, ShowComboHandler>();
 		emplace<MESSAGE_BOX, MessageBoxHandler>();
 		emplace<OPEN_UI_STRING_LIST, OpenUiStringListHandler>();
 	}

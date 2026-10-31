@@ -765,6 +765,16 @@ A few skills do more than buff:
   (21111001, stat 72) is the client's alone. None of the five is shown to
   others. Harness `aran_combo` builds a combo to 30, checks that Combo
   Drain waits for it and spends it, and waits for the 3 s end.
+  HeavenClient (`Gameplay/Combat/AranCombo.h`) sends 0xA3 from
+  `Combat::apply_damage_effect` for each of the player's own landed lines
+  with damage, Combo Ability and a polearm, keeps the SHOW_COMBO count on
+  the `Player`, and ends it 3 seconds on with CANCEL_BUFF; a combo skill
+  used ends it at once. `UIAranCombo` draws the count at the top right
+  (report b361): digits from `Effect/BasicEff.img/Combo/<tier>`, the word
+  under them, and the ComboCommand at 30, 100 and 200. v83 picks the combo
+  skills through key sequences (its combo commands, not yet in
+  HeavenClient); HeavenClient lets a key use one only once the combo
+  allows it. The mini-room's freeze of the combo isn't modelled.
   Still open: the GIVE_BUFF layout of stats 68 to 72 is inferred. The
   server takes 0xA3 on trust and doesn't hold Body Pressure to once a
   second, Body Pressure's `prop` status isn't modelled, and Combo Drain

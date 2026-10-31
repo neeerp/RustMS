@@ -251,5 +251,7 @@ namespace ms
 		// Whether the hit ends the mob's chase: the local player's Disorder
 		// or Hypnotize.
 		bool calms = false;
+		// Whether the local player attacked.
+		bool own = false;
 	};
 }
