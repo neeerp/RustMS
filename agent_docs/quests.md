@@ -1029,7 +1029,13 @@ On the way out of Ereve:
 
 Each brother's start points the guide at a part of the screen
 (`Effect::GuideHint`, TALK_GUIDE mode 1), as Cosmic's `guideHint` does.
-Clicking the guide (CLICK_GUIDE) is not handled.
+Double-clicking the guide sends CLICK_GUIDE (0xA2, no body; the client
+tests characters first, so the player standing over it is picked instead).
+For a Noblesse the server opens Mimo's menu (`NpcScript::mimo`): who Mimo
+is, a guide hint for each of the next thirteen topics (TALK_GUIDE hints 1
+to 13), and who the knights are, as Cosmic's `1101008.js`. Mimo's lines
+are placeholders. Anyone else gets nothing: Cosmic opens Lilin's Aran
+tutorial, which isn't played.
 
 Some titles go with medals won elsewhere: the job medals at level 180
 (29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor

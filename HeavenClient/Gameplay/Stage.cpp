@@ -1658,6 +1658,11 @@ namespace ms
 		return kites.at(cursorpos - camera.position());
 	}
 
+	bool Stage::guide_at(Point<int16_t> cursorpos) const
+	{
+		return state == State::ACTIVE && guide.contains(cursorpos - camera.position());
+	}
+
 	std::optional<MapMerchants::Hit> Stage::merchant_at(Point<int16_t> cursorpos) const
 	{
 		if (state != State::ACTIVE)

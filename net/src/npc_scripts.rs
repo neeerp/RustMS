@@ -624,6 +624,8 @@ const BACK_TO_TREND_ZONE: (i32, u8) = (TREND_ZONE_METROPOLIS, 4);
 const MALAYSIA_HOME_PORTAL: u8 = 4;
 /// Mar the Fairy, who pours the Water of Life on dolls.
 const MAR_THE_FAIRY: i32 = 1032102;
+/// The guide who follows a Noblesse around Ereve.
+pub const MIMO: i32 = 1101008;
 /// The second job's test: the examiner's proctor gives this for the marbles,
 /// and the instructor takes it for the job.
 const PROOF_OF_A_HERO: i32 = 4031012;
@@ -2921,6 +2923,31 @@ impl NpcScript {
             }
         };
         Some(Self::new(MAR_THE_FAIRY, vec![page]))
+    }
+
+    /// Mimo's menu, which double-clicking the guide opens for a Noblesse
+    /// (CLICK_GUIDE): who Mimo is, a guide hint for each of the thirteen
+    /// topics after it, or who the knights are.
+    pub fn mimo() -> Self {
+        let choices = keys::MIMO_TOPICS
+            .iter()
+            .enumerate()
+            .map(|(hint, &label)| {
+                let pages = match hint {
+                    0 => keys::MIMO_ABOUT.map(|key| Page::Say(text(key))).to_vec(),
+                    14 => vec![Page::Say(text(keys::MIMO_KNIGHTS))],
+                    hint => vec![Page::Done(vec![Effect::GuideHint(hint as i32)])],
+                };
+                (text(label), pages)
+            })
+            .collect();
+        Self::new(
+            MIMO,
+            vec![Page::Menu {
+                text: text(keys::MIMO_MENU),
+                choices,
+            }],
+        )
     }
 
     /// A quest's start or end script (`Check.img startscript`/`endscript`),
@@ -21943,6 +21970,38 @@ mod tests {
             ]
         );
         assert_eq!(kind(&woken), Some(0));
+    }
+
+    #[test]
+    fn mimo_answers_from_the_guides_menu() {
+        let mut mimo = NpcScript::mimo();
+        assert_eq!(mimo.npc_id(), MIMO);
+        let Some(Prompt::Selection { text, .. }) = mimo.begin().prompt else {
+            panic!("Mimo's menu");
+        };
+        assert_eq!(text.matches("#L").count(), 15);
+        let hint = mimo.respond(ScriptInput::Select(3)).unwrap();
+        assert_eq!(
+            (hint.prompt, hint.effects),
+            (None, vec![Effect::GuideHint(3)])
+        );
+
+        let mut about = NpcScript::mimo();
+        about.begin();
+        assert_eq!(
+            kind(&about.respond(ScriptInput::Select(0)).unwrap()),
+            Some(0)
+        );
+        assert_eq!(kind(&about.respond(ScriptInput::Next).unwrap()), Some(0));
+        assert_eq!(about.respond(ScriptInput::Next), Some(Step::default()));
+
+        let mut knights = NpcScript::mimo();
+        knights.begin();
+        assert_eq!(
+            kind(&knights.respond(ScriptInput::Select(14)).unwrap()),
+            Some(0)
+        );
+        assert_eq!(knights.respond(ScriptInput::Next), Some(Step::default()));
     }
 
     #[test]

@@ -44,6 +44,11 @@ namespace ms
 		return body.has_value();
 	}
 
+	bool Guide::contains(Point<int16_t> position) const
+	{
+		return body && body->get_body().contains(position);
+	}
+
 	void Guide::respawn(Point<int16_t> position)
 	{
 		if (skill == 0)

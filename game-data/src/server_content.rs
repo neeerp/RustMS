@@ -1251,6 +1251,28 @@ pub mod keys {
     pub const KIMU_WELCOME_DECLINED: &str = "kimu.welcome.declined";
     pub const KIZAN_REWARD: &str = "kizan.reward";
     pub const EREVE_TUTOR_FULL: &str = "ereve_tutor.full";
+    /// Mimo's menu, opened by double-clicking the guide (CLICK_GUIDE).
+    pub const MIMO_MENU: &str = "mimo.menu";
+    /// Its choices: about Mimo, the thirteen guide hints, the knights.
+    pub const MIMO_TOPICS: [&str; 15] = [
+        "mimo.topic.about",
+        "mimo.topic.minimap",
+        "mimo.topic.quest_window",
+        "mimo.topic.inventory",
+        "mimo.topic.attack",
+        "mimo.topic.pick_up",
+        "mimo.topic.equip",
+        "mimo.topic.skills",
+        "mimo.topic.quick_slots",
+        "mimo.topic.boxes",
+        "mimo.topic.chair",
+        "mimo.topic.world_map",
+        "mimo.topic.quest_alerts",
+        "mimo.topic.stats",
+        "mimo.topic.knights",
+    ];
+    pub const MIMO_ABOUT: [&str; 2] = ["mimo.about.master", "mimo.about.no_rush"];
+    pub const MIMO_KNIGHTS: &str = "mimo.knights";
     pub const KIZAN_HUNT: [&str; 2] = ["kizan.hunt.attack", "kizan.hunt.key"];
     pub const KIZAN_HUNT_ASK: &str = "kizan.hunt.ask";
     pub const KIZAN_HUNT_DECLINED: &str = "kizan.hunt.declined";
@@ -4385,6 +4407,25 @@ mod tests {
                 keys::KIMU_WELCOME_DECLINED,
                 keys::KIZAN_REWARD,
                 keys::EREVE_TUTOR_FULL,
+                keys::MIMO_MENU,
+                keys::MIMO_TOPICS[0],
+                keys::MIMO_TOPICS[1],
+                keys::MIMO_TOPICS[2],
+                keys::MIMO_TOPICS[3],
+                keys::MIMO_TOPICS[4],
+                keys::MIMO_TOPICS[5],
+                keys::MIMO_TOPICS[6],
+                keys::MIMO_TOPICS[7],
+                keys::MIMO_TOPICS[8],
+                keys::MIMO_TOPICS[9],
+                keys::MIMO_TOPICS[10],
+                keys::MIMO_TOPICS[11],
+                keys::MIMO_TOPICS[12],
+                keys::MIMO_TOPICS[13],
+                keys::MIMO_TOPICS[14],
+                keys::MIMO_ABOUT[0],
+                keys::MIMO_ABOUT[1],
+                keys::MIMO_KNIGHTS,
                 keys::KIZAN_HUNT[0],
                 keys::KIZAN_HUNT[1],
                 keys::KIZAN_HUNT_ASK,

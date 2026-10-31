@@ -1530,4 +1530,13 @@ namespace ms
 			write_byte(static_cast<int8_t>(index));
 		}
 	};
+
+	// The guide following the player was double-clicked (FUN_0094fbbf);
+	// the server answers with the guide's NPC talking.
+	// Opcode: CLICK_GUIDE(162)
+	class ClickGuidePacket : public OutPacket
+	{
+	public:
+		ClickGuidePacket() : OutPacket(OutPacket::Opcode::CLICK_GUIDE) {}
+	};
 }

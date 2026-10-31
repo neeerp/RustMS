@@ -24,6 +24,9 @@ namespace ms
 
 		bool is_present() const;
 
+		// Whether it covers a point on the map, by its body (FUN_007a38d6).
+		bool contains(Point<int16_t> position) const;
+
 		// It comes along to a new map, appearing again where the player is
 		// (0x949a3b).
 		void respawn(Point<int16_t> position);

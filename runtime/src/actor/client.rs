@@ -593,6 +593,13 @@ impl ClientActor {
                     self.start_script(script).await?
                 }
             }
+            WorldAction::NpcInteraction(NpcInteraction::Mimo) => {
+                // A conversation already open goes on.
+                if self.script.is_none() && self.conversation.is_none() {
+                    self.start_script(net::npc_scripts::NpcScript::mimo())
+                        .await?
+                }
+            }
             WorldAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
                 response,
