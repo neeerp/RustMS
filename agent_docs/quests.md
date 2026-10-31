@@ -1074,6 +1074,28 @@ At level 30 an Aran (2100) takes the second:
   (`Player::take_second_job`) with the Aran in Memory medal (1142130).
   Cosmic also teaches some skills behind a setting, which is left out.
 
+At level 70 a 2110 takes the third:
+
+- Lilin's A Weapon Never Leaves Its Owner (21300, `q21300s`) starts by
+  itself and sends the Aran to Maha, who ends it from the data and starts
+  Catch that Thief! (21301).
+- While 21301 has no Thief Crow (9001013) kill, Rien's pier `east00`
+  (`enterPort`) leads into the thief's room (108010700 `west00`), one
+  player at a time. The room is a solo map, so its `mobTime -1` thief
+  comes back for the next player. Maha's end (`q21301e`) finds the Red
+  Jade lost.
+- Lilin starts Making Red Jade (21302) from the data. While it is taken
+  and Friendship with Yeti (21303) isn't done, the Mirror Cave's `in00`
+  leads into Yeti's room (108010701 `out00`) when it and the thief's room
+  below (108010702, a solo map) are empty, and sets record 21203 to "1".
+  Yeti (1203001) starts 21303 (`q21303s`) on that record. The thief there
+  drops Yeti's Red Jade (4032339, `reward_overrides.toml`), and Yeti ends
+  the quest from the data, which opens the Maker's Red Jade (4032312).
+- Maha's end of 21302 (`q21302e`) takes the Red Jade and makes the Aran
+  a 2111 (`Player::take_third_job`) with the Aran in Misery medal
+  (1142131). Cosmic also teaches Full Swing behind a setting, which is
+  left out.
+
 Some titles go with medals won elsewhere: the job medals at level 180
 (29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor
 medals (29916 to 29921 and 29933). Each quest's start needs the medal held,

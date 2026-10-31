@@ -3171,6 +3171,10 @@ impl NpcScript {
             "q21201e" => Some(maha_in_memory(player)),
             "q21202s" => Some(ultimate_weapon()),
             "q21202e" => Some(weapon_handed(player)),
+            "q21300s" => Some(weapon_never_leaves()),
+            "q21301e" => Some(thief_got_away()),
+            "q21302e" => Some(red_jade_back(player)),
+            "q21303s" => Some(yetis_jade_stolen()),
             "q21700s" => Some(new_beginnings()),
             "q21703s" => Some(target_pigs()),
             "q21703e" => Some(combo_ability()),
@@ -6952,6 +6956,116 @@ fn maha_in_memory(player: &Player) -> NpcScript {
         ],
     );
     script.inventory_full = Some(text(keys::MAHA_IN_MEMORY_FULL));
+    script
+}
+
+// An Aran's third job (2111): at level 70 Lilin hears Maha calling again
+// (21300); Maha sends the Aran after the Thief Crow (9001013) that took
+// the Red Jade off the Polearm (21301), but it gets away, so Lilin has
+// one made anew (21302). In the Mirror of Desire's past Yeti (1203001)
+// has lost a Red Jade to the same thief (21303), and the Maker's recipe
+// for one opens once it is back. With it, Maha makes the Aran a 2111 with
+// the Aran in Misery medal (Cosmic `21300.js` to `21303.js`).
+const WEAPON_NEVER_LEAVES: i16 = 21300;
+const CATCH_THAT_THIEF: i16 = 21301;
+const MAKING_RED_JADE: i16 = 21302;
+const FRIENDSHIP_WITH_YETI: i16 = 21303;
+const YETI: i32 = 1203001;
+const RED_JADE: i32 = 4032312;
+const ARAN_3: i16 = 2111;
+const ARAN_3_MEDAL: i32 = 1142131;
+
+/// `q21300s`: Lilin sends a level-70 Aran back to Rien, where Maha is
+/// calling again; Maha starts Catch that Thief! (21301) from the data.
+fn weapon_never_leaves() -> NpcScript {
+    let [training, ask, talking] = keys::LILIN_WEAPON_NEVER_LEAVES;
+    NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(training)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(WEAPON_NEVER_LEAVES)],
+                on_no: Some(text(keys::LILIN_WEAPON_NEVER_LEAVES_DECLINED)),
+            },
+            Page::Say(text(talking)),
+        ],
+    )
+}
+
+/// `q21301e`: the thief is beaten but the Red Jade is lost, and Maha
+/// despairs; the Aran goes to Lilin, who starts Making Red Jade (21302)
+/// from the data.
+fn thief_got_away() -> NpcScript {
+    let [slain, forgot, calm, anew, lost, despair, leave] = keys::MAHA_THIEF_GOT_AWAY;
+    let mut script = NpcScript::new(
+        MAHA,
+        vec![
+            Page::Say(text(slain)),
+            Page::Say(text(forgot)),
+            Page::Say(text(calm)),
+            Page::Say(text(anew)),
+            Page::Say(text(lost)),
+            Page::Say(text(despair)),
+            Page::Reply(text(leave)),
+        ],
+    );
+    script.on_end.push(Effect::CompleteQuest(CATCH_THAT_THIEF));
+    script
+}
+
+/// `q21302e`: Maha takes the Red Jade back and makes a level-70 Aran a
+/// third-job Aran (2111) with the Aran in Misery medal. Cosmic also
+/// teaches Full Swing behind a setting, which is left out.
+fn red_jade_back(player: &Player) -> NpcScript {
+    if !player.can_take_third_job(ARAN_3) {
+        return NpcScript::new(MAHA, vec![Page::Say(text(keys::MAHA_RED_JADE_NOT_YET))]);
+    }
+    if player.inventory.count(RED_JADE) == 0 {
+        return NpcScript::new(MAHA, vec![Page::Say(text(keys::MAHA_RED_JADE_MISSING))]);
+    }
+    let [jade, reawaken, train] = keys::MAHA_RED_JADE;
+    let mut script = NpcScript::new(
+        MAHA,
+        vec![
+            Page::Say(text(jade)),
+            Page::Say(text(reawaken)),
+            Page::Act {
+                text: text(train),
+                effects: vec![
+                    Effect::TakeItem {
+                        item_id: RED_JADE,
+                        quantity: 1,
+                    },
+                    Effect::TakeThirdJob(ARAN_3),
+                    Effect::GiveItem {
+                        item_id: ARAN_3_MEDAL,
+                        quantity: 1,
+                    },
+                    Effect::CompleteQuest(MAKING_RED_JADE),
+                ],
+            },
+        ],
+    );
+    script.inventory_full = Some(text(keys::MAHA_RED_JADE_FULL));
+    script
+}
+
+/// `q21303s`: in the Mirror of Desire's past, Yeti's Red Jade has been
+/// taken by the Thief Crow, which waits in the next room; Yeti ends it
+/// from the data.
+fn yetis_jade_stolen() -> NpcScript {
+    let [stolen, help, door, wait] = keys::YETI_JADE_STOLEN;
+    let mut script = NpcScript::new(
+        YETI,
+        vec![
+            Page::Say(text(stolen)),
+            Page::Reply(text(help)),
+            Page::Say(text(door)),
+            Page::Reply(text(wait)),
+        ],
+    );
+    script.on_end.push(Effect::StartQuest(FRIENDSHIP_WITH_YETI));
     script
 }
 
@@ -18883,6 +18997,47 @@ mod tests {
         // Under level 30, Maha holds back.
         aran.stats.level = 29;
         assert_eq!(run("q21201e", &aran), (MAHA, vec![]));
+    }
+
+    #[test]
+    fn maha_with_the_red_jade_back_makes_a_third_job_aran() {
+        let mut aran = player(50);
+        (aran.stats.job, aran.stats.level) = (ARAN_2, 70);
+        let run =
+            |script: &str, aran: &Player| yes_through(NpcScript::for_quest(script, aran).unwrap());
+        assert_eq!(
+            run("q21300s", &aran),
+            (LILIN, vec![Effect::StartQuest(WEAPON_NEVER_LEAVES)])
+        );
+        assert_eq!(
+            run("q21301e", &aran),
+            (MAHA, vec![Effect::CompleteQuest(CATCH_THAT_THIEF)])
+        );
+        assert_eq!(
+            run("q21303s", &aran),
+            (YETI, vec![Effect::StartQuest(FRIENDSHIP_WITH_YETI)])
+        );
+
+        // Without the jade, Maha only asks for it.
+        assert_eq!(run("q21302e", &aran), (MAHA, vec![]));
+        let jade = game::Item::stack(RED_JADE, 1);
+        aran.inventory.insert(InventoryType::Etc, 1, jade);
+        let third = vec![
+            Effect::TakeItem {
+                item_id: RED_JADE,
+                quantity: 1,
+            },
+            Effect::TakeThirdJob(ARAN_3),
+            Effect::GiveItem {
+                item_id: ARAN_3_MEDAL,
+                quantity: 1,
+            },
+            Effect::CompleteQuest(MAKING_RED_JADE),
+        ];
+        assert_eq!(run("q21302e", &aran), (MAHA, third));
+        // Under level 70, Maha holds back.
+        aran.stats.level = 69;
+        assert_eq!(run("q21302e", &aran), (MAHA, vec![]));
     }
 
     #[test]
