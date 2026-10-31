@@ -1248,6 +1248,35 @@ pub mod keys {
     pub const MAHA_IN_MEMORY_NOT_YET: &str = "maha.in_memory.not_yet";
     pub const MIRROR_ROOMS_FULL: &str = "mirror_cave.rooms_full";
     pub const MIRROR_ALREADY_PASSED: &str = "mirror_cave.already_passed";
+    pub const LILIN_WEAPON_NEVER_LEAVES: [&str; 3] = [
+        "lilin.weapon_never_leaves.training",
+        "lilin.weapon_never_leaves.ask",
+        "lilin.weapon_never_leaves.talking",
+    ];
+    pub const MAHA_THIEF_GOT_AWAY: [&str; 7] = [
+        "maha.thief_got_away.slain",
+        "maha.thief_got_away.forgot",
+        "maha.thief_got_away.calm",
+        "maha.thief_got_away.anew",
+        "maha.thief_got_away.lost",
+        "maha.thief_got_away.despair",
+        "maha.thief_got_away.leave",
+    ];
+    pub const MAHA_RED_JADE: [&str; 3] = [
+        "maha.red_jade.jade",
+        "maha.red_jade.reawaken",
+        "maha.red_jade.train",
+    ];
+    pub const YETI_JADE_STOLEN: [&str; 4] = [
+        "yeti.jade_stolen.stolen",
+        "yeti.jade_stolen.help",
+        "yeti.jade_stolen.door",
+        "yeti.jade_stolen.wait",
+    ];
+    pub const LILIN_WEAPON_NEVER_LEAVES_DECLINED: &str = "lilin.weapon_never_leaves.declined";
+    pub const MAHA_RED_JADE_FULL: &str = "maha.red_jade.full";
+    pub const MAHA_RED_JADE_NOT_YET: &str = "maha.red_jade.not_yet";
+    pub const MAHA_RED_JADE_MISSING: &str = "maha.red_jade.missing";
     pub const PUO_TARGET_PIGS: [&str; 3] = [
         "puo.target_pigs.lesson",
         "puo.target_pigs.ask",
@@ -4473,6 +4502,27 @@ mod tests {
                 keys::MAHA_IN_MEMORY_NOT_YET,
                 keys::MIRROR_ROOMS_FULL,
                 keys::MIRROR_ALREADY_PASSED,
+                keys::LILIN_WEAPON_NEVER_LEAVES[0],
+                keys::LILIN_WEAPON_NEVER_LEAVES[1],
+                keys::LILIN_WEAPON_NEVER_LEAVES[2],
+                keys::MAHA_THIEF_GOT_AWAY[0],
+                keys::MAHA_THIEF_GOT_AWAY[1],
+                keys::MAHA_THIEF_GOT_AWAY[2],
+                keys::MAHA_THIEF_GOT_AWAY[3],
+                keys::MAHA_THIEF_GOT_AWAY[4],
+                keys::MAHA_THIEF_GOT_AWAY[5],
+                keys::MAHA_THIEF_GOT_AWAY[6],
+                keys::MAHA_RED_JADE[0],
+                keys::MAHA_RED_JADE[1],
+                keys::MAHA_RED_JADE[2],
+                keys::YETI_JADE_STOLEN[0],
+                keys::YETI_JADE_STOLEN[1],
+                keys::YETI_JADE_STOLEN[2],
+                keys::YETI_JADE_STOLEN[3],
+                keys::LILIN_WEAPON_NEVER_LEAVES_DECLINED,
+                keys::MAHA_RED_JADE_FULL,
+                keys::MAHA_RED_JADE_NOT_YET,
+                keys::MAHA_RED_JADE_MISSING,
                 keys::PUO_TARGET_PIGS[0],
                 keys::PUO_TARGET_PIGS[1],
                 keys::PUO_TARGET_PIGS[2],

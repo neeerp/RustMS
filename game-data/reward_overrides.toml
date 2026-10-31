@@ -1057,6 +1057,13 @@ replace = [
 # no drops for it; the rate is Cosmic's.
 replace = [{ item = 4032311, prob = 0.3, quest = 21202 }]
 
+[mobs.9001013]
+# The Thief Crow in the Mirror of Desire's past (Map.nx 108010702) drops
+# Yeti's Red Jade 4032339, which Friendship with Yeti (21303) checks for
+# (Quest.nx Check.img/21303/1/item). The pack has no drops for it; Cosmic's
+# rate is all but certain.
+replace = [{ item = 4032339, prob = 1.0, quest = 21303 }]
+
 [mobs.9001011]
 # The Tiguru of Exam in the 2nd Drill Halls (Map.nx 108000600-108000602)
 # drop the tokens of the Knighthood Exams (20201-20205), 30 of which each

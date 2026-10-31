@@ -371,6 +371,19 @@ const MIRROR_ROOMS: [i32; 9] = [
 const BEARS_ROOM: i32 = 10;
 const THE_MIRROR_OF_DESIRE: i16 = 21201;
 pub const MIRROR_RECORD: i16 = 21203;
+/// A third-job Aran's Thief Crow (9001013) runs off with the Red Jade into
+/// a room past Rien's eastern dock (`enterPort`, on Catch that Thief!,
+/// 21301, until it is beaten), and back in the Mirror of Desire's past,
+/// on Making Red Jade (21302), with Yeti's Rice Cake from the next room
+/// on, 108010702 (`enterMCave`, until Friendship with Yeti, 21303, is
+/// done). Each is for one player at a time, and the thief comes back for
+/// the next (`SOLO_MAPS`).
+const CATCH_THAT_THIEF: i16 = 21301;
+const MAKING_RED_JADE: i16 = 21302;
+const FRIENDSHIP_WITH_YETI: i16 = 21303;
+const THIEF_CROWS_ROOM: i32 = 108_010_700;
+const YETIS_ROOM: i32 = 108_010_701;
+const YETIS_THIEF_ROOM: i32 = 108_010_702;
 /// Fox Ridge's way back to Tiger Ridge (`foxLaidy_map`) leads into the
 /// Gloomy Forest instead for a player on quest 3647 who holds the Old Fox's
 /// Tail.
@@ -505,7 +518,7 @@ pub const WOLVES_TEST_RECORD: i16 = 21620;
 pub const WOLVES_DEN: i32 = 140010210;
 /// What both records read once their run is done (`Check/1 infoex`).
 pub const WOLF_RUN_DONE: &str = "0";
-pub const SOLO_MAPS: [i32; 21] = [
+pub const SOLO_MAPS: [i32; 23] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -527,6 +540,8 @@ pub const SOLO_MAPS: [i32; 21] = [
     SEALED_SHRINE,
     FIELD_OF_WOLVES,
     WOLVES_TEST_ROOM,
+    THIEF_CROWS_ROOM,
+    YETIS_THIEF_ROOM,
 ];
 
 /// The Puppeteer `player` is out to beat, while a hunt for him is under
@@ -1711,7 +1726,12 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ELLINIA_SKY_FERRY,
             named(ELLINIA_SKY_FERRY, "out00"),
         )),
-        // Cosmic also starts an Aran quest's fight here, which isn't in.
+        "enterPort"
+            if quest(CATCH_THAT_THIEF) == QuestState::Started
+                && (player.quests.kills(CATCH_THAT_THIEF).iter()).all(|&count| count == 0) =>
+        {
+            solo_map_at(true, THIEF_CROWS_ROOM, named(THIEF_CROWS_ROOM, "west00"))
+        }
         "enterPort" => through(Effect::WarpToPortal(RIEN_DOCK, named(RIEN_DOCK, "west00"))),
         "rankRoom" => {
             let &(_, room, back) = RANK_ROOMS
@@ -2397,6 +2417,25 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::MIRROR_ROOMS_FULL, &[])),
         },
+        "enterMCave"
+            if quest(MAKING_RED_JADE) == QuestState::Started
+                && quest(FRIENDSHIP_WITH_YETI) != QuestState::Completed =>
+        {
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireEmptyMap(YETIS_ROOM),
+                    Effect::RequireEmptyMap(YETIS_THIEF_ROOM),
+                    Effect::SetRecord {
+                        record: MIRROR_RECORD,
+                        value: "1",
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(YETIS_ROOM, named(YETIS_ROOM, "out00")),
+                ],
+                block: false,
+                occupied: Some(content::text().get(keys::MIRROR_ROOMS_FULL, &[])),
+            }
+        }
         "enterMCave" => refused(keys::MIRROR_ALREADY_PASSED),
         "moveNext" if MIRROR_ROOMS.contains(&player.stats.map_id) => {
             let bears = player.stats.map_id + BEARS_ROOM;
@@ -5535,6 +5574,58 @@ mod tests {
         // Elsewhere the scripts do nothing.
         inside.stats.map_id = 108_000_703;
         assert!(portal("moveBefore", &inside).is_none());
+    }
+
+    #[test]
+    fn a_third_job_aran_chases_the_thief_crow_alone() {
+        let started = QuestState::Started;
+        // Past Rien's dock, into the thief's room until it is beaten.
+        let mut chasing = player_with(&[(CATCH_THAT_THIEF, started)]);
+        let east = portal("enterPort", &chasing).unwrap();
+        let west = named(THIEF_CROWS_ROOM, "west00");
+        assert_ne!(west, 0);
+        assert_eq!(
+            east.effects,
+            [
+                Effect::RequireEmptyMap(THIEF_CROWS_ROOM),
+                Effect::PortalSound,
+                Effect::WarpToPortal(THIEF_CROWS_ROOM, west),
+            ]
+        );
+        assert!(east.occupied.is_some());
+        *chasing.quests.kills_mut(CATCH_THAT_THIEF).unwrap() = vec![1];
+        assert_eq!(
+            warp_of(&portal("enterPort", &chasing).unwrap()),
+            Some((140020300, 1))
+        );
+
+        // The mirror's past holds Yeti and the thief, for one at a time.
+        let jade = player_with(&[(MAKING_RED_JADE, started)]);
+        let mirror = portal("enterMCave", &jade).unwrap();
+        let out = named(YETIS_ROOM, "out00");
+        assert_ne!(out, 0);
+        assert_eq!(
+            mirror.effects,
+            [
+                Effect::RequireEmptyMap(YETIS_ROOM),
+                Effect::RequireEmptyMap(YETIS_THIEF_ROOM),
+                Effect::SetRecord {
+                    record: MIRROR_RECORD,
+                    value: "1",
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(YETIS_ROOM, out),
+            ]
+        );
+        assert!(mirror.occupied.is_some());
+        let befriended = player_with(&[
+            (MAKING_RED_JADE, started),
+            (FRIENDSHIP_WITH_YETI, QuestState::Completed),
+        ]);
+        assert!(pink(&portal("enterMCave", &befriended).unwrap()));
+        // Both thieves come back for the next player.
+        assert!(crate::npc_scripts::resets_when_empty(THIEF_CROWS_ROOM));
+        assert!(crate::npc_scripts::resets_when_empty(YETIS_THIEF_ROOM));
     }
 
     fn holding(quests: &[(i16, QuestState)], item: i32) -> Player {
