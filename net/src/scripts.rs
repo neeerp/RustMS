@@ -156,6 +156,9 @@ const PALACE_ENTRY_PASS: i32 = 4031582;
 /// quests (20301 to 20305) to all but holders of a permit (`enterDisguise0`).
 const TRAINING_FOREST: i32 = 130010000;
 const INVESTIGATION_PERMIT: i32 = 4032179;
+/// The 2nd Drill Halls, where the Tiguru of Exam drop the Knighthood
+/// Exams' tokens.
+const SECOND_DRILL_HALLS: [i32; 3] = [108000600, 108000601, 108000602];
 /// Leafre's Cave of Black Witches (`enterWitch`): the cave The Stolen Egg
 /// (20404) opens, then the one each later quest moves on to.
 const STOLEN_EGG: i16 = 20404;
@@ -1938,6 +1941,32 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             TRAINING_FOREST,
             named(TRAINING_FOREST, "east00"),
         )),
+        // The Entrance to the Drill Hall's way into a 2nd Drill Hall, one of
+        // three at random, for a Knight on a Knighthood Exam, whose tokens
+        // held are taken so the count starts over (Cosmic `enterSecondDH`).
+        "enterSecondDH" => {
+            use npc_scripts::KNIGHT_EXAMS;
+            use rand::seq::SliceRandom;
+            if !(KNIGHT_EXAMS.iter()).any(|exam| quest(exam.0) == QuestState::Started) {
+                return Some(ScriptOutcome::default());
+            }
+            let mut effects: Vec<Effect> = (KNIGHT_EXAMS.iter())
+                .filter_map(|exam| {
+                    let held = player.inventory.count(exam.2);
+                    (held > 0).then(|| Effect::TakeItem {
+                        item_id: exam.2,
+                        quantity: i16::try_from(held).unwrap_or(i16::MAX),
+                    })
+                })
+                .collect();
+            let hall = *SECOND_DRILL_HALLS.choose(&mut rand::thread_rng())?;
+            effects.extend([Effect::PortalSound, Effect::WarpToPortal(hall, 0)]);
+            ScriptOutcome {
+                effects,
+                block: false,
+                occupied: None,
+            }
+        }
         "enterWitch" if quest(STOLEN_EGG) == QuestState::Completed => {
             let cave = WITCH_CAVES
                 .iter()
@@ -3828,6 +3857,26 @@ mod tests {
 
     fn pink(outcome: &ScriptOutcome) -> bool {
         matches!(outcome.effects.as_slice(), [Effect::Pink(_)])
+    }
+
+    #[test]
+    fn a_knight_on_an_exam_enters_a_drill_hall_with_its_tokens_taken() {
+        let player = player_with(&[]);
+        assert!(portal("enterSecondDH", &player).unwrap().effects.is_empty());
+        let mut player = player_with(&[(20202, QuestState::Started)]);
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4032097, 12));
+        let effects = portal("enterSecondDH", &player).unwrap().effects;
+        let [taken, Effect::PortalSound, Effect::WarpToPortal(hall, 0)] = effects.as_slice() else {
+            panic!("{effects:?}");
+        };
+        let tokens = Effect::TakeItem {
+            item_id: 4032097,
+            quantity: 12,
+        };
+        assert_eq!(*taken, tokens);
+        assert!(SECOND_DRILL_HALLS.contains(hall));
     }
 
     #[test]
