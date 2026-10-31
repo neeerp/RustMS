@@ -98,16 +98,17 @@ pub const SCRIPTS: &[&str] = &[
     "q21735s", "q21735e", "q21736s", "q21738s", "q21739e", "q21740s", "q21740e", "q21741s",
     "q21742s", "q21742e", "q21746s", "q21747s", "q21747e", "q21748e", "q21749s", "q21750e",
     "q21753s", "q21754s", "q21757e", "q3314e", "q3382e", "q3941s", "q3941e", "q8255s", "q2156e",
-    "q2291e", "q21100s", "q21101s", "q21101e", "q21700s", "q21703s", "q21703e", "q21704s",
-    "q21712s", "q21716s", "q21719s", "q21720e", "q21729s", "q21766s", "q21766e", "q21767s",
-    "q21600s", "q21604s", "q21613s", "q21618s", "q21618e", "q3250s", "q3250e", "q29002s",
-    "q29002e", "q29400s", "q29400e", "q29906s", "q29907s", "q29908s", "q29909s", "q29922s",
-    "q29923s", "q29924s", "q29925s", "q29926s", "q29927s", "q29928s", "q29905s", "q20010s",
-    "q20010e", "q20011s", "q20011e", "q20012s", "q20012e", "q20013s", "q20013e", "q20015s",
-    "q20016s", "q20017s", "q20020s", "q20100s", "q20101e", "q20102e", "q20103e", "q20104e",
-    "q20105e", "q20200s", "q20201e", "q20202e", "q20203e", "q20204e", "q20205e", "q20311s",
-    "q20312s", "q20313s", "q20314s", "q20315s", "q20400s", "q20401s", "q20405s", "q20406s",
-    "q20408s", "q20520s", "q20600s", "q20610s", "q20700s", "q20710s", "q20720s",
+    "q2291e", "q21100s", "q21101s", "q21101e", "q21200s", "q21200e", "q21201e", "q21202s",
+    "q21202e", "q21700s", "q21703s", "q21703e", "q21704s", "q21712s", "q21716s", "q21719s",
+    "q21720e", "q21729s", "q21766s", "q21766e", "q21767s", "q21600s", "q21604s", "q21613s",
+    "q21618s", "q21618e", "q3250s", "q3250e", "q29002s", "q29002e", "q29400s", "q29400e",
+    "q29906s", "q29907s", "q29908s", "q29909s", "q29922s", "q29923s", "q29924s", "q29925s",
+    "q29926s", "q29927s", "q29928s", "q29905s", "q20010s", "q20010e", "q20011s", "q20011e",
+    "q20012s", "q20012e", "q20013s", "q20013e", "q20015s", "q20016s", "q20017s", "q20020s",
+    "q20100s", "q20101e", "q20102e", "q20103e", "q20104e", "q20105e", "q20200s", "q20201e",
+    "q20202e", "q20203e", "q20204e", "q20205e", "q20311s", "q20312s", "q20313s", "q20314s",
+    "q20315s", "q20400s", "q20401s", "q20405s", "q20406s", "q20408s", "q20520s", "q20600s",
+    "q20610s", "q20700s", "q20710s", "q20720s",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -204,7 +205,9 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
 /// (`Check/0 infoNumber` names it, `infoex` the value), which a script sets
 /// (`game::quest::RECORDS`): `(quest, record)`. The Test (2312) waits for
 /// the Mushroom Kingdom's opening scene (`TD_MC_Openning`) to set 2311.
-/// An Aran's "The Lost Seal Stone of Ellin Forest" (21753) waits for 21764,
+/// An Aran's In Search of the Ultimate Weapon (21202) waits for 21203, set
+/// on stepping through the Mirror of Desire (`enterMCave`), and
+/// "The Lost Seal Stone of Ellin Forest" (21753) waits for 21764,
 /// set on entering Ellin's warehouse, and "Info on Another Seal Stone"
 /// (21754) for 21765, set on entering the Bowman Instructional School, and
 /// "The Puppeteer's Warning" (21720) for 21760, set by Francis's warning in
@@ -220,6 +223,7 @@ pub const START_RECORD_QUESTS: &[(i16, i16)] = &[
     (20010, 20022),
     (20015, 20022),
     (20020, 20022),
+    (21202, 21203),
     (21720, 21760),
     (21753, 21764),
     (21754, 21765),

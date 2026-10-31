@@ -3166,6 +3166,11 @@ impl NpcScript {
             "q21100s" => Some(five_heroes()),
             "q21101s" => Some(polearm_touched()),
             "q21101e" => Some(polearm_hero(player)),
+            "q21200s" => Some(polearm_calling()),
+            "q21200e" => Some(maha_awakens()),
+            "q21201e" => Some(maha_in_memory(player)),
+            "q21202s" => Some(ultimate_weapon()),
+            "q21202e" => Some(weapon_handed(player)),
             "q21700s" => Some(new_beginnings()),
             "q21703s" => Some(target_pigs()),
             "q21703e" => Some(combo_ability()),
@@ -6806,6 +6811,147 @@ fn polearm_hero(player: &Player) -> NpcScript {
         ],
     );
     script.inventory_full = Some(text(keys::POLEARM_HERO_FULL));
+    script
+}
+
+// An Aran's second job (2110): Lilin hears the Polearm calling (21200),
+// which turns out to be Maha, who wants to be remembered (21201); the
+// Mirror of Desire in the Mirror Cave (140030000) shows the Aran the past,
+// where Sir Blacksmith (1203000) asks for 30 Signs of Acceptance from the
+// Scarred Bears before handing over Maha (21202), which Maha hears of and
+// gives some of the Aran's skills back (Cosmic `21200.js` to `21202.js`).
+const POLEARM_CALLING: i16 = 21200;
+const MIRROR_OF_DESIRE: i16 = 21201;
+const ULTIMATE_WEAPON: i16 = 21202;
+const SIR_BLACKSMITH: i32 = 1203000;
+const SIGN_OF_ACCEPTANCE: i32 = 4032311;
+const SIGNS_ASKED: i32 = 30;
+const ARAN_2: i16 = 2110;
+const ARAN_2_MEDAL: i32 = 1142130;
+
+/// `q21200s`: Lilin tells a level-30 Aran that the Polearm in Rien is
+/// acting strange; Maha ends it.
+fn polearm_calling() -> NpcScript {
+    let [ask, go] = keys::LILIN_POLEARM_CALLING;
+    NpcScript::new(
+        LILIN,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(POLEARM_CALLING)],
+                on_no: Some(text(keys::LILIN_POLEARM_CALLING_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    )
+}
+
+/// `q21200e`: Maha speaks up and wants to be remembered; the Aran is sent
+/// to Lilin, who starts The Mirror of Desire (21201) from the data.
+fn maha_awakens() -> NpcScript {
+    let [echo, stranger, angry, who, weapon, sorry, ask, lilin] = keys::MAHA_RIGHTFUL_OWNER;
+    NpcScript::new(
+        MAHA,
+        vec![
+            Page::Say(text(echo)),
+            Page::Reply(text(stranger)),
+            Page::Say(text(angry)),
+            Page::Reply(text(who)),
+            Page::Say(text(weapon)),
+            Page::Reply(text(sorry)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::CompleteQuest(POLEARM_CALLING)],
+                on_no: Some(text(keys::MAHA_RIGHTFUL_OWNER_DECLINED)),
+            },
+            Page::Reply(text(lilin)),
+        ],
+    )
+}
+
+/// `q21202s`: in the Mirror of Desire's past, Sir Blacksmith puts the Aran
+/// to the test for the Polearm.
+fn ultimate_weapon() -> NpcScript {
+    let [secluded, best, buy, only_you, ask, test] = keys::BLACKSMITH_ULTIMATE_WEAPON;
+    NpcScript::new(
+        SIR_BLACKSMITH,
+        vec![
+            Page::Say(text(secluded)),
+            Page::Reply(text(best)),
+            Page::Say(text(buy)),
+            Page::Reply(text(only_you)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(ULTIMATE_WEAPON)],
+                on_no: Some(text(keys::BLACKSMITH_ULTIMATE_WEAPON_DECLINED)),
+            },
+            Page::Say(text(test)),
+        ],
+    )
+}
+
+/// `q21202e`: with 30 Signs of Acceptance, Sir Blacksmith hands over the
+/// Polearm and takes every Sign the Aran holds (Cosmic `removeAll`).
+fn weapon_handed(player: &Player) -> NpcScript {
+    let held = player.inventory.count(SIGN_OF_ACCEPTANCE);
+    if held < SIGNS_ASKED {
+        return NpcScript::new(
+            SIR_BLACKSMITH,
+            vec![Page::Say(text(keys::BLACKSMITH_SIGNS_SHORT))],
+        );
+    }
+    let [brought, wrapped, ask] = keys::BLACKSMITH_WEAPON_HANDED;
+    NpcScript::new(
+        SIR_BLACKSMITH,
+        vec![
+            Page::Say(text(brought)),
+            Page::Say(text(wrapped)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::TakeItem {
+                        item_id: SIGN_OF_ACCEPTANCE,
+                        quantity: i16::try_from(held).unwrap_or(i16::MAX),
+                    },
+                    Effect::CompleteQuest(ULTIMATE_WEAPON),
+                ],
+                on_no: Some(text(keys::BLACKSMITH_WEAPON_HANDED_DECLINED)),
+            },
+        ],
+    )
+}
+
+/// `q21201e`: told of the past, Maha remembers the Aran and makes them a
+/// second-job Aran (2110) with the Aran in Memory medal. Cosmic also
+/// teaches some skills behind a setting, which is left out.
+fn maha_in_memory(player: &Player) -> NpcScript {
+    if !player.can_take_second_job(ARAN_2) {
+        return NpcScript::new(MAHA, vec![Page::Say(text(keys::MAHA_IN_MEMORY_NOT_YET))]);
+    }
+    let [abandoned, blacksmith, begged, little, ask, train] = keys::MAHA_IN_MEMORY;
+    let mut script = NpcScript::new(
+        MAHA,
+        vec![
+            Page::Say(text(abandoned)),
+            Page::Reply(text(blacksmith)),
+            Page::Say(text(begged)),
+            Page::Reply(text(little)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::TakeSecondJob(ARAN_2),
+                    Effect::GiveItem {
+                        item_id: ARAN_2_MEDAL,
+                        quantity: 1,
+                    },
+                    Effect::CompleteQuest(MIRROR_OF_DESIRE),
+                ],
+                on_no: Some(text(keys::MAHA_IN_MEMORY_DECLINED)),
+            },
+            Page::Say(text(train)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::MAHA_IN_MEMORY_FULL));
     script
 }
 
@@ -18690,6 +18836,53 @@ mod tests {
         legend.stats.job = ARAN_1;
         let silent = NpcScript::for_quest("q21101e", &legend).unwrap();
         assert_eq!(yes_through(silent), (ICE_POLEARM, vec![]));
+    }
+
+    #[test]
+    fn maha_remembered_through_the_mirror_makes_a_second_job_aran() {
+        let mut aran = player(50);
+        (aran.stats.job, aran.stats.level) = (ARAN_1, 30);
+        let run =
+            |script: &str, aran: &Player| yes_through(NpcScript::for_quest(script, aran).unwrap());
+        assert_eq!(
+            run("q21200s", &aran),
+            (LILIN, vec![Effect::StartQuest(POLEARM_CALLING)])
+        );
+        assert_eq!(
+            run("q21200e", &aran),
+            (MAHA, vec![Effect::CompleteQuest(POLEARM_CALLING)])
+        );
+        assert_eq!(
+            run("q21202s", &aran),
+            (SIR_BLACKSMITH, vec![Effect::StartQuest(ULTIMATE_WEAPON)])
+        );
+
+        // Short of 30 Signs, the smith only asks for them.
+        let sign = |count| game::Item::stack(SIGN_OF_ACCEPTANCE, count);
+        aran.inventory.insert(InventoryType::Etc, 1, sign(29));
+        assert_eq!(run("q21202e", &aran), (SIR_BLACKSMITH, vec![]));
+        aran.inventory.insert(InventoryType::Etc, 2, sign(3));
+        let handed = vec![
+            Effect::TakeItem {
+                item_id: SIGN_OF_ACCEPTANCE,
+                quantity: 32,
+            },
+            Effect::CompleteQuest(ULTIMATE_WEAPON),
+        ];
+        assert_eq!(run("q21202e", &aran), (SIR_BLACKSMITH, handed));
+
+        let second = vec![
+            Effect::TakeSecondJob(ARAN_2),
+            Effect::GiveItem {
+                item_id: ARAN_2_MEDAL,
+                quantity: 1,
+            },
+            Effect::CompleteQuest(MIRROR_OF_DESIRE),
+        ];
+        assert_eq!(run("q21201e", &aran), (MAHA, second));
+        // Under level 30, Maha holds back.
+        aran.stats.level = 29;
+        assert_eq!(run("q21201e", &aran), (MAHA, vec![]));
     }
 
     #[test]
