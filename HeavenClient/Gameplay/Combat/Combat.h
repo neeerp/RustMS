@@ -94,8 +94,8 @@ namespace ms
 		// Add an attack to the attack queue.
 		void push_attack(const AttackResult &attack);
 
-		// With a full gauge, Energy Charge hits the mob `oid` touching the player, once a second at most
-		// (FUN_0095f135 from 0x94b3aa).
+		// With a full gauge, Energy Charge hits the mob `oid` touching the player, and while it lasts Body
+		// Pressure does too, each once a second at most (FUN_0095f135 from 0x94b3aa and 0x94b49d).
 		void body_attack(int32_t oid);
 
 		// Show a buff effect.
@@ -152,6 +152,9 @@ namespace ms
 		void show_summon_attack(int32_t oid, uint8_t action, const std::vector<std::pair<int32_t, int32_t>> &hits);
 
 	private:
+		// One line of `skill`'s damage on the touching mob `oid`, if `next` allows.
+		void body_attack(int32_t oid, int32_t skill, int64_t &next);
+
 		struct DamageEffect
 		{
 			AttackUser user;
@@ -600,8 +603,9 @@ namespace ms
 		// letting go and pressing again doesn't shoot sooner (0x948ee5).
 		int64_t last_hurricane = INT32_MIN;
 		int64_t last_rapidfire = INT32_MIN;
-		// When Energy Charge may hit a touching mob again (0x95f2e6).
+		// When Energy Charge and Body Pressure may hit a touching mob again (0x95f2e6).
 		int64_t next_body_attack = 0;
+		int64_t next_body_pressure = 0;
 
 		static Texture gauge_bar[2];
 		static Texture gauge_fill[2];

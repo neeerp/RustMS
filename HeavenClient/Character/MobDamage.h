@@ -276,17 +276,21 @@ namespace ms
 		}
 
 		// The number shown over the player for a hit of `damage` (0x9593b8).
-		// The client leaves Achilles, Meso Guard and Magic Guard to the
-		// server, but the number leaves out what the first two save:
-		// Achilles keeps `achilles` per mille off (1000 without it), and Meso
-		// Guard saves half at `mesoguard` mesos per 100 (0 without it), or
-		// what `meso` buys. Magic Guard's share still shows.
-		inline int32_t shown(int32_t damage, int32_t achilles, int32_t mesoguard, int64_t meso)
+		// The client leaves Achilles, Combo Barrier, Meso Guard and Magic
+		// Guard to the server, but the number leaves out what the first three
+		// save: Achilles keeps `achilles` per mille off (1000 without it),
+		// Combo Barrier `barrier` per mille of the rest (0 without it), and
+		// Meso Guard saves half at `mesoguard` mesos per 100 (0 without it),
+		// or what `meso` buys. Magic Guard's share still shows.
+		inline int32_t shown(int32_t damage, int32_t achilles, int32_t barrier, int32_t mesoguard, int64_t meso)
 		{
 			if (damage <= 0)
 				return damage;
 
 			int32_t kept_off = (1000 - achilles) * damage / 1000;
+
+			if (barrier > 0)
+				kept_off += (damage - kept_off) * (1000 - barrier) / 1000;
 			int32_t saved = 0;
 
 			if (mesoguard > 0)

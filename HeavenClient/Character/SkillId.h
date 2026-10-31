@@ -178,7 +178,10 @@ namespace ms
 					MESO_EXPLOSION = 4211006,
 
 			// Shadower
-					SHADOW_SHIFTER_SHADOWER = 4220002
+					SHADOW_SHIFTER_SHADOWER = 4220002,
+
+			// Aran
+					ACHILLES_ARAN = 21120004
 		};
 	}
 }

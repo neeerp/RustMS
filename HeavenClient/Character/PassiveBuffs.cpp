@@ -75,6 +75,9 @@ namespace ms
 		// Dark Knight
 		buffs[SkillId::Id::ACHILLES_DK] = std::make_unique<AchillesBuff>();
 
+		// Aran (0x959321)
+		buffs[SkillId::Id::ACHILLES_ARAN] = std::make_unique<AchillesBuff>();
+
 		for (int32_t id : secondary_stat::NIMBLE_SKILLS)
 			buffs[id] = std::make_unique<NimbleBuff>();
 

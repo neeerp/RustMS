@@ -641,6 +641,21 @@ namespace ms
 			return critical;
 		}
 
+		// The Aran's Combo Critical, after the rest: its rate adds on, and its
+		// damage onto the rest's and another 100, or onto 200 without any
+		// (0x78e254).
+		inline Critical aran_critical(Critical critical, const Critical &combo)
+		{
+			if (!combo.source)
+				return critical;
+
+			critical.rate += percent_cap(combo.rate);
+			critical.damage = critical.damage ? critical.damage + 100 + combo.damage : combo.damage + 200;
+			critical.source = true;
+
+			return critical;
+		}
+
 		// Whether a hit is critical. Blizzard, Shadow Meso and Assassinate's
 		// first strike have their own; Assassinate's second takes its rate and
 		// damage from the skill (0x790100).
@@ -692,6 +707,8 @@ namespace ms
 			Critical critical;
 			// Stun Mastery's rate and damage on a stunned monster.
 			Critical stunned;
+			// Combo Critical's for the Aran's combo.
+			Critical aran;
 			Charge charge;
 			// Berserk's percent, or 0.
 			int32_t berserk = 0;

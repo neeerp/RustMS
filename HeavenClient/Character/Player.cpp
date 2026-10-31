@@ -341,6 +341,18 @@ namespace ms
 			stats.add_value(EquipStat::Id::WATK,
 							secondary_stat::bare_hands_attack(job, stats.get_stat(MapleStat::Id::LEVEL)));
 
+		// The Aran's combo adds Combo Ability's y for every ten (0x77df48).
+		if (int32_t combo = get_buff_value(Buffstat::Id::ARAN_COMBO))
+		{
+			int32_t ability = aran_combo::ability(job);
+
+			if (int32_t level = skillbook.get_level(ability); level > 0)
+			{
+				const SkillData::Stats &combo_ability = SkillData::get(ability).get_stats(level);
+				stats.add_value(EquipStat::Id::WATK, aran_combo::attack(combo, combo_ability.x, combo_ability.y));
+			}
+		}
+
 		// Echo of Hero adds its percent of the whole attack and of the
 		// whole magic, which counts INT (FUN_00791617).
 		int32_t echo = get_buff_value(Buffstat::Id::ECHO_OF_HERO);
@@ -1121,6 +1133,16 @@ namespace ms
 
 		blow.critical = sharpen(blow.critical, get_buff_value(Buffstat::Id::SHARP_EYES));
 
+		// Combo Critical counts the Aran's combo (0x78e254).
+		int32_t combo_critical = aran_combo::critical(job);
+
+		if (int32_t combo = get_buff_value(Buffstat::Id::ARAN_COMBO); combo > 0 && skillbook.get_level(combo_critical) > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, combo_critical);
+			aran_combo::Critical added = aran_combo::critical(combo, source.x, source.y, in_percent(source.damage));
+			blow.aran = { added.rate, added.damage, true };
+		}
+
 		// Stun Mastery crits on a stunned monster.
 		if (skillbook.get_level(STUN_MASTERY) > 0)
 		{
@@ -1264,8 +1286,10 @@ namespace ms
 		else
 		{
 			int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
+			int32_t barrier = get_buff_value(Buffstat::Id::COMBO_BARRIER);
 			int32_t mesoguard = get_buff_value(Buffstat::Id::MESOGUARD);
-			int32_t shown = mob_damage::shown(damage, achilles, mesoguard, inventory.get_meso()) - reflected.damage;
+			int32_t shown =
+					mob_damage::shown(damage, achilles, barrier, mesoguard, inventory.get_meso()) - reflected.damage;
 			show_damage(shown);
 
 			// Magic Guard's share shows, but comes out of MP (0x959595).
@@ -1273,7 +1297,7 @@ namespace ms
 					stats.get_stat(MapleStat::Id::MP), has_buff(Buffstat::Id::INFINITY_));
 			hp_loss = std::max(shown - magic_guard, 0);
 			guarded = reflected.damage > 0 || magic_guard > 0 ||
-					  shown + reflected.damage < mob_damage::shown(damage, achilles, 0, 0);
+					  shown + reflected.damage < mob_damage::shown(damage, achilles, barrier, 0, 0);
 		}
 
 		become_invincible(damage > 0);
@@ -1346,9 +1370,9 @@ namespace ms
 
 	std::pair<int32_t, bool> Player::damage_by_obstacle(int32_t damage, int32_t vx, int32_t vy)
 	{
-		// Achilles leaves the number as for a mob; Meso Guard has no part.
+		// Achilles and Combo Barrier leave the number as for a mob; Meso Guard has no part.
 		int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
-		int32_t shown = mob_damage::shown(damage, achilles, 0, 0);
+		int32_t shown = mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::COMBO_BARRIER), 0, 0);
 		show_damage(shown);
 		int32_t magic_guard = mob_damage::magic_guarded(damage, get_buff_value(Buffstat::Id::MAGIC_GUARD),
 				stats.get_stat(MapleStat::Id::MP), has_buff(Buffstat::Id::INFINITY_));

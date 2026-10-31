@@ -997,7 +997,8 @@ namespace ms
 
 		damagenumbers.emplace_back(DamageNumber::Type::NORMAL, hit.damage, damage_layout::mob_offset(0, false));
 		damagenumbers.back().set_anchor(mobs.get_mob_head_position(hit.oid));
-		mobs.apply_summon_damage(hit.oid, hit.damage, hit.toleft, get_summon_info(hit.skill).hit);
+		mobs.apply_summon_damage(hit.oid, hit.damage, hit.toleft, get_summon_info(hit.skill).hit,
+								 player.get_buff_value(Buffstat::Id::SMART_KNOCKBACK));
 	}
 
 	void Combat::show_summon_attack(int32_t oid, uint8_t action, const std::vector<std::pair<int32_t, int32_t>> &hits)
@@ -2096,7 +2097,8 @@ namespace ms
 		}
 
 		const SpecialMove &move = get_move(effect.move_id);
-		mobs.apply_damage(effect.target_oid, effect.damage, effect.toleft, effect.user, move);
+		mobs.apply_damage(effect.target_oid, effect.damage, effect.toleft, effect.user, move,
+						  player.get_buff_value(Buffstat::Id::SMART_KNOCKBACK));
 
 		// Each of the Aran's polearm hits that lands counts toward the combo the server keeps (0x668c11).
 		int32_t ability = player.get_skills().get_level(aran_combo::ability(player.get_stats().get_job().get_id()));
@@ -2107,13 +2109,22 @@ namespace ms
 
 	void Combat::body_attack(int32_t oid)
 	{
-		if (!player.energy_full() || now < next_body_attack || player.is_climbing()
-			|| mount::is_tamed_monster(player.get_look().get_vehicle()))
+		if (player.energy_full())
+			body_attack(oid, energy::skill(player.get_stats().get_job().get_id()), next_body_attack);
+
+		if (player.has_buff(Buffstat::Id::BODY_PRESSURE)
+			&& player.get_skills().get_level(aran_combo::BODY_PRESSURE) > 0)
+			body_attack(oid, aran_combo::BODY_PRESSURE, next_body_pressure);
+	}
+
+	void Combat::body_attack(int32_t oid, int32_t skill, int64_t &next)
+	{
+		if (now < next || player.is_climbing() || mount::is_tamed_monster(player.get_look().get_vehicle()))
 			return;
 
 		// One line of the skill's damage, with no action or effect of the
 		// player's (0x95f1b6).
-		const Skill &move = get_skill(energy::skill(player.get_stats().get_job().get_id()));
+		const Skill &move = get_skill(skill);
 		Attack attack = player.prepare_attack(move.get_id());
 		move.apply_stats(player, attack);
 		attack.type = Attack::Type::CLOSE;
@@ -2128,7 +2139,7 @@ namespace ms
 		if (result.damagelines.empty())
 			return;
 
-		next_body_attack = now + 1000;
+		next = now + 1000;
 		result.attacker = player.get_oid();
 		expect_hits(result, 1);
 		extract_effects(player, move, result, {}, 0, {}, {});
@@ -2156,9 +2167,9 @@ namespace ms
 			user.update_skill(attack.skill, attack.level);
 			user.update_speed(attack.speed);
 
-			// Energy Charge's body attack shows only its hit on the mob
-			// (FUN_009830bb).
-			if (energy::charges(attack.skill))
+			// Energy Charge's and Body Pressure's body attacks show only
+			// their hit on the mob (FUN_009830bb).
+			if (energy::charges(attack.skill) || attack.skill == aran_combo::BODY_PRESSURE)
 			{
 				extract_effects(user, get_move(attack.skill), attack, {}, 0, {}, {});
 				return;
