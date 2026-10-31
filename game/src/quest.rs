@@ -45,7 +45,9 @@ pub const INFO_QUESTS: &[i16] = &[
 /// also an Aran's runs with the wolves: through the Field of Wolves (21619,
 /// for "Scadur's Advice", 21610) and out of the wolves' test room (21620,
 /// for "The Wolves' Test", 21613); and a Romeo and Juliet run won (7072,
-/// for "Yulete's Request", 3365, and "Romeo's Present", 3369).
+/// for "Yulete's Request", 3365, and "Romeo's Present", 3369), and the
+/// mark a new Noblesse starts with (20022, for their tutorial quests 20010,
+/// 20015 and 20020).
 /// The Mushroom Kingdom's opening scene's (2311) is read by The
 /// Test's start (2312) instead. The party quests' info quests (1200-1206,
 /// 1301, 1302), which the client never offers, are started on the first entry,
@@ -53,9 +55,12 @@ pub const INFO_QUESTS: &[i16] = &[
 /// (`crate::quest_ex`).
 pub const RECORDS: &[i16] = &[
     1200, 1201, 1202, 1203, 1204, 1205, 1206, 1301, 1302, 2311, 6331, 6364, 6371, 6401, 6411, 7067,
-    7072, 7081, 7402, 7662, 7760, 7762, 20731, 20732, 21619, 21620, 21760, 21761, 21762, 21763,
-    21764, 21765,
+    7072, 7081, 7402, 7662, 7760, 7762, 20022, 20731, 20732, 21619, 21620, 21760, 21761, 21762,
+    21763, 21764, 21765,
 ];
+
+/// The record a new Noblesse is created with, set to "1".
+pub const NOBLESSE_MARK: i16 = 20022;
 
 /// The timed titles (`QuestInfo` `timeLimit2`): Celebrity, Diligent
 /// Explorer, Veteran Hunter and Donation King. Their started record is the

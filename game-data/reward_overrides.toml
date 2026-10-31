@@ -222,6 +222,22 @@ replace = [{ item = 4001074, prob = 1.0 }]
 [mobs.9300039]
 replace = [{ item = 4001054, prob = 1.0 }]
 
+[mobs.100121]
+# The Mimis of Ereve's tutorial (Map.nx 130030003, 130030004) drop the proof
+# 4000483 Kinu takes for How Well Do You Know Your Skills? (20012, Quest.nx
+# Check.img/20012/1/item). The pack has no drop for it; Cosmic's rate.
+add = [{ item = 4000483, prob = 0.4, quest = 20012 }]
+
+[reactors.1302000]
+# Ereve tutorial's boxes (Map.nx 130030004; Reactor.nx 1302000, erebItem0)
+# drop the Building Stone 4032267 and Drape 4032268 Kia takes for A Box with
+# Goodies Inside (20013). The pack has neither; Cosmic's reactor drops have
+# both every time, for 20013.
+replace = [
+    { item = 4032267, prob = 1.0, quest = 20013 },
+    { item = 4032268, prob = 1.0, quest = 20013 },
+]
+
 [reactors.2000]
 # Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
 # 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).

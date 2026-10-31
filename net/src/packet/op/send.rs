@@ -182,6 +182,11 @@ pub enum SendOpcode {
     MakerResult = 0xD9,
     /// Locks the UI for a scene (byte 1), or unlocks it (byte 0).
     LockUi = 0xDD,
+    /// Brings out the tutorial guide (byte 1) or sends it away (0x96014f).
+    SpawnGuide = 0xDF,
+    /// A balloon (mode 0) or a hint picture (mode 1) over the tutorial
+    /// guide (0x960239).
+    TalkGuide = 0xE0,
     /// A cash mist's face for its user (FUN_00938b3e).
     ItemEmotion = 0xE2,
     Cooldown = 0xEA,

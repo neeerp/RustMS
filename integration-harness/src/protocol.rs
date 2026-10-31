@@ -786,7 +786,10 @@ async fn load_or_create_character(
         .send_packet(
             build_create_char(
                 &config.character_name,
-                CharacterTemplate::default_for_gender(config.gender),
+                CharacterTemplate {
+                    job: config.class,
+                    ..CharacterTemplate::default_for_gender(config.gender)
+                },
             )
             .map_err(|message| {
                 HarnessError::protocol("create char", login_conn.endpoint(), message)

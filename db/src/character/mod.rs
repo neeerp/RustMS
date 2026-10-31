@@ -1,5 +1,5 @@
 use crate::schema::characters;
-use diesel::Connection;
+use diesel::{Connection, ExpressionMethods, RunQueryDsl};
 use game::{AvatarLook, CharacterStats, InventoryType, Item, Keymap};
 use std::time::SystemTime;
 
@@ -74,9 +74,11 @@ impl NewCharacter<'_> {
     ///
     /// Everything is written in one transaction so a failure cannot leave a
     /// half-created character behind. Returns what the character list needs.
+    /// `records` are info records (`game::quest::RECORDS`) it starts with.
     pub fn create(
         self,
         starting_items: Vec<(InventoryType, i16, Item)>,
+        records: &[(i16, &str)],
     ) -> crate::Result<(CharacterStats, AvatarLook)> {
         let mut connection = crate::connection()?;
         connection
@@ -92,6 +94,16 @@ impl NewCharacter<'_> {
                         .map(|(_, slot, item)| (*slot, item.item_id)),
                 );
                 crate::player::insert_items(connection, character.id, starting_items)?;
+                for &(record, value) in records {
+                    diesel::insert_into(crate::schema::character_quests::table)
+                        .values((
+                            crate::schema::character_quests::character_id.eq(character.id),
+                            crate::schema::character_quests::quest_id.eq(record),
+                            crate::schema::character_quests::status.eq(1),
+                            crate::schema::character_quests::progress.eq(value),
+                        ))
+                        .execute(connection)?;
+                }
                 Ok((stats, look))
             })
             .map_err(Into::into)

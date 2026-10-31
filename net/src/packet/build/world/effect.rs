@@ -141,6 +141,38 @@ pub fn build_lock_ui(locked: bool) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// SPAWN_GUIDE: brings the tutorial guide out at the player's feet, or
+/// sends it away.
+pub fn build_spawn_guide(shown: bool) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::SpawnGuide as i16)?;
+    p.write_byte(u8::from(shown))?;
+    Ok(p)
+}
+
+/// TALK_GUIDE mode 0: a balloon over the guide, `width` px wide, for
+/// `duration` ms.
+pub fn build_guide_says(text: &str, width: i32, duration: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::TalkGuide as i16)?;
+    p.write_byte(0)?;
+    p.write_str_with_length(text)?;
+    p.write_int(width)?;
+    p.write_int(duration)?;
+    Ok(p)
+}
+
+/// TALK_GUIDE mode 1: `UI/tutorial.img/<hint>` over the guide for
+/// `duration` ms.
+pub fn build_guide_hint(hint: i32, duration: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::TalkGuide as i16)?;
+    p.write_byte(1)?;
+    p.write_int(hint)?;
+    p.write_int(duration)?;
+    Ok(p)
+}
+
 /// The charm that kept a dead player's EXP.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharmUsed {
@@ -307,6 +339,24 @@ pub fn build_hint(text: &str, width: i16, height: i16) -> Result<Packet, Network
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn the_guide_comes_out_says_and_hints() {
+        let spawn = build_spawn_guide(true).unwrap();
+        let mut expect = Expect::new(&spawn.bytes);
+        expect.short(SendOpcode::SpawnGuide as i16).byte(1);
+        expect.end();
+        let says = build_guide_says("Hi", 200, 4000).unwrap();
+        let mut expect = Expect::new(&says.bytes);
+        expect.short(SendOpcode::TalkGuide as i16).byte(0);
+        expect.string("Hi").int(200).int(4000);
+        expect.end();
+        let hint = build_guide_hint(11, 7000).unwrap();
+        let mut expect = Expect::new(&hint.bytes);
+        expect.short(SendOpcode::TalkGuide as i16).byte(1);
+        expect.int(11).int(7000);
+        expect.end();
+    }
 
     #[test]
     fn field_music_names_its_track() {

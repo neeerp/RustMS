@@ -20,8 +20,9 @@ the island's world map with the ones from GMS v68
 client loads the same files.
 
 New Explorer characters start in `0`, outside the Training Camp, with Heena
-and Sera. Existing characters keep their saved maps. Other jobs start in
-Amherst (`1010000`). The active route is:
+and Sera. Existing characters keep their saved maps. A Noblesse starts on
+Ereve's tutorial path (`130030000`, below) and an Aran in Amherst
+(`1010000`). The active route is:
 
 `0 → 10000 → 20000 → 30000 → 40000 → 40001 → 40002 → 50000 → 1000000 → 1010000 → 1020000`
 
@@ -286,6 +287,9 @@ nothing. A script returns effects that the client actor sends:
 | `curseforest` | The Forest of Evil I's hidden portal (`100040105` `secret00`) into the Cursed Forest, for players with 2224 or 2226 taken or 2227 done: portal sound, warp to `910100001` (after 2227) or `910100000`, portal `out00`, from 17:00 until 7:00 by the stations' clock (route time, UTC); by day, or off those quests, a pink line |
 | `elevator` | The Helios Tower's floors (`222020100`, `222020200`, `in00`): portal sound and into the floor's waiting room (`222020110`, `222020210`, portal 0) while the elevator's car is docked there, else a pink line; the car takes the waiting room up or down (`ships.md`) |
 | `rienTutor8` | Rien's way out (`140000000` `west00`): portal sound, warp to `140010000` `east00`; an Aran beginner (job 2000) on Basic Fitness Training 1-3 (21015-21017) stays, with a chat line (SHOW_STATUS_INFO 9, `Effect::InfoText`) saying which way the training lies |
+| `tutorHelper` | Ereve's tutorial's first map (`130030000` `scr00`): brings out the guide, Mimo (SPAWN_GUIDE `0xDF`), who says the `portal.ereve_tutor.guide_welcome` line (TALK_GUIDE `0xE0` mode 0, 200 px wide, 4 s), once a session |
+| `tutorMinimap`, `tutorWorldmap` | The tutorial's touch portals on `130030001` and `130030006`: the guide points at the minimap and the world map (TALK_GUIDE mode 1, `UI/tutorial.img` 1 and 11, 7 s), once a session |
+| `tutorquest` | The doors of `130030001`-`130030004` (`west00`): warp to the next map's portal 0 once Kimu's Welcome to Ereve (20010) is taken, or once Kizan's, Kinu's or Kia's quest (20011-20013) is done; otherwise a pink line saying to take or finish the quest. |
 | `enterRienFirst`, `rienTutor7` | The Dangerous Forest's (`140010000`) ways out: `east00` back to Rien (`140000000` `west00`, or `st00` for an Aran beginner who hasn't completed 21014), `west00` on to `140010100` portal 2; an Aran beginner before 21014 isn't let on, with an `Effect::InfoText` line pointing back to town |
 | `OutPerrion_1`, `OutPerrion_2` | The Bottom of the Temple's (`105100100`) ways back up the stairway (`105100000`): `OutPerrion` with a pink line to portal 2, `top001`/`top002` to portal 0 |
 | `foxLaidy_map` | Fox Ridge's (`222010300`) `west00`: to Tiger Ridge (`222010200` `east00`), or with 3647 taken and an Old Fox's Tail (`4031793`), into the Gloomy Forest (`922220000` `east00`). Cosmic also starts quest 23647, which isn't in `Quest.nx` |

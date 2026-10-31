@@ -908,8 +908,41 @@ Their data names Cygnus (1101000) as the completion NPC, with no end script
 and no reward, so the player completes them in the quest window at Cygnus
 in Ereve. The server adds the title's medal (`viewMedalItem`, 1142066 to
 1142069) to the completion's rewards (`game_data::quests::KNIGHT_TITLES`),
-as Cosmic's end scripts do. The Noblesse titles (29904 and 29905) need the
-Cygnus tutorial (20000 and 20015), which is not supported.
+as Cosmic's end scripts do. The Noblesse title (29905) works the same way
+once Cygnus's greeting (20015) is done, with medal 1142065. The old
+tutorial's (29904) needs 20000, which is dated out.
+
+A new Noblesse starts on Ereve's tutorial path (`130030000`, see
+`map-travel.md`) with record 20022 set to "1", which Welcome to Ereve
+(20010), Greetings From the Young Empress (20015) and 5 Different Paths
+(20020) ask for (`infoNumber`). The client's data has no rewards for the
+tutorial (`Act` is empty), so the scripts give Cosmic's:
+
+- Kimu (1102004) offers 20010 (`q20010s`), and Kizan (1102005) ends it
+  (`q20010e`) with five each of 2000020 and 2000021 and 15 EXP.
+- Kizan's How to Hunt (20011) wants one Mimi (9300328) and gives the
+  Noblesse cap and robe (1002869, 1052177) and 30 EXP.
+- Kinu's (1102006) 20012 wants three Mimis (100121) and the proof they drop
+  (4000483, 40%, while the quest is taken), and gives 40 EXP.
+- Kia's (1102007) 20013 wants a Building Stone and a Drape (4032267,
+  4032268), which the boxes of `130030004` (reactor 1302000) drop while the
+  quest is taken, and gives a chair (3010060) and 95 EXP. Cosmic also
+  completes 20000-20002 and 20015 here. We don't: that would hide Cygnus's
+  greeting and the Noblesse title.
+- Kisha's The Empress is Waiting (20014) runs from its data: a letter
+  (4032269) to Cygnus, for 140 EXP.
+- Cygnus's greeting (`q20015s`, level 6-10) has no Cosmic script. It
+  completes as it starts, and its text is unsourced.
+- Neinheart's (1101002) briefing (`q20016s`) completes on the yes, for 380
+  EXP.
+- Kiku's (1102000) First Knight Training (`q20017s`) starts the hunt for 15
+  Mimis (100122), which the data ends for 430 EXP and ten of each potion.
+  Cosmic also starts 20020 and completes 20100 here; we leave those to the
+  Cygnus first-job quests.
+
+Each brother's start points the guide at a part of the screen
+(`Effect::GuideHint`, TALK_GUIDE mode 1), as Cosmic's `guideHint` does.
+Clicking the guide (CLICK_GUIDE) is not handled.
 
 Some titles go with medals won elsewhere: the job medals at level 180
 (29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor
