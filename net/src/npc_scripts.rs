@@ -18,6 +18,7 @@ use crate::gachapon::{self, Prize};
 use crate::guild_quest;
 use crate::item_makers::{self, Recipe};
 use crate::items;
+use crate::npc_data;
 use crate::packet::handle::world;
 use crate::refiners::{self, Refine};
 use crate::rides;
@@ -26,7 +27,8 @@ use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
 use game::character::{
-    CARNIVAL_RETURN, DOJO_RETURN, EVENT_RETURN, FLORINA_RETURN, PYRAMID_RETURN, WORLD_TOUR_RETURN,
+    CARNIVAL_RETURN, DOJO_RETURN, EVENT_RETURN, FLORINA_RETURN, HAPPYVILLE_RETURN, PYRAMID_RETURN,
+    WORLD_TOUR_RETURN,
 };
 use game::family::FamilyInfo;
 use game::guild::{self, Guild};
@@ -565,6 +567,9 @@ const FLORINA_BEACH: (i32, u8) = (110000000, 4);
 /// Pison on Florina Beach (`florina1`), who takes players back where they
 /// came from, else to Lith Harbor.
 const PISON: i32 = 1081001;
+/// Rupi in Happyville (`go_victoria`), who takes players back where they
+/// came from, else to Ellinia.
+const RUPI: i32 = 2002000;
 /// Thomas Swift, free between Henesys and Amoria: to Amoria's portal 0, and
 /// back to Henesys's portal 5, at the town's east end.
 const THOMAS_SWIFT: i32 = 9201022;
@@ -2790,6 +2795,8 @@ impl NpcScript {
             DOLPHIN => Some(dolphin(player)),
             SPINEL => Some(spinel(player)),
             PISON => Some(pison(player)),
+            npc_data::ROONEY => Some(rooney(player)),
+            RUPI => Some(rupi(player)),
             THOMAS_SWIFT => thomas_swift(player),
             MOONY => Some(moony(player)),
             MOM_AND_DAD => mom_and_dad(player),
@@ -10913,6 +10920,40 @@ fn pison(player: &Player) -> NpcScript {
                 on_no: Some(content::text().get(keys::FLORINA_LEAVE_DECLINE, &map)),
             },
         ],
+    )
+}
+
+/// `go_xmas`: Rooney takes a player to Happyville for free, saving where
+/// the trip began.
+fn rooney(player: &Player) -> NpcScript {
+    NpcScript::new(
+        npc_data::ROONEY,
+        vec![Page::Ask {
+            text: text(keys::ROONEY_HAPPYVILLE_ASK),
+            on_yes: vec![
+                Effect::SaveLocation(HAPPYVILLE_RETURN, Some(player.stats.map_id)),
+                Effect::WarpToPortal(events::HAPPYVILLE, 0),
+            ],
+            on_no: None,
+        }],
+    )
+}
+
+/// `go_victoria`: Rupi takes a player back where the trip to Happyville
+/// began, else to Ellinia.
+fn rupi(player: &Player) -> NpcScript {
+    let back = saved_location(player, HAPPYVILLE_RETURN, ELLINIA);
+    let map = back.to_string();
+    NpcScript::new(
+        RUPI,
+        vec![Page::Ask {
+            text: content::text().get(keys::RUPI_LEAVE_ASK, &[("map", map.as_str())]),
+            on_yes: vec![
+                Effect::SaveLocation(HAPPYVILLE_RETURN, None),
+                Effect::Warp(back),
+            ],
+            on_no: None,
+        }],
     )
 }
 
@@ -20818,6 +20859,38 @@ mod tests {
                 home.respond(ScriptInput::Yes).unwrap().effects,
                 [
                     Effect::SaveLocation(FLORINA_RETURN, None),
+                    Effect::Warp(back)
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn rooney_takes_players_to_happyville_and_rupi_brings_them_back() {
+        let mut trip = NpcScript::for_npc(npc_data::ROONEY, &rider(100, 0, 220000000)).unwrap();
+        assert_eq!(kind(&trip.begin()), Some(1));
+        assert_eq!(
+            trip.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SaveLocation(HAPPYVILLE_RETURN, Some(220000000)),
+                Effect::WarpToPortal(events::HAPPYVILLE, 0)
+            ]
+        );
+        assert!(crate::npc_stands(npc_data::ROONEY) && crate::npc_stands(RUPI));
+
+        // Rupi: back where the trip began, else to Ellinia.
+        let mut came = rider(100, 0, events::HAPPYVILLE);
+        came.saved_locations.insert(HAPPYVILLE_RETURN, 220000000);
+        for (player, back) in [
+            (&came, 220000000),
+            (&rider(100, 0, events::HAPPYVILLE), ELLINIA),
+        ] {
+            let mut home = NpcScript::for_npc(RUPI, player).unwrap();
+            assert_eq!(kind(&home.begin()), Some(1));
+            assert_eq!(
+                home.respond(ScriptInput::Yes).unwrap().effects,
+                [
+                    Effect::SaveLocation(HAPPYVILLE_RETURN, None),
                     Effect::Warp(back)
                 ]
             );

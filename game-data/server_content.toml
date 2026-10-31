@@ -50,6 +50,8 @@ unsourced = [
     "florina.leave",
     "florina.leave_ask",
     "florina.leave_decline",
+    "rooney.happyville_ask",
+    "rupi.leave_ask",
     "amoria.to_amoria",
     "amoria.to_henesys",
     "amoria.decline",

@@ -227,6 +227,8 @@ fn load_field_map_npcs(field_key: FieldKey) -> Vec<FieldMapEntityNpc> {
         .iter()
         .chain(net::extra_npcs(field_key.map_id))
         .enumerate()
+        // Object ids follow the data's order, whoever is left out.
+        .filter(|(_, npc)| net::npc_stands(npc.npc_id))
         .filter_map(|(index, npc)| {
             i32::try_from(index).ok().map(|offset| FieldMapEntityNpc {
                 object_id: MAP_NPC_OBJECT_ID_BASE + offset,

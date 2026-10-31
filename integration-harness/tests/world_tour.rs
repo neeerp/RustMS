@@ -24,11 +24,15 @@ const AMORIA: i32 = 680_000_000;
 const MALAYSIA_CBD: i32 = 540_000_000;
 const TREND_ZONE: i32 = 550_000_000;
 const KAMPUNG_VILLAGE: i32 = 551_000_000;
+const HAPPYVILLE: i32 = 209_000_000;
+const ELLINIA: i32 = 101_000_000;
 const SPINEL: i32 = 9000020;
 const PASON: i32 = 1002002;
 const PISON: i32 = 1081001;
 const THOMAS_SWIFT: i32 = 9201022;
 const AUDREY: i32 = 9201135;
+const ROONEY: i32 = 1022101;
+const RUPI: i32 = 2002000;
 const VIP_TICKET_TO_FLORINA: i32 = 4031134;
 const ETC: i16 = 4;
 
@@ -166,6 +170,35 @@ async fn thomas_swift_walks_between_henesys_and_amoria() {
         assert_eq!(t.prompts, [(THOMAS_SWIFT, 0)]);
         let t = step(c, &format!("{m} go"), answer(0, 1, None)).await;
         assert_eq!(t.warps, [to]);
+    }
+}
+
+#[tokio::test]
+async fn rooney_takes_players_to_happyville_and_rupi_sees_them_home() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = traveller(&config, 0, None, HENESYS).await;
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    let t = step(c, &format!("{m} talk"), talk(HENESYS, ROONEY)).await;
+    assert_eq!(t.prompts, [(ROONEY, 1)]);
+    let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+    assert_eq!(t.warps, [HAPPYVILLE]);
+    drop(session);
+
+    // The way back outlasts a relogin, and is used once; then Ellinia.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+    for home in [HENESYS, ELLINIA] {
+        if home == ELLINIA {
+            let mut t = Trace::default();
+            assert_eq!(warp(c, HAPPYVILLE, "", &mut t).await, HAPPYVILLE);
+        }
+        let t = step(c, &format!("{m} talk"), talk(HAPPYVILLE, RUPI)).await;
+        assert_eq!(t.prompts, [(RUPI, 1)]);
+        assert!(t.prompt_texts[0].contains(&format!("#m{home}#")));
+        let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+        assert_eq!(t.warps, [home]);
     }
 }
 
