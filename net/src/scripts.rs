@@ -384,6 +384,9 @@ const FRIENDSHIP_WITH_YETI: i16 = 21303;
 const THIEF_CROWS_ROOM: i32 = 108_010_700;
 const YETIS_ROOM: i32 = 108_010_701;
 const YETIS_THIEF_ROOM: i32 = 108_010_702;
+/// Where a fourth-job Aran fights an enraged Maha (9001014) on Taming the
+/// Polearm (21401), one at a time; `outMaha` leads back to Rien.
+pub const MAHAS_BATTLE: i32 = 914_020_000;
 /// Fox Ridge's way back to Tiger Ridge (`foxLaidy_map`) leads into the
 /// Gloomy Forest instead for a player on quest 3647 who holds the Old Fox's
 /// Tail.
@@ -518,7 +521,7 @@ pub const WOLVES_TEST_RECORD: i16 = 21620;
 pub const WOLVES_DEN: i32 = 140010210;
 /// What both records read once their run is done (`Check/1 infoex`).
 pub const WOLF_RUN_DONE: &str = "0";
-pub const SOLO_MAPS: [i32; 23] = [
+pub const SOLO_MAPS: [i32; 24] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -542,6 +545,7 @@ pub const SOLO_MAPS: [i32; 23] = [
     WOLVES_TEST_ROOM,
     THIEF_CROWS_ROOM,
     YETIS_THIEF_ROOM,
+    MAHAS_BATTLE,
 ];
 
 /// The Puppeteer `player` is out to beat, while a hunt for him is under
@@ -2401,6 +2405,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(MIRROR_CAVE, 1))
         }
         "rienCaveEnter" => refused(keys::MIRROR_CAVE_BLOCKED),
+        "outMaha" => through(Effect::WarpToPortal(RIEN, 0)),
         "enterMCave" if quest(THE_MIRROR_OF_DESIRE) == QuestState::Started => ScriptOutcome {
             effects: vec![
                 Effect::WarpToFreeCopy {
@@ -5626,6 +5631,17 @@ mod tests {
         // Both thieves come back for the next player.
         assert!(crate::npc_scripts::resets_when_empty(THIEF_CROWS_ROOM));
         assert!(crate::npc_scripts::resets_when_empty(YETIS_THIEF_ROOM));
+    }
+
+    #[test]
+    fn mahas_battle_is_for_one_and_leads_back_to_rien() {
+        let player = player_with(&[]);
+        assert_eq!(
+            warp_of(&portal("outMaha", &player).unwrap()),
+            Some((RIEN, 0))
+        );
+        assert!(crate::npc_scripts::resets_when_empty(MAHAS_BATTLE));
+        assert_eq!(crate::npc_scripts::time_limit(MAHAS_BATTLE), Some(600));
     }
 
     fn holding(quests: &[(i16, QuestState)], item: i32) -> Player {

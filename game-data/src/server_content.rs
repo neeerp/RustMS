@@ -1277,6 +1277,23 @@ pub mod keys {
     pub const MAHA_RED_JADE_FULL: &str = "maha.red_jade.full";
     pub const MAHA_RED_JADE_NOT_YET: &str = "maha.red_jade.not_yet";
     pub const MAHA_RED_JADE_MISSING: &str = "maha.red_jade.missing";
+    pub const LILIN_POLEARM_FIGHT: [&str; 2] =
+        ["lilin.polearm_fight.ask", "lilin.polearm_fight.feeling"];
+    pub const MAHA_TAMING: [&str; 4] = [
+        "maha.taming.why",
+        "maha.taming.frozen",
+        "maha.taming.darkness",
+        "maha.taming.ask",
+    ];
+    pub const MAHA_TAMED: [&str; 3] =
+        ["maha.tamed.thanks", "maha.tamed.ask", "maha.tamed.restored"];
+    pub const LILIN_POLEARM_FIGHT_DECLINED: &str = "lilin.polearm_fight.declined";
+    pub const MAHA_TAMING_DECLINED: &str = "maha.taming.declined";
+    pub const MAHA_BATTLE_BUSY: &str = "maha.battle.busy";
+    pub const MAHA_BATTLE_AGAIN: &str = "maha.battle.again";
+    pub const MAHA_TAMED_DECLINED: &str = "maha.tamed.declined";
+    pub const MAHA_TAMED_FULL: &str = "maha.tamed.full";
+    pub const MAHA_TAMED_NOT_YET: &str = "maha.tamed.not_yet";
     pub const PUO_TARGET_PIGS: [&str; 3] = [
         "puo.target_pigs.lesson",
         "puo.target_pigs.ask",
@@ -4523,6 +4540,22 @@ mod tests {
                 keys::MAHA_RED_JADE_FULL,
                 keys::MAHA_RED_JADE_NOT_YET,
                 keys::MAHA_RED_JADE_MISSING,
+                keys::LILIN_POLEARM_FIGHT[0],
+                keys::LILIN_POLEARM_FIGHT[1],
+                keys::MAHA_TAMING[0],
+                keys::MAHA_TAMING[1],
+                keys::MAHA_TAMING[2],
+                keys::MAHA_TAMING[3],
+                keys::MAHA_TAMED[0],
+                keys::MAHA_TAMED[1],
+                keys::MAHA_TAMED[2],
+                keys::LILIN_POLEARM_FIGHT_DECLINED,
+                keys::MAHA_TAMING_DECLINED,
+                keys::MAHA_BATTLE_BUSY,
+                keys::MAHA_BATTLE_AGAIN,
+                keys::MAHA_TAMED_DECLINED,
+                keys::MAHA_TAMED_FULL,
+                keys::MAHA_TAMED_NOT_YET,
                 keys::PUO_TARGET_PIGS[0],
                 keys::PUO_TARGET_PIGS[1],
                 keys::PUO_TARGET_PIGS[2],

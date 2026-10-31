@@ -2650,6 +2650,7 @@ impl NpcScript {
             THIEF_DOOR => return Some(thief_door(player)),
             FRANCIS => return Some(francis()),
             CAVE_FRANCIS => return Some(cave_francis(player)),
+            MAHA if fights_maha_again(player) => return Some(mahas_battle_again()),
             PACK_WOLF if retakes_the_wolves_test(player) => {
                 return Some(the_wolves_test_again());
             }
@@ -3175,6 +3176,9 @@ impl NpcScript {
             "q21301e" => Some(thief_got_away()),
             "q21302e" => Some(red_jade_back(player)),
             "q21303s" => Some(yetis_jade_stolen()),
+            "q21400s" => Some(polearm_starts_a_fight()),
+            "q21401s" => Some(taming_the_polearm()),
+            "q21401e" => Some(polearm_tamed(player)),
             "q21700s" => Some(new_beginnings()),
             "q21703s" => Some(target_pigs()),
             "q21703e" => Some(combo_ability()),
@@ -7066,6 +7070,115 @@ fn yetis_jade_stolen() -> NpcScript {
         ],
     );
     script.on_end.push(Effect::StartQuest(FRIENDSHIP_WITH_YETI));
+    script
+}
+
+// An Aran's fourth job (2112): at level 120 Lilin hears Maha raging
+// (21400); Maha, ending it from the data, asks to be stopped (21401) and
+// sends the Aran into a room alone with an enraged Maha (9001014). Once it
+// is beaten, Maha makes the Aran a 2112 with the Aran in Hope medal and a
+// Maple Hero book (Cosmic `21400.js`, `21401.js` and `MahaBattle`).
+const POLEARM_STARTS_A_FIGHT: i16 = 21400;
+const TAMING_THE_POLEARM: i16 = 21401;
+const ARAN_4: i16 = 2112;
+const ARAN_4_MEDAL: i32 = 1142132;
+
+/// `q21400s`: Lilin calls a level-120 Aran back to Rien, where Maha is
+/// acting strangely again.
+fn polearm_starts_a_fight() -> NpcScript {
+    let [ask, feeling] = keys::LILIN_POLEARM_FIGHT;
+    NpcScript::new(
+        LILIN,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(POLEARM_STARTS_A_FIGHT)],
+                on_no: Some(text(keys::LILIN_POLEARM_FIGHT_DECLINED)),
+            },
+            Page::Say(text(feeling)),
+        ],
+    )
+}
+
+/// `q21401s`: Maha asks to be stopped from going berserk and sends the
+/// Aran into its battle room, if nobody is in it.
+fn taming_the_polearm() -> NpcScript {
+    let [why, frozen, darkness, ask] = keys::MAHA_TAMING;
+    let mut script = NpcScript::new(
+        MAHA,
+        vec![
+            Page::Say(text(why)),
+            Page::Say(text(frozen)),
+            Page::Say(text(darkness)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::RequireEmptyMap(scripts::MAHAS_BATTLE),
+                    Effect::StartQuest(TAMING_THE_POLEARM),
+                    Effect::WarpToPortal(scripts::MAHAS_BATTLE, 0),
+                ],
+                on_no: Some(text(keys::MAHA_TAMING_DECLINED)),
+            },
+        ],
+    );
+    script.refused = Some(text(keys::MAHA_BATTLE_BUSY));
+    script
+}
+
+/// Whether Maha sends `player` into the battle again: on 21401 and yet to
+/// beat it. Cosmic has no way back in once the battle is lost.
+fn fights_maha_again(player: &Player) -> bool {
+    player.quests.state(TAMING_THE_POLEARM) == QuestState::Started
+        && (player.quests.kills(TAMING_THE_POLEARM).iter()).all(|&count| count == 0)
+}
+
+fn mahas_battle_again() -> NpcScript {
+    let mut script = NpcScript::new(
+        MAHA,
+        vec![Page::Ask {
+            text: text(keys::MAHA_BATTLE_AGAIN),
+            on_yes: vec![
+                Effect::RequireEmptyMap(scripts::MAHAS_BATTLE),
+                Effect::WarpToPortal(scripts::MAHAS_BATTLE, 0),
+            ],
+            on_no: None,
+        }],
+    );
+    script.refused = Some(text(keys::MAHA_BATTLE_BUSY));
+    script
+}
+
+/// `q21401e`: calmed, Maha makes a level-120 Aran a fourth-job Aran
+/// (2112) with the Aran in Hope medal and a Maple Hero book.
+fn polearm_tamed(player: &Player) -> NpcScript {
+    if !player.can_take_fourth_job(ARAN_4) {
+        return NpcScript::new(MAHA, vec![Page::Say(text(keys::MAHA_TAMED_NOT_YET))]);
+    }
+    let [thanks, ask, restored] = keys::MAHA_TAMED;
+    let mut script = NpcScript::new(
+        MAHA,
+        vec![
+            Page::Say(text(thanks)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::TakeFourthJob(ARAN_4),
+                    Effect::GiveItem {
+                        item_id: ARAN_4_MEDAL,
+                        quantity: 1,
+                    },
+                    Effect::GiveItem {
+                        item_id: MAPLE_HERO,
+                        quantity: 1,
+                    },
+                    Effect::CompleteQuest(TAMING_THE_POLEARM),
+                ],
+                on_no: Some(text(keys::MAHA_TAMED_DECLINED)),
+            },
+            Page::Say(text(restored)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::MAHA_TAMED_FULL));
     script
 }
 
@@ -15562,7 +15675,8 @@ fn kyrin_fourth_job_test(player: &Player) -> Option<NpcScript> {
 }
 
 /// The clone's room, Lord Jonathan's test, Kyrin's, the Junior Balrog's
-/// other world, the Field of Wolves and the wolves' test room: the time a
+/// other world, the Field of Wolves, the wolves' test room and Maha's
+/// battle: the time a
 /// challenger has in it, which the map itself doesn't set.
 pub fn time_limit(map_id: i32) -> Option<u32> {
     if map_id == crate::scripts::BALROG_WORLD {
@@ -15580,12 +15694,18 @@ pub fn time_limit(map_id: i32) -> Option<u32> {
     if [scripts::FIELD_OF_WOLVES, scripts::WOLVES_TEST_ROOM].contains(&map_id) {
         return Some(WOLF_RUN_TIME_LIMIT);
     }
+    if map_id == scripts::MAHAS_BATTLE {
+        return Some(MAHAS_BATTLE_TIME_LIMIT);
+    }
     is_clone_room(map_id).then_some(CLONE_TIME_LIMIT)
 }
 
 /// An Aran's time in the Field of Wolves or the wolves' test room
 /// (Cosmic's `Aran_2ndmount` and `Aran_3rdmount` events).
 const WOLF_RUN_TIME_LIMIT: u32 = 3 * 60;
+
+/// An Aran's time against an enraged Maha (Cosmic's `MahaBattle` event).
+const MAHAS_BATTLE_TIME_LIMIT: u32 = 10 * 60;
 
 fn is_clone_room(map_id: i32) -> bool {
     THIRD_JOBS.iter().any(|line| line.boss_map == map_id)
@@ -16210,7 +16330,7 @@ pub fn input(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use game::QuestStatus;
+    use game::{QuestRecord, QuestStatus};
 
     fn player(hp: i16) -> Player {
         let mut player = crate::codec::stats::sample_player();
@@ -19038,6 +19158,59 @@ mod tests {
         // Under level 70, Maha holds back.
         aran.stats.level = 69;
         assert_eq!(run("q21302e", &aran), (MAHA, vec![]));
+    }
+
+    #[test]
+    fn maha_tamed_makes_a_fourth_job_aran() {
+        let mut aran = player(50);
+        (aran.stats.job, aran.stats.level) = (ARAN_3, 120);
+        let run =
+            |script: &str, aran: &Player| yes_through(NpcScript::for_quest(script, aran).unwrap());
+        assert_eq!(
+            run("q21400s", &aran),
+            (LILIN, vec![Effect::StartQuest(POLEARM_STARTS_A_FIGHT)])
+        );
+        let into = vec![
+            Effect::RequireEmptyMap(scripts::MAHAS_BATTLE),
+            Effect::StartQuest(TAMING_THE_POLEARM),
+            Effect::WarpToPortal(scripts::MAHAS_BATTLE, 0),
+        ];
+        assert_eq!(run("q21401s", &aran), (MAHA, into));
+
+        // Lost, Maha sends the Aran back in until it is beaten.
+        assert!(NpcScript::for_npc(MAHA, &aran).is_none());
+        aran.quests.upsert(QuestRecord {
+            quest_id: TAMING_THE_POLEARM,
+            status: QuestStatus::Started {
+                kills: vec![0],
+                info: None,
+            },
+        });
+        let again = vec![
+            Effect::RequireEmptyMap(scripts::MAHAS_BATTLE),
+            Effect::WarpToPortal(scripts::MAHAS_BATTLE, 0),
+        ];
+        let talk = NpcScript::for_npc(MAHA, &aran).unwrap();
+        assert_eq!(yes_through(talk), (MAHA, again));
+        *aran.quests.kills_mut(TAMING_THE_POLEARM).unwrap() = vec![1];
+        assert!(NpcScript::for_npc(MAHA, &aran).is_none());
+
+        let fourth = vec![
+            Effect::TakeFourthJob(ARAN_4),
+            Effect::GiveItem {
+                item_id: ARAN_4_MEDAL,
+                quantity: 1,
+            },
+            Effect::GiveItem {
+                item_id: MAPLE_HERO,
+                quantity: 1,
+            },
+            Effect::CompleteQuest(TAMING_THE_POLEARM),
+        ];
+        assert_eq!(run("q21401e", &aran), (MAHA, fourth));
+        // Under level 120, Maha holds back.
+        aran.stats.level = 119;
+        assert_eq!(run("q21401e", &aran), (MAHA, vec![]));
     }
 
     #[test]
