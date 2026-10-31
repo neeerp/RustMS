@@ -1323,6 +1323,20 @@ pub mod keys {
     pub const TEARDROP_TOO_MUCH_SP: &str = "teardrop.too_much_sp";
     pub const TEARDROP_ADVANCED: &str = "teardrop.advanced";
     pub const KNIGHT_TARGET_GO: &str = "knight_target.go";
+    pub const KNIGHT_TARGET_ZOMBIES: &str = "knight_target.zombies";
+    pub const KNIGHT_TARGET_NOTE: [&str; 2] =
+        ["knight_target.note.found", "knight_target.note.sent"];
+    pub const KNIGHT_TARGET_RETURN: &str = "knight_target.return";
+    pub const CHIEF_KNIGHT_THANKS: &str = "chief_knight.thanks";
+    pub const CHIEF_KNIGHT_WORK: &str = "chief_knight.work";
+    pub const CHIEF_KNIGHT_ASK: &str = "chief_knight.ask";
+    pub const CHIEF_KNIGHT_APPOINTED: &str = "chief_knight.appointed";
+    pub const KNIGHTS_DIGNITY_REACHED: &str = "knights_dignity.reached";
+    pub const KNIGHTS_DIGNITY_ASK: &str = "knights_dignity.ask";
+    pub const KNIGHTS_DIGNITY_GO: &str = "knights_dignity.go";
+    pub const TRAINING_NEVER_ENDS_ASK: &str = "training_never_ends.ask";
+    pub const TRAINING_STILL_NEVER_ENDS_ASK: &str = "training_still_never_ends.ask";
+    pub const TRAINING_STILL_NEVER_ENDS_DECLINED: &str = "training_still_never_ends.declined";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
     /// (`q21604s`), the end of the Field of Wolves (`clearRider`), the
@@ -4424,6 +4438,20 @@ mod tests {
                 keys::TEARDROP_TOO_MUCH_SP,
                 keys::TEARDROP_ADVANCED,
                 keys::KNIGHT_TARGET_GO,
+                keys::KNIGHT_TARGET_ZOMBIES,
+                keys::KNIGHT_TARGET_NOTE[0],
+                keys::KNIGHT_TARGET_NOTE[1],
+                keys::KNIGHT_TARGET_RETURN,
+                keys::CHIEF_KNIGHT_THANKS,
+                keys::CHIEF_KNIGHT_WORK,
+                keys::CHIEF_KNIGHT_ASK,
+                keys::CHIEF_KNIGHT_APPOINTED,
+                keys::KNIGHTS_DIGNITY_REACHED,
+                keys::KNIGHTS_DIGNITY_ASK,
+                keys::KNIGHTS_DIGNITY_GO,
+                keys::TRAINING_NEVER_ENDS_ASK,
+                keys::TRAINING_STILL_NEVER_ENDS_ASK,
+                keys::TRAINING_STILL_NEVER_ENDS_DECLINED,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
                 keys::PUCCI_WOLF_REQUEST[2],
