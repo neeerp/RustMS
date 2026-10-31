@@ -23,6 +23,7 @@
 #include <optional>
 #include <vector>
 
+#include "Combat/AranCombo.h"
 #include "Combat/Combat.h"
 #include "Combat/Dash.h"
 #include "EmoteCooldown.h"
@@ -352,6 +353,9 @@ namespace ms
 		// (v83 FUN_0063196b).
 		bool try_macro_step(const skill_macro::Step& step);
 
+		// Try the Aran combo command waiting; returns whether its skill went off (FUN_0074de09).
+		bool try_aran_command(int32_t id);
+
 		void respawn(int8_t portalid, std::optional<Point<int16_t>> chase);
 
 		void check_portals();
@@ -539,6 +543,8 @@ namespace ms
 		Combat combat;
 		skill_macro::Runner macro_runner;
 		dash::Command dash_command;
+		aran_combo::Commands aran_commands;
+		aran_combo::Queue aran_queue;
 		EmoteCooldown emote_cooldown;
 		FameCooldown fame_cooldown;
 		// When the last effect item was shown, in ms of uptime, or -1.

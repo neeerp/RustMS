@@ -70,6 +70,105 @@ int main()
 		require(two_hundred.index == 3 && two_hundred.first == 21120006 && two_hundred.second == 21120007,
 				"200 Combo Tempest and Barrier");
 		require(command(31).index == 0 && command(300).index == 0, "only those counts announce anything");
+
+		auto knows = [](std::vector<int32_t> skills)
+		{
+			return [skills](int32_t skill)
+			{
+				for (int32_t known : skills)
+					if (known == skill)
+						return 1;
+
+				return 0;
+			};
+		};
+		auto all = knows({ 21100004, 21100005, 21110004, 21120006, 21120007 });
+		auto smash = knows({ 21100004 });
+
+		require(enabled(TO_THE_LEFT, 2110, POLEARM, smash) && enabled(TO_THE_RIGHT, 2112, POLEARM, smash),
+				"an Aran with a polearm and Combo Smash");
+		require(!enabled(DOWN_TWICE, 2110, POLEARM, smash) && enabled(DOWN_TWICE, 2110, POLEARM, all),
+				"down twice needs Combo Drain");
+		require(!enabled(TO_THE_LEFT, 2110, 130, all) && !enabled(TO_THE_LEFT, 1100, POLEARM, all),
+				"no polearm or no Aran, no command");
+		require(enabled(TO_THE_LEFT, 2000, POLEARM, all), "a Legend too");
+
+		require(pick(TO_THE_LEFT, 29, all) == 0 && pick(TO_THE_LEFT, 30, all) == 21100004, "Smash from 30");
+		require(pick(TO_THE_RIGHT, 150, all) == 21110004 && pick(TO_THE_RIGHT, 200, all) == 21120006,
+				"Penril from 100, Tempest from 200");
+		require(pick(TO_THE_LEFT, 250, smash) == 21100004, "the best the player knows");
+		require(pick(DOWN_TWICE, 30, all) == 21100005 && pick(DOWN_TWICE, 199, all) == 21100005
+				&& pick(DOWN_TWICE, 200, all) == 21120007, "Drain from 30, Barrier from 200");
+		require(pick(DOWN_TWICE, 250, smash) == 0, "nothing the player doesn't know");
+
+		require(faces_right(TO_THE_RIGHT, false) == true && faces_right(TO_THE_LEFT, false) == false,
+				"each turns its way");
+		require(faces_right(TO_THE_RIGHT, true) == false && faces_right(TO_THE_LEFT, true) == true,
+				"the other way while confused");
+		require(!faces_right(DOWN_TWICE, false), "down twice doesn't turn");
+
+		auto yes = [](int32_t) { return true; };
+		auto press = [&](Commands& c, Key key, bool down, int64_t now, int64_t code = -1)
+		{
+			return c.feed(code < 0 ? static_cast<int64_t>(key) : code, key, down, now, yes);
+		};
+
+		Commands c;
+		require(press(c, Key::DOWN, true, 0) == 0 && press(c, Key::LEFT, true, 100) == 0, "not yet");
+		require(press(c, Key::ATTACK, true, 200) == TO_THE_LEFT, "Down, Left, attack");
+
+		require(press(c, Key::DOWN, true, 1000) == 0 && press(c, Key::DOWN, false, 1050) == 0
+				&& press(c, Key::LEFT, false, 1060) == 0 && press(c, Key::RIGHT, true, 1100) == 0
+				&& press(c, Key::RIGHT, false, 1150) == 0, "keys let go between don't matter");
+		require(press(c, Key::ATTACK, true, 1200) == TO_THE_RIGHT, "Down, Right, attack");
+
+		require(press(c, Key::DOWN, true, 2000) == 0 && press(c, Key::RIGHT, true, 2100) == 0, "begun");
+		require(press(c, Key::ATTACK, true, 2601) == 0, "but the whole of it must come within 600 ms");
+
+		press(c, Key::ATTACK, false, 2700);
+		require(press(c, Key::DOWN, true, 3000) == 0 && press(c, Key::OTHER, true, 3050) == 0
+				&& press(c, Key::LEFT, true, 3100) == 0, "begun and broken");
+		require(press(c, Key::ATTACK, true, 3200) == 0, "by any other key going down");
+
+		press(c, Key::ATTACK, false, 3300);
+		press(c, Key::LEFT, false, 3300);
+		require(press(c, Key::DOWN, true, 4000) == 0 && press(c, Key::DOWN, false, 4100) == 0
+				&& press(c, Key::DOWN, true, 4200) == 0, "Down, let go, Down");
+		require(press(c, Key::ATTACK, true, 4300) == DOWN_TWICE, "and attack");
+
+		press(c, Key::ATTACK, false, 4400);
+		require(press(c, Key::DOWN, true, 5000) == 0 && press(c, Key::DOWN, true, 5050) == 0
+				&& press(c, Key::DOWN, true, 5100) == 0, "a key held repeats its press, which doesn't count");
+		require(press(c, Key::ATTACK, true, 5200) == 0, "so holding Down isn't down twice");
+
+		press(c, Key::ATTACK, false, 5300);
+		press(c, Key::DOWN, false, 5300);
+		require(press(c, Key::DOWN, true, 6000) == 0 && press(c, Key::DOWN, false, 6100) == 0
+				&& press(c, Key::DOWN, true, 6200) == 0 && press(c, Key::LEFT, true, 6300) == 0,
+				"one begun down twice keeps the sideways ones from beginning again");
+		require(press(c, Key::ATTACK, true, 6400) == 0, "so it has to be Down, a side, attack from the start");
+
+		Commands refused;
+		auto smash_only = [](int32_t id) { return id != DOWN_TWICE; };
+		refused.feed(1, Key::DOWN, true, 0, smash_only);
+		refused.feed(1, Key::DOWN, false, 50, smash_only);
+		refused.feed(1, Key::DOWN, true, 100, smash_only);
+		require(refused.feed(2, Key::ATTACK, true, 150, smash_only) == 0, "one not enabled never begins");
+
+		Commands dead;
+		press(dead, Key::DOWN, true, 0);
+		press(dead, Key::LEFT, true, 50);
+		dead.clear();
+		require(press(dead, Key::ATTACK, true, 100) == 0, "cleared, it begins again");
+
+		Queue q;
+		require(!q.due(0) && q.empty(), "nothing waits");
+		q.push(TO_THE_LEFT, 100);
+		require(!q.empty() && q.due(1099) == TO_THE_LEFT, "a command waits");
+		require(!q.due(1100) && q.empty(), "for a second at most");
+		q.push(DOWN_TWICE, 2000);
+		q.pop();
+		require(q.empty(), "and goes once used");
 	}
 	catch (const std::exception& e)
 	{
