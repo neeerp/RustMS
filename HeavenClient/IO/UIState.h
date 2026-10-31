@@ -61,6 +61,12 @@ namespace ms
 
 		virtual void send_close() = 0;
 
+		// The window holding the focus, if this state has one.
+		virtual UIElement *get_focused()
+		{
+			return nullptr;
+		}
+
 		virtual void drag_icon(Icon *icon) = 0;
 
 		// Drop any dragged icon without placing it, e.g. before the icons it

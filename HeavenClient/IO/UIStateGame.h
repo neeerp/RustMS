@@ -128,7 +128,7 @@ namespace ms
 
 		// The window holding the focus. Once it closes, the focus goes back
 		// to the one it opened over, such as a dialog under its notice.
-		UIElement *get_focused();
+		UIElement *get_focused() override;
 
 		template<class T, typename...Args>
 		void emplace(Args &&...args);

@@ -218,6 +218,13 @@ namespace ms
 		virtual void send_key(int32_t keycode, bool pressed, bool escape)
 		{}
 
+		// Tab or Space, as the GLFW key, before any field hears it, for a window that moves the keys between its
+		// controls. Returns whether it took the key.
+		virtual bool send_focus_key(int32_t keycode, bool pressed, bool shift)
+		{
+			return false;
+		}
+
 		virtual UIElement::Type get_type() const = 0;
 
 	protected:

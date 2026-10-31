@@ -28,6 +28,8 @@ namespace ms
 		constexpr int32_t WOBBLE = 45;
 		constexpr int32_t WOBBLES = 6;
 		constexpr int16_t WOBBLE_X = 5;
+		// The item's art fades in over 1500 ms as it comes (report c003b: its layer's alpha goes from 0 to 255).
+		constexpr int32_t FADE = 1500;
 		// It slides out after 10 s (CWvsContext::Update).
 		constexpr int32_t SHOWN_FOR = 10'000;
 
@@ -78,7 +80,7 @@ namespace ms
 	{
 		Point<int16_t> at = position + Point<int16_t>(offset(), 0);
 
-		art.draw(at, alpha);
+		art.draw(DrawArgument(at, static_cast<float>(std::min(shown, FADE)) / FADE), alpha);
 		look.draw(at + AVATAR, false, Stance::Id::STAND1, expression);
 		plate.draw(at + Point<int16_t>(plate_x, PLATE_Y));
 		name.draw(at + Point<int16_t>(NAME_X, PLATE_Y - TEXT_RAISE));

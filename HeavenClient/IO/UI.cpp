@@ -338,6 +338,13 @@ namespace ms
 			// The quick slot editor reads every key itself while none of its
 			// notices is up (OnKey 72ce91).
 			quickslots->send_raw_key(keycode, pressed);
+		} else if (UIElement *focused =
+						   keycode == GLFW_KEY_TAB || keycode == GLFW_KEY_SPACE ? state->get_focused() : nullptr;
+				   focused && focused->send_focus_key(keycode, pressed,
+													  is_key_down[keyboard.leftshiftcode()] ||
+													  is_key_down[keyboard.rightshiftcode()]))
+		{
+			// The window moves the keys between its controls (FUN_004edc29), or a button with them hears Space.
 		} else if (focusedtextfield)
 		{
 			bool ctrl = is_key_down[keyboard.leftctrlcode()] || is_key_down[keyboard.rightctrlcode()];

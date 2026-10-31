@@ -13,8 +13,8 @@
 namespace ms
 {
 	// An avatar megaphone's banner (v83 FUN_0045a4cd, drawn by FUN_0045aef1): the item's art in the top right
-	// corner, the speaker standing in it with the item's face, the name on a plate under them, and four lines in
-	// the speech box. It slides in from the right edge with a wobble (FUN_0045b2b9), and back out after 10 s or
+	// corner, fading in over 1500 ms, the speaker standing in it with the item's face, the name on a plate under
+	// them, and four lines in the speech box. It slides in from the right edge with a wobble (FUN_0045b2b9), and back out after 10 s or
 	// when the server clears it (FUN_0045b818). The next banner replaces it at once. Clicks go through it.
 	class UIAvatarMegaphone : public UIElement
 	{

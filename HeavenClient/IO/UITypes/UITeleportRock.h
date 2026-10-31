@@ -2,6 +2,7 @@
 
 #include "../UIElement.h"
 
+#include "../Components/FocusRing.h"
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
 
@@ -34,6 +35,8 @@ namespace ms
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		bool send_focus_key(int32_t keycode, bool pressed, bool shift) override;
 
 		UIElement::Type get_type() const override;
 
@@ -89,6 +92,8 @@ namespace ms
 		int16_t counter_width;
 		Textfield namefield;
 		Slider slider;
+		// Register, Delete, Move, Close and the field (FUN_008392c1); the VIP list's scrollbar is left out.
+		FocusRing ring;
 		int16_t first;
 		int16_t selected;
 		bool held;

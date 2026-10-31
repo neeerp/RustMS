@@ -17,6 +17,12 @@
 
 #include <nlnx/nx.hpp>
 
+#ifdef _WIN32
+#include <glfw3.h>
+#else
+#include <GLFW/glfw3.h>
+#endif
+
 namespace ms
 {
 	namespace
@@ -116,6 +122,12 @@ namespace ms
 
 		refresh();
 
+		ring.add(Buttons::REGISTER, *buttons[Buttons::REGISTER]);
+		ring.add(Buttons::DELETE, *buttons[Buttons::DELETE]);
+		ring.add(Buttons::MOVE, *buttons[Buttons::MOVE]);
+		ring.add(Buttons::CLOSE, *buttons[Buttons::CLOSE]);
+		ring.add(namefield);
+
 		namefield.set_state(Textfield::State::FOCUSED);
 	}
 
@@ -169,6 +181,8 @@ namespace ms
 
 		enable(Buttons::MOVE, selected >= 0 || !namefield.empty());
 		enable(Buttons::DELETE, selected >= 0);
+
+		ring.update();
 	}
 
 	void UITeleportRock::remove_cursor()
@@ -220,6 +234,26 @@ namespace ms
 			move();
 	}
 
+	bool UITeleportRock::send_focus_key(int32_t keycode, bool pressed, bool shift)
+	{
+		if (keycode == GLFW_KEY_TAB)
+		{
+			if (pressed)
+				ring.cycle(shift);
+
+			return true;
+		}
+
+		// Space is typed in the field, and clicks a button with the keys.
+		if (!ring.holds_keys())
+			return false;
+
+		if (auto id = ring.space(pressed))
+			button_pressed(*id);
+
+		return true;
+	}
+
 	UIElement::Type UITeleportRock::get_type() const
 	{
 		return TYPE;
@@ -248,6 +282,9 @@ namespace ms
 
 	Button::State UITeleportRock::button_pressed(uint16_t buttonid)
 	{
+		// A click gives a button the keys.
+		ring.focus_button(buttonid);
+
 		switch (buttonid)
 		{
 			case Buttons::REGISTER:
@@ -291,7 +328,7 @@ namespace ms
 
 			// v83 gives the keys to Register.
 			selected = i;
-			release_field();
+			ring.focus_button(Buttons::REGISTER);
 
 			return true;
 		}
