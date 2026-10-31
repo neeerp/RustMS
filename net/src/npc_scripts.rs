@@ -3034,6 +3034,9 @@ impl NpcScript {
             "q20015s" => Some(cygnus_greeting()),
             "q20016s" => Some(neinhearts_briefing()),
             "q20017s" => Some(kikus_training()),
+            "q20020s" => Some(five_paths()),
+            "q20100s" => Some(time_to_choose()),
+            "q20101e" | "q20102e" | "q20103e" | "q20104e" | "q20105e" => knight_job(script, player),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -4796,8 +4799,8 @@ fn neinhearts_briefing() -> NpcScript {
 
 /// `q20017s`: Kiku sends the Noblesse after 15 Mimis (100122) in Training
 /// Forest II; the data's end gives 430 EXP and ten of each potion. Cosmic
-/// also starts 20020 and completes 20100 here, which are the job's own
-/// quests' to start.
+/// also starts 20020 and completes 20100 here; Neinheart's `q20020s` does
+/// both at level 10 instead.
 fn kikus_training() -> NpcScript {
     ereve_offer(
         KIKU,
@@ -4807,6 +4810,112 @@ fn kikus_training() -> NpcScript {
         FIRST_KNIGHT_TRAINING,
         12,
     )
+}
+
+// A Noblesse's first job (b310): at level 10 Neinheart sends them to the
+// five Knight Commanders (1101003-1101007), whose quests (20101-20105)
+// wait on Time to Choose (20100) done, and each Commander's end script
+// makes them a Knight. The data's rewards are empty; these are Cosmic's
+// (`20101.js` to `20105.js`).
+const FIVE_PATHS: i16 = 20020;
+const TIME_TO_CHOOSE: i16 = 20100;
+
+/// A Knight's first job: the quest, its Commander, the job, the name its
+/// lines give it, and its weapon (and ammunition). Cosmic gives the
+/// Knight-in-Training medal (1142066) too, but that is the reward of its
+/// title (29906, `KNIGHT_TITLES`), which Cygnus gives.
+const KNIGHT_JOBS: [(i16, i32, i16, &str, &[(i32, i16)]); 5] = [
+    (20101, 1101003, 1100, "Dawn Warrior", &[(1302077, 1)]),
+    (20102, 1101004, 1200, "Blaze Wizard", &[(1372043, 1)]),
+    (
+        20103,
+        1101005,
+        1300,
+        "Wind Archer",
+        &[(1452051, 1), (2060000, 2000)],
+    ),
+    (
+        20104,
+        1101006,
+        1400,
+        "Night Walker",
+        &[(1472061, 1), (2070000, 800)],
+    ),
+    (20105, 1101007, 1500, "Thunder Breaker", &[(1482014, 1)]),
+];
+
+/// `q20020s`: Neinheart's five paths. Cosmic's offers a clip of the player
+/// as a Knight Commander (913040100), which we skip (b311): the yes
+/// completes Time to Choose (20100), which frees the Commanders' quests,
+/// and the end completes 20020 itself. Should the player leave between
+/// the two, only 20020 stays undone, which nothing waits on.
+fn five_paths() -> NpcScript {
+    let mut pages: Vec<Page> = keys::NEINHEART_PATHS
+        .iter()
+        .map(|key| Page::Say(text(key)))
+        .collect();
+    pages.push(Page::Ask {
+        text: text(keys::NEINHEART_PATHS_ASK),
+        on_yes: vec![Effect::FinishQuest(TIME_TO_CHOOSE)],
+        on_no: Some(text(keys::NEINHEART_PATHS_DECLINED)),
+    });
+    pages.push(Page::Say(text(keys::NEINHEART_PATHS_GO)));
+    let mut script = NpcScript::new(NEINHEART, pages);
+    script.on_end = vec![Effect::FinishQuest(FIVE_PATHS)];
+    script
+}
+
+/// `q20100s`: Time to Choose, which the client offers only after the old
+/// tutorial (`SCRIPTED_PREREQUISITES`), completes as it starts (Cosmic's
+/// `20100.js`).
+fn time_to_choose() -> NpcScript {
+    let pages = vec![
+        Page::Ask {
+            text: text(keys::NEINHEART_PATHS_ASK),
+            on_yes: vec![Effect::FinishQuest(TIME_TO_CHOOSE)],
+            on_no: Some(text(keys::NEINHEART_PATHS_DECLINED)),
+        },
+        Page::Say(text(keys::NEINHEART_PATHS_GO)),
+    ];
+    NpcScript::new(NEINHEART, pages)
+}
+
+/// `q20101e` to `q20105e`: a Commander makes the Noblesse a Knight, as an
+/// Explorer instructor does (`first_job`), with the weapon, a row more of
+/// equipment and of etc. slots, and the quest done.
+fn knight_job(script: &str, player: &Player) -> Option<NpcScript> {
+    let &(quest, npc, job, name, items) = KNIGHT_JOBS
+        .iter()
+        .find(|(quest, ..)| script[1..].starts_with(&quest.to_string()))?;
+    let content = content::text();
+    let line = |key: &str| content.get(key, &[("job", name)]);
+    if !player.can_take_first_job(job) {
+        return Some(NpcScript::new(
+            npc,
+            vec![Page::Say(line(keys::KNIGHT_JOB_TOO_WEAK))],
+        ));
+    }
+    let mut on_yes = vec![
+        Effect::TakeFirstJob(job),
+        Effect::AddSlotRow(InventoryType::Equip),
+        Effect::AddSlotRow(InventoryType::Etc),
+    ];
+    on_yes
+        .extend((items.iter()).map(|&(item_id, quantity)| Effect::GiveItem { item_id, quantity }));
+    on_yes.push(Effect::CompleteQuest(quest));
+    let mut pages = vec![Page::Ask {
+        text: line(keys::KNIGHT_JOB_ASK),
+        on_yes,
+        on_no: Some(line(keys::KNIGHT_JOB_DECLINED)),
+    }];
+    pages.extend(
+        keys::KNIGHT_JOB_AFTER
+            .iter()
+            .map(|key| Page::Say(line(key))),
+    );
+    let mut script = NpcScript::new(npc, pages);
+    script.inventory_full = Some(line(keys::KNIGHT_JOB_INVENTORY_FULL));
+    Some(script)
 }
 
 /// The titles of medals won elsewhere (29910 to 29928 and 29933): each
@@ -18083,6 +18192,61 @@ mod tests {
         let declined = kimu.respond(ScriptInput::No).unwrap();
         assert!(declined.effects.is_empty());
         assert_eq!(page_text(&declined), text(keys::KIMU_WELCOME_DECLINED));
+    }
+
+    #[test]
+    fn neinheart_sends_a_noblesse_of_10_to_the_commanders_who_make_knights() {
+        let mut noblesse = player(50);
+        (noblesse.stats.job, noblesse.stats.level) = (1000, 10);
+        let run = |script: &str| yes_through(NpcScript::for_quest(script, &noblesse).unwrap());
+
+        // The yes frees the Commanders' quests; the end completes 20020.
+        let mut paths = NpcScript::for_quest("q20020s", &noblesse).unwrap();
+        let mut step = paths.begin();
+        while kind(&step) != Some(1) {
+            assert!(step.effects.is_empty());
+            step = paths.respond(ScriptInput::Next).unwrap();
+        }
+        let yes = paths.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::FinishQuest(TIME_TO_CHOOSE)]);
+        assert_eq!(page_text(&yes), text(keys::NEINHEART_PATHS_GO));
+        let end = paths.respond(ScriptInput::Next).unwrap();
+        assert_eq!(
+            (end.prompt, end.effects),
+            (None, vec![Effect::FinishQuest(FIVE_PATHS)])
+        );
+        assert_eq!(
+            run("q20100s"),
+            (NEINHEART, vec![Effect::FinishQuest(TIME_TO_CHOOSE)])
+        );
+
+        // A Dawn Warrior needs 35 STR.
+        noblesse.stats.str = 34;
+        let weak = NpcScript::for_quest("q20101e", &noblesse).unwrap();
+        assert_eq!(yes_through(weak), (1101003, vec![]));
+        noblesse.stats.str = 35;
+        let rows = [
+            Effect::AddSlotRow(InventoryType::Equip),
+            Effect::AddSlotRow(InventoryType::Etc),
+        ];
+        let give = |item_id, quantity| Effect::GiveItem { item_id, quantity };
+        let mut knight = vec![Effect::TakeFirstJob(1100)];
+        knight.extend(rows.clone());
+        knight.extend([give(1302077, 1), Effect::CompleteQuest(20101)]);
+        let run = |script: &str| yes_through(NpcScript::for_quest(script, &noblesse).unwrap());
+        assert_eq!(run("q20101e"), (1101003, knight));
+
+        // A Night Walker gets a claw and stars.
+        noblesse.stats.dex = 25;
+        let mut knight = vec![Effect::TakeFirstJob(1400)];
+        knight.extend(rows);
+        knight.extend([
+            give(1472061, 1),
+            give(2070000, 800),
+            Effect::CompleteQuest(20104),
+        ]);
+        let walker = NpcScript::for_quest("q20104e", &noblesse).unwrap();
+        assert_eq!(yes_through(walker), (1101006, knight));
     }
 
     #[test]

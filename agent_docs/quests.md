@@ -937,8 +937,30 @@ tutorial (`Act` is empty), so the scripts give Cosmic's:
   EXP.
 - Kiku's (1102000) First Knight Training (`q20017s`) starts the hunt for 15
   Mimis (100122), which the data ends for 430 EXP and ten of each potion.
-  Cosmic also starts 20020 and completes 20100 here; we leave those to the
-  Cygnus first-job quests.
+  Cosmic also starts 20020 and completes 20100 here; we leave those to
+  Neinheart's five paths.
+
+At level 10 the Noblesse takes a first job:
+
+- Neinheart's 5 Different Paths of Cygnus Knights (`q20020s`) completes
+  Time to Choose (20100) on the yes and 20020 itself at the end. Cosmic's
+  offers a clip of the player as a Knight Commander (913040100) first; we
+  skip it. 20100 waits on the old tutorial's 20000 and 20001 done, which
+  nothing starts any more, so the client never offers it, and 20020 waits
+  on 20100 not started. The server reads past both
+  (`game_data::quests::SCRIPTED_PREREQUISITES`). `q20100s` completes 20100
+  as it starts, for a client that does offer it.
+- The five Knight Commanders' quests (20101 to 20105, at 1101003 to
+  1101007 on Ereve) wait on 20100 done and exclude each other. The player
+  starts one in the quest window, and its end script (`q20101e` to
+  `q20105e`) asks once more. The yes makes them a Dawn Warrior, Blaze
+  Wizard, Wind Archer, Night Walker or Thunder Breaker (1100 to 1500) with
+  the first-job rules of the Explorer counterpart (`Player::take_first_job`;
+  level 10 for all, and the same stat minimums). It also adds a row of
+  equipment and of etc. slots, and gives Cosmic's weapon: a sword, a wand,
+  a bow with 2000 arrows, a claw with 800 stars, or a knuckle. Cosmic also
+  gives the Knight-in-Training medal (1142066), but the server leaves that
+  to the title (29906), whose reward it is.
 
 Each brother's start points the guide at a part of the screen
 (`Effect::GuideHint`, TALK_GUIDE mode 1), as Cosmic's `guideHint` does.

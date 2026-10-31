@@ -760,20 +760,20 @@ impl Player {
     }
 
     /// Whether this beginner may take the first job `job` (100, 200, 300,
-    /// 400 or 500): level 10, or 8 for magicians, and 35 STR, 20 INT,
-    /// 25 DEX, 25 DEX or 20 DEX.
+    /// 400 or 500, or a Noblesse's 1100 to 1500): level 10, or 8 for
+    /// Explorer magicians, and 35 STR, 20 INT, 25 DEX, 25 DEX or 20 DEX.
     pub fn can_take_first_job(&self, job: i16) -> bool {
         let stats = &self.stats;
         let Some((level, _, _)) = first_job_rules(job) else {
             return false;
         };
-        let (stat, needed) = match job {
+        let (stat, needed) = match job % 1000 {
             100 => (stats.str, 35),
             200 => (stats.int, 20),
             500 => (stats.dex, 20),
             _ => (stats.dex, 25),
         };
-        stats.job == 0 && stats.level >= level && stat >= needed
+        stats.job == job / 1000 * 1000 && stats.level >= level && stat >= needed
     }
 
     /// Become a first-job `job`: 3 SP for each level past the job's
@@ -1060,12 +1060,15 @@ fn growth(job: i16) -> Growth {
 
 /// A first job's minimum level and the max HP/MP it adds: the middle of
 /// the random ranges community servers use (e.g. warriors 201-250 HP).
+/// The Knights of Cygnus' jobs take what their Explorer counterparts do,
+/// at level 10 for all, as their quests (20101-20105) ask.
 fn first_job_rules(job: i16) -> Option<(u8, i16, i16)> {
     match job {
-        100 => Some((10, 225, 0)),
+        100 | 1100 => Some((10, 225, 0)),
         200 => Some((8, 0, 125)),
-        300 | 400 => Some((10, 125, 38)),
-        500 => Some((10, 175, 63)),
+        1200 => Some((10, 0, 125)),
+        300 | 400 | 1300 | 1400 => Some((10, 125, 38)),
+        500 | 1500 => Some((10, 175, 63)),
         _ => None,
     }
 }
@@ -1493,6 +1496,24 @@ mod tests {
         assert_eq!((player.stats.hp, player.stats.mp), (50, 5));
         assert!(player.is_dirty());
         assert!(!player.can_take_first_job(100), "only beginners advance");
+    }
+
+    #[test]
+    fn a_noblesse_takes_a_knights_job_at_10() {
+        let mut player = player();
+        (player.stats.level, player.stats.int) = (9, 20);
+        assert!(!player.can_take_first_job(1200), "a Noblesse only");
+        player.stats.job = 1000;
+        assert!(!player.can_take_first_job(1200), "Blaze Wizards need 10");
+        assert!(!player.can_take_first_job(200), "not an Explorer's job");
+        player.stats.level = 10;
+        assert!(player.can_take_first_job(1200));
+        assert!(!player.can_take_first_job(1100), "Dawn Warriors need STR");
+
+        player.take_first_job(1200);
+        assert_eq!(player.stats.job, 1200);
+        assert_eq!(player.stats.sp, 1);
+        assert_eq!(player.stats.max_mp, 130);
     }
 
     #[test]

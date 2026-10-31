@@ -103,7 +103,8 @@ pub const SCRIPTS: &[&str] = &[
     "q21618s", "q21618e", "q3250s", "q3250e", "q29002s", "q29002e", "q29400s", "q29400e",
     "q29906s", "q29907s", "q29908s", "q29909s", "q29922s", "q29923s", "q29924s", "q29925s",
     "q29926s", "q29927s", "q29928s", "q29905s", "q20010s", "q20010e", "q20011s", "q20011e",
-    "q20012s", "q20012e", "q20013s", "q20013e", "q20015s", "q20016s", "q20017s",
+    "q20012s", "q20012e", "q20013s", "q20013e", "q20015s", "q20016s", "q20017s", "q20020s",
+    "q20100s", "q20101e", "q20102e", "q20103e", "q20104e", "q20105e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -116,10 +117,10 @@ pub const SCRIPTS: &[&str] = &[
 /// Steps (21704), told to Lilin, and the titles of medals held (29922 to
 /// 29928: Veteran Hunter, Legendary Hunter and the Aran titles), and a
 /// Noblesse's greeting from Cygnus (20015) and briefing from Neinheart
-/// (20016).
+/// (20016), and the Knights' Time to Choose (20100).
 pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
     2216, 2217, 2218, 2219, 2228, 2245, 2334, 2342, 3108, 3523, 3524, 3525, 3526, 3527, 3529, 3539,
-    3714, 20015, 20016, 21704, 29922, 29923, 29924, 29925, 29926, 29927, 29928,
+    3714, 20015, 20016, 20100, 21704, 29922, 29923, 29924, 29925, 29926, 29927, 29928,
 ];
 /// The Noblesse and Knight titles (29905 to 29909): Cygnus (1101000)
 /// completes them, and
@@ -216,6 +217,14 @@ pub const START_RECORD_QUESTS: &[(i16, i16)] = &[
     (21753, 21764),
     (21754, 21765),
 ];
+/// Start prerequisites the server reads past, as a script sees to them:
+/// `(quest, prerequisites)`. Time to Choose (20100) waits on the old
+/// Cygnus tutorial's 20000 and 20001 done, which nothing starts any more,
+/// so the client never offers it; Neinheart's 5 Different Paths of Cygnus
+/// Knights (`q20020s`) completes it, and then 20020 itself, which waits on
+/// 20100 not started (b310). The Knights' first jobs (20101-20105) wait on
+/// 20100 done.
+pub const SCRIPTED_PREREQUISITES: &[(i16, &[i16])] = &[(20020, &[20100]), (20100, &[20000, 20001])];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
@@ -807,6 +816,12 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         }
     }
     requirements.quests = prerequisites(nx, start)?;
+    if let Some((_, read_past)) = SCRIPTED_PREREQUISITES
+        .iter()
+        .find(|(quest, _)| *quest == id)
+    {
+        (requirements.quests).retain(|p| !read_past.contains(&p.quest_id));
+    }
     requirements.worn_all = int_list(nx, start, "equipAllNeed")?;
     requirements.worn_any = int_list(nx, start, "equipSelectNeed")?;
     requirements.maps = int_list(nx, start, "fieldEnter")?;
