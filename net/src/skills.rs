@@ -821,9 +821,14 @@ const ARMED: [(i32, BuffStat, MobStat); 2] = [
     (3221006, BuffStat::Blind, MobStat::Blind),
 ];
 
+/// The Aran's Snow Charge, an ice charge that also slows the mobs it hits
+/// by its `x` for `y` seconds.
+pub const SNOW_CHARGE: i32 = 21111005;
+
 /// What an attack puts on each mob it hits, besides its damage: its
 /// skill's status, Hamstring's or Blind's `x` by their `prop` for `y`
-/// seconds while they last (Cosmic's AbstractDealDamageHandler), and the
+/// seconds while they last (Cosmic's AbstractDealDamageHandler), Snow
+/// Charge's slow while the charge is on, and the
 /// poison of a thief's Venom, each second a roll
 /// between (8 (STR + LUK) + 2 DEX) / 100 and (18.5 (STR + LUK) + 2 DEX) /
 /// 100 times the Venom's `mad` (the old community damage formulas).
@@ -861,6 +866,17 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
                 statuses: vec![(status, Amount::Value(effect.x as i16))],
             });
         }
+    }
+    let snow = (player.buffs.active())
+        .iter()
+        .any(|buff| buff.stat == BuffStat::WeaponCharge && buff.skill_id == SNOW_CHARGE);
+    if let Some(skill) = learned(player, SNOW_CHARGE).filter(|_| snow) {
+        inflicts.push(Inflict {
+            skill_id: SNOW_CHARGE,
+            prop: 100,
+            duration: Duration::from_secs(skill.effect.y.max(0) as u64),
+            statuses: vec![(MobStat::Speed, Amount::Value(skill.effect.x as i16))],
+        });
     }
     let venom = VENOMS
         .iter()
@@ -1211,19 +1227,23 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         1011 | 10001011 | 20001011 | 20011011 => vec![(BuffStat::DojangBerserk, effect.x)],
         1002 | 10001002 | 20001002 => vec![],
         // Iron Body, Rage, Iron Will, Magic Armor, Meditation, Bless,
-        // Focus, Haste, Enrage.
+        // Focus, Haste, Enrage, and the knights' Iron Body, Rage, Magic
+        // Armor, Meditation, Focus and Haste.
         1001003 | 1101006 | 1301006 | 2001003 | 2101001 | 2201001 | 2301004 | 3001003 | 4101004
-        | 4201003 | 1121010 => vec![],
-        1101004 | 1101005 | 1201004 | 1201005 | 1301004 | 1301005 | 2111005 | 2211005 | 3101002
-        | 3201002 | 4101003 | 4201002 | 5101006 | 5201003 => {
-            vec![(BuffStat::Booster, effect.x)]
+        | 4201003 | 1121010 | 11001001 | 11101003 | 12001002 | 12101000 | 13001002 | 14101003 => {
+            vec![]
         }
+        1101004 | 1101005 | 1201004 | 1201005 | 1301004 | 1301005 | 2111005 | 2211005 | 3101002
+        | 3201002 | 4101003 | 4201002 | 5101006 | 5201003 | 11101001 | 12101004 | 13101001
+        | 14101002 | 15101002 | 21001003 => vec![(BuffStat::Booster, effect.x)],
         1101007 | 1201007 => vec![(BuffStat::PowerGuard, effect.x)],
         5121009 | 15111005 => vec![(BuffStat::SpeedInfusion, effect.x)],
         // The orbs start at none, which the client counts from 1.
-        1111002 => vec![(BuffStat::Combo, 1)],
-        1211003..=1211008 | 1221003 | 1221004 => {
-            return Some(vec![(BuffStat::WeaponCharge, effect.x)]);
+        1111002 | 11111001 => vec![(BuffStat::Combo, 1)],
+        // The value is only a mark; the client reads the charge's element
+        // from its skill (0x7908e7), and Snow Charge's `x` is its slow.
+        1211003..=1211008 | 1221003 | 1221004 | 11111007 | 15101006 | SNOW_CHARGE => {
+            return Some(vec![(BuffStat::WeaponCharge, effect.x.max(1))]);
         }
         1301007 | 9101008 => vec![(BuffStat::MaxHp, effect.x), (BuffStat::MaxMp, effect.y)],
         // The GM's Haste (Normal) and (Super), and Bless.
@@ -1231,9 +1251,11 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         9101002 => vec![(BuffStat::HolySymbol, effect.x)],
         DRAGON_BLOOD => vec![(BuffStat::DragonBlood, effect.x)],
         1121000 | 1221000 | 1321000 | 2121000 | 2221000 | 2321000 | 3121000 | 3221000 | 4121000
-        | 4221000 | 5121000 | 5221000 => vec![(BuffStat::MapleWarrior, effect.x)],
-        1121002 | 1221002 | 1321002 => vec![(BuffStat::Stance, effect.prop)],
-        2001002 => vec![(BuffStat::MagicGuard, effect.x)],
+        | 4221000 | 5121000 | 5221000 | 21121000 => vec![(BuffStat::MapleWarrior, effect.x)],
+        // Power Stance, and the Aran's Freeze Standing, which the client
+        // takes for the same stance (0x958aa9).
+        1121002 | 1221002 | 1321002 | 21121003 => vec![(BuffStat::Stance, effect.prop)],
+        2001002 | 12001001 => vec![(BuffStat::MagicGuard, effect.x)],
         2301003 => vec![(BuffStat::Invincible, effect.x)],
         2311003 => vec![(BuffStat::HolySymbol, effect.x)],
         2121004 | 2221004 | 2321004 => vec![(BuffStat::Infinity, effect.x)],
@@ -1247,7 +1269,7 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         SHADOW_STARS => vec![(BuffStat::ShadowStars, 0)],
         3121008 => vec![(BuffStat::Concentrate, effect.x)],
         3121002 | 3221002 => vec![(BuffStat::SharpEyes, effect.x << 8 | effect.y)],
-        4001003 => vec![(BuffStat::DarkSight, effect.x)],
+        4001003 | 14001003 => vec![(BuffStat::DarkSight, effect.x)],
         4111001 => vec![(BuffStat::MesoUp, effect.x)],
         4111002 | 14111000 => vec![(BuffStat::ShadowPartner, effect.x)],
         4211003 => vec![(BuffStat::PickPocket, effect.x)],
@@ -1411,6 +1433,73 @@ mod tests {
         let stat = |skill_id| buffs(&at_level(skill_id, 1).unwrap()).unwrap()[0].0;
         assert_eq!(stat(13101003), BuffStat::SoulArrow);
         assert_eq!(stat(14111000), BuffStat::ShadowPartner);
+    }
+
+    #[test]
+    fn the_knights_and_the_arans_buffs_give_their_stats() {
+        if data().is_err() {
+            return;
+        }
+        let stats = |skill_id, level| buffs(&at_level(skill_id, level).unwrap()).unwrap();
+        assert_eq!(stats(11001001, 10), [(BuffStat::Pdd, 30)]);
+        assert_eq!(
+            stats(11101003, 20),
+            [(BuffStat::Pad, 12), (BuffStat::Pdd, -12)]
+        );
+        assert_eq!(stats(12001002, 10), [(BuffStat::Pdd, 40)]);
+        assert_eq!(stats(12101000, 20), [(BuffStat::Mad, 20)]);
+        assert_eq!(
+            stats(13001002, 10),
+            [(BuffStat::Acc, 20), (BuffStat::Eva, 20)]
+        );
+        assert_eq!(
+            stats(14101003, 20),
+            [(BuffStat::Speed, 40), (BuffStat::Jump, 20)]
+        );
+        for booster in [11101001, 12101004, 13101001, 14101002, 15101002] {
+            assert_eq!(stats(booster, 20), [(BuffStat::Booster, -2)]);
+        }
+        assert_eq!(stats(21001003, 20), [(BuffStat::Booster, -3)]);
+        assert_eq!(stats(12001001, 10), [(BuffStat::MagicGuard, 80)]);
+        assert_eq!(stats(14001003, 10), [(BuffStat::DarkSight, 1)]);
+        assert_eq!(stats(11111001, 20), [(BuffStat::Combo, 1)]);
+        for charge in [11111007, 15101006, SNOW_CHARGE] {
+            assert_eq!(stats(charge, 20), [(BuffStat::WeaponCharge, 1)]);
+        }
+        assert_eq!(stats(21121000, 30), [(BuffStat::MapleWarrior, 15)]);
+        assert_eq!(stats(21121003, 30), [(BuffStat::Stance, 90)]);
+    }
+
+    #[test]
+    fn snow_charge_slows_the_mobs_it_hits() {
+        if data().is_err() {
+            return;
+        }
+        let mut player = knowing(&[(SNOW_CHARGE, 20)]);
+        assert!(on_hit(&player, None, false, 0.5).is_empty());
+        let now = std::time::Instant::now();
+        let lasts = Duration::from_secs(200);
+        (player.buffs).give(game::Buff::new(
+            SNOW_CHARGE,
+            BuffStat::WeaponCharge,
+            1,
+            now,
+            lasts,
+        ));
+        let inflicts = on_hit(&player, None, false, 0.5);
+        assert_eq!(inflicts.len(), 1);
+        assert_eq!(inflicts[0].duration, Duration::from_secs(20));
+        assert_eq!(inflicts[0].statuses, [(MobStat::Speed, Amount::Value(-40))]);
+        // Another charge leaves the mobs alone.
+        let mut other = knowing(&[(SNOW_CHARGE, 20)]);
+        (other.buffs).give(game::Buff::new(
+            1211004,
+            BuffStat::WeaponCharge,
+            1,
+            now,
+            lasts,
+        ));
+        assert!(on_hit(&other, None, false, 0.5).is_empty());
     }
 
     #[test]
