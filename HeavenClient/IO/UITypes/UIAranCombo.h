@@ -25,6 +25,10 @@ namespace ms
 		// Shows `count`, with its ComboCommand's first and second lines if so, or takes the HUD down at 0.
 		static void show(int32_t count, bool first, bool second);
 
+		// The Lie Detector froze the combo: the count shown again, still and opaque, and so it stays until it
+		// ends, thawed or not (FUN_00960fa4 with 1, report b361).
+		static void hold();
+
 		void draw(float alpha) const override;
 		void update() override;
 
@@ -43,5 +47,7 @@ namespace ms
 		bool first_shown, second_shown;
 		// How long ago the count came.
 		int64_t elapsed;
+		// Drawn without the fade or the bounce.
+		bool held;
 	};
 }

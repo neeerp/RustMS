@@ -1602,9 +1602,12 @@ namespace ms
 
 	void Player::freeze_aran_combo(bool frozen)
 	{
-		// Thawing restarts the 3 seconds.
+		// Thawing restarts the 3 seconds, and leaves the held count as it is.
 		if (aran_frozen && !frozen)
 			aran_combo_shown = now_ms();
+
+		if (frozen && aran_combo > 0)
+			UIAranCombo::hold();
 
 		aran_frozen = frozen;
 	}
