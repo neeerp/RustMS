@@ -25,6 +25,8 @@ pub enum NpcInteraction {
     RemoteGachapon {
         machine: i32,
     },
+    /// A Noblesse double-clicked their guide: Mimo's menu opens.
+    Mimo,
 }
 
 /// One server-driven NPC prompt.

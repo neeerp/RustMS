@@ -375,6 +375,10 @@ namespace ms
 			if (Stage::get().get_player().request(CharInfoRequestPacket(cid), ExclRequest::USE_WAIT))
 				emplace<UICharInfo>(cid);
 		}
+		// Last, the guide, so the player standing over it is picked instead
+		// (0x95002f).
+		else if (Stage::get().guide_at(pos))
+			ClickGuidePacket().dispatch();
 	}
 
 	void UIStateGame::rightclick(Point<int16_t> pos)

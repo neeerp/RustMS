@@ -114,6 +114,9 @@ namespace ms
 		// The kite under the cursor, newest first, or none.
 		const MapKites::Kite *kite_at(Point<int16_t> cursorpos) const;
 
+		// Whether the guide following the player is under the cursor.
+		bool guide_at(Point<int16_t> cursorpos) const;
+
 		// The hired merchant whose balloon is at `cursorpos`, if any.
 		std::optional<MapMerchants::Hit> merchant_at(Point<int16_t> cursorpos) const;
 
