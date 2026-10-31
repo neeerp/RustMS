@@ -1037,6 +1037,22 @@ to 13), and who the knights are, as Cosmic's `1101008.js`. Mimo's lines
 are placeholders. Anyone else gets nothing: Cosmic opens Lilin's Aran
 tutorial, which isn't played.
 
+An Aran's jobs run on scripts too (`Act.img` is empty for all of them).
+At level 10 a Legend (2000) takes the first:
+
+- Lilin's (1201000, Rien) The Five Heroes (21100, `q21100s`) tells of the
+  Polearm found in the ice and starts the quest on the yes. The client is
+  then pointed at the Polearm (`Effect::ScenePart`,
+  `Direction1.img/aranTutorial/ClickPoleArm`), and Lilin ends the quest
+  from the data. Cosmic completes it at once; the quest's text has Lilin
+  waiting between.
+- The Polearm (1201001) starts The Polearm-Wielding Hero (21101,
+  `q21101s`) at a touch, and its end (`q21101e`) asks once more. The yes
+  makes the player an Aran (2100) with a warrior's first-job rules but no
+  stat minimum (`Player::take_first_job`), a row of equipment and of etc.
+  slots, as a Knight's first job adds, and the Aran medal (1142129).
+  Cosmic does all this on the start and adds no rows.
+
 Some titles go with medals won elsewhere: the job medals at level 180
 (29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor
 medals (29916 to 29921 and 29933). Each quest's start needs the medal held,

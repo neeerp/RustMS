@@ -760,14 +760,17 @@ impl Player {
     }
 
     /// Whether this beginner may take the first job `job` (100, 200, 300,
-    /// 400 or 500, or a Noblesse's 1100 to 1500): level 10, or 8 for
-    /// Explorer magicians, and 35 STR, 20 INT, 25 DEX, 25 DEX or 20 DEX.
+    /// 400 or 500, a Noblesse's 1100 to 1500, or a Legend's 2100): level
+    /// 10, or 8 for Explorer magicians, and 35 STR, 20 INT, 25 DEX, 25 DEX
+    /// or 20 DEX. An Aran needs no stat, as the Polearm's script asks none
+    /// (Cosmic `21101.js`).
     pub fn can_take_first_job(&self, job: i16) -> bool {
         let stats = &self.stats;
         let Some((level, _, _)) = first_job_rules(job) else {
             return false;
         };
         let (stat, needed) = match job % 1000 {
+            _ if job == ARAN => (stats.str, 0),
             100 => (stats.str, 35),
             200 => (stats.int, 20),
             500 => (stats.dex, 20),
@@ -793,15 +796,15 @@ impl Player {
     }
 
     /// Whether this first job may take the second job `job` of its line
-    /// (e.g. a 100 may become a 110, 120 or 130, a 1100 a 1110): level 30.
-    /// A Knight also may not keep more SP than 3 for each level past 30, as
-    /// its Chief Knight's exam asks (Cosmic `q20201e`).
+    /// (e.g. a 100 may become a 110, 120 or 130, a 1100 a 1110, a 2100 a
+    /// 2110): level 30. A Knight also may not keep more SP than 3 for each
+    /// level past 30, as its Chief Knight's exam asks (Cosmic `q20201e`).
     pub fn can_take_second_job(&self, job: i16) -> bool {
         let stats = &self.stats;
         second_job_rules(job).is_some()
             && stats.job == job / 100 * 100
             && stats.level >= 30
-            && (job < 1000 || stats.sp <= (i16::from(stats.level) - 30) * 3)
+            && (job / 1000 != 1 || stats.sp <= (i16::from(stats.level) - 30) * 3)
     }
 
     /// Become a second-job `job`: 1 SP and the job's max HP/MP bonus.
@@ -819,14 +822,15 @@ impl Player {
 
     /// Whether this second-job Explorer may take the third job `job` that
     /// follows it (e.g. a 110 may become a 111): level 70, with no more SP
-    /// left than 3 for each level past 70.
+    /// left than 3 for each level past 70. An Aran's job scripts count no
+    /// SP (Cosmic `21302.js`).
     pub fn can_take_third_job(&self, job: i16) -> bool {
         let stats = &self.stats;
         job % 10 == 1
             && second_job_rules(job - 1).is_some()
             && stats.job == job - 1
             && stats.level >= 70
-            && stats.sp <= (i16::from(stats.level) - 70) * 3
+            && (job / 1000 == 2 || stats.sp <= (i16::from(stats.level) - 70) * 3)
     }
 
     /// Become a third-job `job`: 1 SP, 5 AP and the second job's max HP/MP
@@ -1063,13 +1067,17 @@ fn growth(job: i16) -> Growth {
     Growth { level_up, ap }
 }
 
+/// A Legend's first job.
+const ARAN: i16 = 2100;
+
 /// A first job's minimum level and the max HP/MP it adds: the middle of
 /// the random ranges community servers use (e.g. warriors 201-250 HP).
 /// The Knights of Cygnus' jobs take what their Explorer counterparts do,
-/// at level 10 for all, as their quests (20101-20105) ask.
+/// at level 10 for all, as their quests (20101-20105) ask, and an Aran a
+/// warrior's, as Cosmic's job change rolls by `job % 1000`.
 fn first_job_rules(job: i16) -> Option<(u8, i16, i16)> {
     match job {
-        100 | 1100 => Some((10, 225, 0)),
+        100 | 1100 | ARAN => Some((10, 225, 0)),
         200 => Some((8, 0, 125)),
         1200 => Some((10, 0, 125)),
         300 | 400 | 1300 | 1400 => Some((10, 125, 38)),
@@ -1090,10 +1098,11 @@ fn second_job_bonus(job: i16) -> Option<(i16, i16)> {
 
 /// The max HP/MP an Explorer second job adds, again the middle of the
 /// community servers' ranges (e.g. warriors 300-350 HP), and each later
-/// job adds again. A Knight's adds what its Explorer counterpart's does.
+/// job adds again. A Knight's, and an Aran's (2110), adds what its Explorer
+/// counterpart's does.
 fn second_job_rules(job: i16) -> Option<(i16, i16)> {
     match job {
-        1110 | 1210 | 1310 | 1410 | 1510 => second_job_rules(job % 1000),
+        1110 | 1210 | 1310 | 1410 | 1510 | 2110 => second_job_rules(job % 1000),
         110 | 120 | 130 => Some((325, 0)),
         210 | 220 | 230 => Some((0, 475)),
         310 | 320 | 410 | 420 | 510 | 520 => Some((325, 175)),
@@ -1520,6 +1529,43 @@ mod tests {
         assert_eq!(player.stats.job, 1200);
         assert_eq!(player.stats.sp, 1);
         assert_eq!(player.stats.max_mp, 130);
+    }
+
+    #[test]
+    fn a_legend_of_10_becomes_an_aran_with_no_stat_asked() {
+        let mut player = player();
+        (player.stats.job, player.stats.level, player.stats.str) = (2000, 9, 4);
+        assert!(!player.can_take_first_job(2100), "level 10");
+        player.stats.level = 12;
+        assert!(player.can_take_first_job(2100));
+        assert!(!player.can_take_first_job(100), "not an Explorer's job");
+        assert!(!player.can_take_first_job(1100), "not a Knight's job");
+
+        let hp = player.stats.max_hp;
+        player.take_first_job(2100);
+        assert_eq!(player.stats.job, 2100);
+        assert_eq!(player.stats.sp, 7, "1 and 3 for each level past 10");
+        assert_eq!(player.stats.max_hp, hp + 225);
+    }
+
+    #[test]
+    fn an_aran_advances_with_any_sp_left() {
+        let mut player = player();
+        (player.stats.job, player.stats.level, player.stats.sp) = (2100, 30, 40);
+        assert!(player.can_take_second_job(2110));
+        assert!(!player.can_take_second_job(1110), "another line");
+        let hp = player.stats.max_hp;
+        player.take_second_job(2110);
+        assert_eq!((player.stats.job, player.stats.max_hp), (2110, hp + 325));
+
+        player.stats.level = 70;
+        assert!(player.can_take_third_job(2111));
+        player.take_third_job(2111);
+        player.stats.level = 120;
+        assert!(player.can_take_fourth_job(2112));
+        player.take_fourth_job(2112);
+        assert_eq!(player.stats.job, 2112);
+        assert_eq!(player.stats.max_hp, hp + 3 * 325);
     }
 
     #[test]

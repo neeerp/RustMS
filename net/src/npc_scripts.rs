@@ -3163,6 +3163,9 @@ impl NpcScript {
             "q21753s" => Some(athena_keeps_the_letter()),
             "q21754s" => Some(athena_hands_over_the_letter(player)),
             "q21757e" => Some(neinheart_takes_the_letter()),
+            "q21100s" => Some(five_heroes()),
+            "q21101s" => Some(polearm_touched()),
+            "q21101e" => Some(polearm_hero(player)),
             "q21700s" => Some(new_beginnings()),
             "q21703s" => Some(target_pigs()),
             "q21703e" => Some(combo_ability()),
@@ -6679,6 +6682,13 @@ fn neinheart_takes_the_letter() -> NpcScript {
     script
 }
 
+const FIVE_HEROES: i16 = 21100;
+const POLEARM_WIELDING_HERO: i16 = 21101;
+/// The Polearm Lilin found in the ice (1201001), in the middle of Rien.
+const ICE_POLEARM: i32 = 1201001;
+/// The first Aran job, and the medal for it (Cosmic `21101.js`).
+const ARAN_1: i16 = 2100;
+const ARAN_1_MEDAL: i32 = 1142129;
 const NEW_BEGINNINGS: i16 = 21700;
 const TRAIN_OR_DIE_3: i16 = 21703;
 const BABY_STEPS: i16 = 21704;
@@ -6715,6 +6725,89 @@ const SPECIAL_RIEN_BLUE_POTION: i32 = 2000023;
 const COMBO_ABILITY: i32 = 21000000;
 const POLEARM_BOOSTER: i32 = 21001003;
 const ARTHRITIS_MEDICINE: i32 = 4032423;
+
+/// `q21100s`: Lilin tells a Legend of 10 about the Polearm found in the
+/// ice and starts The Five Heroes (21100), which she ends from the data
+/// (`Check.img/21100/1` is her alone); the client then points at the
+/// Polearm (`aranTutorial/ClickPoleArm`, Cosmic `21100.js`). Cosmic ends
+/// the quest at once, but its text has a step between, Lilin waiting to
+/// hear (`QuestInfo.img/21100/1`).
+fn five_heroes() -> NpcScript {
+    let [records, forgot, weapon, which, found, saw, ask, go] = keys::LILIN_FIVE_HEROES;
+    NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(records)),
+            Page::Reply(text(forgot)),
+            Page::Say(text(weapon)),
+            Page::Reply(text(which)),
+            Page::Say(text(found)),
+            Page::Reply(text(saw)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::StartQuest(FIVE_HEROES),
+                    Effect::ScenePart(
+                        "Effect/Direction1.img/aranTutorial/ClickPoleArm".to_string(),
+                    ),
+                ],
+                on_no: Some(text(keys::LILIN_FIVE_HEROES_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    )
+}
+
+/// `q21101s`: the Polearm stirs memories at a touch, which starts The
+/// Polearm-Wielding Hero (21101); the quest's text asks the Legend to hold
+/// it again (`QuestInfo.img/21101/1`).
+fn polearm_touched() -> NpcScript {
+    let [ask, memories] = keys::POLEARM_TOUCHED;
+    NpcScript::new(
+        ICE_POLEARM,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(POLEARM_WIELDING_HERO)],
+                on_no: Some(text(keys::POLEARM_NOT_YET)),
+            },
+            Page::Reply(text(memories)),
+        ],
+    )
+}
+
+/// `q21101e`: held again, the Polearm knows its hero: on the yes a
+/// Legend becomes an Aran (2100) with the Aran medal and a row in the Equip
+/// and Etc bags, as a Knight's first job gives (Cosmic `21101.js`, which
+/// does this on the start and gives no rows).
+fn polearm_hero(player: &Player) -> NpcScript {
+    if !player.can_take_first_job(ARAN_1) {
+        return NpcScript::new(ICE_POLEARM, vec![Page::Say(text(keys::POLEARM_SILENT))]);
+    }
+    let [ask, remember] = keys::POLEARM_HERO;
+    let mut script = NpcScript::new(
+        ICE_POLEARM,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::TakeFirstJob(ARAN_1),
+                    Effect::AddSlotRow(InventoryType::Equip),
+                    Effect::AddSlotRow(InventoryType::Etc),
+                    Effect::GiveItem {
+                        item_id: ARAN_1_MEDAL,
+                        quantity: 1,
+                    },
+                    Effect::CompleteQuest(POLEARM_WIELDING_HERO),
+                ],
+                on_no: Some(text(keys::POLEARM_HERO_DECLINED)),
+            },
+            Page::Reply(text(remember)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::POLEARM_HERO_FULL));
+    script
+}
 
 /// `q21700s`: Lilin hands an Aran a Practice Polearm (`Act.img/21700/0`)
 /// and sends them west of Rien to Puo, who ends it from the data (Cosmic
@@ -18564,6 +18657,39 @@ mod tests {
         ]);
         let walker = NpcScript::for_quest("q20104e", &noblesse).unwrap();
         assert_eq!(yes_through(walker), (1101006, knight));
+    }
+
+    #[test]
+    fn the_polearm_in_the_ice_makes_a_legend_of_10_an_aran() {
+        let mut legend = player(50);
+        (legend.stats.job, legend.stats.level) = (2000, 10);
+        let run = |script: &str| yes_through(NpcScript::for_quest(script, &legend).unwrap());
+        let pointed =
+            Effect::ScenePart("Effect/Direction1.img/aranTutorial/ClickPoleArm".to_string());
+        assert_eq!(
+            run("q21100s"),
+            (LILIN, vec![Effect::StartQuest(FIVE_HEROES), pointed])
+        );
+        assert_eq!(
+            run("q21101s"),
+            (ICE_POLEARM, vec![Effect::StartQuest(POLEARM_WIELDING_HERO)])
+        );
+        let aran = vec![
+            Effect::TakeFirstJob(ARAN_1),
+            Effect::AddSlotRow(InventoryType::Equip),
+            Effect::AddSlotRow(InventoryType::Etc),
+            Effect::GiveItem {
+                item_id: ARAN_1_MEDAL,
+                quantity: 1,
+            },
+            Effect::CompleteQuest(POLEARM_WIELDING_HERO),
+        ];
+        assert_eq!(run("q21101e"), (ICE_POLEARM, aran));
+
+        // An Aran already is one: the Polearm keeps still.
+        legend.stats.job = ARAN_1;
+        let silent = NpcScript::for_quest("q21101e", &legend).unwrap();
+        assert_eq!(yes_through(silent), (ICE_POLEARM, vec![]));
     }
 
     #[test]
