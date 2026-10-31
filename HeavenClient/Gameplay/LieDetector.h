@@ -10,6 +10,13 @@
 // shows, and whether a test is running.
 namespace ms::lie_detector
 {
+	// The GM's Lie Detector skill.
+	constexpr int32_t SKILL = 9001009;
+
+	// ANTI_MACRO_RESULT's codes: what gave the test.
+	constexpr uint8_t BY_ITEM = 1;
+	constexpr uint8_t BY_SKILL = 2;
+
 	// A first picture's time to answer, in milliseconds (FUN_00a265c2).
 	constexpr int32_t TEST_TIME = 60000;
 	// The clock shows the time left only up to this many seconds (7e778c).
@@ -27,12 +34,66 @@ namespace ms::lie_detector
 		NOT_ATTACKING = 1,
 		TESTED = 2,
 		IN_A_TEST = 3,
+		MONITORED = 4,
 		USED = 5,
 		CHALLENGE = 6,
 		FAILED = 7,
+		SUSPECTED = 8,
 		PASSED = 9,
+		CLEARED = 10,
 		FINE_RECEIVED = 11
 	};
+
+	// The types that carry a name.
+	constexpr bool named(uint8_t type)
+	{
+		return type == MONITORED || type == USED || type == SUSPECTED || type == CLEARED;
+	}
+
+	// A line in chat, and whether a screenshot goes with it.
+	struct Line
+	{
+		std::string text;
+		bool screenshot;
+	};
+
+	// The chat line for a named type and `code` (FUN_00a265c2), with
+	// `name`; nothing for a code it doesn't show. The `name`_ is the shot's
+	// file name, which starts with it.
+	inline std::optional<Line> line(uint8_t type, uint8_t code, const std::string &name)
+	{
+		switch (type)
+		{
+			case MONITORED:
+				// StringPool 0xc60.
+				return Line{ name + "_The screenshot has been saved. You have been notified of macro-assisted "
+									"program monitoring.", true };
+			case USED:
+				if (code == BY_ITEM)
+					return Line{ name + USED_BY, false };
+
+				// StringPool 0xc61.
+				if (code == BY_SKILL)
+					return Line{ name + "_The screenshot has been saved. The Lie Detector has been activated.", true };
+
+				return std::nullopt;
+			case SUSPECTED:
+				// StringPool 0xc63.
+				if (code == BY_SKILL)
+					return Line{ name + "_The screenshot has been saved. It appears that you may be using a "
+										"macro-assisted program.", true };
+
+				return std::nullopt;
+			case CLEARED:
+				// StringPool 0xc62.
+				if (code == BY_SKILL)
+					return Line{ name + "_You have passed the Lie Detector Test.", false };
+
+				return std::nullopt;
+			default:
+				return std::nullopt;
+		}
+	}
 
 	// What the result dialog shows: the GM's face, Macro/admin/N, and its
 	// paragraphs.
@@ -43,7 +104,7 @@ namespace ms::lie_detector
 	};
 
 	// The result dialog for `type` and `code` (FUN_007e8a2f); nothing for
-	// a type it doesn't show. Code 2 is the GM skill's test, left out.
+	// a type it doesn't show.
 	inline std::optional<Result> result(uint8_t type, uint8_t code)
 	{
 		switch (type)
@@ -61,7 +122,7 @@ namespace ms::lie_detector
 				Result failed{ 2, { "The Lie Detector Test confirms that you have been botting. Repeated failure of "
 									"the test will result in game restrictions." } };
 
-				if (code == 2)
+				if (code == BY_SKILL)
 					failed.lines.emplace_back("You will be sanctioned for using a macro-assisted program.");
 
 				return failed;
@@ -71,7 +132,7 @@ namespace ms::lie_detector
 					return Result{ 0, { "You have succesfully passed the Lie Detector Test. Thank you for "
 										"participating!" } };
 
-				if (code == 2)
+				if (code == BY_SKILL)
 					return Result{ 0, { "Thank you for your cooperation." } };
 
 				return Result{ 0, { "Thank you for cooperating with the Lie Detector Test. You'll be rewarded "

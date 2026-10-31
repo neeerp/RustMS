@@ -40,6 +40,7 @@
 #include "SoulArrow.h"
 
 #include "../MapleMap/DoorRules.h"
+#include "../LieDetector.h"
 #include "../MapleMap/FieldLimit.h"
 #include "../Stage.h"
 #include "../TrembleRules.h"
@@ -55,6 +56,8 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIMaker.h"
 #include "../../IO/UITypes/UIEnchantSkill.h"
+#include "../../IO/UITypes/UILieDetector.h"
+#include "../../Net/Packets/InventoryPackets.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
@@ -263,6 +266,15 @@ namespace ms
 
 			if (!open && player.get_skills().get_level(move_id) > 0 && player.can_request(200))
 				UI::get().emplace<UIEnchantSkill>();
+
+			return false;
+		}
+
+		// So does a GM's Lie Detector, which has no data to go by (FUN_0096d0d1).
+		if (move_id == lie_detector::SKILL)
+		{
+			if (player.get_skills().get_level(move_id) > 0)
+				request_lie_detector();
 
 			return false;
 		}
@@ -694,6 +706,29 @@ namespace ms
 					   ExclRequest::SKILL_WAIT);
 
 		return true;
+	}
+
+	// v83 FUN_0096d0d1 asks whom to test as the item does, but anywhere, unless a mini room is open or the
+	// player rides. Someone of that name must be on the map; the server says whether the test begins.
+	void Combat::request_lie_detector()
+	{
+		if (UI::get().dialog_open() || player.ride_refuses())
+			return;
+
+		UI::get().emplace<UILieDetectorName>([](const std::string &name)
+		{
+			for (auto &mmo : *Stage::get().get_chars().get_chars())
+			{
+				if (static_cast<const Char *>(mmo.second.get())->get_name() == name)
+				{
+					UseLieDetectorSkillPacket(name).dispatch();
+					return;
+				}
+			}
+
+			auto shown = lie_detector::result(lie_detector::NOT_FOUND, lie_detector::BY_SKILL);
+			UI::get().emplace<UILieDetectorResult>(shown->portrait, shown->lines);
+		});
 	}
 
 	bool Combat::request_door(const SpecialMove &move, int32_t level)

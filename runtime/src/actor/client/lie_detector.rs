@@ -1,5 +1,6 @@
 //! The Lie Detector (report c025): the tested player's test, which this
-//! actor shows, times and judges, and the tester's side of it.
+//! actor shows, times and judges, and the tester's side of it, by the item
+//! or a GM's skill.
 
 use super::ClientActor;
 use crate::error::RuntimeError;
@@ -7,7 +8,9 @@ use crate::message::{ClientHandle, DirectoryMessage, FieldKey, ServerMessage};
 use net::captcha::{self, Captcha};
 use net::handler::HandlerResult;
 use net::handler::WorldAction;
-use net::packet::build::world::anti_macro::{build_anti_macro_result, AntiMacroResult};
+use net::packet::build::world::anti_macro::{
+    build_anti_macro_result, build_anti_macro_result_by, AntiMacroResult, Detector,
+};
 use net::packet::handle::world::lie_detector::{
     failed, fine_received, passed, refusal, spend_detector, TEST_TIME, TRIES,
 };
@@ -22,6 +25,7 @@ pub(super) struct LieTest {
     /// When the time to answer runs out; the client doesn't end it itself.
     deadline: Instant,
     tester: ClientHandle,
+    by: Detector,
     /// Answers still to come, counting the one awaited.
     tries: u8,
 }
@@ -58,24 +62,30 @@ impl ClientActor {
         }
         let mut captcha = captcha::generate(&mut thread_rng());
         let jpeg = std::mem::take(&mut captcha.jpeg);
+        let by = test.by.detector();
         self.lie_test = Some(LieTest {
             captcha,
             deadline: Instant::now() + TEST_TIME,
             tester: reply_to.clone(),
+            by,
             tries: TRIES,
         });
         reply_to.send(ServerMessage::LieDetected {
             test,
             outcome: Ok(()),
         });
-        let used = AntiMacroResult::Used { name: tester };
-        self.send(&mut build_anti_macro_result(&used)?).await?;
+        // A GM's test goes unannounced; the picture comes in its own window.
+        if by == Detector::Item {
+            let used = AntiMacroResult::Used { name: tester };
+            self.send(&mut build_anti_macro_result(&used)?).await?;
+        }
         let challenge = AntiMacroResult::Challenge { first: true, jpeg };
-        self.send(&mut build_anti_macro_result(&challenge)?).await
+        self.send(&mut build_anti_macro_result_by(by, &challenge)?)
+            .await
     }
 
-    /// The tester's side: the Lie Detector goes once the test began, or the
-    /// client hears why it didn't.
+    /// The tester's side: the Lie Detector goes, or the GM hears whom it
+    /// tests, once the test began; or the client hears why it didn't.
     pub(super) async fn lie_detected(
         &mut self,
         test: LieDetectorUse,
@@ -89,7 +99,9 @@ impl ClientActor {
         };
         let result = match outcome {
             Ok(()) => spend_detector(&mut game.player, &test)?,
-            Err(refused) => HandlerResult::reply(build_anti_macro_result(&refused)?),
+            Err(refused) => {
+                HandlerResult::reply(build_anti_macro_result_by(test.by.detector(), &refused)?)
+            }
         };
         self.apply_all(result).await
     }
@@ -108,12 +120,33 @@ impl ClientActor {
             test.captcha = captcha::generate(&mut thread_rng());
             let jpeg = std::mem::take(&mut test.captcha.jpeg);
             let challenge = AntiMacroResult::Challenge { first: false, jpeg };
-            return self.send(&mut build_anti_macro_result(&challenge)?).await;
+            let by = test.by;
+            return self
+                .send(&mut build_anti_macro_result_by(by, &challenge)?)
+                .await;
         }
-        self.lie_test = None;
+        let Some(test) = self.lie_test.take() else {
+            return Ok(());
+        };
         self.lie_tested().await;
-        let result = passed(&mut self.in_game_mut()?.player)?;
+        let result = if test.by == Detector::Skill {
+            self.judged(&test, true)?;
+            HandlerResult::reply(build_anti_macro_result_by(
+                Detector::Skill,
+                &AntiMacroResult::Passed,
+            )?)
+        } else {
+            passed(&mut self.in_game_mut()?.player)?
+        };
         self.apply_all(result).await
+    }
+
+    /// Tell the GM who gave `test` whether the player passed it.
+    fn judged(&self, test: &LieTest, passed: bool) -> Result<(), RuntimeError> {
+        let name = self.in_game()?.player.name().to_string();
+        test.tester
+            .send(ServerMessage::LieDetectorJudged { name, passed });
+        Ok(())
     }
 
     /// A wrong answer, or the time ran out.
@@ -133,7 +166,7 @@ impl ClientActor {
     }
 
     /// Fail the test, if there is one: the fine taken and handed to the
-    /// tester, and what the player is to be told.
+    /// tester, or the GM told, and what the player is to be told.
     async fn fine_for_lie_test(
         &mut self,
     ) -> Result<Option<HandlerResult<WorldAction>>, RuntimeError> {
@@ -141,6 +174,14 @@ impl ClientActor {
             return Ok(None);
         };
         self.lie_tested().await;
+        if test.by == Detector::Skill {
+            warn!(self.client_id, "Failed a GM's Lie Detector test");
+            self.judged(&test, false)?;
+            return Ok(Some(HandlerResult::reply(build_anti_macro_result_by(
+                Detector::Skill,
+                &AntiMacroResult::Failed,
+            )?)));
+        }
         let (result, fine) = failed(&mut self.in_game_mut()?.player)?;
         warn!(self.client_id, fine, "Failed a Lie Detector test");
         test.tester.send(ServerMessage::LieDetectorFine { fine });
@@ -166,6 +207,25 @@ impl ClientActor {
             return Ok(());
         }
         self.apply_all(result).await
+    }
+
+    /// The player this GM tested passed or failed, `name`d with the line and
+    /// the screenshot the client takes.
+    pub(super) async fn lie_detector_judged(
+        &mut self,
+        name: String,
+        passed: bool,
+    ) -> Result<(), RuntimeError> {
+        if self.game.is_none() || self.in_cash_shop {
+            return Ok(());
+        }
+        let result = if passed {
+            AntiMacroResult::Cleared { name }
+        } else {
+            AntiMacroResult::Suspected { name }
+        };
+        self.send(&mut build_anti_macro_result_by(Detector::Skill, &result)?)
+            .await
     }
 
     async fn apply_all(&mut self, result: HandlerResult<WorldAction>) -> Result<(), RuntimeError> {

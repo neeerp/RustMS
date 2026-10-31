@@ -34,6 +34,7 @@
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UIKeyConfig.h"
 #include "../IO/UITypes/UILieDetector.h"
+#include "../IO/Window.h"
 #include "../IO/UITypes/UIMaker.h"
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UIStatusMessenger.h"
@@ -349,20 +350,25 @@ namespace ms
 		uint8_t type = recv.read_byte();
 		uint8_t code = recv.read_byte();
 
+		if (lie_detector::named(type))
+		{
+			std::string name = recv.read_string();
+			auto line = lie_detector::line(type, code, name);
+
+			if (!line)
+				return;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line->text, UIChatBar::LineType::SKILL);
+
+			if (line->screenshot)
+				Window::get().screenshot(name);
+
+			return;
+		}
+
 		switch (type)
 		{
-			case lie_detector::USED:
-			{
-				std::string name = recv.read_string();
-
-				if (code != 1)
-					return;
-
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline(name + lie_detector::USED_BY, UIChatBar::LineType::SKILL);
-
-				return;
-			}
 			case lie_detector::CHALLENGE:
 			{
 				bool first = recv.read_byte() != 0;
@@ -372,12 +378,10 @@ namespace ms
 				for (int32_t i = 0; i < size && recv.available(); i++)
 					jpeg.push_back(static_cast<uint8_t>(recv.read_byte()));
 
-				if (code == 2)
-					return;
-
 				int32_t time = lie_detector::picture_time(first);
 				Stage::get().get_player().freeze_aran_combo(true);
-				UI::get().emplace<UILieDetector>(PixelTexture::from_jpeg(jpeg), time, first);
+				UI::get().emplace<UILieDetector>(PixelTexture::from_jpeg(jpeg), time, first,
+												 code == lie_detector::BY_SKILL);
 
 				return;
 			}

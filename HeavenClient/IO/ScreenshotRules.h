@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <ctime>
 #include <functional>
 #include <optional>
 #include <string>
@@ -70,6 +71,18 @@ namespace ms
 			std::snprintf(name, sizeof(name), "Maple%04d.jpg", index);
 
 			return name;
+		}
+
+		// "%s\%s_%04d%02d%02d_%02d%02d%02d.jpg" (FUN_00a26b05), without the
+		// folder: a Lie Detector's shot, named for the player tested and the
+		// time it was taken.
+		inline std::string named_file(const std::string &name, const std::tm &at)
+		{
+			char stamp[32];
+			std::snprintf(stamp, sizeof(stamp), "_%04d%02d%02d_%02d%02d%02d.jpg", at.tm_year + 1900, at.tm_mon + 1,
+						  at.tm_mday, at.tm_hour, at.tm_min, at.tm_sec);
+
+			return name + stamp;
 		}
 
 		// The index of the next shot (FUN_00745264): probe 0, 1, 3, 7, ...

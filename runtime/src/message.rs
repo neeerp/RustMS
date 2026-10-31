@@ -283,6 +283,11 @@ pub enum ServerMessage {
     LieDetectorFine {
         fine: i32,
     },
+    /// The player `name` this GM tested by the skill `passed` or failed.
+    LieDetectorJudged {
+        name: String,
+        passed: bool,
+    },
     /// Someone's Maple TV message names this player: hand it back to the
     /// world's line with this player's look.
     MapleTvPartner {

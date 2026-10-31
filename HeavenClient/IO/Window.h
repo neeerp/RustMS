@@ -28,6 +28,7 @@
 #include <GLFW/glfw3.h>
 #include <string>
 #include <functional>
+#include <optional>
 
 #ifdef WINDOWS
 #include <direct.h>
@@ -79,6 +80,9 @@ namespace ms
 		// Save the next frame as the next free MapleNNNN.jpg in the working
 		// directory.
 		void screenshot();
+		// Save the next frame as `name`_YYYYMMDD_HHMMSS.jpg, a Lie
+		// Detector's evidence.
+		void screenshot(const std::string &name);
 
 	private:
 		void updateopc();
@@ -92,6 +96,7 @@ namespace ms
 		int16_t width;
 		int16_t height;
 		mutable bool screenshot_pending = false;
+		mutable std::optional<std::string> screenshot_name;
 
 		void save_screenshot() const;
 

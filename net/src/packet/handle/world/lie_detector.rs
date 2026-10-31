@@ -2,10 +2,13 @@
 //! their map who is fighting, and the server shows that player a picture
 //! of a few letters to type back within a minute. A right answer earns
 //! them 5000 mesos; a wrong one, or none, costs them up to 7000, which go
-//! to the tester.
+//! to the tester. A GM's Lie Detector skill (9001009) tests the same way,
+//! for nothing won or lost, and the GM hears how it went.
 
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
-use crate::packet::build::world::anti_macro::{build_anti_macro_result, AntiMacroResult};
+use crate::packet::build::world::anti_macro::{
+    build_anti_macro_result, build_anti_macro_result_by, AntiMacroResult, Detector,
+};
 use crate::packet::build::world::inventory::build_inventory_operation;
 use crate::packet::build::world::stat::{build_stat_update, StatUpdate};
 use crate::packet::op::RecvOpcode;
@@ -28,11 +31,32 @@ pub const PASS_REWARD: i32 = 5000;
 /// The most a fail costs, given to the tester.
 pub const FAIL_FINE: i32 = 7000;
 
+/// The GM's Lie Detector skill, which the v83 client handles though its
+/// data has no such skill (report 229).
+pub const LIE_DETECTOR_SKILL: i32 = 9001009;
+
+/// What a Lie Detector test is given with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LieDetectorBy {
+    /// The item at `slot` in the USE bag, taken once the test begins.
+    Item { slot: i16, item_id: i32 },
+    /// A GM's skill.
+    Skill,
+}
+
+impl LieDetectorBy {
+    pub fn detector(self) -> Detector {
+        match self {
+            LieDetectorBy::Item { .. } => Detector::Item,
+            LieDetectorBy::Skill => Detector::Skill,
+        }
+    }
+}
+
 /// A Lie Detector in use, while the server looks for the character named.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LieDetectorUse {
-    pub slot: i16,
-    pub item_id: i32,
+    pub by: LieDetectorBy,
     pub name: String,
 }
 
@@ -88,8 +112,37 @@ impl WorldHandler for UseLieDetectorHandler {
             return reply(AntiMacroResult::NotFound);
         }
         let test = LieDetectorUse {
-            slot,
-            item_id,
+            by: LieDetectorBy::Item { slot, item_id },
+            name,
+        };
+        Ok(HandlerResult::empty().with(WorldAction::LieDetect(test)))
+    }
+}
+
+/// `USE_LIE_DETECTOR_SKILL` (0x68, v83 FUN_0096d0d1): the name a GM typed
+/// for the Lie Detector skill. The client asks no town or map's leave and
+/// names only a character on its map who is fighting.
+pub struct UseLieDetectorSkillHandler;
+
+impl WorldHandler for UseLieDetectorSkillHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let name = reader.read_str_with_length()?;
+        let player = &*ctx.player;
+        // No Skill.nx of v83 has the skill, so only the book says a GM has it.
+        let has_skill = player.gm_level > 0 && player.skills.level(LIE_DETECTOR_SKILL) > 0;
+        if player.stats.hp <= 0 || !has_skill {
+            return Ok(HandlerResult::empty());
+        }
+        if name.is_empty() || name.eq_ignore_ascii_case(player.name()) {
+            return Ok(HandlerResult::reply(build_anti_macro_result_by(
+                Detector::Skill,
+                &AntiMacroResult::NotFound,
+            )?));
+        }
+        let test = LieDetectorUse {
+            by: LieDetectorBy::Skill,
             name,
         };
         Ok(HandlerResult::empty().with(WorldAction::LieDetect(test)))
@@ -129,16 +182,25 @@ pub fn refusal(
 }
 
 /// The tester's side once a test began: the Lie Detector used up, if it is
-/// still where it was.
+/// still where it was, or the GM told whom the skill tests.
 pub fn spend_detector(player: &mut Player, test: &LieDetectorUse) -> WorldResult {
+    let LieDetectorBy::Item { slot, item_id } = test.by else {
+        let used = AntiMacroResult::Used {
+            name: test.name.clone(),
+        };
+        return Ok(HandlerResult::reply(build_anti_macro_result_by(
+            Detector::Skill,
+            &used,
+        )?));
+    };
     let held = player
         .inventory
-        .get(InventoryType::Use, test.slot)
-        .is_some_and(|item| item.item_id == test.item_id);
+        .get(InventoryType::Use, slot)
+        .is_some_and(|item| item.item_id == item_id);
     let changes = if held {
         player
             .inventory_mut()
-            .take(InventoryType::Use, test.slot, 1)
+            .take(InventoryType::Use, slot, 1)
             .unwrap_or_default()
     } else {
         Vec::new()
@@ -256,6 +318,64 @@ mod tests {
         };
         let result = UseLieDetectorHandler.handle(&mut p, &mut ctx).unwrap();
         assert!(result.actions.is_empty());
+    }
+
+    fn skill_packet(name: &str) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::UseLieDetectorSkill as i16)
+            .unwrap();
+        p.write_str_with_length(name).unwrap();
+        p
+    }
+
+    #[test]
+    fn only_a_gm_with_the_skill_tests_by_it() {
+        let mut player = crate::codec::stats::sample_player();
+        player.skills.set(game::SkillRecord {
+            skill_id: LIE_DETECTOR_SKILL,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let result = UseLieDetectorSkillHandler
+            .handle(&mut skill_packet("Bo"), &mut ctx)
+            .unwrap();
+        assert!(result.actions.is_empty());
+
+        player.gm_level = 3;
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let result = UseLieDetectorSkillHandler
+            .handle(&mut skill_packet("Bo"), &mut ctx)
+            .unwrap();
+        assert!(matches!(
+            result.actions.as_slice(),
+            [WorldAction::LieDetect(LieDetectorUse { by: LieDetectorBy::Skill, name })]
+                if name == "Bo"
+        ));
+        let result = UseLieDetectorSkillHandler
+            .handle(&mut skill_packet(""), &mut ctx)
+            .unwrap();
+        assert_eq!(replies(&result), [vec![0x2B, 0, 0, 2]]);
+    }
+
+    #[test]
+    fn the_skill_spends_nothing_and_tells_the_gm_whom_it_tests() {
+        let mut player = crate::codec::stats::sample_player();
+        let test = LieDetectorUse {
+            by: LieDetectorBy::Skill,
+            name: "Bo".into(),
+        };
+        let result = spend_detector(&mut player, &test).unwrap();
+        assert_eq!(replies(&result), [vec![0x2B, 0, 5, 2, 2, 0, b'B', b'o']]);
     }
 
     #[test]

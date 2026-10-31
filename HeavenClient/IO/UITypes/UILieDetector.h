@@ -53,9 +53,10 @@ namespace ms
 		Textfield field;
 	};
 
-	// The tested player's challenge (v83 dialog A, 0x7e65de, on UIWindow.img/Macro/backgrnd4): the picture,
-	// the time left and the tries left. OK or Enter sends what was typed and closes it; it can't be cancelled,
-	// and when the time runs out the server ends the test (0x7e7603).
+	// The tested player's challenge (v83 dialog A, 0x7e65de, on UIWindow.img/Macro/backgrnd4, or for a GM's
+	// skill dialog B on MacroSkill/backgrnd2): the picture, the time left and the tries left. OK or Enter
+	// sends what was typed and closes it; it can't be cancelled, and when the time runs out the server ends
+	// the test (0x7e7603).
 	class UILieDetector : public UIElement
 	{
 	public:
@@ -63,8 +64,8 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		// `first` says whether this is the test's first picture.
-		UILieDetector(PixelTexture picture, int32_t time_left, bool first);
+		// `first` says whether this is the test's first picture, `by_skill` whether a GM's skill gave it.
+		UILieDetector(PixelTexture picture, int32_t time_left, bool first, bool by_skill);
 
 		void draw(float alpha) const override;
 

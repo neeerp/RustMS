@@ -45,6 +45,26 @@ int main()
 		require(ld::result(ld::FINE_RECEIVED, 1)->portrait == 0, "the tester smiles at a fine");
 		require(!ld::result(ld::USED, 1) && !ld::result(ld::CHALLENGE, 1) && !ld::result(4, 2),
 				"chat lines and the challenge have no result dialog");
+		require(!ld::result(ld::SUSPECTED, 2) && !ld::result(ld::CLEARED, 2), "nor do the GM's");
+
+		// The chat lines: the item's names the tester; the skill's name the player tested, after whom the
+		// shot that goes with most of them is named.
+		require(ld::named(ld::MONITORED) && ld::named(ld::USED) && ld::named(ld::SUSPECTED) &&
+				ld::named(ld::CLEARED) && !ld::named(ld::CHALLENGE) && !ld::named(ld::FINE_RECEIVED),
+				"four types carry a name");
+		auto used = ld::line(ld::USED, ld::BY_ITEM, "Ann");
+		require(used && used->text == "Ann have used the Lie Detector Test." && !used->screenshot,
+				"the item's line names the tester, unshot");
+		auto activated = ld::line(ld::USED, ld::BY_SKILL, "Bo");
+		require(activated && activated->text == "Bo_The screenshot has been saved. The Lie Detector has been "
+												 "activated." && activated->screenshot, "the skill's is shot");
+		require(ld::line(ld::SUSPECTED, ld::BY_SKILL, "Bo")->screenshot, "a fail is shot");
+		auto cleared = ld::line(ld::CLEARED, ld::BY_SKILL, "Bo");
+		require(cleared && cleared->text == "Bo_You have passed the Lie Detector Test." && !cleared->screenshot,
+				"a pass is not");
+		require(ld::line(ld::MONITORED, 7, "Bo")->screenshot, "monitoring is shot whatever the code");
+		require(!ld::line(ld::USED, 3, "Bo") && !ld::line(ld::SUSPECTED, ld::BY_ITEM, "Bo") &&
+				!ld::line(ld::CLEARED, ld::BY_ITEM, "Bo"), "other codes show nothing");
 
 		// The clock: m,ss of the seconds left, hidden past two minutes or below zero.
 		auto minute = ld::clock(60000);

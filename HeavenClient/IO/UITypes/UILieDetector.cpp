@@ -165,12 +165,14 @@ namespace ms
 		deactivate();
 	}
 
-	UILieDetector::UILieDetector(PixelTexture pic, int32_t time_left, bool first)
+	UILieDetector::UILieDetector(PixelTexture pic, int32_t time_left, bool first, bool by_skill)
 			: UIElement(Point<int16_t>(), Point<int16_t>()), picture(std::move(pic)), deadline(now_ms() + time_left)
 	{
 		nl::node macro = NxFiles::ui_classic["UIWindow.img"]["Macro"];
-		Texture background = macro["backgrnd4"];
-		sprites.emplace_back(macro["backgrnd4"]);
+		// Dialog B's art has dialog A's layout, though UIClassic.nx left its words in Korean.
+		nl::node art = by_skill ? NxFiles::ui_classic["UIWindow.img"]["MacroSkill"]["backgrnd2"] : macro["backgrnd4"];
+		Texture background = art;
+		sprites.emplace_back(art);
 
 		for (size_t i = 0; i < digits.size(); i++)
 			digits[i] = macro["num1"][std::to_string(i)];

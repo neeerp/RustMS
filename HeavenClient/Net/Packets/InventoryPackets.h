@@ -155,6 +155,18 @@ namespace ms
 		}
 	};
 
+	// Uses a GM's Lie Detector skill on the character named, on the user's
+	// map (FUN_0096d0d1).
+	// Opcode: USE_LIE_DETECTOR_SKILL(104)
+	class UseLieDetectorSkillPacket : public OutPacket
+	{
+	public:
+		UseLieDetectorSkillPacket(const std::string &name) : OutPacket(OutPacket::Opcode::USE_LIE_DETECTOR_SKILL)
+		{
+			write_string(name);
+		}
+	};
+
 	// What the tested player typed for the Lie Detector's picture (0x7e76b2).
 	// Opcode: ANSWER_LIE_DETECTOR(105)
 	class AnswerLieDetectorPacket : public OutPacket
