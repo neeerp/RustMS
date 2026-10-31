@@ -1219,6 +1219,12 @@ namespace ms
 		return invincible == true;
 	}
 
+	void Char::end_invincibility()
+	{
+		invincible = false;
+		blinking = false;
+	}
+
 	int32_t Char::get_charge() const
 	{
 		return 0;

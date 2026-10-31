@@ -358,8 +358,10 @@ namespace ms
 		combat.clear_final_attack();
 		player.set_flymap(mapinfo.is_flying());
 		player.respawn(startpos, mapinfo.is_swimming(startpos));
-		// v83 makes the user anew in each field, showing their orbs as they
-		// are (FUN_0092e499).
+		// v83 makes the user anew in each field: a revival or a portal just
+		// after a hit leaves no invincibility (0x92df81), and the orbs show
+		// as they are (FUN_0092e499).
+		player.end_invincibility();
 		player.show_combo(player.get_buff_value(Buffstat::Id::COMBO) - 1, true);
 		// And the aura of a Berserk it is in (0x9497c1).
 		player.show_berserk(player.get_berserk() != 0);

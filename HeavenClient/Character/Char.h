@@ -92,6 +92,9 @@ namespace ms
 
 		// Check whether the character is invincible
 		virtual bool is_invincible() const;
+		// Each field makes CUserLocal anew, with no invincibility left from a
+		// hit (0x92df81); only a hit sets it (0x9591fe).
+		void end_invincibility();
 
 		// Return the character's level.
 		virtual uint16_t get_level() const = 0;
