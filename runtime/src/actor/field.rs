@@ -374,6 +374,9 @@ pub struct FieldActor {
     /// of the goddess's guardians due or out, from the first; one past the
     /// last once that is down.
     guardians_wave: Option<usize>,
+    /// In a copy of the Spooky World, Targa's and Scarlion's last forms
+    /// that have fallen.
+    scarga_fallen: Vec<i32>,
     /// In a run's copy of a Holiday PQ arena, its difficulty, its snowman,
     /// and its kills that left no Snow Vigor.
     holiday: Option<HolidayArena>,
@@ -506,6 +509,7 @@ impl FieldActor {
             race: None,
             stirges_gone: false,
             guardians_wave: None,
+            scarga_fallen: Vec::new(),
             holiday,
             later: Vec::new(),
             tick,
@@ -2382,6 +2386,15 @@ impl FieldActor {
             // Every mob in the arena goes with The Boss (Cosmic
             // `ShowaBattle.clearPQ`).
             (net::events::THE_BOSS, net::events::SHOWA_ARENA) if self.key.instance_id != 0 => {
+                self.boss_falls();
+                self.clear_mobs();
+            }
+            // Every mob in the Spooky World goes once Targa and Scarlion both
+            // fall (Cosmic `ScargaBattle.monsterKilled`).
+            (mob, net::events::SPOOKY_WORLD)
+                if self.key.instance_id != 0
+                    && net::events::scarga_falls(&mut self.scarga_fallen, mob) =>
+            {
                 self.boss_falls();
                 self.clear_mobs();
             }

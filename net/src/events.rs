@@ -132,6 +132,10 @@ pub enum EventKind {
     /// The battle with the Balrog in its tomb under Sleepywood, an
     /// expedition gathered by Mu Young (1061014) (`crate::squads`).
     Balrog,
+    /// The battle with Targa and Scarlion in Malaysia's Spooky World, an
+    /// expedition gathered by Aldol (9270047) at its entrance
+    /// (`crate::squads`).
+    Scarga,
     /// The fight with Capt. Latanica in the ghost ship's Engine Room,
     /// which a party's leader holding a White Essence starts by its portal
     /// on the ship's last deck.
@@ -2685,6 +2689,120 @@ pub const SEALED_BALROG_AFTER: Duration = Duration::from_secs(10);
 /// What the clear map's way out (`balog_end`) gives each winner.
 pub const BALROG_LEATHER: i32 = 4_001_261;
 
+/// The battle with Targa and Scarlion in the Spooky World (Cosmic
+/// `ScargaBattle`): an expedition of 6 to 30 of level 100 or more,
+/// gathered by Aldol at the Spooky World's entrance by a leader with the
+/// Spirit of Fantasy Theme Park, goes into its own copy of the Spooky
+/// World for an hour. A spirit dropped on each of its two reactors
+/// brings out Targa or Scarlion, each of which comes back twice, angrier;
+/// the death of both last forms wins it (its one stage, cleared by any
+/// member there), and Aldol there hands each member a prize and takes
+/// them back out. It lasts until its last member leaves, like Zakum's.
+/// The defaults are in `v83ref/lanes/QUESTIONS.md` b375.
+pub const SCARGA: Event = Event {
+    lobby: SPOOKY_ENTRANCE,
+    entrances: &[],
+    maps: SPOOKY_WORLD..=SPOOKY_WORLD,
+    entry: SPOOKY_WORLD,
+    entries: 1,
+    exit: SPOOKY_ENTRANCE,
+    levels: 100..=u8::MAX,
+    spread: None,
+    team: 6..=30,
+    married: false,
+    minutes: 60,
+    exp_per_stage: &[0],
+    meso_per_stage: &[],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: true,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+    alone: false,
+};
+
+/// The Spooky World's entrance, where expeditions gather and come back
+/// to, and the Spooky World itself.
+pub const SPOOKY_ENTRANCE: i32 = 551_030_100;
+pub const SPOOKY_WORLD: i32 = 551_030_200;
+/// What a leader needs to gather an expedition, and what each of the
+/// Spooky World's reactors takes one of: quest 4576's reward.
+pub const SPIRIT_OF_THEME_PARK: i32 = 4_032_246;
+/// The Spooky World's two reactors (`myboss0`, `myboss1`), and the first
+/// form each brings out, where. Each first form revives as an angrier
+/// one, and that as the last (`Mob.nx`'s `revive`).
+pub const TARGA_REACTOR: i32 = 5_511_000;
+pub const SCARLION_REACTOR: i32 = 5_511_001;
+pub const TARGA: i32 = 9_420_542;
+pub const TARGA_AT: (i16, i16) = (-527, 637);
+pub const SCARLION: i32 = 9_420_547;
+pub const SCARLION_AT: (i16, i16) = (-238, 636);
+/// The last forms, Furious Targa and Furious Scarlion Boss, both of
+/// whose deaths win the battle (Cosmic `ScargaBattle.monsterKilled`).
+pub const SCARGA_BOSSES: [i32; 2] = [9_420_544, 9_420_549];
+/// Whether the death of `mob_id` in a copy of the Spooky World wins it,
+/// `fallen` being the last forms that fell there before, which it joins:
+/// the second of the two last forms does (Cosmic counts kills of either;
+/// one comes out of each reactor, once).
+pub fn scarga_falls(fallen: &mut Vec<i32>, mob_id: i32) -> bool {
+    if !SCARGA_BOSSES.contains(&mob_id) || fallen.contains(&mob_id) {
+        return false;
+    }
+    fallen.push(mob_id);
+    SCARGA_BOSSES.iter().all(|boss| fallen.contains(boss))
+}
+
+/// What Aldol in the Spooky World hands each member once both fall: one
+/// of these, at random (Cosmic `ScargaBattle`'s `setEventRewards`, Showa's
+/// list with other numbers, its 2022306 twice).
+pub const SCARGA_REWARDS: [(i32, i16); 29] = [
+    (1_102_145, 1),
+    (1_102_084, 1),
+    (1_102_085, 1),
+    (1_102_086, 1),
+    (1_102_087, 1),
+    (1_052_165, 1),
+    (1_052_166, 1),
+    (1_052_167, 1),
+    (1_402_013, 1),
+    (1_332_030, 1),
+    (1_032_030, 1),
+    (1_032_070, 1),
+    (4_003_000, 50),
+    (4_000_030, 50),
+    (4_006_000, 120),
+    (4_006_001, 120),
+    (4_005_000, 4),
+    (4_005_001, 4),
+    (4_005_002, 4),
+    (4_005_003, 4),
+    (4_005_004, 2),
+    (2_022_016, 125),
+    (2_022_263, 125),
+    (2_022_264, 125),
+    (2_022_015, 30),
+    (2_022_306, 30),
+    (2_022_307, 30),
+    (2_022_306, 30),
+    (2_022_113, 30),
+];
+
 /// The fight with Capt. Latanica (Cosmic `LatanicaBattle`): one to six of
 /// a party, all on the ghost ship's last deck with their leader, who holds
 /// a White Essence, go to their own copy of its Engine Room for ten
@@ -4781,7 +4899,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 77] = [
+    pub const ALL: [EventKind; 78] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4838,6 +4956,7 @@ impl EventKind {
         EventKind::Cwk,
         EventKind::Showa,
         EventKind::Balrog,
+        EventKind::Scarga,
         EventKind::Latanica,
         EventKind::PinkBean,
         EventKind::Holiday(1),
@@ -4892,6 +5011,7 @@ impl EventKind {
                 | EventKind::PrimeMinister
                 | EventKind::Balrog
                 | EventKind::Showa
+                | EventKind::Scarga
                 | EventKind::PinkBean
                 | EventKind::GuardianNex(_)
                 | EventKind::NeoBoss(_)
@@ -4938,6 +5058,7 @@ impl EventKind {
             EventKind::Cwk => &CWK,
             EventKind::Showa => &SHOWA,
             EventKind::Balrog => &BALROG,
+            EventKind::Scarga => &SCARGA,
             EventKind::Latanica => &LATANICA,
             EventKind::PinkBean => &PINK_BEAN,
             EventKind::Holiday(level) => &HOLIDAY[usize::from(level.clamp(1, 3) - 1)],
@@ -6142,6 +6263,34 @@ mod tests {
             assert_eq!(info.revive, [*statues.last().unwrap()], "{guardian}");
         }
         assert!(!pink_bean_guardian(crate::mobs::PINK_BEAN_STATUE));
+    }
+
+    #[test]
+    fn scarga_s_expedition_ends_with_both_last_forms_and_lasts_till_its_last_leaves() {
+        assert_eq!(EventKind::Scarga.event().lobby, SPOOKY_ENTRANCE);
+        assert!(SCARGA.squad && SCARGA.lasts_until_empty());
+        assert_eq!((SCARGA.team.clone(), *SCARGA.levels.start()), (6..=30, 100));
+        assert_eq!((SCARGA.minutes, SCARGA.last_stage()), (60, 1));
+        assert!(SCARGA.holds(SPOOKY_WORLD) && !SCARGA.holds(SPOOKY_ENTRANCE));
+        assert_eq!((SCARGA.entry, SCARGA.exit), (SPOOKY_WORLD, SPOOKY_ENTRANCE));
+        assert!(opening_mobs(SPOOKY_WORLD).is_empty());
+        // Each first form comes back twice, the last time as one of the two.
+        for (first, last) in [TARGA, SCARLION].into_iter().zip(SCARGA_BOSSES) {
+            let angry = crate::mobs::info(first).unwrap().revive[0];
+            assert_eq!(crate::mobs::info(angry).unwrap().revive, [last], "{first}");
+            assert!(crate::mobs::info(last).unwrap().revive.is_empty());
+        }
+        // The second last form to fall wins it, either way round, once.
+        let [targa, scarlion] = SCARGA_BOSSES;
+        let mut fallen = Vec::new();
+        assert!(!scarga_falls(&mut fallen, TARGA));
+        assert!(!scarga_falls(&mut fallen, scarlion));
+        assert!(!scarga_falls(&mut fallen, scarlion));
+        assert!(scarga_falls(&mut fallen, targa));
+        assert!(!scarga_falls(&mut fallen, targa));
+        let mut fallen = Vec::new();
+        assert!(!scarga_falls(&mut fallen, targa));
+        assert!(scarga_falls(&mut fallen, scarlion));
     }
 
     #[test]

@@ -109,6 +109,7 @@ impl ClientActor {
             | EventKind::Cwk
             | EventKind::Showa
             | EventKind::Balrog
+            | EventKind::Scarga
             | EventKind::PinkBean
             | EventKind::Papulatus
             | EventKind::Latanica => return Ok(()),

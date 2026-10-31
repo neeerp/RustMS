@@ -1076,3 +1076,214 @@ replace = [
     { item = 4032099, prob = 0.7, quest = 20204 },
     { item = 4032100, prob = 0.7, quest = 20205 },
 ]
+
+[mobs.9420544]
+# Furious Targa, the last of Targa's three forms in the Spooky World
+# (Map.nx 551030200, net::events::SCARGA). The pack has no drops for it;
+# these are Cosmic's (152-drop-data, 9420544), Targa's Foot 4001241
+# included. Every item is in our String.nx. Cosmic's hats 1003023 and
+# 1003024 come 3 to 5 at a time, an equip one at a time here, and its 2,000
+# to 5,000 mesos at 40 in 100 are one pile that ours vary around
+# (v83ref/lanes/QUESTIONS.md b375).
+replace = [
+    { money = 3500, prob = 0.4 },
+    { item = 2280010, prob = 0.02 },
+    { item = 2280009, prob = 0.02 },
+    { item = 2280008, prob = 0.02 },
+    { item = 2280007, prob = 0.02 },
+    { item = 1032031, prob = 0.003 },
+    { item = 4001241, prob = 0.3 },
+    { item = 2020013, prob = 0.333333 },
+    { item = 2020014, prob = 0.1 },
+    { item = 1302056, prob = 0.003 },
+    { item = 1312030, prob = 0.003 },
+    { item = 1322045, prob = 0.003 },
+    { item = 1332051, prob = 0.025 },
+    { item = 1332052, prob = 0.025 },
+    { item = 1372010, prob = 0.003 },
+    { item = 1382035, prob = 0.003 },
+    { item = 1402035, prob = 0.003 },
+    { item = 1422027, prob = 0.003 },
+    { item = 1412021, prob = 0.003 },
+    { item = 1432030, prob = 0.025 },
+    { item = 1452020, prob = 0.025 },
+    { item = 1462015, prob = 0.025 },
+    { item = 1462016, prob = 0.025 },
+    { item = 1472053, prob = 0.013 },
+    { item = 1452019, prob = 0.025 },
+    { item = 1442044, prob = 0.003 },
+    { item = 1492012, prob = 0.333333 },
+    { item = 1482012, prob = 0.333333 },
+    { item = 2043001, prob = 0.001 },
+    { item = 2043101, prob = 0.001 },
+    { item = 2043201, prob = 0.001 },
+    { item = 2043301, prob = 0.001 },
+    { item = 2043701, prob = 0.001 },
+    { item = 2043801, prob = 0.001 },
+    { item = 2044001, prob = 0.001 },
+    { item = 2044101, prob = 0.001 },
+    { item = 2044301, prob = 0.001 },
+    { item = 2044201, prob = 0.001 },
+    { item = 2044401, prob = 0.001 },
+    { item = 2044501, prob = 0.001 },
+    { item = 2044601, prob = 0.001 },
+    { item = 2044701, prob = 0.001 },
+    { item = 2040804, prob = 0.0005 },
+    { item = 2040001, prob = 0.001 },
+    { item = 2040004, prob = 0.001 },
+    { item = 2040301, prob = 0.001 },
+    { item = 2040401, prob = 0.001 },
+    { item = 2040501, prob = 0.001 },
+    { item = 2040504, prob = 0.001 },
+    { item = 2040516, prob = 0.001 },
+    { item = 2040513, prob = 0.001 },
+    { item = 2040601, prob = 0.001 },
+    { item = 2040701, prob = 0.001 },
+    { item = 2040704, prob = 0.001 },
+    { item = 2040707, prob = 0.001 },
+    { item = 2040801, prob = 0.001 },
+    { item = 2040901, prob = 0.001 },
+    { item = 2290098, prob = 0.02 },
+    { item = 2290015, prob = 0.02 },
+    { item = 2290027, prob = 0.02 },
+    { item = 2290089, prob = 0.02 },
+    { item = 2290054, prob = 0.02 },
+    { item = 2290119, prob = 0.02 },
+    { item = 2290002, prob = 0.02 },
+    { item = 2290022, prob = 0.02 },
+    { item = 2290034, prob = 0.02 },
+    { item = 2290105, prob = 0.02 },
+    { item = 2290110, prob = 0.02 },
+    { item = 2290094, prob = 0.02 },
+    { item = 2290052, prob = 0.02 },
+    { item = 1003023, prob = 0.05 },
+    { item = 1003024, prob = 0.05 },
+]
+
+[mobs.9420549]
+# Furious Scarlion Boss, the last of Scarlion's three forms: as Furious
+# Targa, with the Scarlion Boss's Foot 4001242 and the hats 1003025 and
+# 1003026 for Targa's.
+replace = [
+    { money = 3500, prob = 0.4 },
+    { item = 2280010, prob = 0.02 },
+    { item = 2280009, prob = 0.02 },
+    { item = 2280008, prob = 0.02 },
+    { item = 2280007, prob = 0.02 },
+    { item = 1032031, prob = 0.003 },
+    { item = 2043001, prob = 0.001 },
+    { item = 2020013, prob = 0.333333 },
+    { item = 2020014, prob = 0.1 },
+    { item = 1302056, prob = 0.003 },
+    { item = 1312030, prob = 0.003 },
+    { item = 1322045, prob = 0.003 },
+    { item = 1332051, prob = 0.025 },
+    { item = 1332052, prob = 0.025 },
+    { item = 1372010, prob = 0.003 },
+    { item = 1382035, prob = 0.003 },
+    { item = 1402035, prob = 0.003 },
+    { item = 1422027, prob = 0.003 },
+    { item = 1412021, prob = 0.003 },
+    { item = 1432030, prob = 0.025 },
+    { item = 1452020, prob = 0.025 },
+    { item = 1462015, prob = 0.025 },
+    { item = 1462016, prob = 0.025 },
+    { item = 1472053, prob = 0.013 },
+    { item = 1452019, prob = 0.025 },
+    { item = 1442044, prob = 0.003 },
+    { item = 1492012, prob = 0.333333 },
+    { item = 1482012, prob = 0.333333 },
+    { item = 2043101, prob = 0.001 },
+    { item = 2043201, prob = 0.001 },
+    { item = 2043301, prob = 0.001 },
+    { item = 2043701, prob = 0.001 },
+    { item = 2043801, prob = 0.001 },
+    { item = 2044001, prob = 0.001 },
+    { item = 2044101, prob = 0.001 },
+    { item = 2044301, prob = 0.001 },
+    { item = 2044201, prob = 0.001 },
+    { item = 2044401, prob = 0.001 },
+    { item = 2044501, prob = 0.001 },
+    { item = 2044601, prob = 0.001 },
+    { item = 2044701, prob = 0.001 },
+    { item = 2040804, prob = 0.0005 },
+    { item = 2040001, prob = 0.001 },
+    { item = 2040004, prob = 0.001 },
+    { item = 2040301, prob = 0.001 },
+    { item = 2040401, prob = 0.001 },
+    { item = 2040501, prob = 0.001 },
+    { item = 2040504, prob = 0.001 },
+    { item = 2040516, prob = 0.001 },
+    { item = 2040513, prob = 0.001 },
+    { item = 2040601, prob = 0.001 },
+    { item = 2040701, prob = 0.001 },
+    { item = 2040704, prob = 0.001 },
+    { item = 2040707, prob = 0.001 },
+    { item = 2040801, prob = 0.001 },
+    { item = 2040901, prob = 0.001 },
+    { item = 2290098, prob = 0.02 },
+    { item = 2290015, prob = 0.02 },
+    { item = 2290027, prob = 0.02 },
+    { item = 2290089, prob = 0.02 },
+    { item = 2290054, prob = 0.02 },
+    { item = 2290119, prob = 0.02 },
+    { item = 2290002, prob = 0.02 },
+    { item = 2290022, prob = 0.02 },
+    { item = 2290034, prob = 0.02 },
+    { item = 2290105, prob = 0.02 },
+    { item = 2290110, prob = 0.02 },
+    { item = 2290094, prob = 0.02 },
+    { item = 2290052, prob = 0.02 },
+    { item = 4001242, prob = 0.3 },
+    { item = 1003025, prob = 0.05 },
+    { item = 1003026, prob = 0.05 },
+]
+
+[mobs.9420527]
+# Malaysia's mobs 9420527-9420540 (Map.nx 551000100-551030100) each drop
+# their own Etc item. Those of Rodeo, Yabber Doo, Booper Scarlion, Vikerola
+# and Gallopera are what the chain of quests to the Spirit of Fantasy Theme
+# Park 4032246 asks for (Quest.nx Check.img/4557-4560 and 4576), the spirit
+# being what the Spooky World's expedition needs. The pack has no drops for
+# them; the rate is Cosmic's (152-drop-data), and their other loot is not
+# here yet.
+replace = [{ item = 4000465, prob = 0.3 }]
+
+[mobs.9420528]
+replace = [{ item = 4000466, prob = 0.3 }]
+
+[mobs.9420529]
+replace = [{ item = 4000467, prob = 0.3 }]
+
+[mobs.9420530]
+replace = [{ item = 4000468, prob = 0.3 }]
+
+[mobs.9420531]
+replace = [{ item = 4000469, prob = 0.3 }]
+
+[mobs.9420532]
+replace = [{ item = 4000470, prob = 0.3 }]
+
+[mobs.9420533]
+replace = [{ item = 4000471, prob = 0.3 }]
+
+[mobs.9420534]
+replace = [{ item = 4000472, prob = 0.3 }]
+
+[mobs.9420535]
+replace = [{ item = 4000473, prob = 0.3 }]
+
+[mobs.9420536]
+replace = [{ item = 4000474, prob = 0.3 }]
+
+[mobs.9420537]
+replace = [{ item = 4000475, prob = 0.3 }]
+
+[mobs.9420538]
+replace = [{ item = 4000476, prob = 0.3 }]
+
+[mobs.9420539]
+replace = [{ item = 4000477, prob = 0.3 }]
+
+[mobs.9420540]
+replace = [{ item = 4000478, prob = 0.3 }]

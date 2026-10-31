@@ -26,6 +26,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/showa.md`: The Boss in Showa's gang hideout: the way in, Konpei's expedition and the comb, the statue and the bodyguards, the win, the prizes, and the Slot Machine
 - `agent_docs/balrog.md`: the Balrog's tomb under Sleepywood: Mu Young's expedition, the arms and the claw that shield the body, the win, the sealed Balrog, and the leather
 - `agent_docs/latanica.md`: Capt. Latanica on the Ghost Ship off Singapore: the White Essence and the party's portal, the reactor's summon, Bob, and the win
+- `agent_docs/scarga.md`: Targa and Scarlion in Malaysia's Spooky World: Aldol's expedition and the spirit, the reactors' summons, the two-kill win, the prizes, and the drops
 - `agent_docs/pink-bean.md`: Pink Bean in the Temple of Time: the gate's expedition, the copy and its revival room, the Temple Keeper, the ways out, and the statue's guardians' waves
 - `agent_docs/ships.md`: the Ellinia–Orbis ship's timetable, boarding NPCs, CONTI packets, and the station wall clock
 - `agent_docs/combat.md`: mob spawning and control, melee attacks, EXP and level-ups, spending AP and SP, drops and pickup, touch damage and death
