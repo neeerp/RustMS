@@ -112,7 +112,9 @@ mode on a channel, as many as the maps have copies.
   last count it was told in `Player::pyramid_rage`
   (`ServerMessage::PyramidRage`), cleared when it leaves the run.
 - Rage of Pharaoh (1020, and its Cygnus, Aran and Evan copies) is refused
-  without a use (`AttackHandler`), as the client does. With one, the
+  without a use (`AttackHandler`), as the client does. HeavenClient uses
+  it for any job on Down, Up, attack, only with a use left (`combat.md`, "The Aran's
+  key sequences"). With one, the
   attack takes it and tells the run (`EventCommand::Rage`). The run spends
   one if any are left and tells everyone how many remain. Two members who
   use the last one at once both get their attack.

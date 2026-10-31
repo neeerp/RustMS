@@ -1098,13 +1098,15 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
             effect.cooldown as i16,
         )?);
     }
-    let shown = buff::build_skill_effect(
-        player.id(),
-        skill.skill_id,
-        player.stats.level,
-        skill.level as u8,
-    )?;
-    result = result.with(WorldAction::Field(FieldRequest::Broadcast(shown)));
+    if skill.skill_id != skills::COMBAT_STEP {
+        let shown = buff::build_skill_effect(
+            player.id(),
+            skill.skill_id,
+            player.stats.level,
+            skill.level as u8,
+        )?;
+        result = result.with(WorldAction::Field(FieldRequest::Broadcast(shown)));
+    }
     if let Some(foreign) = show_given(player, stats)? {
         result = result.with(WorldAction::BuffsChanged(foreign));
     }
@@ -2512,6 +2514,20 @@ mod tests {
                 other => panic!("unexpected {other:?}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn combat_step_unlocks_the_stepper_and_shows_the_map_nothing() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(skills::COMBAT_STEP, 1);
+        player.stats.job = 2100;
+        let actions = handle(&mut player, skills::COMBAT_STEP, 1);
+        assert!(actions.iter().any(unlocks));
+        assert!(!actions
+            .iter()
+            .any(|action| matches!(action, WorldAction::Field(FieldRequest::Broadcast(_)))));
     }
 
     #[test]

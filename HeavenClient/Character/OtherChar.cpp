@@ -25,6 +25,7 @@
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Combat/PqSkills.h"
+#include "../Gameplay/Combat/CombatStep.h"
 #include "../Gameplay/Combat/RecoilShot.h"
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Stage.h"
@@ -80,6 +81,10 @@ namespace ms
 		// So does a Recoil Shot (0x980104).
 		if (arrived & (1u << recoil_shot::MOVE))
 			Stage::get().get_combat().show_recoil_shot(*this);
+
+		// And a Combat Step (0x980308).
+		if (arrived & (1u << combat_step::MOVE))
+			Stage::get().get_combat().show_combat_step(*this);
 
 		// Wings' glide shows while the path glides down (0x9b17ec).
 		glide(wings::gliding(path.command() == wings::GLIDE, now.vy), now.fh > 0);

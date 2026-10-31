@@ -307,6 +307,9 @@ pub const CHAKRA: i32 = 4211001;
 /// v83 looks them all up as the Fire/Poison one's (0x958db2).
 pub const MANA_REFLECTION: i32 = 2121002;
 pub const TIME_LEAP: i32 = 5121010;
+/// Combat Step: the others in the map see its effect from the slide in the
+/// stepper's path (report b366), so the server shows them nothing.
+pub const COMBAT_STEP: i32 = 21001001;
 /// Echo of Hero, the Beginner's, the Noblesse's, and the Legend's: it
 /// reaches everyone around, in the player's party or not (0x96a33a).
 pub const ECHOES: [i32; 3] = [1005, 10001005, 20001005];

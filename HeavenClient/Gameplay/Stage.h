@@ -353,7 +353,13 @@ namespace ms
 		// (v83 FUN_0063196b).
 		bool try_macro_step(const skill_macro::Step& step);
 
-		// Try the Aran combo command waiting; returns whether its skill went off (FUN_0074de09).
+		// The skill a key sequence's command would use now, or 0.
+		int32_t aran_skill(int32_t id);
+
+		// Whether the player may use a key sequence's command.
+		bool may_use(int32_t id);
+
+		// Try the key sequence's command waiting; returns whether it is done with (FUN_0074de09).
 		bool try_aran_command(int32_t id);
 
 		void respawn(int8_t portalid, std::optional<Point<int16_t>> chase);
@@ -386,6 +392,9 @@ namespace ms
 		void use_teleport(int32_t skill);
 
 		void use_flash_jump(int32_t skill);
+
+		// Combat Step's slide, where it may go.
+		void use_combat_step();
 
 		void use_wings(int32_t skill);
 

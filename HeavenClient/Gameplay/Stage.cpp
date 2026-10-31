@@ -24,7 +24,9 @@
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
+#include "Combat/CombatStep.h"
 #include "Combat/FlashJump.h"
+#include "Combat/Massacre.h"
 #include "Combat/Wings.h"
 #include "FieldEffectRules.h"
 #include "OxQuizRules.h"
@@ -505,8 +507,8 @@ namespace ms
 		if (auto step = macro_runner.due(Constants::TIMESTEP))
 			macro_runner.tried(try_macro_step(*step));
 
-		// A combo command waiting is tried each frame while the player is alive and not attacking, until it
-		// goes off or has waited too long (FUN_0074de09).
+		// A key sequence's command waiting is tried each frame while the player is alive and not attacking,
+		// until it is done with or has waited too long (FUN_0074de09).
 		if (std::optional<int32_t> id = aran_queue.due(get_uptime() / 1000))
 			if (!player.is_dead() && !player.is_attacking() && try_aran_command(*id))
 				aran_queue.pop();
@@ -1383,8 +1385,8 @@ namespace ms
 		else if (walking && !down && dashing)
 			CancelBuffPacket(dash_skill).dispatch();
 
-		// An Aran's combo command waits to be used once its sequence ends, if the combo allows one of its
-		// skills; while it waits the keys that act are dropped, so the last one doesn't attack as well.
+		// A key sequence's command waits to be used, if the player may use it; while one waits the keys that act
+		// are dropped, so the last one doesn't attack as well. Some take their last key outright.
 		int64_t now = get_uptime() / 1000;
 		int32_t job = player.get_stats().get_job().get_id();
 		int32_t weapon = player.get_weapontype();
@@ -1396,11 +1398,21 @@ namespace ms
 		{
 			return aran_combo::enabled(id, job, weapon, level);
 		};
+		auto make = [&](int32_t id)
+		{
+			aran_combo::Outcome outcome = aran_combo::outcome(id, may_use(id),
+															  aran_combo::doing(player.get_look().get_actionstr()),
+															  aran_queue.last());
+
+			if (outcome.waits)
+				aran_queue.push(id, now);
+
+			return outcome.takes;
+		};
 		int64_t code = (static_cast<int64_t>(type) << 32) | static_cast<uint32_t>(action);
 
-		if (int32_t id = aran_commands.feed(code, aran_key(type, action), down, now, may_start))
-			if (aran_combo::pick(id, player.get_aran_combo(), level) != 0)
-				aran_queue.push(id, now);
+		if (aran_commands.feed(code, aran_key(type, action), down, now, may_start, make))
+			return;
 
 		bool acts = type == KeyType::Id::SKILL || type == KeyType::Id::ITEM || type == KeyType::Id::MACRO
 					|| (type == KeyType::Id::ACTION
@@ -1483,22 +1495,70 @@ namespace ms
 		}
 	}
 
-	bool Stage::try_aran_command(int32_t id)
+	int32_t Stage::aran_skill(int32_t id)
 	{
 		auto level = [this](int32_t skill)
 		{
 			return player.get_skills().get_level(skill);
 		};
-		int32_t skill = aran_combo::pick(id, player.get_aran_combo(), level);
 
-		if (skill == 0)
+		switch (id)
+		{
+			case aran_combo::TO_THE_LEFT:
+			case aran_combo::TO_THE_RIGHT:
+			case aran_combo::DOWN_TWICE:
+				return aran_combo::pick(id, player.get_aran_combo(), level);
+			default:
+			{
+				int32_t skill = aran_combo::skill(id, player.get_stats().get_job().get_id());
+
+				return level(skill) > 0 ? skill : 0;
+			}
+		}
+	}
+
+	bool Stage::may_use(int32_t id)
+	{
+		// Rage of Pharaoh needs a use left, not its level (0x74d841).
+		if (id == aran_combo::RAGE)
+			return massacre::rage_ready(massacre::session().skill);
+
+		return aran_skill(id) != 0;
+	}
+
+	bool Stage::try_aran_command(int32_t id)
+	{
+		if (!may_use(id))
 			return false;
 
-		// The player turns the command's way before each try (0x74d314).
+		// The player turns the command's way before each try (0x74d314, 0x74cb84, 0x74d69a).
 		if (std::optional<bool> right = aran_combo::faces_right(id, player.has_buff(Buffstat::Id::CONFUSE)))
 			player.set_direction(*right);
 
-		return combat.use_move(skill);
+		// Combat Step goes once tried, used or not.
+		if (id == aran_combo::STEP_LEFT || id == aran_combo::STEP_RIGHT)
+		{
+			use_combat_step();
+
+			return true;
+		}
+
+		return combat.use_move(id == aran_combo::RAGE ? aran_combo::skill(id, player.get_stats().get_job().get_id())
+													  : aran_skill(id));
+	}
+
+	// v83 slides an Aran along the ground with Combat Step once the skill
+	// is used, at the level's x (FUN_0096d95e). A GM may step where the
+	// map forbids movement skills.
+	void Stage::use_combat_step()
+	{
+		bool allowed = mapinfo.can_use_movement_skills() || Configuration::get().get_grade().gm();
+
+		if (!player.may_combat_step(allowed) || !combat.use_move(combat_step::ID))
+			return;
+
+		int32_t level = player.get_skills().get_level(combat_step::ID);
+		player.combat_step(SkillData::get(combat_step::ID).get_stats(level).x);
 	}
 
 	void Stage::stop_macro()

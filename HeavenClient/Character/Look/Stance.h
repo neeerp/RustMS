@@ -73,6 +73,9 @@ namespace ms
 
 		Id by_string(const std::string &name);
 
+		// by_string without the warning, for a name that may be an action instead.
+		Id find(const std::string &name);
+
 		bool is_climbing(Id value);
 
 		Id baseof(Id value);
