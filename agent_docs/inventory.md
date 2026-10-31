@@ -410,7 +410,7 @@ Double-clicking a megaphone in the Cash tab opens its dialog
   "Display whisper icon" checkbox (on at first). It closes before the lines
   are checked as above; the triple megaphone asks "One of the lines has not
   been applied." before sending with an empty line, and sends the lines up
-  to the last one typed. Tab moves to the next line. Preview writes "This is
+  to the last one typed. Preview writes "This is
   a preview option for the Triple Megaphone." and the lines up to the last
   one typed to the own chat log only, and nothing when all are empty.
   "Special character" opens the item's samples (`Item.nx`
@@ -424,6 +424,19 @@ Double-clicking a megaphone in the Cash tab opens its dialog
   with "Other requests are in process." while a request is waiting.
 
 The item megaphone can't be opened while a dialog is open ("Not available").
+
+In the super, triple and avatar dialogs Tab moves the keys through every
+control in the order v83 makes them, and Shift+Tab goes back, past any
+disabled one (`FocusRing`, `tab_focus::next`; v83 FUN_004edc29, report
+179e): the super megaphone's line, OK, Cancel and the checkbox; the triple's
+three lines, OK, Cancel, Special Character, Preview and the checkbox; the
+avatar's OK, Cancel, box and checkbox. A button with the keys shows its
+`keyFocused` art if it has any (only `Basic.img`'s OK and Cancel do), and
+Space presses it going down and clicks it coming up; clicking a button gives
+it the keys too. Enter is still OK and Escape Cancel wherever the keys are,
+and the checkbox only holds them (Space doesn't tick it). `UI::send_key`
+hands Tab and Space to the focused window's `send_focus_key` before any
+field hears them. Tab does nothing in the triple's samples popup.
 The gates are in `Util/Megaphones.h`.
 
 #### Avatar megaphones
@@ -451,7 +464,9 @@ The packet carries the look `Player::look_entry` builds from the equipped
 items. The banner is `UIAvatarMegaphone`: the item's `info/path` art from
 `Map.nx` `MapHelper.img/AvatarMegaphone` in the top right corner, the speaker
 standing in it with the item's `info/emotion` face, the name on the short or
-long plate, and the four lines. It slides in from the right edge over 225 ms
+long plate, and the four lines. The art fades in over 1500 ms (report
+c003b: its layer's alpha, taken as alpha rather than a colour). It slides in
+from the right edge over 225 ms
 with a small wobble, and out again after 10 s, when the next replaces it at
 once, or on 0x70. The line also goes to the chat log in its own colours, with the
 channel tag, as `<name> : <lines>`. A banner that arrives in the cash shop
@@ -584,7 +599,12 @@ TROCK_ADD_MAP for the current map, unless the list is full, already has it, or
 the map can't be kept; DEL. MAP asks before dropping the selected map. MOVE
 asks before using the rock on the selected map, or uses it at once on the
 typed name once the name is valid and isn't the player's own. Enter is MOVE
-and Escape closes the window, which closes before the rock is used. A refused
+and Escape closes the window, which closes before the rock is used. Tab and
+Shift+Tab move the keys through ADD MAP, DEL. MAP, MOVE, the close button and
+the name field, past the disabled ones (v83 FUN_008392c1; the VIP rock's
+scroll bar isn't a stop here), and Space clicks a button that has them, as
+in the megaphone dialogs. Clicking a map in the list gives the keys to ADD
+MAP, as v83 does. A refused
 rock shows the result as a notice, naming the character for result 6.
 
 ### Meso sacks

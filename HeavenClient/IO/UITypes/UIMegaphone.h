@@ -2,6 +2,7 @@
 
 #include "../UIElement.h"
 
+#include "../Components/FocusRing.h"
 #include "../Components/Textfield.h"
 
 #include "../../Template/Optional.h"
@@ -41,6 +42,8 @@ namespace ms
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
+		bool send_focus_key(int32_t keycode, bool pressed, bool shift) override;
+
 		UIElement::Type get_type() const override;
 
 	protected:
@@ -57,9 +60,6 @@ namespace ms
 		void use_sample(std::optional<uint16_t> index);
 
 		Cursor::State send_samples_cursor(bool press, bool release, bool clicked, Point<int16_t> cursorpos);
-
-		// Gives the keys to field `index`, if there is one.
-		void focus_field(int16_t index);
 
 		void preview();
 
@@ -111,5 +111,7 @@ namespace ms
 		Texture samples_top;
 		Texture samples_row;
 		Texture samples_bottom;
+		// Every control is a Tab stop, the checkbox last.
+		FocusRing ring;
 	};
 }

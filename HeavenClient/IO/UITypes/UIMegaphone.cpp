@@ -15,6 +15,12 @@
 
 #include <nlnx/nx.hpp>
 
+#ifdef _WIN32
+#include <glfw3.h>
+#else
+#include <GLFW/glfw3.h>
+#endif
+
 namespace ms
 {
 	namespace
@@ -115,17 +121,32 @@ namespace ms
 						close();
 					}
 			);
-
-			// FUN_004edd21 moves through every control, buttons too; here Tab moves through the lines.
-			if (triple)
-				field.set_key_callback(
-						KeyAction::Id::TAB,
-						[&, i]()
-						{
-							focus_field(static_cast<int16_t>((i + 1) % field_count));
-						}
-				);
 		}
+
+		// Tab goes through the controls in the order v83 makes them (report 179e and FUN_007f1196): the super
+		// megaphone's line, OK, Cancel and the checkbox; the triple's lines, OK, Cancel, Special Character and Preview,
+		// then the checkbox; the avatar's OK, Cancel, box and checkbox.
+		if (avatar)
+		{
+			ring.add(Buttons::OK, *buttons[Buttons::OK]);
+			ring.add(Buttons::CANCEL, *buttons[Buttons::CANCEL]);
+			ring.add(fields[0]);
+		} else
+		{
+			for (size_t i = 0; i < field_count; i++)
+				ring.add(fields[i]);
+
+			ring.add(Buttons::OK, *buttons[Buttons::OK]);
+			ring.add(Buttons::CANCEL, *buttons[Buttons::CANCEL]);
+
+			if (triple)
+			{
+				ring.add(Buttons::EXAMPLE, *buttons[Buttons::EXAMPLE]);
+				ring.add(Buttons::PREVIEW, *buttons[Buttons::PREVIEW]);
+			}
+		}
+
+		ring.add_blank();
 
 		// Centred, with no title bar to drag it by.
 		dimension = background.get_dimensions();
@@ -201,6 +222,8 @@ namespace ms
 
 		for (size_t i = 0; i < field_count; i++)
 			fields[i].update(position);
+
+		ring.update();
 	}
 
 	void UIMegaphone::remove_cursor()
@@ -294,6 +317,30 @@ namespace ms
 		}
 	}
 
+	bool UIMegaphone::send_focus_key(int32_t keycode, bool pressed, bool shift)
+	{
+		// The samples have the keys while they are open; Tab among them isn't done.
+		if (sampling)
+			return keycode == GLFW_KEY_TAB;
+
+		if (keycode == GLFW_KEY_TAB)
+		{
+			if (pressed)
+				ring.cycle(shift);
+
+			return true;
+		}
+
+		// Space is typed in a line, and clicks a button with the keys.
+		if (!ring.holds_keys())
+			return false;
+
+		if (auto id = ring.space(pressed))
+			button_pressed(*id);
+
+		return true;
+	}
+
 	UIElement::Type UIMegaphone::get_type() const
 	{
 		return TYPE;
@@ -301,6 +348,10 @@ namespace ms
 
 	Button::State UIMegaphone::button_pressed(uint16_t buttonid)
 	{
+		// A click gives a button the keys.
+		if (buttonid < Buttons::SAMPLE)
+			ring.focus_button(buttonid);
+
 		switch (buttonid)
 		{
 			case Buttons::OK:
@@ -385,12 +436,6 @@ namespace ms
 
 		for (uint16_t i = 0; i < sample_count; i++)
 			buttons[Buttons::SAMPLE + i]->set_active(false);
-	}
-
-	void UIMegaphone::focus_field(int16_t index)
-	{
-		if (index >= 0)
-			fields[index].set_state(Textfield::State::FOCUSED);
 	}
 
 	void UIMegaphone::preview()

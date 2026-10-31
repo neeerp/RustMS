@@ -94,6 +94,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME package_tooltip COMMAND package_tooltip_tests)
     add_executable(answer_focus_tests tests/answer_focus.cpp)
     add_test(NAME answer_focus COMMAND answer_focus_tests)
+    add_executable(tab_focus_tests tests/tab_focus.cpp)
+    add_test(NAME tab_focus COMMAND tab_focus_tests)
     add_executable(window_layer_tests tests/window_layer.cpp)
     add_test(NAME window_layer COMMAND window_layer_tests)
     add_executable(slider_steps_tests tests/slider_steps.cpp)
@@ -863,6 +865,8 @@ add_executable(HeavenClient
     IO/Components/ContextMenuLayout.h
     IO/Components/FadeNotice.h
     IO/Components/FloatingLines.h
+    IO/Components/FocusRing.cpp
+    IO/Components/FocusRing.h
     IO/Components/Gauge.cpp
     IO/Components/Gauge.h
     IO/Components/Icon.cpp
@@ -896,6 +900,7 @@ add_executable(HeavenClient
     IO/Components/StatefulIcon.cpp
     IO/Components/StatefulIcon.h
     IO/Components/Textfield.cpp
+    IO/Components/TabFocus.h
     IO/Components/Textfield.h
     IO/Components/TextTooltip.cpp
     IO/Components/TextTooltip.h
