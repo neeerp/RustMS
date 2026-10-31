@@ -1110,6 +1110,7 @@ impl ClientActor {
         self.show_event_clock().await?;
         self.show_event_gate().await?;
         self.show_dojo_floor().await?;
+        self.show_massacre_stage().await?;
         self.show_carnival().await?;
         self.taunt_challenger().await?;
         self.start_hazard()?;

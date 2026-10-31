@@ -291,6 +291,17 @@ own, in `game_data::MobInfo`:
 - PYRAMID_SCORE (0x9E, `build_pyramid_score`), on the result map: a byte
   rank, 0 for S to 4 for D, then the EXP as an int. The tallies come from
   the session values sent before it.
+- FIELD_EFFECT (screen, `build_field_effect`) on arriving on a stage, the
+  Pyramid's or the Dusty Platform's: `killing/first/stage`,
+  `killing/first/number/N` and `killing/first/start`, "Stage N" above the
+  centre and "Start!" on it. In the Tomb and Train 999 they are
+  `killing/bonus/bonus` and `killing/bonus/stage`, "Bonus Stage". These are
+  the maps' `onFirstUserEnter` scripts, `killing_MapSetting` and
+  `killing_BonusSetting`; neither Cosmic nor the client has them, and the
+  client names only `killing/clear` and `killing/fail` itself. Every part
+  opens on a blank frame (1000 ms for the stage and number, 1600 for the
+  start), so `ClientActor::show_massacre_stage` sends them together, to each
+  player who arrives rather than only the first.
 
 ## HeavenClient
 
