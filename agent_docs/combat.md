@@ -510,8 +510,10 @@ The client keys these by `job % 1000`, so Cygnus Knights and Aran use the
 Explorer rows; GMs use the beginners'. Max MP also gains a tenth of total
 INT per level and 3/40 of it per AP (the share the client's AP Reset takes
 back), and a warrior's Improving MaxHP Increase (1000001), a Brawler's
-Improve MaxHP (5100000) and a magician's Improving MaxMP Increase (2000001)
-add their `x` to each level's growth and their `y` to an AP's
+Improve MaxHP (5100000) and a magician's Improving MaxMP Increase (2000001),
+and the Knights' Max HP Enhancement (11000000, Dawn Warrior), Improve Max
+HP (15100000, Thunder Breaker) and Increasing Max MP (12000000, Blaze
+Wizard), add their `x` to each level's growth and their `y` to an AP's
 (`net::skills::growth_bonus`). Level ups stop at 30,000 like AP.
 
 A job advance adds max HP/MP so the player stays above the client's least

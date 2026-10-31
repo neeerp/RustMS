@@ -210,10 +210,15 @@ pub fn natural_recovery(player: &Player) -> NaturalRecovery {
 pub const IMPROVING_MAX_HP: i32 = 1000001;
 pub const IMPROVING_MAX_MP: i32 = 2000001;
 pub const BRAWLER_IMPROVE_MAX_HP: i32 = 5100000;
+pub const DAWN_WARRIOR_MAX_HP_ENHANCEMENT: i32 = 11000000;
+pub const BLAZE_WIZARD_INCREASING_MAX_MP: i32 = 12000000;
+pub const THUNDER_BREAKER_IMPROVE_MAX_HP: i32 = 15100000;
 
 /// What the player adds to max HP and MP growth: a warrior's Improving
 /// MaxHP Increase, a Brawler's Improve MaxHP and a magician's Improving
-/// MaxMP Increase (`x` on a level up, or `y` for an AP, as their
+/// MaxMP Increase, and their Knights' counterparts, a Dawn Warrior's Max
+/// HP Enhancement, a Thunder Breaker's Improve Max HP and a Blaze Wizard's
+/// Increasing Max MP (`x` on a level up, or `y` for an AP, as their
 /// descriptions say), and for MP a share of total INT: a tenth on a level
 /// up, 3/40 for an AP, the share the client's AP Reset takes back.
 pub fn growth_bonus(player: &Player, level_up: bool) -> (i16, i16) {
@@ -232,8 +237,13 @@ pub fn growth_bonus(player: &Player, level_up: bool) -> (i16, i16) {
     let int = total_int(player);
     let int = if level_up { int / 10 } else { int * 3 / 40 };
     (
-        bonus(100, IMPROVING_MAX_HP) + bonus(510, BRAWLER_IMPROVE_MAX_HP),
-        bonus(200, IMPROVING_MAX_MP) + i16::try_from(int).unwrap_or(i16::MAX),
+        bonus(100, IMPROVING_MAX_HP)
+            + bonus(510, BRAWLER_IMPROVE_MAX_HP)
+            + bonus(1100, DAWN_WARRIOR_MAX_HP_ENHANCEMENT)
+            + bonus(1510, THUNDER_BREAKER_IMPROVE_MAX_HP),
+        bonus(200, IMPROVING_MAX_MP)
+            + bonus(1200, BLAZE_WIZARD_INCREASING_MAX_MP)
+            + i16::try_from(int).unwrap_or(i16::MAX),
     )
 }
 
@@ -1585,6 +1595,28 @@ mod tests {
         // A Gunslinger has no Improve MaxHP.
         player.stats.job = 520;
         assert_eq!(growth_bonus(&player, false), (0, 0));
+    }
+
+    #[test]
+    fn the_knights_max_hp_and_mp_skills_add_to_their_jobs_growth() {
+        let mut player = knowing(&[
+            (DAWN_WARRIOR_MAX_HP_ENHANCEMENT, 1),
+            (BLAZE_WIZARD_INCREASING_MAX_MP, 1),
+            (THUNDER_BREAKER_IMPROVE_MAX_HP, 1),
+        ]);
+        player.stats.int = 9;
+        player.stats.job = 1111;
+        assert_eq!(growth_bonus(&player, true), (4, 0));
+        assert_eq!(growth_bonus(&player, false), (3, 0));
+        player.stats.job = 1200;
+        assert_eq!(growth_bonus(&player, true), (0, 2));
+        assert_eq!(growth_bonus(&player, false), (0, 1));
+        player.stats.job = 1510;
+        assert_eq!(growth_bonus(&player, true), (3, 0));
+        assert_eq!(growth_bonus(&player, false), (2, 0));
+        // A first-job Thunder Breaker can't have learned it yet.
+        player.stats.job = 1500;
+        assert_eq!(growth_bonus(&player, true), (0, 0));
     }
 
     #[test]
