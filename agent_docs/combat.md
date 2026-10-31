@@ -806,7 +806,8 @@ A few skills do more than buff:
   - Left, Left or Right, Right is Combat Step (21001001). The client
     slides the player along the ground at the level's `x`
     (`Player::combat_step`), only on a foothold, where the map allows
-    movement skills (or for a GM), and a second apart. A jump down holds
+    movement skills (or for a GM), not on a jump pad (a touch portal of
+    type 12 or 13, `Stage::use_combat_step`), and a second apart. A jump down holds
     it off 200 ms, and no jump is allowed during the step. The path gets
     element 20, from which others see the step's effect
     (`OtherChar::send_movement`). The server announces no skill effect for
@@ -826,7 +827,7 @@ A few skills do more than buff:
     `skills::learned` give a hidden swing its owner's level
     (`aran_combo::swing_owner`). The Legend's copies have no such skills.
   - Not modelled: the plain swing's own wait (the action's length plus
-    400 ms), and the portal kinds Combat Step refuses.
+    400 ms).
 - **Berserk** (`net::berserk`, 1320006) is a Dark Knight's passive. The
   client keeps the state: Berserk is on while HP is at most `x` percent
   of max HP, rechecked when HP changes and anew on entering the game. Each
