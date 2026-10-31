@@ -1433,7 +1433,12 @@ px ahead on a foothold within 80 px, the Octopi 45 px ahead, and the rest at
 the owner (v83 `FUN_0096b140`). The cast costs MP and any `itemCon`, for
 example a Summoning Rock for Silver Hawk. It also gives a buff that shows
 the summon's icon and lasts its `time`: Puppet's own stat for summons that
-stay put, the combo counter for the rest. The field then takes the summon
+stay put, and `BuffStat::Summon` for the rest. The client shows that icon
+on Combo Attack's bit, as Cosmic does, but a Dawn Warrior has both, so the
+server keeps them apart as two stats. While Combo Attack is up, the
+summon's icon is never sent, nor its end (`Buffs::heard`), so the orbs
+stay. If Combo Attack ends with a summon out, its cancel takes the
+summon's icon away too. The field then takes the summon
 (`FieldRequest::Summon`). If the spot is more than 250×150 px from the
 owner, it uses the owner's position. The owner's earlier summon of that
 kind is dismissed. SPAWN_SUMMON (`0xAF`) shows it to the map and to players
