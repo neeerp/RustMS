@@ -485,13 +485,16 @@ namespace ms
 		if (offiter != offsets.end())
 			return offiter->second;
 
+		if (bmp.width() <= 0 || bmp.height() <= 0)
+			return nulloffset;
+
+		return place(id, bmp.width(), bmp.height(), bmp.data());
+	}
+
+	const GraphicsGL::Offset &GraphicsGL::place(size_t id, GLshort width, GLshort height, const void *pixels)
+	{
 		GLshort x = 0;
 		GLshort y = 0;
-		GLshort width = bmp.width();
-		GLshort height = bmp.height();
-
-		if (width <= 0 || height <= 0)
-			return nulloffset;
 
 		Leftover value = Leftover(x, y, width, height);
 
@@ -590,7 +593,7 @@ namespace ms
 		//
 		//std::cout << "Used: [" << usedpercent << "] Wasted: [" << wastedpercent << "]" << std::endl;
 
-		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, bmp.data());
+		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
 
 		return offsets.emplace(
 				std::piecewise_construct,
@@ -635,6 +638,28 @@ namespace ms
 		offset.left += crop.left();
 		offset.bottom = offset.top + crop.bottom();
 		offset.top += crop.top();
+
+		quads.emplace_back(rect.left(), rect.right(), rect.top(), rect.bottom(), offset, color, angle);
+		mark_additive();
+	}
+
+	void GraphicsGL::draw(size_t id, int16_t width, int16_t height, const void *pixels,
+						  const Rectangle<int16_t> &rect, const Color &color, float angle)
+	{
+		if (locked)
+			return;
+
+		if (color.invisible())
+			return;
+
+		if (!rect.overlaps(SCREEN))
+			return;
+
+		if (width <= 0 || height <= 0)
+			return;
+
+		auto offiter = offsets.find(id);
+		const Offset &offset = offiter != offsets.end() ? offiter->second : place(id, width, height, pixels);
 
 		quads.emplace_back(rect.left(), rect.right(), rect.top(), rect.bottom(), offset, color, angle);
 		mark_additive();

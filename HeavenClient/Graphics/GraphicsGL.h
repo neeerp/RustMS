@@ -63,6 +63,11 @@ namespace ms
 		void draw(const nl::bitmap &bmp, const Rectangle<int16_t> &rect, const Rectangle<int16_t> &crop,
 				  const Color &color, float angle);
 
+		// Draw `width` x `height` BGRA `pixels` not read from a file, kept
+		// under `id` until the atlas is next cleared.
+		void draw(size_t id, int16_t width, int16_t height, const void *pixels, const Rectangle<int16_t> &rect,
+				  const Color &color, float angle);
+
 		// Whether the bitmaps drawn next add their colour to what is under them, as v83 draws a map layer
 		// with `blend` 1 (Gr2D blend flag 1: SRCALPHA, ONE).
 		void set_additive(bool additive);
@@ -138,6 +143,9 @@ namespace ms
 
 		// Add a bitmap to the available resources.
 		const Offset &getoffset(const nl::bitmap &bmp);
+
+		// Place `pixels` in the atlas under `id`.
+		const Offset &place(size_t id, GLshort width, GLshort height, const void *pixels);
 
 		struct Leftover
 		{

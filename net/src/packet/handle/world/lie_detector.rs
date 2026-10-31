@@ -20,6 +20,9 @@ pub const TEST_TIME: Duration = Duration::from_secs(60);
 pub const ATTACK_WINDOW: Duration = Duration::from_secs(10);
 /// How long after a test the same player can't be tested again.
 pub const TESTED_FOR: Duration = Duration::from_secs(60 * 60);
+/// How many answers a test takes: the client counts the tries left, two
+/// with the first picture and one with the next (0x7e6a94).
+pub const TRIES: u8 = 2;
 /// What a pass earns.
 pub const PASS_REWARD: i32 = 5000;
 /// The most a fail costs, given to the tester.

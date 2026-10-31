@@ -9,7 +9,7 @@ use net::handler::HandlerResult;
 use net::handler::WorldAction;
 use net::packet::build::world::anti_macro::{build_anti_macro_result, AntiMacroResult};
 use net::packet::handle::world::lie_detector::{
-    failed, fine_received, passed, refusal, spend_detector, TEST_TIME,
+    failed, fine_received, passed, refusal, spend_detector, TEST_TIME, TRIES,
 };
 use net::packet::handle::world::LieDetectorUse;
 use rand::thread_rng;
@@ -22,6 +22,8 @@ pub(super) struct LieTest {
     /// When the time to answer runs out; the client doesn't end it itself.
     deadline: Instant,
     tester: ClientHandle,
+    /// Answers still to come, counting the one awaited.
+    tries: u8,
 }
 
 impl ClientActor {
@@ -60,6 +62,7 @@ impl ClientActor {
             captcha,
             deadline: Instant::now() + TEST_TIME,
             tester: reply_to.clone(),
+            tries: TRIES,
         });
         reply_to.send(ServerMessage::LieDetected {
             test,
@@ -91,13 +94,21 @@ impl ClientActor {
         self.apply_all(result).await
     }
 
-    /// The player typed `typed` back: right passes, anything else fails.
+    /// The player typed `typed` back: right passes; anything else shows a
+    /// new picture in the time left while a try remains, or fails.
     pub(super) async fn answer_lie_test(&mut self, typed: String) -> Result<(), RuntimeError> {
-        let Some(test) = self.lie_test.as_ref() else {
+        let Some(test) = self.lie_test.as_mut() else {
             return Ok(());
         };
         if !test.captcha.accepts(&typed) {
-            return self.fail_lie_test().await;
+            if test.tries <= 1 {
+                return self.fail_lie_test().await;
+            }
+            test.tries -= 1;
+            test.captcha = captcha::generate(&mut thread_rng());
+            let jpeg = std::mem::take(&mut test.captcha.jpeg);
+            let challenge = AntiMacroResult::Challenge { first: false, jpeg };
+            return self.send(&mut build_anti_macro_result(&challenge)?).await;
         }
         self.lie_test = None;
         self.lie_tested().await;

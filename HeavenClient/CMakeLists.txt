@@ -492,6 +492,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME admin_result COMMAND admin_result_tests)
     add_executable(gm_command_tests tests/gm_command.cpp IO/GmCommand.cpp)
     add_test(NAME gm_command COMMAND gm_command_tests)
+    add_executable(lie_detector_tests tests/lie_detector.cpp Graphics/Jpeg.cpp)
+    target_include_directories(lie_detector_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/stb)
+    add_test(NAME lie_detector COMMAND lie_detector_tests)
 endif()
 
 include_directories(.)
@@ -833,6 +836,10 @@ add_executable(HeavenClient
     Graphics/TextLayout.cpp
     Graphics/TextLayout.h
     Graphics/Utf8.h
+    Graphics/Jpeg.cpp
+    Graphics/Jpeg.h
+    Graphics/PixelTexture.cpp
+    Graphics/PixelTexture.h
     Graphics/Texture.cpp
     Graphics/Texture.h
     IO/Components/AreaButton.cpp
@@ -1050,6 +1057,8 @@ add_executable(HeavenClient
     IO/UITypes/UIGuildRank.h
     IO/UITypes/UITransform.cpp
     IO/UITypes/UITransform.h
+    IO/UITypes/UILieDetector.cpp
+    IO/UITypes/UILieDetector.h
     IO/UITypes/UIMegaphone.cpp
     IO/UITypes/UIMegaphone.h
     IO/UITypes/UIMapleTv.cpp

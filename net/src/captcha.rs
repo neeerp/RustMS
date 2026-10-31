@@ -1,16 +1,18 @@
 //! The Lie Detector's picture (report c025): a few letters and digits drawn
 //! askew over noise, as the baseline JPEG the v83 client decodes, and the
-//! text a tested player must type back.
+//! text a tested player must type back. It is the size of the picture's
+//! box in the challenge's art (UIWindow.img/Macro/backgrnd4).
 
 use jpeg_encoder::{ColorType, Encoder};
 use rand::Rng;
 
-pub const WIDTH: usize = 220;
-pub const HEIGHT: usize = 70;
+pub const WIDTH: usize = 192;
+pub const HEIGHT: usize = 42;
 const QUALITY: u8 = 80;
 
-/// The characters it draws: no I, O, S, Z, B, Q or the digits like them.
-const GLYPHS: [(char, [u8; 7]); 24] = [
+/// The characters it draws: no I, O, S, Z, B, Q, U (too like V) or the
+/// digits like them.
+const GLYPHS: [(char, [u8; 7]); 23] = [
     (
         'A',
         [
@@ -99,12 +101,6 @@ const GLYPHS: [(char, [u8; 7]); 24] = [
         'T',
         [
             0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100,
-        ],
-    ),
-    (
-        'U',
-        [
-            0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
         ],
     ),
     (
@@ -210,12 +206,13 @@ pub fn generate(rng: &mut impl Rng) -> Captcha {
 
     let count = rng.gen_range(4, 7);
     let mut answer = String::new();
-    let mut x = rng.gen_range(6, 20);
+    let mut x = rng.gen_range(4, 11);
     for _ in 0..count {
         let (letter, rows) = GLYPHS[rng.gen_range(0, GLYPHS.len())];
         answer.push(letter);
-        let scale = rng.gen_range(4, 6);
-        let top = rng.gen_range(4, HEIGHT as i32 - 7 * scale - 4);
+        // Six characters fit only at the smaller size.
+        let scale = if count == 6 { 4 } else { rng.gen_range(4, 6) };
+        let top = rng.gen_range(2, HEIGHT as i32 - 7 * scale - 1);
         let shear: f32 = rng.gen_range(-0.35, 0.35);
         let colour = dark(rng);
         for py in 0..7 * scale {
@@ -227,7 +224,7 @@ pub fn generate(rng: &mut impl Rng) -> Captcha {
                 }
             }
         }
-        x += 5 * scale + rng.gen_range(4, 9);
+        x += 5 * scale + rng.gen_range(3, 7);
     }
 
     for _ in 0..rng.gen_range(4, 7) {
