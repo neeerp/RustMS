@@ -523,6 +523,20 @@ namespace ms
 			return swings[roll % 3];
 		}
 
+		// That swing then holds off the next attack with no skill for the length of its action, every frame's delay
+		// whatever its sign and whatever the attack speed, and 400 ms more (0x951936, report b365).
+		constexpr int64_t SWING_REST = 400;
+
+		inline int64_t polearm_swing_wait(const std::vector<uint16_t> &delays)
+		{
+			int64_t wait = SWING_REST;
+
+			for (uint16_t delay : delays)
+				wait += delay;
+
+			return wait;
+		}
+
 		// What a command does as its sequence matches, given whether the player may use it (its skill learned,
 		// or for Rage of Pharaoh a use left, or for a combo command a skill the combo allows), what the body is
 		// doing and the command waiting last. Double Swing waits only on an attack with the polearm and before

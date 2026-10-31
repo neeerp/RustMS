@@ -826,8 +826,10 @@ A few skills do more than buff:
     `Combat::use_move`). The client's skill book and the server's
     `skills::learned` give a hidden swing its owner's level
     (`aran_combo::swing_owner`). The Legend's copies have no such skills.
-  - Not modelled: the plain swing's own wait (the action's length plus
-    400 ms).
+  - That plain swing holds off the next attack with no skill for its
+    action's length, every frame's delay whatever its sign and whatever
+    the attack speed (540 ms for each of the three), and 400 ms more
+    (`aran_combo::polearm_swing_wait`, `Combat::apply_move`).
 - **Berserk** (`net::berserk`, 1320006) is a Dark Knight's passive. The
   client keeps the state: Berserk is on while HP is at most `x` percent
   of max HP, rechecked when HP changes and anew on entering the game. Each

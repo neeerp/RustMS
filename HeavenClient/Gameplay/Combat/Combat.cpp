@@ -1223,6 +1223,11 @@ namespace ms
 			if (!move.is_skill() && swing_at_reactor())
 				return true;
 
+			// An attack with no skill waits out an Aran's last polearm swing
+			// (0x950d5d).
+			if (!move.is_skill() && !follow && now < reuse_times[0])
+				return false;
+
 			// A Final Attack swings or shoots as the weapon does.
 			Attack attack = player.prepare_attack(move.is_skill() && !follow ? move.get_id() : 0);
 			attack.charge = charge;
@@ -1301,6 +1306,11 @@ namespace ms
 			} else if (!held)
 			{
 				move.apply_actions(player, attack.type);
+
+				if (!move.is_skill()
+					&& aran_combo::polearm_swing(player.get_job(), player.get_stats().get_weapontype(), 0))
+					reuse_times[0] = now + aran_combo::polearm_swing_wait(
+											   player.get_look().get_action_delays(player.get_look().get_actionstr()));
 			}
 
 			player.set_afterimage(move.get_id());

@@ -149,6 +149,8 @@ int main()
 		require(plain_mob_count(2112, POLEARM, 120) == 8 && plain_mob_count(2000, POLEARM, 1) == 2
 					&& plain_mob_count(2112, 130, 120) == 1 && plain_mob_count(110, POLEARM, 120) == 1,
 				"an Aran's plain polearm swing reaches more mobs with level");
+		require(polearm_swing_wait({ 120, 60, 360 }) == 940 && polearm_swing_wait({}) == 400,
+				"an Aran's plain polearm swing rests its action's length and 400 ms");
 
 		auto waiting = [](Outcome o) { return o.waits; };
 		require(waiting(outcome(DOUBLE_SWING, true, Doing::SWING, std::nullopt))
