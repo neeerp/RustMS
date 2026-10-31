@@ -1305,6 +1305,18 @@ pub mod keys {
         "knight_job.after.death",
         "knight_job.after.go",
     ];
+    pub const KNIGHTHOOD_ASK: &str = "knighthood.ask";
+    pub const KNIGHTHOOD_DECLINED: &str = "knighthood.declined";
+    pub const KNIGHTHOOD_GO: &str = "knighthood.go";
+    pub const KNIGHT_EXAM_ASK: &str = "knight_exam.ask";
+    pub const KNIGHT_EXAM_DECLINED: &str = "knight_exam.declined";
+    pub const KNIGHT_EXAM_TOO_MUCH_SP: &str = "knight_exam.too_much_sp";
+    pub const KNIGHT_EXAM_AFTER: [&str; 3] = [
+        "knight_exam.after.official",
+        "knight_exam.after.sp",
+        "knight_exam.after.go",
+    ];
+    pub const DRILL_HALL_LEAVE: &str = "drill_hall.leave";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
     /// (`q21604s`), the end of the Field of Wolves (`clearRider`), the
@@ -4390,6 +4402,16 @@ mod tests {
                 keys::KNIGHT_JOB_AFTER[2],
                 keys::KNIGHT_JOB_AFTER[3],
                 keys::KNIGHT_JOB_AFTER[4],
+                keys::KNIGHTHOOD_ASK,
+                keys::KNIGHTHOOD_DECLINED,
+                keys::KNIGHTHOOD_GO,
+                keys::KNIGHT_EXAM_ASK,
+                keys::KNIGHT_EXAM_DECLINED,
+                keys::KNIGHT_EXAM_TOO_MUCH_SP,
+                keys::DRILL_HALL_LEAVE,
+                keys::KNIGHT_EXAM_AFTER[0],
+                keys::KNIGHT_EXAM_AFTER[1],
+                keys::KNIGHT_EXAM_AFTER[2],
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
                 keys::PUCCI_WOLF_REQUEST[2],

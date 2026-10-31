@@ -962,6 +962,27 @@ At level 10 the Noblesse takes a first job:
   gives the Knight-in-Training medal (1142066), but the server leaves that
   to the title (29906), whose reward it is.
 
+At level 30 a Knight takes a second job:
+
+- Neinheart's The End of Knight-in-Training (20200, `q20200s`), which the
+  data starts by itself (`autoStart`), completes as it starts on the yes.
+- The Chief Knights' Knighthood Exams (20201 to 20205, at 1101003 to
+  1101007) wait on 20200 done. Each asks for 30 tokens (4032096 to
+  4032100) from the Tiguru of Exam (9001011), who drop them only to a
+  player on that exam (`reward_overrides.toml`). The Tiguru stand in the
+  three 2nd Drill Halls (108000600 to 108000602). The Entrance to the
+  Drill Hall's portal (`enterSecondDH`, `agent_docs/map-travel.md`) leads
+  to one of them at random, and only for a player on an exam. Kiriko
+  (1102001) in each hall asks whether to leave and sends the player back
+  to the entrance (130020000).
+- The end script (`q20201e` to `q20205e`) asks once more. The yes takes
+  the 30 tokens and makes the player a 1110, 1210, 1310, 1410 or 1510,
+  with the second-job bonus of the Explorer counterpart
+  (`Player::take_second_job`). A Knight keeping more SP than 3 for each
+  level past 30 is told to spend it first, as in Cosmic. Cosmic also
+  gives the Official Knight medal (1142067), but the server leaves that
+  to its title (29907).
+
 Each brother's start points the guide at a part of the screen
 (`Effect::GuideHint`, TALK_GUIDE mode 1), as Cosmic's `guideHint` does.
 Clicking the guide (CLICK_GUIDE) is not handled.

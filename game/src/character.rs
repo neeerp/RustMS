@@ -792,11 +792,16 @@ impl Player {
         self.dirty = true;
     }
 
-    /// Whether this first-job Explorer may take the second job `job` of its
-    /// line (e.g. a 100 may become a 110, 120 or 130): level 30.
+    /// Whether this first job may take the second job `job` of its line
+    /// (e.g. a 100 may become a 110, 120 or 130, a 1100 a 1110): level 30.
+    /// A Knight also may not keep more SP than 3 for each level past 30, as
+    /// its Chief Knight's exam asks (Cosmic `q20201e`).
     pub fn can_take_second_job(&self, job: i16) -> bool {
         let stats = &self.stats;
-        second_job_rules(job).is_some() && stats.job == job / 100 * 100 && stats.level >= 30
+        second_job_rules(job).is_some()
+            && stats.job == job / 100 * 100
+            && stats.level >= 30
+            && (job < 1000 || stats.sp <= (i16::from(stats.level) - 30) * 3)
     }
 
     /// Become a second-job `job`: 1 SP and the job's max HP/MP bonus.
@@ -1085,9 +1090,10 @@ fn second_job_bonus(job: i16) -> Option<(i16, i16)> {
 
 /// The max HP/MP an Explorer second job adds, again the middle of the
 /// community servers' ranges (e.g. warriors 300-350 HP), and each later
-/// job adds again.
+/// job adds again. A Knight's adds what its Explorer counterpart's does.
 fn second_job_rules(job: i16) -> Option<(i16, i16)> {
     match job {
+        1110 | 1210 | 1310 | 1410 | 1510 => second_job_rules(job % 1000),
         110 | 120 | 130 => Some((325, 0)),
         210 | 220 | 230 => Some((0, 475)),
         310 | 320 | 410 | 420 | 510 | 520 => Some((325, 175)),
@@ -1514,6 +1520,24 @@ mod tests {
         assert_eq!(player.stats.job, 1200);
         assert_eq!(player.stats.sp, 1);
         assert_eq!(player.stats.max_mp, 130);
+    }
+
+    #[test]
+    fn a_knight_of_30_takes_its_second_job_with_little_sp_left() {
+        let mut player = player();
+        (player.stats.job, player.stats.level, player.stats.sp) = (1100, 32, 7);
+        assert!(!player.can_take_second_job(1110), "at most 6 SP left");
+        player.stats.sp = 6;
+        assert!(player.can_take_second_job(1110));
+        assert!(!player.can_take_second_job(1120), "no such job");
+        assert!(!player.can_take_second_job(1210), "another line");
+        assert!(!player.can_take_second_job(110), "not an Explorer");
+
+        let hp = player.stats.max_hp;
+        player.take_second_job(1110);
+        assert_eq!(player.stats.job, 1110);
+        assert_eq!(player.stats.sp, 7);
+        assert_eq!(player.stats.max_hp, hp + 325);
     }
 
     #[test]

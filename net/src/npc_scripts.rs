@@ -2222,6 +2222,13 @@ impl NpcScript {
         if npc_id == DOJO_BOARD {
             return Some(dojo_board(player));
         }
+        if npc_id == DRILL_HALL_GATEKEEPER {
+            return Some(ask_warp(
+                npc_id,
+                keys::DRILL_HALL_LEAVE,
+                DRILL_HALL_ENTRANCE,
+            ));
+        }
         if npc_id == OLSON && player.quests.state(events::DOLLHOUSE_QUEST) == QuestState::Started {
             return Some(olson());
         }
@@ -3037,6 +3044,10 @@ impl NpcScript {
             "q20020s" => Some(five_paths()),
             "q20100s" => Some(time_to_choose()),
             "q20101e" | "q20102e" | "q20103e" | "q20104e" | "q20105e" => knight_job(script, player),
+            "q20200s" => Some(knighthood()),
+            "q20201e" | "q20202e" | "q20203e" | "q20204e" | "q20205e" => {
+                knight_exam(script, player)
+            }
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -4916,6 +4927,87 @@ fn knight_job(script: &str, player: &Player) -> Option<NpcScript> {
     let mut script = NpcScript::new(npc, pages);
     script.inventory_full = Some(line(keys::KNIGHT_JOB_INVENTORY_FULL));
     Some(script)
+}
+
+// A Knight's second job (b310): at level 30 Neinheart's The End of
+// Knight-in-Training (20200) sends them to the Chief Knights, whose
+// Knighthood Exams (20201-20205) wait on it done. Each exam is 30 tokens
+// from the Tiguru of Exam (9001011) in the Drill Halls (108000600-602,
+// `enterSecondDH`), and its end script makes them an official Knight.
+// Quest.nx gives no rewards; these are Cosmic's (`20200.js`, `20201.js` to
+// `20205.js`).
+const END_OF_KNIGHT_IN_TRAINING: i16 = 20200;
+
+/// A Knighthood Exam: the quest, its Chief Knight, the token it asks 30
+/// of, the second job, and the name the lines give it. Cosmic gives the
+/// Official Knight medal (1142067) too, but that is the reward of its
+/// title (29907, `KNIGHT_TITLES`), which Cygnus gives.
+pub const KNIGHT_EXAMS: [(i16, i32, i32, i16, &str); 5] = [
+    (20201, 1101003, 4032096, 1110, "Dawn Warrior"),
+    (20202, 1101004, 4032097, 1210, "Blaze Wizard"),
+    (20203, 1101005, 4032098, 1310, "Wind Archer"),
+    (20204, 1101006, 4032099, 1410, "Night Walker"),
+    (20205, 1101007, 4032100, 1510, "Thunder Breaker"),
+];
+/// The tokens each exam asks for.
+pub const KNIGHT_EXAM_TOKENS: i16 = 30;
+/// Kiriko (1102001), in each 2nd Drill Hall (`outSecondDH`), sends the
+/// player back to the Entrance to the Drill Hall.
+const DRILL_HALL_GATEKEEPER: i32 = 1102001;
+const DRILL_HALL_ENTRANCE: i32 = 130020000;
+
+/// `q20200s`: Neinheart's yes completes The End of Knight-in-Training as
+/// it starts it.
+fn knighthood() -> NpcScript {
+    let pages = vec![
+        Page::Ask {
+            text: text(keys::KNIGHTHOOD_ASK),
+            on_yes: vec![Effect::FinishQuest(END_OF_KNIGHT_IN_TRAINING)],
+            on_no: Some(text(keys::KNIGHTHOOD_DECLINED)),
+        },
+        Page::Say(text(keys::KNIGHTHOOD_GO)),
+    ];
+    NpcScript::new(NEINHEART, pages)
+}
+
+/// `q20201e` to `q20205e`: a Chief Knight takes the 30 tokens and makes
+/// the Knight an official one, unless they keep too much SP
+/// (`Character::can_take_second_job`).
+fn knight_exam(script: &str, player: &Player) -> Option<NpcScript> {
+    let &(quest, npc, token, job, name) = KNIGHT_EXAMS
+        .iter()
+        .find(|(quest, ..)| script[1..].starts_with(&quest.to_string()))?;
+    let content = content::text();
+    let item = format!("#t{token}#");
+    let count = KNIGHT_EXAM_TOKENS.to_string();
+    let params = [("job", name), ("item", item.as_str()), ("count", &count)];
+    let line = |key: &str| content.get(key, &params);
+    let refusal = (!player.can_take_second_job(job)).then(|| line(keys::KNIGHT_EXAM_TOO_MUCH_SP));
+    let on_yes = match refusal {
+        Some(_) => Vec::new(),
+        None => vec![
+            Effect::TakeItem {
+                item_id: token,
+                quantity: KNIGHT_EXAM_TOKENS,
+            },
+            Effect::TakeSecondJob(job),
+            Effect::CompleteQuest(quest),
+        ],
+    };
+    let mut pages = vec![Page::Ask {
+        text: line(keys::KNIGHT_EXAM_ASK),
+        on_yes,
+        on_no: Some(line(keys::KNIGHT_EXAM_DECLINED)),
+    }];
+    match refusal {
+        Some(refusal) => pages.push(Page::Say(refusal)),
+        None => pages.extend(
+            keys::KNIGHT_EXAM_AFTER
+                .iter()
+                .map(|key| Page::Say(line(key))),
+        ),
+    }
+    Some(NpcScript::new(npc, pages))
 }
 
 /// The titles of medals won elsewhere (29910 to 29928 and 29933): each
@@ -18247,6 +18339,30 @@ mod tests {
         ]);
         let walker = NpcScript::for_quest("q20104e", &noblesse).unwrap();
         assert_eq!(yes_through(walker), (1101006, knight));
+    }
+
+    #[test]
+    fn a_chief_knight_takes_thirty_tokens_and_makes_an_official_knight() {
+        let mut knight = player(50);
+        (knight.stats.job, knight.stats.level, knight.stats.sp) = (1300, 31, 4);
+        let run = |script: &str, knight: &Player| {
+            yes_through(NpcScript::for_quest(script, knight).unwrap())
+        };
+        let end = vec![Effect::FinishQuest(END_OF_KNIGHT_IN_TRAINING)];
+        assert_eq!(run("q20200s", &knight), (NEINHEART, end));
+
+        // Over 3 SP for each level past 30 is too much.
+        assert_eq!(run("q20203e", &knight), (1101005, vec![]));
+        knight.stats.sp = 3;
+        let official = vec![
+            Effect::TakeItem {
+                item_id: 4032098,
+                quantity: 30,
+            },
+            Effect::TakeSecondJob(1310),
+            Effect::CompleteQuest(20203),
+        ];
+        assert_eq!(run("q20203e", &knight), (1101005, official));
     }
 
     #[test]

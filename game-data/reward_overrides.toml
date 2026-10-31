@@ -1049,3 +1049,16 @@ replace = [
     { item = 2022268, prob = 0.2 },
     { item = 2022269, prob = 0.2 },
 ]
+
+[mobs.9001011]
+# The Tiguru of Exam in the 2nd Drill Halls (Map.nx 108000600-108000602)
+# drop the tokens of the Knighthood Exams (20201-20205), 30 of which each
+# exam's end checks (Quest.nx Check.img/2020x/1/item). The pack has no
+# drops for it; the rate is the community servers'.
+replace = [
+    { item = 4032096, prob = 0.7, quest = 20201 },
+    { item = 4032097, prob = 0.7, quest = 20202 },
+    { item = 4032098, prob = 0.7, quest = 20203 },
+    { item = 4032099, prob = 0.7, quest = 20204 },
+    { item = 4032100, prob = 0.7, quest = 20205 },
+]
