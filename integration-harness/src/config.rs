@@ -15,6 +15,8 @@ pub struct HarnessConfig {
     pub password: String,
     pub character_name: String,
     pub gender: u8,
+    /// The creation packet's class flag: 0 Cygnus, 1 Explorer, 2 Aran.
+    pub class: i32,
     pub world_id: u8,
     pub channel_id: u8,
     pub login_addr: SocketAddr,
@@ -47,6 +49,7 @@ impl HarnessConfig {
             password: "test".to_string(),
             character_name: random_character_name("ic"),
             gender: 0,
+            class: 1,
             world_id: 0,
             channel_id: 0,
             login_addr,
@@ -68,6 +71,13 @@ impl HarnessConfig {
         self.world_id = world_id;
         self.channel_id = channel_id;
         self.expected_redirect_addr = self.channel_addr(channel_id);
+        self
+    }
+
+    /// A character of another class than the Explorer, made at the first
+    /// login.
+    pub fn with_class(mut self, class: i32) -> Self {
+        self.class = class;
         self
     }
 
@@ -122,6 +132,7 @@ impl MultiHarnessConfig {
             password: player.password.clone(),
             character_name: player.character_name.clone(),
             gender: player.gender,
+            class: 1,
             world_id: player.world_id,
             channel_id: player.channel_id,
             login_addr: self.login_addr,

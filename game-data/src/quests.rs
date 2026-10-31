@@ -102,7 +102,8 @@ pub const SCRIPTS: &[&str] = &[
     "q21720e", "q21729s", "q21766s", "q21766e", "q21767s", "q21600s", "q21604s", "q21613s",
     "q21618s", "q21618e", "q3250s", "q3250e", "q29002s", "q29002e", "q29400s", "q29400e",
     "q29906s", "q29907s", "q29908s", "q29909s", "q29922s", "q29923s", "q29924s", "q29925s",
-    "q29926s", "q29927s", "q29928s",
+    "q29926s", "q29927s", "q29928s", "q29905s", "q20010s", "q20010e", "q20011s", "q20011e",
+    "q20012s", "q20012e", "q20013s", "q20013e", "q20015s", "q20016s", "q20017s",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -113,16 +114,19 @@ pub const SCRIPTS: &[&str] = &[
 /// clue in the broken Spirit of Snow Statue (3108), and the lost memory
 /// each job instructor gives back (3523-3527, 3529, 3539), and an Aran's Baby
 /// Steps (21704), told to Lilin, and the titles of medals held (29922 to
-/// 29928: Veteran Hunter, Legendary Hunter and the Aran titles).
+/// 29928: Veteran Hunter, Legendary Hunter and the Aran titles), and a
+/// Noblesse's greeting from Cygnus (20015) and briefing from Neinheart
+/// (20016).
 pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
     2216, 2217, 2218, 2219, 2228, 2245, 2334, 2342, 3108, 3523, 3524, 3525, 3526, 3527, 3529, 3539,
-    3714, 21704, 29922, 29923, 29924, 29925, 29926, 29927, 29928,
+    3714, 20015, 20016, 21704, 29922, 29923, 29924, 29925, 29926, 29927, 29928,
 ];
-/// The Knight titles (29906 to 29909): Cygnus (1101000) completes them, and
+/// The Noblesse and Knight titles (29905 to 29909): Cygnus (1101000)
+/// completes them, and
 /// their medal (`QuestInfo` `viewMedalItem`) is the reward. The client's
 /// data names no end script and an empty `Act/1`, so the medal is ours to
 /// give; Cosmic's end scripts give it too.
-pub const KNIGHT_TITLES: &[i16] = &[29906, 29907, 29908, 29909];
+pub const KNIGHT_TITLES: &[i16] = &[29905, 29906, 29907, 29908, 29909];
 /// Quests no NPC completes through the quest window: `Check/1` is only an
 /// `infoex` entry ("dummy") on an info string nothing sets, which v83's
 /// completion check reads, so neither the client nor the server lets it
@@ -197,12 +201,17 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
 /// (21754) for 21765, set on entering the Bowman Instructional School, and
 /// "The Puppeteer's Warning" (21720) for 21760, set by Francis's warning in
 /// the Puppeteer's Cave. "Yulete's Request" (3365) and "Romeo's Present"
-/// (3369) wait for 7072, set on winning a Romeo and Juliet run.
+/// (3369) wait for 7072, set on winning a Romeo and Juliet run. A
+/// Noblesse's tutorial quests (20010, 20015, 20020) wait for 20022, which
+/// a new Noblesse starts with.
 /// See [`StartRequirements::record`].
 pub const START_RECORD_QUESTS: &[(i16, i16)] = &[
     (2312, 2311),
     (3365, 7072),
     (3369, 7072),
+    (20010, 20022),
+    (20015, 20022),
+    (20020, 20022),
     (21720, 21760),
     (21753, 21764),
     (21754, 21765),
@@ -1452,6 +1461,7 @@ mod tests {
         let catalog = QuestCatalog::load_from_nx(path).unwrap();
         let supported: Vec<i16> = catalog.supported().map(|q| q.id).collect();
         for (quest, medal) in [
+            (29905, 1142065),
             (29906, 1142066),
             (29907, 1142067),
             (29908, 1142068),

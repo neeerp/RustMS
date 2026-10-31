@@ -328,6 +328,19 @@ pub const HTPQ_LAMP_NAME: &str = "light";
 const RIEN: i32 = 140000000;
 const SECOND_DANGEROUS_FOREST: i32 = 140010100;
 const RIEN_TUTORIAL: i16 = 21014;
+/// Ereve's tutorial maps whose west door (`tutorquest`) opens on a quest:
+/// Kiku's "Welcome to Ereve" (20010) started, then each brother's done.
+/// The door leads to the next map.
+const EREVE_TUTORIAL_DOORS: [(i32, i16, QuestState); 4] = [
+    (130_030_001, 20010, QuestState::Started),
+    (130_030_002, 20011, QuestState::Completed),
+    (130_030_003, 20012, QuestState::Completed),
+    (130_030_004, 20013, QuestState::Completed),
+];
+/// The guide's hint pictures (`UI/tutorial.img/<n>`) for the minimap and
+/// the world map.
+const GUIDE_MINIMAP: i32 = 1;
+const GUIDE_WORLD_MAP: i32 = 11;
 /// The Snow Island training grounds Puo's lessons (21701 to 21703) send an
 /// Aran to (`enterGym`), and the Mirror Cave, open on The Five Heroes'
 /// quests (21201, 21302) (`rienCaveEnter`).
@@ -650,6 +663,11 @@ pub enum Effect {
         width: i16,
         height: i16,
     },
+    /// Bring out the tutorial guide (Mimo for a Noblesse) at the player's
+    /// feet and have it say a line.
+    SpawnGuide(String),
+    /// Show `UI/tutorial.img/<n>` over the tutorial guide, if it's out.
+    GuideHint(i32),
     /// Offer to skip the tutorial (Maple Administrator), only to accounts
     /// that already have a level-30 character.
     OfferTutorialSkip,
@@ -1397,6 +1415,52 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: true,
             occupied: None,
         },
+        // Ereve's tutorial: Mimo comes out on its first map, and shows the
+        // minimap and the world map on theirs, once a session each.
+        "tutorHelper" => ScriptOutcome {
+            effects: vec![Effect::SpawnGuide(
+                content::text().get(keys::EREVE_GUIDE_WELCOME, &[]),
+            )],
+            block: true,
+            occupied: None,
+        },
+        "tutorMinimap" => ScriptOutcome {
+            effects: vec![Effect::GuideHint(GUIDE_MINIMAP)],
+            block: true,
+            occupied: None,
+        },
+        "tutorWorldmap" => ScriptOutcome {
+            effects: vec![Effect::GuideHint(GUIDE_WORLD_MAP)],
+            block: true,
+            occupied: None,
+        },
+        "tutorquest" => {
+            let map_id = player.stats.map_id;
+            let Some(&(_, quest_id, state)) = EREVE_TUTORIAL_DOORS
+                .iter()
+                .find(|&&(door, ..)| door == map_id)
+            else {
+                return Some(ScriptOutcome::default());
+            };
+            let open = match state {
+                QuestState::Started => quest(quest_id) != QuestState::NotStarted,
+                _ => quest(quest_id) == state,
+            };
+            if open {
+                through(Effect::WarpToPortal(map_id + 1, 0))
+            } else {
+                let key = if state == QuestState::Started {
+                    keys::EREVE_DOOR_TAKE_QUEST
+                } else {
+                    keys::EREVE_DOOR_FINISH_QUEST
+                };
+                ScriptOutcome {
+                    effects: vec![Effect::Pink(content::text().get(key, &[]))],
+                    block: false,
+                    occupied: None,
+                }
+            }
+        }
         // The Free Market's exit, back to the town the player came from.
         "market00" => {
             let town = saved(FREE_MARKET_RETURN);
@@ -5231,6 +5295,61 @@ mod tests {
             warp_of(&portal("rienTutor7", &done).unwrap()),
             Some((SECOND_DANGEROUS_FOREST, 2))
         );
+    }
+
+    #[test]
+    fn ereves_tutorial_doors_wait_on_each_brothers_quest() {
+        let started = QuestState::Started;
+        let done = QuestState::Completed;
+        let at = |map_id, quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = map_id;
+            portal("tutorquest", &player).unwrap()
+        };
+        let says = |outcome: &ScriptOutcome, key| {
+            outcome.effects == [Effect::Pink(content::text().get(key, &[]))] && !outcome.block
+        };
+        // Kimu's door opens once 20010 is taken; the others once theirs is done.
+        assert!(says(&at(130_030_001, &[]), keys::EREVE_DOOR_TAKE_QUEST));
+        assert_eq!(
+            warp_of(&at(130_030_001, &[(20010, started)])),
+            Some((130_030_002, 0))
+        );
+        assert_eq!(
+            warp_of(&at(130_030_001, &[(20010, done)])),
+            Some((130_030_002, 0))
+        );
+        for (map_id, quest) in [
+            (130_030_002, 20011),
+            (130_030_003, 20012),
+            (130_030_004, 20013),
+        ] {
+            let held = at(map_id, &[(quest, started)]);
+            assert!(says(&held, keys::EREVE_DOOR_FINISH_QUEST), "{map_id}");
+            assert_eq!(
+                warp_of(&at(map_id, &[(quest, done)])),
+                Some((map_id + 1, 0))
+            );
+        }
+        assert_eq!(at(130_030_005, &[]), ScriptOutcome::default());
+    }
+
+    #[test]
+    fn ereves_guide_comes_out_and_points_once() {
+        let player = player_with(&[]);
+        let helper = portal("tutorHelper", &player).unwrap();
+        assert!(helper.block);
+        assert_eq!(
+            helper.effects,
+            [Effect::SpawnGuide(
+                content::text().get(keys::EREVE_GUIDE_WELCOME, &[])
+            )]
+        );
+        for (script, hint) in [("tutorMinimap", 1), ("tutorWorldmap", 11)] {
+            let shown = portal(script, &player).unwrap();
+            assert!(shown.block, "{script}");
+            assert_eq!(shown.effects, [Effect::GuideHint(hint)], "{script}");
+        }
     }
 
     #[test]

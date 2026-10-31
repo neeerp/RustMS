@@ -712,6 +712,11 @@ pub mod keys {
     pub const TEMPLE_SHORTCUT: &str = "portal.temple.shortcut";
     /// The Dangerous Forest's way on (`rienTutor7`) during the Aran tutorial.
     pub const RIEN_TUTOR_TO_TOWN: &str = "portal.rien_tutor.to_town";
+    /// Ereve's tutorial path: Mimo's welcome (`tutorHelper`) and the doors
+    /// that wait on each brother's quest (`tutorquest`).
+    pub const EREVE_GUIDE_WELCOME: &str = "portal.ereve_tutor.guide_welcome";
+    pub const EREVE_DOOR_TAKE_QUEST: &str = "portal.ereve_tutor.take_quest";
+    pub const EREVE_DOOR_FINISH_QUEST: &str = "portal.ereve_tutor.finish_quest";
     /// The training grounds (`enterGym`) without one of Puo's lessons.
     pub const TRAINING_GROUND_NO_LESSON: &str = "portal.training_ground.no_lesson";
     /// The Mirror Cave (`rienCaveEnter`) before the Aran's quests lead there.
@@ -1234,6 +1239,53 @@ pub mod keys {
     pub const TEO_JOHN_CLEARED: [&str; 2] = ["teo.john_cleared.ask", "teo.john_cleared.made_up"];
     pub const JOHNS_BOX_MEDICINE: &str = "johns_box.medicine";
     pub const JOHNS_BOX_FULL: &str = "johns_box.full";
+
+    /// A Noblesse's first quests on Ereve (20010 to 20017): the four brothers
+    /// Kimu, Kizan, Kinu and Kia, Cygnus, Neinheart and Kiku.
+    pub const KIMU_WELCOME: [&str; 3] = [
+        "kimu.welcome.greet",
+        "kimu.welcome.empress",
+        "kimu.welcome.quests",
+    ];
+    pub const KIMU_WELCOME_ASK: &str = "kimu.welcome.ask";
+    pub const KIMU_WELCOME_DECLINED: &str = "kimu.welcome.declined";
+    pub const KIZAN_REWARD: &str = "kizan.reward";
+    pub const EREVE_TUTOR_FULL: &str = "ereve_tutor.full";
+    pub const KIZAN_HUNT: [&str; 2] = ["kizan.hunt.attack", "kizan.hunt.key"];
+    pub const KIZAN_HUNT_ASK: &str = "kizan.hunt.ask";
+    pub const KIZAN_HUNT_DECLINED: &str = "kizan.hunt.declined";
+    pub const KIZAN_HUNTED: [&str; 2] = ["kizan.hunted.well_done", "kizan.hunted.outfit"];
+    pub const KINU_SKILLS: [&str; 2] = ["kinu.skills.greet", "kinu.skills.points"];
+    pub const KINU_SKILLS_ASK: &str = "kinu.skills.ask";
+    pub const KINU_SKILLS_DECLINED: &str = "kinu.skills.declined";
+    pub const KINU_SKILLED: &str = "kinu.skilled";
+    pub const KIA_CHAIR: [&str; 4] = [
+        "kia.chair.clang",
+        "kia.chair.greet",
+        "kia.chair.materials",
+        "kia.chair.boxes",
+    ];
+    pub const KIA_CHAIR_ASK: &str = "kia.chair.ask";
+    pub const KIA_CHAIR_DECLINED: &str = "kia.chair.declined";
+    pub const KIA_CHAIR_MADE: [&str; 2] = ["kia.chair_made.thanks", "kia.chair_made.chair"];
+    pub const CYGNUS_GREETING: [&str; 2] = ["cygnus.greeting.welcome", "cygnus.greeting.neinheart"];
+    pub const NEINHEART_BLACK_MAGE: [&str; 4] = [
+        "neinheart.black_mage.hello",
+        "neinheart.black_mage.ereve",
+        "neinheart.black_mage.revival",
+        "neinheart.black_mage.knights",
+    ];
+    pub const NEINHEART_BLACK_MAGE_ASK: &str = "neinheart.black_mage.ask";
+    pub const NEINHEART_BLACK_MAGE_DECLINED: &str = "neinheart.black_mage.declined";
+    pub const NEINHEART_TRAINING: [&str; 2] =
+        ["neinheart.training.not_yet", "neinheart.training.forest"];
+    pub const KIKU_TRAINING: [&str; 3] = [
+        "kiku.training.greet",
+        "kiku.training.piyos",
+        "kiku.training.mimis",
+    ];
+    pub const KIKU_TRAINING_ASK: &str = "kiku.training.ask";
+    pub const KIKU_TRAINING_DECLINED: &str = "kiku.training.declined";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
     /// (`q21604s`), the end of the Field of Wolves (`clearRider`), the
@@ -3884,6 +3936,9 @@ mod tests {
             keys::ELLIN_GATE_PASSING,
             keys::TEMPLE_SHORTCUT,
             keys::RIEN_TUTOR_TO_TOWN,
+            keys::EREVE_GUIDE_WELCOME,
+            keys::EREVE_DOOR_TAKE_QUEST,
+            keys::EREVE_DOOR_FINISH_QUEST,
             keys::TRAINING_GROUND_NO_LESSON,
             keys::MIRROR_CAVE_BLOCKED,
             keys::NINE_SPIRIT_NEST_BLOCKED,
@@ -4261,6 +4316,47 @@ mod tests {
                 keys::TEO_JOHN_CLEARED[1],
                 keys::JOHNS_BOX_MEDICINE,
                 keys::JOHNS_BOX_FULL,
+                keys::KIMU_WELCOME[0],
+                keys::KIMU_WELCOME[1],
+                keys::KIMU_WELCOME[2],
+                keys::KIMU_WELCOME_ASK,
+                keys::KIMU_WELCOME_DECLINED,
+                keys::KIZAN_REWARD,
+                keys::EREVE_TUTOR_FULL,
+                keys::KIZAN_HUNT[0],
+                keys::KIZAN_HUNT[1],
+                keys::KIZAN_HUNT_ASK,
+                keys::KIZAN_HUNT_DECLINED,
+                keys::KIZAN_HUNTED[0],
+                keys::KIZAN_HUNTED[1],
+                keys::KINU_SKILLS[0],
+                keys::KINU_SKILLS[1],
+                keys::KINU_SKILLS_ASK,
+                keys::KINU_SKILLS_DECLINED,
+                keys::KINU_SKILLED,
+                keys::KIA_CHAIR[0],
+                keys::KIA_CHAIR[1],
+                keys::KIA_CHAIR[2],
+                keys::KIA_CHAIR[3],
+                keys::KIA_CHAIR_ASK,
+                keys::KIA_CHAIR_DECLINED,
+                keys::KIA_CHAIR_MADE[0],
+                keys::KIA_CHAIR_MADE[1],
+                keys::CYGNUS_GREETING[0],
+                keys::CYGNUS_GREETING[1],
+                keys::NEINHEART_BLACK_MAGE[0],
+                keys::NEINHEART_BLACK_MAGE[1],
+                keys::NEINHEART_BLACK_MAGE[2],
+                keys::NEINHEART_BLACK_MAGE[3],
+                keys::NEINHEART_BLACK_MAGE_ASK,
+                keys::NEINHEART_BLACK_MAGE_DECLINED,
+                keys::NEINHEART_TRAINING[0],
+                keys::NEINHEART_TRAINING[1],
+                keys::KIKU_TRAINING[0],
+                keys::KIKU_TRAINING[1],
+                keys::KIKU_TRAINING[2],
+                keys::KIKU_TRAINING_ASK,
+                keys::KIKU_TRAINING_DECLINED,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
                 keys::PUCCI_WOLF_REQUEST[2],

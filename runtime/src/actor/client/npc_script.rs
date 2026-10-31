@@ -31,6 +31,12 @@ use tracing::{debug, warn};
 
 /// The NPC that offers veterans a tutorial skip.
 const MAPLE_ADMINISTRATOR: i32 = 2007;
+/// The guide's balloon: its width and how long it stays, in ms, and a
+/// hint picture's (OdinMS-family servers' numbers; the client reads them
+/// from the packet).
+const GUIDE_WIDTH: i32 = 200;
+const GUIDE_SAYS_FOR: i32 = 4000;
+const GUIDE_HINT_FOR: i32 = 7000;
 
 /// A script conversation and the prompt it is waiting on.
 pub(super) struct ActiveScript {
@@ -208,6 +214,13 @@ impl ClientActor {
                     width,
                     height,
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
+                Effect::SpawnGuide(text) => {
+                    afterwards.push(effect::build_spawn_guide(true)?);
+                    afterwards.push(effect::build_guide_says(text, GUIDE_WIDTH, GUIDE_SAYS_FOR)?);
+                }
+                Effect::GuideHint(hint) => {
+                    afterwards.push(effect::build_guide_hint(*hint, GUIDE_HINT_FOR)?)
+                }
                 Effect::OfferTutorialSkip => offer_skip = true,
                 Effect::OpenNpc(npc_id) => open_npc = Some(*npc_id),
                 Effect::Think(text) => thought = Some(text.clone()),

@@ -3022,7 +3022,18 @@ impl NpcScript {
             | "q29923s" | "q29924s" | "q29925s" | "q29926s" | "q29927s" | "q29928s" => {
                 medal_title(script)
             }
-            "q29906s" | "q29907s" | "q29908s" | "q29909s" => knight_title(script),
+            "q29905s" | "q29906s" | "q29907s" | "q29908s" | "q29909s" => knight_title(script),
+            "q20010s" => Some(kimus_welcome()),
+            "q20010e" => Some(kizans_reward()),
+            "q20011s" => Some(kizans_hunt()),
+            "q20011e" => Some(kizans_outfit()),
+            "q20012s" => Some(kinus_skills()),
+            "q20012e" => Some(kinus_proof()),
+            "q20013s" => Some(kias_materials()),
+            "q20013e" => Some(kias_chair()),
+            "q20015s" => Some(cygnus_greeting()),
+            "q20016s" => Some(neinhearts_briefing()),
+            "q20017s" => Some(kikus_training()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -4538,7 +4549,8 @@ fn adventurer_medal(script: &str) -> Option<NpcScript> {
 /// itself (`normalAutoStart`) once a Cygnus Knight reaches its job and
 /// level, and Cygnus (1101000) completes it with the medal
 /// (`game_data::quests::KNIGHT_TITLES`).
-const KNIGHT_TITLES: [(i16, &str); 4] = [
+const KNIGHT_TITLES: [(i16, &str); 5] = [
+    (29905, "Noblesse"),
     (29906, "Knight-in-Training"),
     (29907, "Official Knight"),
     (29908, "Advanced Knight"),
@@ -4546,7 +4558,7 @@ const KNIGHT_TITLES: [(i16, &str); 4] = [
 ];
 const CYGNUS: i32 = 1101000;
 
-/// `q29906s` to `q29909s`: the title is earned. The quest starts with no
+/// `q29905s` to `q29909s`: the title is earned. The quest starts with no
 /// dialogue and a chat-log line names it, as for the Adventurer titles
 /// (Cosmic `29906.js` to `29909.js`). The text is unsourced.
 fn knight_title(script: &str) -> Option<NpcScript> {
@@ -4561,6 +4573,240 @@ fn knight_title(script: &str) -> Option<NpcScript> {
             Effect::InfoText(line),
         ])],
     ))
+}
+
+// A Noblesse's first quests on Ereve (Map.nx 130030001-130030004, then
+// the island): the brothers Kimu, Kizan, Kinu and Kia (1102004-1102007),
+// then Cygnus, Neinheart (1101002) and Kiku (1102000). The client's data
+// gives no rewards (`Act` is empty); they are Cosmic's (`20010.js` to
+// `20017.js`), less its doing others' quests. After each step the guide
+// points at a part of the screen (`UI/tutorial.img`).
+const KIMU: i32 = 1102004;
+const KIZAN: i32 = 1102005;
+const KINU: i32 = 1102006;
+const KIA: i32 = 1102007;
+const KIKU: i32 = 1102000;
+const WELCOME_TO_EREVE: i16 = 20010;
+const SHOW_YOU_HOW_TO_HUNT: i16 = 20011;
+const KNOW_YOUR_SKILLS: i16 = 20012;
+const BOX_WITH_GOODIES: i16 = 20013;
+const GREETINGS_FROM_THE_EMPRESS: i16 = 20015;
+const KNOW_THE_BLACK_MAGE: i16 = 20016;
+const FIRST_KNIGHT_TRAINING: i16 = 20017;
+const RED_POTION: i32 = 2000020;
+const BLUE_POTION: i32 = 2000021;
+const NOBLESSE_CAP: i32 = 1002869;
+const NOBLESSE_ROBE: i32 = 1052177;
+const MIMIS_PROOF: i32 = 4000483;
+const BUILDING_STONE: i32 = 4032267;
+const DRAPE: i32 = 4032268;
+const KIAS_CHAIR: i32 = 3010060;
+
+/// A brother's offer: `pages`, then a yes that starts `quest` and points
+/// at `hint`.
+fn ereve_offer(
+    npc: i32,
+    pages: &[&str],
+    ask: &str,
+    declined: &str,
+    quest: i16,
+    hint: i32,
+) -> NpcScript {
+    let mut pages: Vec<Page> = pages.iter().map(|key| Page::Say(text(key))).collect();
+    pages.push(Page::Ask {
+        text: text(ask),
+        on_yes: vec![Effect::StartQuest(quest), Effect::GuideHint(hint)],
+        on_no: Some(text(declined)),
+    });
+    NpcScript::new(npc, pages)
+}
+
+/// `q20010s`: Kimu welcomes the Noblesse and sends them to Kizan.
+fn kimus_welcome() -> NpcScript {
+    ereve_offer(
+        KIMU,
+        &keys::KIMU_WELCOME,
+        keys::KIMU_WELCOME_ASK,
+        keys::KIMU_WELCOME_DECLINED,
+        WELCOME_TO_EREVE,
+        2,
+    )
+}
+
+/// `q20010e`: Kizan gives what Kimu asked: five of each potion and 15 EXP.
+fn kizans_reward() -> NpcScript {
+    let mut script = NpcScript::new(KIZAN, vec![Page::Say(text(keys::KIZAN_REWARD))]);
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: RED_POTION,
+            quantity: 5,
+        },
+        Effect::GiveItem {
+            item_id: BLUE_POTION,
+            quantity: 5,
+        },
+        Effect::GainExp(15),
+        Effect::CompleteQuest(WELCOME_TO_EREVE),
+        Effect::GuideHint(3),
+    ];
+    script.inventory_full = Some(text(keys::EREVE_TUTOR_FULL));
+    script
+}
+
+/// `q20011s`: Kizan teaches the Regular Attack; one Mimi (9300328, by the
+/// data) is the test.
+fn kizans_hunt() -> NpcScript {
+    ereve_offer(
+        KIZAN,
+        &keys::KIZAN_HUNT,
+        keys::KIZAN_HUNT_ASK,
+        keys::KIZAN_HUNT_DECLINED,
+        SHOW_YOU_HOW_TO_HUNT,
+        4,
+    )
+}
+
+/// `q20011e`: the Noblesse's cap and robe and 30 EXP.
+fn kizans_outfit() -> NpcScript {
+    let [well_done, outfit] = keys::KIZAN_HUNTED;
+    let mut script = NpcScript::new(
+        KIZAN,
+        vec![Page::Say(text(well_done)), Page::Say(text(outfit))],
+    );
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: NOBLESSE_CAP,
+            quantity: 1,
+        },
+        Effect::GiveItem {
+            item_id: NOBLESSE_ROBE,
+            quantity: 1,
+        },
+        Effect::GainExp(30),
+        Effect::CompleteQuest(SHOW_YOU_HOW_TO_HUNT),
+        Effect::GuideHint(6),
+    ];
+    script.inventory_full = Some(text(keys::EREVE_TUTOR_FULL));
+    script
+}
+
+/// `q20012s`: Kinu teaches skills; three Mimis (100121) and a proof of
+/// them, by the data.
+fn kinus_skills() -> NpcScript {
+    ereve_offer(
+        KINU,
+        &keys::KINU_SKILLS,
+        keys::KINU_SKILLS_ASK,
+        keys::KINU_SKILLS_DECLINED,
+        KNOW_YOUR_SKILLS,
+        8,
+    )
+}
+
+/// `q20012e`: Kinu takes the proof, for 40 EXP.
+fn kinus_proof() -> NpcScript {
+    let mut script = NpcScript::new(KINU, vec![Page::Say(text(keys::KINU_SKILLED))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: MIMIS_PROOF,
+            quantity: 1,
+        },
+        Effect::GainExp(40),
+        Effect::CompleteQuest(KNOW_YOUR_SKILLS),
+    ];
+    script
+}
+
+/// `q20013s`: Kia asks for a Building Stone and a Drape from the boxes.
+fn kias_materials() -> NpcScript {
+    ereve_offer(
+        KIA,
+        &keys::KIA_CHAIR,
+        keys::KIA_CHAIR_ASK,
+        keys::KIA_CHAIR_DECLINED,
+        BOX_WITH_GOODIES,
+        9,
+    )
+}
+
+/// `q20013e`: Kia makes a chair of them, with 95 EXP. Cosmic also
+/// completes 20015 and the old chain's 20000-20002 here; that would hide
+/// Cygnus's greeting and the Noblesse title (29905), which wait on 20015
+/// done and 20000 not started, so we don't.
+fn kias_chair() -> NpcScript {
+    let [thanks, chair] = keys::KIA_CHAIR_MADE;
+    let mut script = NpcScript::new(KIA, vec![Page::Say(text(thanks)), Page::Say(text(chair))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: BUILDING_STONE,
+            quantity: 1,
+        },
+        Effect::TakeItem {
+            item_id: DRAPE,
+            quantity: 1,
+        },
+        Effect::GiveItem {
+            item_id: KIAS_CHAIR,
+            quantity: 1,
+        },
+        Effect::GainExp(95),
+        Effect::CompleteQuest(BOX_WITH_GOODIES),
+        Effect::GuideHint(10),
+    ];
+    script.inventory_full = Some(text(keys::EREVE_TUTOR_FULL));
+    script
+}
+
+/// `q20015s`: Cygnus greets the new Noblesse and sends them to Neinheart;
+/// the quest completes as it starts (`FINISHED_BY_START_SCRIPT`). Cosmic
+/// has no script; the text is unsourced.
+fn cygnus_greeting() -> NpcScript {
+    let [welcome, neinheart] = keys::CYGNUS_GREETING;
+    let mut script = NpcScript::new(
+        CYGNUS,
+        vec![Page::Say(text(welcome)), Page::Say(text(neinheart))],
+    );
+    script.on_end = vec![Effect::FinishQuest(GREETINGS_FROM_THE_EMPRESS)];
+    script
+}
+
+/// `q20016s`: Neinheart tells of Ereve and the Black Mage; the yes
+/// completes the quest (`FINISHED_BY_START_SCRIPT`) for 380 EXP before
+/// the way to Kiku.
+fn neinhearts_briefing() -> NpcScript {
+    let mut pages: Vec<Page> = keys::NEINHEART_BLACK_MAGE
+        .iter()
+        .map(|key| Page::Say(text(key)))
+        .collect();
+    pages.push(Page::Ask {
+        text: text(keys::NEINHEART_BLACK_MAGE_ASK),
+        on_yes: vec![
+            Effect::FinishQuest(KNOW_THE_BLACK_MAGE),
+            Effect::GainExp(380),
+        ],
+        on_no: Some(text(keys::NEINHEART_BLACK_MAGE_DECLINED)),
+    });
+    pages.extend(
+        keys::NEINHEART_TRAINING
+            .iter()
+            .map(|key| Page::Say(text(key))),
+    );
+    NpcScript::new(NEINHEART, pages)
+}
+
+/// `q20017s`: Kiku sends the Noblesse after 15 Mimis (100122) in Training
+/// Forest II; the data's end gives 430 EXP and ten of each potion. Cosmic
+/// also starts 20020 and completes 20100 here, which are the job's own
+/// quests' to start.
+fn kikus_training() -> NpcScript {
+    ereve_offer(
+        KIKU,
+        &keys::KIKU_TRAINING,
+        keys::KIKU_TRAINING_ASK,
+        keys::KIKU_TRAINING_DECLINED,
+        FIRST_KNIGHT_TRAINING,
+        12,
+    )
 }
 
 /// The titles of medals won elsewhere (29910 to 29928 and 29933): each
@@ -17736,6 +17982,107 @@ mod tests {
                 "{quest}"
             );
         }
+    }
+
+    #[test]
+    fn the_brothers_walk_a_noblesse_through_ereves_tutorial() {
+        let mut noblesse = player(50);
+        noblesse.stats.job = 1000;
+        let run = |script: &str| yes_through(NpcScript::for_quest(script, &noblesse).unwrap());
+        let give = |item_id, quantity| Effect::GiveItem { item_id, quantity };
+        let take = |item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        };
+        let offer = |npc, quest, hint| {
+            (
+                npc,
+                vec![Effect::StartQuest(quest), Effect::GuideHint(hint)],
+            )
+        };
+        assert_eq!(run("q20010s"), offer(KIMU, WELCOME_TO_EREVE, 2));
+        assert_eq!(
+            run("q20010e"),
+            (
+                KIZAN,
+                vec![
+                    give(RED_POTION, 5),
+                    give(BLUE_POTION, 5),
+                    Effect::GainExp(15),
+                    Effect::CompleteQuest(WELCOME_TO_EREVE),
+                    Effect::GuideHint(3),
+                ]
+            )
+        );
+        assert_eq!(run("q20011s"), offer(KIZAN, SHOW_YOU_HOW_TO_HUNT, 4));
+        assert_eq!(
+            run("q20011e"),
+            (
+                KIZAN,
+                vec![
+                    give(NOBLESSE_CAP, 1),
+                    give(NOBLESSE_ROBE, 1),
+                    Effect::GainExp(30),
+                    Effect::CompleteQuest(SHOW_YOU_HOW_TO_HUNT),
+                    Effect::GuideHint(6),
+                ]
+            )
+        );
+        assert_eq!(run("q20012s"), offer(KINU, KNOW_YOUR_SKILLS, 8));
+        assert_eq!(
+            run("q20012e"),
+            (
+                KINU,
+                vec![
+                    take(MIMIS_PROOF),
+                    Effect::GainExp(40),
+                    Effect::CompleteQuest(KNOW_YOUR_SKILLS),
+                ]
+            )
+        );
+        assert_eq!(run("q20013s"), offer(KIA, BOX_WITH_GOODIES, 9));
+        assert_eq!(
+            run("q20013e"),
+            (
+                KIA,
+                vec![
+                    take(BUILDING_STONE),
+                    take(DRAPE),
+                    give(KIAS_CHAIR, 1),
+                    Effect::GainExp(95),
+                    Effect::CompleteQuest(BOX_WITH_GOODIES),
+                    Effect::GuideHint(10),
+                ]
+            )
+        );
+        assert_eq!(
+            run("q20015s"),
+            (
+                CYGNUS,
+                vec![Effect::FinishQuest(GREETINGS_FROM_THE_EMPRESS)]
+            )
+        );
+        assert_eq!(
+            run("q20016s"),
+            (
+                NEINHEART,
+                vec![
+                    Effect::FinishQuest(KNOW_THE_BLACK_MAGE),
+                    Effect::GainExp(380),
+                ]
+            )
+        );
+        assert_eq!(run("q20017s"), offer(KIKU, FIRST_KNIGHT_TRAINING, 12));
+
+        // A no leaves the quest untaken.
+        let mut kimu = NpcScript::for_quest("q20010s", &noblesse).unwrap();
+        let mut step = kimu.begin();
+        while kind(&step) != Some(1) {
+            step = kimu.respond(ScriptInput::Next).unwrap();
+        }
+        let declined = kimu.respond(ScriptInput::No).unwrap();
+        assert!(declined.effects.is_empty());
+        assert_eq!(page_text(&declined), text(keys::KIMU_WELCOME_DECLINED));
     }
 
     #[test]

@@ -134,6 +134,10 @@ pub struct Trace {
     pub scene_parts: Vec<String>,
     /// LOCK_UI: whether each locked the UI or gave it back.
     pub ui_locks: Vec<bool>,
+    /// SPAWN_GUIDE: whether each brought the tutorial guide out.
+    pub guides: Vec<bool>,
+    /// TALK_GUIDE: what the guide said (mode 0), or `#<hint>` (mode 1).
+    pub guide_talk: Vec<String>,
     /// "You can't get anymore items." (SHOW_STATUS_INFO 0/-1).
     pub inventory_full: usize,
     /// "This item is unavailable for the pick-up." (SHOW_STATUS_INFO 0, -2).
@@ -455,6 +459,14 @@ impl Trace {
             }
         } else if op == SendOpcode::LockUi as i16 {
             self.ui_locks.push(r.read_byte().unwrap() != 0);
+        } else if op == SendOpcode::SpawnGuide as i16 {
+            self.guides.push(r.read_byte().unwrap() != 0);
+        } else if op == SendOpcode::TalkGuide as i16 {
+            let talk = match r.read_byte().unwrap() {
+                0 => r.read_str_with_length().unwrap(),
+                _ => format!("#{}", r.read_int().unwrap()),
+            };
+            self.guide_talk.push(talk);
         } else if op == SendOpcode::MesoBagUsed as i16 {
             self.meso_bags.push(Some(r.read_int().unwrap()));
         } else if op == SendOpcode::MesoBagFailed as i16 {

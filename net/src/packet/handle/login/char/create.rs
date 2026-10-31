@@ -70,22 +70,36 @@ impl LoginHandler for CreateCharacterHandler {
             gender: i16::from(gender),
             // Explorers start outside the Training Camp, with Heena and Sera.
             // The island's exits lead one-way from there, so starting further
-            // along skips its first quests.
-            map_id: if job == 0 { 0 } else { 1_010_000 },
+            // along skips its first quests. A Noblesse starts on Ereve's
+            // tutorial path, bearing the mark its first quest asks for.
+            map_id: match job {
+                0 => 0,
+                NOBLESSE => EREVE_TUTORIAL,
+                _ => 1_010_000,
+            },
         };
 
-        let (stats, look) = character.create(starting_items)?;
+        let records: &[(i16, &str)] = if job == NOBLESSE {
+            &[(game::quest::NOBLESSE_MARK, "1")]
+        } else {
+            &[]
+        };
+        let (stats, look) = character.create(starting_items, records)?;
         Ok(HandlerResult::reply(login::char::build_char_packet(
             &stats, &look,
         )?))
     }
 }
 
+const NOBLESSE: i16 = 1000;
+/// The first of Ereve's tutorial maps, before the island proper.
+const EREVE_TUTORIAL: i32 = 130_030_000;
+
 fn starting_job(class_family: i32) -> Result<i16, NetworkError> {
     match class_family {
-        0 => Ok(1000), // Cygnus Noblesse
-        1 => Ok(0),    // Explorer Beginner
-        2 => Ok(2000), // Aran Legend
+        0 => Ok(NOBLESSE), // Cygnus Noblesse
+        1 => Ok(0),        // Explorer Beginner
+        2 => Ok(2000),     // Aran Legend
         _ => Err(NetworkError::PacketHandlerError(
             "Unsupported character class",
         )),
