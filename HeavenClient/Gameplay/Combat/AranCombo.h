@@ -14,6 +14,8 @@ namespace ms
 		constexpr int64_t IDLE = 3000;
 
 		constexpr int32_t ARAN_BEGINNER = 2000;
+		// Body Pressure, whose buff makes touching a mob hit it (0x94b49d).
+		constexpr int32_t BODY_PRESSURE = 21101003;
 		// A polearm's Weapon::Type, its id's first three digits.
 		constexpr int32_t POLEARM = 144;
 
@@ -21,6 +23,27 @@ namespace ms
 		inline int32_t ability(int32_t job)
 		{
 			return job == ARAN_BEGINNER ? 20000017 : 21000000;
+		}
+
+		// Combo Critical for a job.
+		inline int32_t critical(int32_t job)
+		{
+			return job == ARAN_BEGINNER ? 20000018 : 21110000;
+		}
+
+		// What Combo Critical adds for a combo, from its x, y and damage: y percent of rate for every ten,
+		// up to x tens, and 10 more, and its damage for every ten (0x78e254).
+		struct Critical
+		{
+			int32_t rate;
+			int32_t damage;
+		};
+
+		inline Critical critical(int32_t count, int32_t x, int32_t y, int32_t damage)
+		{
+			int32_t tens = x < count / 10 ? x : count / 10;
+
+			return { y * tens + 10, damage * tens };
 		}
 
 		// The combo a skill needs, which using it spends, or 0: Combo Smash and Combo Drain 30, Combo Penril
@@ -123,6 +146,25 @@ namespace ms
 				return static_cast<int32_t>(hermite(0.0, 10.0, height, 10.0, elapsed / 50.0));
 
 			return static_cast<int32_t>(hermite(height, 10.0, 0.0, 0.0, (elapsed - 50) / 250.0));
+		}
+
+		// What the combo adds to attack (0x77df48): Combo Ability's `y` for every ten, up to its `x` tens.
+		inline int32_t attack(int32_t count, int32_t x, int32_t y)
+		{
+			if (count <= 0)
+				return 0;
+
+			return (x < count / 10 ? x : count / 10) * y;
+		}
+
+		// How hard a hit must be for a mob that isn't a boss to flinch, as the player's Smart Knockback
+		// keeps `smart` percent of the mob's `pushed` (0 without it) (FUN_00671210).
+		inline int32_t pushed(int32_t pushed, int32_t smart, bool boss)
+		{
+			if (boss || smart <= 0)
+				return pushed;
+
+			return static_cast<int32_t>(static_cast<double>(pushed * smart) * 0.01);
 		}
 
 		// The ComboCommand a count announces, by its number (0 for none), and the skills its two lines wait

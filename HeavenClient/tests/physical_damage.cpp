@@ -140,6 +140,11 @@ int main()
 		require(!sharpen(none, 0).source, "no Sharp Eyes");
 		Critical stunned = stun(none, 40, 200);
 		require(stunned.rate == 40 && stunned.damage == 200, "Stun Mastery");
+		Critical combo = aran_critical(none, { 25, 25, true });
+		require(combo.rate == 25 && combo.damage == 225 && combo.source, "Combo Critical alone");
+		Critical after = aran_critical({ 50, 140, true }, { 95, 25, true });
+		require(after.rate == 145 && after.damage == 265, "Combo Critical after the rest");
+		require(!aran_critical(none, none).source, "no Combo Critical");
 
 		require(critical({ 50, 200, true }, 0, 0.49) && !critical({ 50, 200, true }, 0, 0.5), "a critical");
 		require(!critical({ 50, 200, false }, 0, 0.0) && !critical({ 50, 200, true }, 4221001, 0.0), "none");

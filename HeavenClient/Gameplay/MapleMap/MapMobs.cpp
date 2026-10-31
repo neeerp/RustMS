@@ -311,11 +311,12 @@ namespace ms
 	}
 
 	void
-	MapMobs::apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser &user, const SpecialMove &move)
+	MapMobs::apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser &user, const SpecialMove &move,
+						  int32_t smart)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
 		{
-			mob->apply_damage(damage, toleft);
+			mob->apply_damage(damage, toleft, smart);
 
 			if (user.calms)
 				mob->calm();
@@ -325,11 +326,11 @@ namespace ms
 		}
 	}
 
-	void MapMobs::apply_summon_damage(int32_t oid, int32_t damage, bool toleft, const Animation &hit)
+	void MapMobs::apply_summon_damage(int32_t oid, int32_t damage, bool toleft, const Animation &hit, int32_t smart)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
 		{
-			mob->apply_damage(damage, toleft);
+			mob->apply_damage(damage, toleft, smart);
 			mob->show_hit(hit, mob->get_body(), toleft);
 		}
 	}

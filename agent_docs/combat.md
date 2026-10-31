@@ -774,7 +774,17 @@ A few skills do more than buff:
   under them, and the ComboCommand at 30, 100 and 200. v83 picks the combo
   skills through key sequences (its combo commands, not yet in
   HeavenClient); HeavenClient lets a key use one only once the combo
-  allows it. The mini-room's freeze of the combo isn't modelled.
+  allows it. Stat 68 adds Combo Ability's attack in `Player::recalc_stats`,
+  so the stat window shows it, and Combo Critical's rate (its `y` percent
+  for every ten up to `x` tens, plus 10) and damage come after Stun
+  Mastery's in the mob's critical roll (`physical_damage::aran_critical`).
+  `Combat::body_attack` sends Body Pressure's TOUCH_MONSTER_ATTACK on a
+  touching mob, a second apart from Energy Charge's own, and shows others'
+  as Energy Charge's are. A local hit with Smart Knockback makes a mob that
+  isn't a boss flinch at its percent of the mob's `pushed`
+  (`aran_combo::pushed`); the Aran's Achilles (21120004) and Combo Barrier
+  count in the damage the client predicts over its head. The mini-room's
+  freeze of the combo isn't modelled.
   Still open: the GIVE_BUFF layout of stats 68 to 72 is inferred. The
   server takes 0xA3 on trust and doesn't hold Body Pressure to once a
   second, Body Pressure's `prop` status isn't modelled, and Combo Drain

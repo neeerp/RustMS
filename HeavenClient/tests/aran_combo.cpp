@@ -52,6 +52,16 @@ int main()
 		require(bounce(4, 50) == 4 && bounce(4, 90) == 4 && bounce(4, 299) == 0, "4 too");
 		require(bounce(0, 25) == 0, "no height, no bounce");
 
+		require(attack(0, 10, 1) == 0 && attack(9, 10, 1) == 0 && attack(57, 10, 1) == 5, "a point for every ten");
+		require(attack(300, 10, 1) == 10 && attack(300, 3, 2) == 6, "up to x tens");
+		require(critical(2000) == 20000018 && critical(2110) == 21110000, "Combo Critical");
+		require(critical(9, 5, 3, 5).rate == 10 && critical(9, 5, 3, 5).damage == 0, "10 percent before the first ten");
+		require(critical(57, 5, 3, 5).rate == 25 && critical(57, 5, 3, 5).damage == 25, "y and damage for every ten");
+		require(critical(300, 5, 3, 5).rate == 25 && critical(300, 5, 3, 5).damage == 25, "up to x tens");
+
+		require(pushed(100, 10, false) == 10 && pushed(33, 60, false) == 19, "Smart Knockback keeps its percent");
+		require(pushed(100, 10, true) == 100 && pushed(100, 0, false) == 100, "not of a boss, nor without it");
+
 		Command thirty = command(30);
 		require(thirty.index == 1 && thirty.first == 21100004 && thirty.second == 21100005, "30 frees Combo Smash and Drain");
 		Command hundred = command(100);

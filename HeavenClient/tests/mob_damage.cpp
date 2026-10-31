@@ -42,15 +42,17 @@ int main()
 		require(physical(warrior, stumpy, 125, 1.0, 0) == 82, "the highest Stumpy hit on a warrior");
 		require(physical(warrior, stumpy, 125, 1.0, 50) == 41, "Invincible takes its share off last");
 
-		require(shown(1000, 850, 0, 0) == 850, "the number leaves out Achilles' share");
-		require(shown(101, 1000, 78, 1000) == 51, "and the half Meso Guard saves");
-		require(shown(100, 1000, 78, 20) == 75, "or what the mesos buy");
+		require(shown(1000, 850, 0, 0, 0) == 850, "the number leaves out Achilles' share");
+		require(shown(1000, 1000, 800, 0, 0) == 800 && shown(1000, 850, 800, 0, 0) == 680,
+				"and Combo Barrier's of what Achilles leaves");
+		require(shown(101, 1000, 0, 78, 1000) == 51, "and the half Meso Guard saves");
+		require(shown(100, 1000, 0, 78, 20) == 75, "or what the mesos buy");
 		require(magic_guarded(1000, 80, 5000, false) == 800, "Magic Guard takes its share from MP");
 		require(magic_guarded(1000, 80, 300, false) == 300, "while there is any");
 		require(magic_guarded(1000, 80, 300, true) == 800, "or all of it under Infinity");
 		require(magic_guarded(-1, 80, 300, false) == 0 && magic_guarded(1000, 0, 300, false) == 0,
 				"a miss or no Magic Guard takes nothing");
-		require(shown(-1, 850, 78, 1000) == -1 && shown(0, 850, 0, 0) == 0, "a dodge or miss stays");
+		require(shown(-1, 850, 800, 78, 1000) == -1 && shown(0, 850, 0, 0, 0) == 0, "a dodge or miss stays");
 		require(physical(warrior, stumpy, 125, 1.0, 50, 200) == 82, "then a Power Up scales what is left");
 
 		// A level 30 magician short of the expected W.DEF takes more than

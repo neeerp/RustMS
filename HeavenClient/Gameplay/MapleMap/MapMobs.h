@@ -106,10 +106,11 @@ namespace ms
 		void expect_hits(int32_t oid, int32_t count);
 
 		// Applies damage to a mob.
-		void apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser &user, const SpecialMove &move);
+		void apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser &user, const SpecialMove &move,
+						  int32_t smart);
 
 		// A summon's hit lands on a mob, with the summon's spark.
-		void apply_summon_damage(int32_t oid, int32_t damage, bool toleft, const Animation &hit);
+		void apply_summon_damage(int32_t oid, int32_t damage, bool toleft, const Animation &hit, int32_t smart);
 
 		// Monster Magnet caught a mob for the user at `user`.
 		void catch_mob(int32_t oid, Point<int16_t> user);

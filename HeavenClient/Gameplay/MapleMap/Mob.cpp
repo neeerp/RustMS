@@ -20,6 +20,7 @@
 #include "Layer.h"
 #include "SummonRules.h"
 
+#include "../Combat/AranCombo.h"
 #include "../Combat/Assassinate.h"
 #include "../../Character/Carnival.h"
 #include "../Combat/Heal.h"
@@ -2537,6 +2538,8 @@ namespace ms
 		if (blow.stunned.source && status_value(MobStatParser::STUN))
 			critical = stun(critical, blow.stunned.rate, blow.stunned.damage);
 
+		critical = aran_critical(critical, blow.aran);
+
 		bool second_strike = attack.display & assassinate::SECOND_STRIKE;
 		bool iscritical = physical_damage::critical(critical, attack.skill, randomizer.next_real(1.0), second_strike);
 		damage = scaled(damage, static_cast<int32_t>(damage), blow.scale, blow.combo, iscritical, critical.damage);
@@ -2617,7 +2620,7 @@ namespace ms
 		return finish(damage);
 	}
 
-	void Mob::apply_damage(int32_t damage, bool toleft)
+	void Mob::apply_damage(int32_t damage, bool toleft, int32_t smart)
 	{
 		hitsound.play();
 
@@ -2628,7 +2631,7 @@ namespace ms
 		{
 			if (pending_hits == 0)
 				apply_death();
-		} else if (control && is_alive() && damage >= knockback && !acting)
+		} else if (control && is_alive() && damage >= aran_combo::pushed(knockback, smart, boss) && !acting)
 		{
 			// It shows the hit at once; the AI flinches next update.
 			show_stance(Stance::HIT, toleft);
