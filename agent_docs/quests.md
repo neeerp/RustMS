@@ -994,9 +994,25 @@ At level 70 an official Knight takes a third job:
   As at the second job, a Knight keeping more SP than 3 for each level past
   70 is told to spend it first. Cosmic's script gives the Advanced Knight
   medal (1142068) too, which the server leaves to its title (29908).
-- At level 120 Neinheart's Chasing the Knight's Target (20400, `q20400s`,
-  `autoStart`) gives an advanced Knight their orders and completes once
-  heard.
+At level 120 an Advanced Knight hunts for a missing Knight, and takes a
+fourth job:
+
+- Chasing the Knight's Target (20400, Neinheart, `autoStart`), Hunting the
+  Zombies (20401, at 2020006 in El Nath), The Cave of the Black Witch
+  (20405, a note at 2081013) and The Knight That Disappeared (20406,
+  Neinheart) are each a lead told, completed once heard. 20402 to 20404
+  and 20407 between them are plain quests from the data.
+- Cygnus's Chief Knight of the Empress (20408, `q20408s`) waits on 20407.
+  The yes completes it and makes an x11 Knight of 120 a 1112, 1212, 1312,
+  1412 or 1512 (`Player::take_fourth_job`), a job with no skills in v83's
+  data. Cosmic gives the Chief Knight medal (1142069) too, which the server
+  leaves to its title (29909).
+
+Neinheart has three more for Knights: Knight's Dignity (20520, `q20520s`,
+level 50, `autoStart`) tells of mounts and completes on the yes, and
+Training Never Ends (20600, level 100) and Training Still Never Ends
+(20610, level 110), for third and fourth-job Knights, start on the yes and
+are handed back to Neinheart, who asks for nothing.
 
 Each brother's start points the guide at a part of the screen
 (`Effect::GuideHint`, TALK_GUIDE mode 1), as Cosmic's `guideHint` does.

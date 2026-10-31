@@ -3046,7 +3046,14 @@ impl NpcScript {
             "q20101e" | "q20102e" | "q20103e" | "q20104e" | "q20105e" => knight_job(script, player),
             "q20200s" => Some(knighthood()),
             "q20311s" | "q20312s" | "q20313s" | "q20314s" | "q20315s" => teardrop(script, player),
-            "q20400s" => Some(knights_target()),
+            "q20400s" | "q20401s" | "q20405s" | "q20406s" => knights_target(script),
+            "q20408s" => Some(chief_knight(player)),
+            "q20520s" => Some(knights_dignity()),
+            "q20600s" => Some(training_never_ends(TRAINING_NEVER_ENDS, None)),
+            "q20610s" => Some(training_never_ends(
+                TRAINING_STILL_NEVER_ENDS,
+                Some(text(keys::TRAINING_STILL_NEVER_ENDS_DECLINED)),
+            )),
             "q20201e" | "q20202e" | "q20203e" | "q20204e" | "q20205e" => {
                 knight_exam(script, player)
             }
@@ -5028,7 +5035,18 @@ const KNIGHT_TEARDROPS: [(i16, i32, i16, &str); 5] = [
 ];
 /// Chasing the Knight's Target (20400), which the data starts by itself
 /// for an Advanced Knight of 120.
-const KNIGHTS_TARGET: i16 = 20400;
+/// Chasing the Knight's Target and the steps of it that are only told:
+/// quest, NPC and pages.
+const KNIGHTS_TARGET_STEPS: [(i16, i32, &[&str]); 4] = [
+    (20400, NEINHEART, &[keys::KNIGHT_TARGET_GO]),
+    (20401, 2020006, &[keys::KNIGHT_TARGET_ZOMBIES]),
+    (20405, 2081013, &keys::KNIGHT_TARGET_NOTE),
+    (20406, NEINHEART, &[keys::KNIGHT_TARGET_RETURN]),
+];
+const CHIEF_KNIGHT_OF_THE_EMPRESS: i16 = 20408;
+const KNIGHTS_DIGNITY: i16 = 20520;
+const TRAINING_NEVER_ENDS: i16 = 20600;
+const TRAINING_STILL_NEVER_ENDS: i16 = 20610;
 
 /// `q20311s` to `q20315s`: the third job and the quest done on the yes,
 /// unless the Knight keeps more SP than 3 for each level past 70
@@ -5057,12 +5075,72 @@ fn teardrop(script: &str, player: &Player) -> Option<NpcScript> {
     Some(NpcScript::new(npc, pages))
 }
 
-/// `q20400s`: Neinheart's orders, which complete the quest once heard
-/// (Cosmic's `forceCompleteQuest`).
-fn knights_target() -> NpcScript {
-    let mut script = NpcScript::new(NEINHEART, vec![Page::Say(text(keys::KNIGHT_TARGET_GO))]);
-    script.on_end = vec![Effect::FinishQuest(KNIGHTS_TARGET)];
-    script
+/// `q20400s`, `q20401s`, `q20405s` and `q20406s`: the next lead in the
+/// search for the missing Advanced Knight, which completes the quest once
+/// heard (Cosmic's `forceCompleteQuest`).
+fn knights_target(script: &str) -> Option<NpcScript> {
+    let &(quest, npc, lines) = KNIGHTS_TARGET_STEPS
+        .iter()
+        .find(|(quest, ..)| script[1..].starts_with(&quest.to_string()))?;
+    let pages = lines.iter().map(|key| Page::Say(text(key))).collect();
+    let mut script = NpcScript::new(npc, pages);
+    script.on_end = vec![Effect::FinishQuest(quest)];
+    Some(script)
+}
+
+/// `q20408s`: Cygnus's thanks, and on the yes the quest done and, for an
+/// Advanced Knight of 120, the fourth job (1112 to 1512), which has no
+/// skills. Cosmic gives the Chief Knight medal (1142069) too, which the
+/// server leaves to its title (29909).
+fn chief_knight(player: &Player) -> NpcScript {
+    let job = player.stats.job + 1;
+    let mut on_yes = Vec::new();
+    if player.can_take_fourth_job(job) {
+        on_yes.push(Effect::TakeFourthJob(job));
+    }
+    on_yes.push(Effect::FinishQuest(CHIEF_KNIGHT_OF_THE_EMPRESS));
+    let pages = vec![
+        Page::Say(text(keys::CHIEF_KNIGHT_THANKS)),
+        Page::Say(text(keys::CHIEF_KNIGHT_WORK)),
+        Page::Ask {
+            text: text(keys::CHIEF_KNIGHT_ASK),
+            on_yes,
+            on_no: None,
+        },
+        Page::Say(text(keys::CHIEF_KNIGHT_APPOINTED)),
+    ];
+    NpcScript::new(CYGNUS, pages)
+}
+
+/// `q20520s`: Neinheart's word on mounts at level 50, which starts and
+/// completes the quest on the yes.
+fn knights_dignity() -> NpcScript {
+    let pages = vec![
+        Page::Say(text(keys::KNIGHTS_DIGNITY_REACHED)),
+        Page::Ask {
+            text: text(keys::KNIGHTS_DIGNITY_ASK),
+            on_yes: vec![Effect::FinishQuest(KNIGHTS_DIGNITY)],
+            on_no: None,
+        },
+        Page::Say(text(keys::KNIGHTS_DIGNITY_GO)),
+    ];
+    NpcScript::new(NEINHEART, pages)
+}
+
+/// `q20600s` and `q20610s`: Neinheart's push to train, which starts the
+/// quest on the yes; Neinheart completes it without asking for anything.
+fn training_never_ends(quest: i16, on_no: Option<String>) -> NpcScript {
+    let key = if quest == TRAINING_NEVER_ENDS {
+        keys::TRAINING_NEVER_ENDS_ASK
+    } else {
+        keys::TRAINING_STILL_NEVER_ENDS_ASK
+    };
+    let ask = Page::Ask {
+        text: text(key),
+        on_yes: vec![Effect::StartQuest(quest)],
+        on_no,
+    };
+    NpcScript::new(NEINHEART, vec![ask])
 }
 
 /// The titles of medals won elsewhere (29910 to 29928 and 29933): each
@@ -18407,8 +18485,33 @@ mod tests {
         assert_eq!(run(&knight), (1101006, advanced));
 
         let orders = NpcScript::for_quest("q20400s", &knight).unwrap();
-        let heard = vec![Effect::FinishQuest(KNIGHTS_TARGET)];
+        let heard = vec![Effect::FinishQuest(20400)];
         assert_eq!(yes_through(orders), (NEINHEART, heard));
+    }
+
+    #[test]
+    fn cygnus_makes_an_advanced_knight_of_120_a_chief_knight() {
+        let mut knight = player(50);
+        (knight.stats.job, knight.stats.level) = (1511, 120);
+        let run = |script: &str, knight: &Player| {
+            yes_through(NpcScript::for_quest(script, knight).unwrap())
+        };
+        let note = run("q20405s", &knight);
+        assert_eq!(note, (2081013, vec![Effect::FinishQuest(20405)]));
+        let chief = vec![
+            Effect::TakeFourthJob(1512),
+            Effect::FinishQuest(CHIEF_KNIGHT_OF_THE_EMPRESS),
+        ];
+        assert_eq!(run("q20408s", &knight), (CYGNUS, chief));
+        // A Knight short of the third job is only thanked.
+        knight.stats.job = 1510;
+        let thanked = vec![Effect::FinishQuest(CHIEF_KNIGHT_OF_THE_EMPRESS)];
+        assert_eq!(run("q20408s", &knight), (CYGNUS, thanked));
+
+        let started = vec![Effect::StartQuest(TRAINING_STILL_NEVER_ENDS)];
+        assert_eq!(run("q20610s", &knight), (NEINHEART, started));
+        let dignity = vec![Effect::FinishQuest(KNIGHTS_DIGNITY)];
+        assert_eq!(run("q20520s", &knight), (NEINHEART, dignity));
     }
 
     #[test]
