@@ -60,6 +60,29 @@ namespace ms
 {
 	namespace
 	{
+		// What a key is to the combo commands: an arrow, the attack, or any other.
+		aran_combo::Key aran_key(KeyType::Id type, int32_t action)
+		{
+			if (type != KeyType::Id::ACTION)
+				return aran_combo::Key::OTHER;
+
+			switch (action)
+			{
+				case KeyAction::Id::UP:
+					return aran_combo::Key::UP;
+				case KeyAction::Id::DOWN:
+					return aran_combo::Key::DOWN;
+				case KeyAction::Id::LEFT:
+					return aran_combo::Key::LEFT;
+				case KeyAction::Id::RIGHT:
+					return aran_combo::Key::RIGHT;
+				case KeyAction::Id::ATTACK:
+					return aran_combo::Key::ATTACK;
+				default:
+					return aran_combo::Key::OTHER;
+			}
+		}
+
 		// An in-map portal's move lands 120 ms after Up; the portal then
 		// waits 600 ms (v83 FUN_00957b74, FUN_0094e5e5).
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
@@ -480,6 +503,12 @@ namespace ms
 
 		if (auto step = macro_runner.due(Constants::TIMESTEP))
 			macro_runner.tried(try_macro_step(*step));
+
+		// A combo command waiting is tried each frame while the player is alive and not attacking, until it
+		// goes off or has waited too long (FUN_0074de09).
+		if (std::optional<int32_t> id = aran_queue.due(get_uptime() / 1000))
+			if (!player.is_dead() && !player.is_attacking() && try_aran_command(*id))
+				aran_queue.pop();
 
 		backgrounds.update();
 		clouds.update();
@@ -1319,7 +1348,11 @@ namespace ms
 	void Stage::send_key(KeyType::Id type, int32_t action, bool down)
 	{
 		if (state != State::ACTIVE || !playable || player.is_dead())
+		{
+			// The dead begin no combo command, and lose those begun (FUN_0074d993).
+			aran_commands.clear();
 			return;
+		}
 
 		// While one of v83's dialogs is open the field takes no key going
 		// down (FUN_00529968): no skill, item, face, macro, attack, jump,
@@ -1348,6 +1381,32 @@ namespace ms
 			combat.use_move(dash_skill);
 		else if (walking && !down && dashing)
 			CancelBuffPacket(dash_skill).dispatch();
+
+		// An Aran's combo command waits to be used once its sequence ends, if the combo allows one of its
+		// skills; while it waits the keys that act are dropped, so the last one doesn't attack as well.
+		int64_t now = get_uptime() / 1000;
+		int32_t job = player.get_stats().get_job().get_id();
+		int32_t weapon = player.get_weapontype();
+		auto level = [this](int32_t skill)
+		{
+			return player.get_skills().get_level(skill);
+		};
+		auto may_start = [&](int32_t id)
+		{
+			return aran_combo::enabled(id, job, weapon, level);
+		};
+		int64_t code = (static_cast<int64_t>(type) << 32) | static_cast<uint32_t>(action);
+
+		if (int32_t id = aran_commands.feed(code, aran_key(type, action), down, now, may_start))
+			if (aran_combo::pick(id, player.get_aran_combo(), level) != 0)
+				aran_queue.push(id, now);
+
+		bool acts = type == KeyType::Id::SKILL || type == KeyType::Id::ITEM || type == KeyType::Id::MACRO
+					|| (type == KeyType::Id::ACTION
+						&& (action == KeyAction::Id::ATTACK || action == KeyAction::Id::JUMP));
+
+		if (down && acts && !aran_queue.empty())
+			return;
 
 		switch (type)
 		{
@@ -1421,6 +1480,24 @@ namespace ms
 
 				break;
 		}
+	}
+
+	bool Stage::try_aran_command(int32_t id)
+	{
+		auto level = [this](int32_t skill)
+		{
+			return player.get_skills().get_level(skill);
+		};
+		int32_t skill = aran_combo::pick(id, player.get_aran_combo(), level);
+
+		if (skill == 0)
+			return false;
+
+		// The player turns the command's way before each try (0x74d314).
+		if (std::optional<bool> right = aran_combo::faces_right(id, player.has_buff(Buffstat::Id::CONFUSE)))
+			player.set_direction(*right);
+
+		return combat.use_move(skill);
 	}
 
 	void Stage::stop_macro()

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <deque>
+#include <optional>
 #include <vector>
 
 namespace ms
@@ -191,5 +194,224 @@ namespace ms
 					return { 0, 0, 0 };
 			}
 		}
+
+		// The combo commands (v83ref report b362-aran-combo-commands.md): Down, then Left or Right, then the
+		// attack key uses the best of Combo Tempest, Penril and Smash the combo allows, and Down, Down let go,
+		// Down, then the attack key the best of Combo Barrier and Drain. They are entries of v83's table of
+		// key sequences (FUN_0074ab67), which also holds other Aran attacks not made here yet.
+		constexpr int32_t TO_THE_LEFT = 9;
+		constexpr int32_t TO_THE_RIGHT = 10;
+		constexpr int32_t DOWN_TWICE = 11;
+		// How soon after its first key a sequence must end.
+		constexpr int64_t WINDOW = 600;
+		// How long a command matched waits to be used before it is dropped (vt +0x18).
+		constexpr int64_t WAITS = 1000;
+
+		// The keys the sequences are made of: the arrows and the key the attack is bound to.
+		enum class Key
+		{
+			OTHER,
+			UP,
+			DOWN,
+			LEFT,
+			RIGHT,
+			ATTACK
+		};
+
+		struct Node
+		{
+			Key key;
+			bool down;
+		};
+
+		struct Sequence
+		{
+			int32_t id;
+			std::vector<Node> nodes;
+		};
+
+		inline const std::vector<Sequence>& sequences()
+		{
+			static const std::vector<Sequence> table = {
+					{ TO_THE_LEFT, { { Key::DOWN, true }, { Key::LEFT, true }, { Key::ATTACK, true } } },
+					{ TO_THE_RIGHT, { { Key::DOWN, true }, { Key::RIGHT, true }, { Key::ATTACK, true } } },
+					{ DOWN_TWICE, { { Key::DOWN, true }, { Key::DOWN, false }, { Key::DOWN, true }, { Key::ATTACK, true } } }
+			};
+
+			return table;
+		}
+
+		// Whether a command may begin: an Aran with a polearm, who knows Combo Smash for the first two and
+		// Combo Drain for the last.
+		template <typename Level>
+		bool enabled(int32_t id, int32_t job, int32_t weapon_type, Level level)
+		{
+			bool aran = job / 100 == 21 || job == ARAN_BEGINNER;
+
+			if (!aran || weapon_type != POLEARM)
+				return false;
+
+			return level(id == DOWN_TWICE ? 21100005 : 21100004) > 0;
+		}
+
+		// The skill a command uses for a combo, or 0 when the combo allows none of its skills (0x74d314,
+		// 0x74d51a).
+		template <typename Level>
+		int32_t pick(int32_t id, int32_t count, Level level)
+		{
+			static const std::vector<int32_t> sideways = { 21120006, 21110004, 21100004 };
+			static const std::vector<int32_t> down_twice = { 21120007, 21100005 };
+
+			for (int32_t skill : id == DOWN_TWICE ? down_twice : sideways)
+				if (count >= needs(skill) && level(skill) > 0)
+					return skill;
+
+			return 0;
+		}
+
+		// Which way a command turns the player before each try: Left's to the left and Right's to the right,
+		// the other way round while confused. Down twice doesn't turn.
+		inline std::optional<bool> faces_right(int32_t id, bool confused)
+		{
+			if (id == DOWN_TWICE)
+				return std::nullopt;
+
+			return (id == TO_THE_RIGHT) != confused;
+		}
+
+		// The matcher (FUN_0074d993). A key repeating its last event is ignored. Every sequence begun goes
+		// on while each key matches its next one or is a key let go, and ends past its window, checked as
+		// keys come, or on any other key going down. New ones begin only on a key no sequence took.
+		class Commands
+		{
+		public:
+			// The command `code`'s key going `down` completes, or 0. `may_start(id)` says which may begin.
+			template <typename Enabled>
+			int32_t feed(int64_t code, Key key, bool down, int64_t now, Enabled may_start)
+			{
+				if (fed && code == last_code && down == last_down)
+					return 0;
+
+				fed = true;
+				last_code = code;
+				last_down = down;
+
+				const std::vector<Sequence>& table = sequences();
+				std::vector<Active> going;
+				int32_t done = 0;
+
+				for (Active a : active)
+				{
+					const Sequence& sequence = table[a.sequence];
+
+					if (now > a.start + WINDOW)
+						continue;
+
+					const Node& next = sequence.nodes[a.next];
+
+					if (next.key == key && next.down == down)
+					{
+						if (++a.next == sequence.nodes.size())
+						{
+							done = sequence.id;
+							continue;
+						}
+
+						going.push_back(a);
+					}
+					else if (!down)
+					{
+						going.push_back(a);
+					}
+				}
+
+				if (done != 0)
+				{
+					active.clear();
+					return done;
+				}
+
+				if (going.empty())
+				{
+					for (size_t i = 0; i < table.size(); i++)
+					{
+						const Node& first = table[i].nodes.front();
+
+						if (first.key == key && first.down == down && may_start(table[i].id))
+							going.push_back({ i, 1, now });
+					}
+				}
+
+				active = going;
+
+				return 0;
+			}
+
+			void clear()
+			{
+				active.clear();
+			}
+
+		private:
+			struct Active
+			{
+				size_t sequence;
+				size_t next;
+				int64_t start;
+			};
+
+			std::vector<Active> active;
+			bool fed = false;
+			int64_t last_code = 0;
+			bool last_down = false;
+		};
+
+		// The commands matched, waiting to be used one by one (mgr+0x3c). While one waits the keys that act
+		// are dropped (FUN_0094f2ed), which keeps the last key from attacking too.
+		class Queue
+		{
+		public:
+			void push(int32_t id, int64_t now)
+			{
+				queued.push_back({ id, now });
+			}
+
+			bool empty() const
+			{
+				return queued.empty();
+			}
+
+			// The command to try now, once those that waited too long are dropped.
+			std::optional<int32_t> due(int64_t now)
+			{
+				while (!queued.empty() && now >= queued.front().at + WAITS)
+					queued.pop_front();
+
+				if (queued.empty())
+					return std::nullopt;
+
+				return queued.front().id;
+			}
+
+			void pop()
+			{
+				if (!queued.empty())
+					queued.pop_front();
+			}
+
+			void clear()
+			{
+				queued.clear();
+			}
+
+		private:
+			struct Queued
+			{
+				int32_t id;
+				int64_t at;
+			};
+
+			std::deque<Queued> queued;
+		};
 	}
 }
