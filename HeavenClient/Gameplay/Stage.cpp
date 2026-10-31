@@ -1549,10 +1549,15 @@ namespace ms
 
 	// v83 slides an Aran along the ground with Combat Step once the skill
 	// is used, at the level's x (FUN_0096d95e). A GM may step where the
-	// map forbids movement skills.
+	// map forbids movement skills, but no one steps off a jump pad: the
+	// touch portal holding the player may not be of type 12 or 13 (report
+	// b366).
 	void Stage::use_combat_step()
 	{
-		bool allowed = mapinfo.can_use_movement_skills() || Configuration::get().get_grade().gm();
+		const Portal *portal = portals.find_touch_portal(player.get_position());
+		bool on_jump_pad =
+			portal && (portal->get_type() == Portal::SPRING1 || portal->get_type() == Portal::SPRING2);
+		bool allowed = (mapinfo.can_use_movement_skills() || Configuration::get().get_grade().gm()) && !on_jump_pad;
 
 		if (!player.may_combat_step(allowed) || !combat.use_move(combat_step::ID))
 			return;
