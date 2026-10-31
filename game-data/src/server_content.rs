@@ -1287,6 +1287,25 @@ pub mod keys {
     pub const KIKU_TRAINING_ASK: &str = "kiku.training.ask";
     pub const KIKU_TRAINING_DECLINED: &str = "kiku.training.declined";
 
+    /// A Noblesse's first job: Neinheart's five paths (`q20020s`, and
+    /// `q20100s`), and each Knight Commander's (`q20101e` to `q20105e`),
+    /// whose lines name the `{job}`.
+    pub const NEINHEART_PATHS: [&str; 2] = ["neinheart.paths.level", "neinheart.paths.five"];
+    pub const NEINHEART_PATHS_ASK: &str = "neinheart.paths.ask";
+    pub const NEINHEART_PATHS_DECLINED: &str = "neinheart.paths.declined";
+    pub const NEINHEART_PATHS_GO: &str = "neinheart.paths.go";
+    pub const KNIGHT_JOB_ASK: &str = "knight_job.ask";
+    pub const KNIGHT_JOB_DECLINED: &str = "knight_job.declined";
+    pub const KNIGHT_JOB_TOO_WEAK: &str = "knight_job.too_weak";
+    pub const KNIGHT_JOB_INVENTORY_FULL: &str = "knight_job.inventory_full";
+    pub const KNIGHT_JOB_AFTER: [&str; 5] = [
+        "knight_job.after.stats",
+        "knight_job.after.slots",
+        "knight_job.after.sp",
+        "knight_job.after.death",
+        "knight_job.after.go",
+    ];
+
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
     /// (`q21604s`), the end of the Field of Wolves (`clearRider`), the
     /// pack's test (`q21613s`, and its retake) and Maha's evolution
@@ -4357,6 +4376,20 @@ mod tests {
                 keys::KIKU_TRAINING[2],
                 keys::KIKU_TRAINING_ASK,
                 keys::KIKU_TRAINING_DECLINED,
+                keys::NEINHEART_PATHS[0],
+                keys::NEINHEART_PATHS[1],
+                keys::NEINHEART_PATHS_ASK,
+                keys::NEINHEART_PATHS_DECLINED,
+                keys::NEINHEART_PATHS_GO,
+                keys::KNIGHT_JOB_ASK,
+                keys::KNIGHT_JOB_DECLINED,
+                keys::KNIGHT_JOB_TOO_WEAK,
+                keys::KNIGHT_JOB_INVENTORY_FULL,
+                keys::KNIGHT_JOB_AFTER[0],
+                keys::KNIGHT_JOB_AFTER[1],
+                keys::KNIGHT_JOB_AFTER[2],
+                keys::KNIGHT_JOB_AFTER[3],
+                keys::KNIGHT_JOB_AFTER[4],
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
                 keys::PUCCI_WOLF_REQUEST[2],
