@@ -177,6 +177,9 @@ pub enum RecvOpcode {
     /// An item used on the character named in v83's Transform dialog: the
     /// Maplemas Party Potion (report c041).
     UseTargetItem = 0xA0,
+    /// An Aran's polearm landed a hit while they know Combo Ability; no
+    /// payload (report b360).
+    AranComboCounter = 0xA3,
     MovePet = 0xA7,
     PetChat = 0xA8,
     PetCommand = 0xA9,

@@ -113,6 +113,21 @@ pub enum BuffStat {
     /// No mob can hurt the player: the client dodges every hit
     /// (Invincibility, 1010).
     DivineBody = 60,
+    /// The Aran's combo, the count of hits their polearm has landed: Combo
+    /// Ability adds to attack, and Combo Critical to criticals, for every
+    /// ten (0x77df48, report b360). Never shown to others.
+    AranCombo = 68,
+    /// Combo Drain (21100005): each weapon hit heals `value` percent of its
+    /// damage, which the client leaves to the server.
+    ComboDrain = 69,
+    /// Combo Barrier (21120007): the player keeps `value` per mille of each
+    /// hit after Achilles (report 193, step 18).
+    ComboBarrier = 70,
+    /// Body Pressure (21101003): a touching mob is hit by the body attack.
+    BodyPressure = 71,
+    /// Smart Knockback (21111001): only hits of `value` percent of a mob's
+    /// `pushed` knock it back, which only the client draws.
+    SmartKnockback = 72,
     /// An item's `berserk` (Pharaoh's Blessing, Power Buff): the client only
     /// draws `Effect/ItemEff.img/<item>` about the player, the item coming
     /// as `-skill_id`, and hides Power Explosion's loop meanwhile (report

@@ -1,5 +1,6 @@
 use super::combat::{set_combo, spend_dojo_energy};
 use super::mount::dismount;
+use crate::aran_combo;
 use crate::combo;
 use crate::consume_effect;
 use crate::error::NetworkError;
@@ -248,6 +249,9 @@ impl WorldHandler for UseSkillHandler {
                 if skill_id == combo::ENRAGE {
                     result = set_combo(ctx.player, 1, now, result)?;
                 }
+                if aran_combo::needs(skill_id) > 0 && aran_combo::spend(ctx.player) {
+                    result = result.with_reply(buff::build_cancel_buff(&[BuffStat::AranCombo])?);
+                }
                 if secret {
                     result = spend_dojo_energy(ctx.player, result)?;
                 }
@@ -396,6 +400,32 @@ impl WorldHandler for CancelBuffHandler {
     }
 }
 
+/// How long the client is told the combo lasts as stat 68; the server's
+/// own 3 seconds end it with CANCEL_BUFF.
+const COMBO_SHOWN_MS: i32 = 86_400_000;
+
+/// `ARAN_COMBO_COUNTER` (0xA3): an Aran's polearm landed a hit. Count it
+/// and show the combo; at the first and every tenth hit, give it as stat
+/// 68 too, which the client adds to attack and criticals (report b360).
+pub struct AranComboHandler;
+
+impl WorldHandler for AranComboHandler {
+    fn handle(&self, _packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let Some(count) = aran_combo::landed(ctx.player) else {
+            return Ok(HandlerResult::empty());
+        };
+        let Some(skill_id) = aran_combo::set(ctx.player, count, Instant::now()) else {
+            return Ok(HandlerResult::empty());
+        };
+        let mut result = HandlerResult::reply(buff::build_show_combo(count.into())?);
+        if aran_combo::shown_as_stat(count) {
+            let stats = [(BuffStat::AranCombo, count)];
+            result = result.with_reply(buff::build_give_buff(skill_id, COMBO_SHOWN_MS, &stats)?);
+        }
+        Ok(result)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum Refusal {
     Dead,
@@ -416,6 +446,8 @@ enum Refusal {
     NoDoorHere,
     /// Enrage without the orbs to spend.
     TooFewOrbs,
+    /// Combo Drain or Combo Barrier without the Aran's combo they need.
+    ComboShort,
     /// Riding without a mount that can be ridden and a saddle on.
     NoMount,
     /// Riding where mounts aren't allowed.
@@ -852,6 +884,9 @@ fn use_skill(
     }
     if combo::enrage_refused(player, skill_id) {
         return Err(Refusal::TooFewOrbs);
+    }
+    if aran_combo::refused(player, skill_id) {
+        return Err(Refusal::ComboShort);
     }
     let stats = skills::buffs(&skill);
     let buffs = stats.is_some();

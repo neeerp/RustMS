@@ -187,6 +187,9 @@ pub enum SendOpcode {
     /// A balloon (mode 0) or a hint picture (mode 1) over the tutorial
     /// guide (0x960239).
     TalkGuide = 0xE0,
+    /// The Aran's combo, an int the client shows over its stats and keeps
+    /// for 3 seconds (report b360).
+    ShowCombo = 0xE1,
     /// A cash mist's face for its user (FUN_00938b3e).
     ItemEmotion = 0xE2,
     Cooldown = 0xEA,

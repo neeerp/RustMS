@@ -1,5 +1,6 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
+use crate::aran_combo;
 use crate::beacon;
 use crate::berserk;
 use crate::charge;
@@ -226,7 +227,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
 const LUCKY_SEVENS: [i32; 4] = [4001344, 4121007, 14001004, 14111005];
 
 /// The weapon the player holds, or 0.
-fn weapon(player: &Player) -> i32 {
+pub(crate) fn weapon(player: &Player) -> i32 {
     player
         .inventory
         .get(InventoryType::Equipped, equip_slot::WEAPON)
@@ -352,6 +353,7 @@ pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
         .map(|equip| i32::from(equip.watk))
         .sum::<i32>()
         + buff(player, BuffStat::Pad)
+        + aran_combo::attack(player)
         + expert_attack(player, weapon)
         + ammo_attack(attack, player, weapon)
         + bare_hands
@@ -373,7 +375,7 @@ pub(crate) fn fairy_blessing(player: &Player) -> (i32, i32) {
 /// weapon's critical skill for a shot or a punch, or Assassinate's own
 /// `criticalDamage` for its second strike, then Sharp Eyes as the server
 /// gives it, then Stun Mastery's whole damage, as the monster may be
-/// stunned. Blizzard, Shadow Meso (its own critical is in its cap) and
+/// stunned, then Combo Critical's. Blizzard, Shadow Meso (its own critical is in its cap) and
 /// Assassinate's first strike never crit (FUN_0078df87's gate).
 fn critical_bonus(player: &Player, attack: &Attack) -> i32 {
     if attack.skill == BLIZZARD
@@ -412,6 +414,7 @@ fn critical_bonus(player: &Player, attack: &Attack) -> i32 {
         damage = if damage == 0 { 100 } else { damage } + (sharp_eyes & 0xFF);
     }
     damage += skills::learned(player, STUN_MASTERY).map_or(0, |skill| skill.effect.damage);
+    damage = aran_combo::critical(player, damage);
     (damage - 100).max(0)
 }
 
@@ -553,6 +556,8 @@ pub enum AttackRejection {
     NoOrbs,
     /// An Energy skill without a full gauge.
     NotCharged,
+    /// A combo skill without the Aran's combo it needs.
+    ComboShort,
     /// Morphed by an item, or by a skill that rules this attack out.
     Morphed,
     /// Not from the Battleship, or only from it.
@@ -632,9 +637,16 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     if combo::finisher(attack.skill) && combo::orbs(player).unwrap_or(0) < 1 {
         return Err(AttackRejection::NoOrbs);
     }
-    // Energy Charge hits only as the body attack, which nothing else is.
-    if (attack.kind == AttackKind::Body) != energy::charges(attack.skill) {
+    // Energy Charge and Body Pressure hit only as the body attack, which
+    // nothing else is; Body Pressure only while its buff is up.
+    let body = energy::charges(attack.skill) || aran_combo::presses(attack.skill);
+    if (attack.kind == AttackKind::Body) != body
+        || (aran_combo::presses(attack.skill) && !aran_combo::pressing(player))
+    {
         return Err(AttackRejection::Skill);
+    }
+    if aran_combo::refused(player, attack.skill) {
+        return Err(AttackRejection::ComboShort);
     }
     if energy::refused(player, attack.skill) || charge::refused(player, attack.skill) {
         return Err(AttackRejection::NotCharged);
@@ -933,8 +945,8 @@ pub fn poison_resisted(player: &Player, poison: i32) -> i32 {
 /// What a hit of `damage` takes from the player. A v83 client sends the
 /// damage before these skills and leaves them to the server, working them
 /// out only to show the number and to drink a pet's potion in time
-/// (FUN_009581a9 at 0x959321 and 0x959595). Achilles always keeps its
-/// share off; with `magic_guard`, Magic Guard moves its share to MP (as
+/// (FUN_009581a9 at 0x959321 and 0x959595). Achilles, and Combo Barrier
+/// after it, always keep their share off; with `magic_guard`, Magic Guard moves its share to MP (as
 /// much as there is, or all of it and no MP under Infinity); with
 /// `meso_guard`, Meso Guard halves the hit for mesos.
 pub fn taken(player: &Player, damage: i32, magic_guard: bool, meso_guard: bool) -> Taken {
@@ -945,6 +957,13 @@ pub fn taken(player: &Player, damage: i32, magic_guard: bool, meso_guard: bool) 
         };
     }
     let achilles = achilles(player).map_or(0, |kept| (1000 - kept) * damage / 1000);
+    // Combo Barrier keeps its per mille of what Achilles left (report 193,
+    // step 18).
+    let barrier = match buff(player, BuffStat::ComboBarrier) {
+        kept if kept > 0 => (damage - achilles) * (1000 - kept) / 1000,
+        _ => 0,
+    };
+    let achilles = achilles + barrier;
     let guarded = if magic_guard {
         buff(player, BuffStat::MagicGuard) * damage / 100
     } else {

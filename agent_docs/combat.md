@@ -740,6 +740,35 @@ A few skills do more than buff:
   the Aran's Maple Warrior give the same stat as their Explorer twins; and
   Freeze Standing (21121003) is the Aran's Power Stance, which the client
   picks for job 2112 (0x958aa9).
+- **The Aran's combo** (`net::aran_combo`, report b360) counts the hits a
+  polearm lands while Combo Ability (21000000, or 20000017 for job 2000)
+  is learned. The client counts nothing: it sends ARAN_COMBO_COUNTER
+  (0xA3, no payload) for each landed line, and the server answers with
+  SHOW_COMBO (0xE1, the count). It also gives the count as stat 68
+  (`BuffStat::AranCombo`) under Combo Ability at the first hit and every
+  tenth, where it adds to attack and criticals: Combo Ability's `y` attack
+  for every ten up to `x` tens, and with Combo Critical (21110000) a
+  critical's damage raised by its `damage` for every ten up to `x` tens,
+  plus 100 (200 if nothing else made the hit a critical). The count is
+  capped at 30000. It ends 3 seconds after the last hit on both sides: the
+  client sends CANCEL_BUFF for Combo Ability, and the server's own buff
+  ends with CANCEL_BUFF. Combo Smash and Combo Drain need 30, Combo Penril
+  100, and Combo Tempest and Combo Barrier 200 (`aran_combo::refused`,
+  `AttackRejection::ComboShort`, `Refusal::ComboShort`). The client says
+  nothing about it, since its key picks a skill the combo allows. Any of
+  them spends the whole count, with a CANCEL_BUFF of stat 68. Combo Drain
+  (21100005, stat 69) heals its `x` percent of each weapon hit (`skills::takes`),
+  and Combo Barrier (21120007, stat 70, reaching the party) keeps its `x`
+  per mille of a hit after Achilles (`combat::taken`). Body Pressure
+  (21101003, stat 71) lets the client hit one touching mob a second with
+  TOUCH_MONSTER_ATTACK, which is refused without the buff. Smart Knockback
+  (21111001, stat 72) is the client's alone. None of the five is shown to
+  others. Harness `aran_combo` builds a combo to 30, checks that Combo
+  Drain waits for it and spends it, and waits for the 3 s end.
+  Still open: the GIVE_BUFF layout of stats 68 to 72 is inferred. The
+  server takes 0xA3 on trust and doesn't hold Body Pressure to once a
+  second, Body Pressure's `prop` status isn't modelled, and Combo Drain
+  shares Drain's cap of half max HP.
 - **Berserk** (`net::berserk`, 1320006) is a Dark Knight's passive. The
   client keeps the state: Berserk is on while HP is at most `x` percent
   of max HP, rechecked when HP changes and anew on entering the game. Each

@@ -269,6 +269,10 @@ pub struct Trace {
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
     pub cancelled_buffs: Vec<i64>,
+    /// CANCEL_BUFF: the first long of each mask.
+    pub cancelled_high_buffs: Vec<i64>,
+    /// SHOW_COMBO: the Aran's combo.
+    pub combos: Vec<i32>,
     /// COOLDOWN: (skill id, seconds).
     pub cooldowns: Vec<(i32, i16)>,
     /// BLOCKED_MAP and BLOCKED_SERVER: (opcode, reason).
@@ -890,8 +894,10 @@ impl Trace {
             self.buffs
                 .push((r.read_int().unwrap(), value, r.read_int().unwrap()));
         } else if op == SendOpcode::CancelBuff as i16 {
-            r.read_long().unwrap();
+            self.cancelled_high_buffs.push(r.read_long().unwrap());
             self.cancelled_buffs.push(r.read_long().unwrap());
+        } else if op == SendOpcode::ShowCombo as i16 {
+            self.combos.push(r.read_int().unwrap());
         } else if op == SendOpcode::Cooldown as i16 {
             self.cooldowns
                 .push((r.read_int().unwrap(), r.read_short().unwrap()));
