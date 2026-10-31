@@ -230,6 +230,8 @@ namespace ms
 	bool Combat::use_move(int32_t move_id)
 	{
 		move_id = beacon::cast(move_id, player.get_skills().get_level(beacon::BULLSEYE));
+		move_id = aran_combo::swing_cast(move_id, player.get_skills().get_level(aran_combo::OVER_SWING),
+										 player.get_skills().get_level(aran_combo::FULL_SWING));
 
 		if (!ride_allows(move_id))
 			return false;

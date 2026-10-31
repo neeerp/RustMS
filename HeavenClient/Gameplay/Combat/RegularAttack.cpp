@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "RegularAttack.h"
 
+#include "AranCombo.h"
+
 #include "../../Util/Randomizer.h"
 
 #include <nlnx/nx.hpp>
@@ -35,7 +37,8 @@ namespace ms
 	{
 		attack.damagetype = Attack::DMG_WEAPON;
 		attack.skill = 0;
-		attack.mobcount = 1;
+		attack.mobcount = static_cast<uint8_t>(
+				aran_combo::plain_mob_count(user.get_job(), user.get_weapontype(), user.get_level()));
 		attack.hitcount = 1;
 		attack.stance = user.get_look().get_stance();
 

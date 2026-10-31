@@ -137,6 +137,18 @@ int main()
 					&& std::string(polearm_swing(2100, POLEARM, 2)->action) == "swingP2PoleArm"
 					&& !polearm_swing(2112, 130, 0) && !polearm_swing(1100, POLEARM, 0),
 				"an Aran's polearm swings");
+		require(swing_cast(21000002, 0, 0) == 21000002 && swing_cast(21000002, 0, 5) == 21110007
+					&& swing_cast(21100001, 0, 5) == 21110008 && swing_cast(21000002, 3, 5) == 21120009
+					&& swing_cast(21100001, 3, 0) == 21120010 && swing_cast(20000014, 3, 5) == 20000014
+					&& swing_cast(21100002, 3, 5) == 21100002,
+				"Full and Over Swing cast their hidden swings, Over Swing first");
+		require(swing_owner(21110007) == FULL_SWING && swing_owner(21110008) == FULL_SWING
+					&& swing_owner(21120009) == OVER_SWING && swing_owner(21120010) == OVER_SWING
+					&& swing_owner(21000002) == 0,
+				"the hidden swings' levels");
+		require(plain_mob_count(2112, POLEARM, 120) == 8 && plain_mob_count(2000, POLEARM, 1) == 2
+					&& plain_mob_count(2112, 130, 120) == 1 && plain_mob_count(110, POLEARM, 120) == 1,
+				"an Aran's plain polearm swing reaches more mobs with level");
 
 		auto waiting = [](Outcome o) { return o.waits; };
 		require(waiting(outcome(DOUBLE_SWING, true, Doing::SWING, std::nullopt))

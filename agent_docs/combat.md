@@ -816,9 +816,17 @@ A few skills do more than buff:
     (`aran_combo::polearm_swing`). Double Swing waits on those. Others see
     the plain swing of the same name, since HeavenClient's wire stance is
     its own list.
-  - Not modelled: Full Swing and Over Swing turning Double and Triple
-    Swing into their hidden skills, and the portal kinds Combat Step
-    refuses.
+  - Its plain polearm attack hits two more mobs than a twentieth of its
+    level (`aran_combo::plain_mob_count` on both sides); anyone else's
+    hits one.
+  - Full Swing (21110002) and Over Swing (21120002), Over Swing first,
+    make Double and Triple Swing cast their hidden skills (21110007/8,
+    21120009/10) at their own level (`aran_combo::swing_cast` in
+    `Combat::use_move`). The client's skill book and the server's
+    `skills::learned` give a hidden swing its owner's level
+    (`aran_combo::swing_owner`). The Legend's copies have no such skills.
+  - Not modelled: the plain swing's own wait (the action's length plus
+    400 ms), and the portal kinds Combat Step refuses.
 - **Berserk** (`net::berserk`, 1320006) is a Dark Knight's passive. The
   client keeps the state: Berserk is on while HP is at most `x` percent
   of max HP, rechecked when HP changes and anew on entering the game. Each
