@@ -265,6 +265,7 @@ impl WorldHandler for UseSkillHandler {
                         skill_id,
                         level,
                         left: false,
+                        at: None,
                         inflict,
                     }));
                 }

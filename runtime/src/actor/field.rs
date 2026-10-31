@@ -1156,8 +1156,9 @@ impl FieldActor {
                     skill_id,
                     level,
                     left,
+                    at,
                     inflict,
-                } => self.handle_mist(from, skill_id, level, left, inflict),
+                } => self.handle_mist(from, skill_id, level, left, at, inflict),
                 FieldRequest::ItemMist {
                     item_id,
                     area,
@@ -3060,6 +3061,7 @@ impl FieldActor {
         skill_id: i32,
         level: i32,
         left: bool,
+        at: Option<(i16, i16)>,
         inflict: Inflict,
     ) {
         let Some(user) = self.occupants.get(&from) else {
@@ -3068,6 +3070,7 @@ impl FieldActor {
         let Some(skill) = skills::at_level(skill_id, level) else {
             return;
         };
+        let origin = skills::mist_origin((user.avatar.x, user.avatar.y), at);
         let view = MistView {
             object_id: 0,
             kind: skills::mist_kind(skill_id),
@@ -3075,7 +3078,7 @@ impl FieldActor {
             skill_id,
             level: level as u8,
             delay: MIST_DELAY,
-            area: skills::area_box(&skill.effect, (user.avatar.x, user.avatar.y), left),
+            area: skills::area_box(&skill.effect, origin, left),
             element: 0,
         };
         let lasts = inflict.duration;
