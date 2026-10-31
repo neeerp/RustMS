@@ -65,6 +65,9 @@ pub const FIELD_LIMIT_WEATHER_ITEMS: i32 = 0x4000;
 /// `info/fieldLimit` bit keeping Miu Miu's merchant away (v83 FUN_00a0a63f,
 /// type 0x25, and FUN_00a0ecab).
 pub const FIELD_LIMIT_MIU_MIU: i32 = 0x40000;
+/// `info/fieldLimit` bit forbidding the Lie Detector (v83 FUN_00a262d9, report
+/// c025).
+pub const FIELD_LIMIT_LIE_DETECTOR: i32 = 0x10000;
 /// `info/fieldLimit` bit sparing whoever dies there their EXP (Cosmic's
 /// NO_EXP_DECREASE; v83 never reads it). The Dojo and most event maps.
 pub const FIELD_LIMIT_NO_EXP_LOSS: i32 = 0x80000;
@@ -582,6 +585,12 @@ impl FieldTemplate {
     /// Whether Miu Miu's merchant comes here.
     pub fn may_call_merchant(&self) -> bool {
         self.field_limit & FIELD_LIMIT_MIU_MIU == 0
+    }
+
+    /// Whether a player may use the Lie Detector here: not in a town, nor
+    /// where the map forbids it.
+    pub fn may_lie_detect(&self) -> bool {
+        !self.town && self.field_limit & FIELD_LIMIT_LIE_DETECTOR == 0
     }
 
     /// Whether players may drop items and mesos here.

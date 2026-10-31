@@ -36,6 +36,7 @@ mod jukebox;
 mod karma;
 mod keybinds;
 mod kite;
+pub mod lie_detector;
 mod logged_in;
 mod maker;
 mod map_transfer;
@@ -133,6 +134,7 @@ pub use self::hired_merchant::{
 pub use self::item_effect::UseItemEffectHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
+pub use self::lie_detector::{AnswerLieDetectorHandler, LieDetectorUse, UseLieDetectorHandler};
 pub use self::logged_in::PlayerLoggedInHandler;
 pub use self::maker::ItemMakeHandler;
 pub use self::map_transfer::PlayerMapTransferHandler;

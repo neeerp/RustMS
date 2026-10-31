@@ -160,6 +160,10 @@ pub enum RecvOpcode {
     SpawnPet = 0x62,
     ChangeMapSpecial = 0x64,
     TeleportRockList = 0x66,
+    /// A Lie Detector used on someone (FUN_00a262d9).
+    UseLieDetector = 0x67,
+    /// The text a tested player typed (0x7e76b2, 0x7e872f).
+    AnswerLieDetector = 0x69,
     /// A report of a player (CWvsContext::SendClaim, FUN_00a2719c).
     Claim = 0x6A,
     QuestAction = 0x6B,

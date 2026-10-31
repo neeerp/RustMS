@@ -1,4 +1,5 @@
 pub mod alliance;
+pub mod anti_macro;
 pub mod buddy;
 pub mod buff;
 pub mod carnival;

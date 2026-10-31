@@ -14,6 +14,7 @@ game = { path = "../game" }
 game-data = { path = "../game-data" }
 bufstream = "0.1.4"
 rand = "0.7.3"
+jpeg-encoder = "0.7"
 num = "0.2"
 num-derive = "0.4.2"
 num-traits = "0.2"

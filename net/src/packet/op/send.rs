@@ -25,6 +25,8 @@ pub enum SendOpcode {
     ShowStatusInfo = 0x27,
     MemoResult = 0x29,
     MapTransferResult = 0x2A,
+    /// A Lie Detector test's turns (FUN_00a265c2).
+    AntiMacroResult = 0x2B,
     /// What became of a report of a player (FUN_00a27891).
     ClaimResult = 0x2D,
     /// The hours reports are taken, start and end (FUN_00a27b38).

@@ -668,6 +668,11 @@ pub enum WorldAction {
     /// Look on the channel for the character a Party Potion names, to
     /// morph them.
     MorphAnother(crate::packet::handle::world::PartyPotion),
+    /// Look on the channel for the character a Lie Detector names, to test
+    /// them.
+    LieDetect(crate::packet::handle::world::LieDetectorUse),
+    /// The text the player typed back in a Lie Detector test.
+    LieDetectorAnswer(String),
     /// Natural HP/MP recovery the client reports; the runtime checks timing.
     NaturalHeal {
         hp: i16,
@@ -1356,6 +1361,11 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::GiveFame, InGame(&world::GiveFameHandler)),
             (Op::Claim, InGame(&world::ClaimHandler)),
+            (Op::UseLieDetector, InGame(&world::UseLieDetectorHandler)),
+            (
+                Op::AnswerLieDetector,
+                InGame(&world::AnswerLieDetectorHandler),
+            ),
             (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
             (Op::DamageSummon, InGame(&world::DamageSummonHandler)),
@@ -1393,7 +1403,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 141);
+        assert_eq!(world_routes().len(), 143);
     }
 
     #[test]
