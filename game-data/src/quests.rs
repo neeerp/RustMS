@@ -107,7 +107,7 @@ pub const SCRIPTS: &[&str] = &[
     "q20100s", "q20101e", "q20102e", "q20103e", "q20104e", "q20105e", "q20200s", "q20201e",
     "q20202e", "q20203e", "q20204e", "q20205e", "q20311s", "q20312s", "q20313s", "q20314s",
     "q20315s", "q20400s", "q20401s", "q20405s", "q20406s", "q20408s", "q20520s", "q20600s",
-    "q20610s",
+    "q20610s", "q20700s", "q20710s", "q20720s",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -123,11 +123,11 @@ pub const SCRIPTS: &[&str] = &[
 /// (20016), and the Knights' Time to Choose (20100), and Shinsoo's Teardrop
 /// for each Knight's third job (20311-20315), and the told steps of Chasing
 /// the Knight's Target (20401, 20405, 20406), the Chief Knight of the Empress
-/// (20408) and Knight's Dignity (20520).
+/// (20408), Knight's Dignity (20520) and Are You Sure You Can Leave? (20700).
 pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
     2216, 2217, 2218, 2219, 2228, 2245, 2334, 2342, 3108, 3523, 3524, 3525, 3526, 3527, 3529, 3539,
     3714, 20015, 20016, 20100, 20311, 20312, 20313, 20314, 20315, 20401, 20405, 20406, 20408,
-    20520, 21704, 29922, 29923, 29924, 29925, 29926, 29927, 29928,
+    20520, 20700, 21704, 29922, 29923, 29924, 29925, 29926, 29927, 29928,
 ];
 /// The Noblesse and Knight titles (29905 to 29909): Cygnus (1101000)
 /// completes them, and

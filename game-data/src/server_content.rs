@@ -1337,6 +1337,17 @@ pub mod keys {
     pub const TRAINING_NEVER_ENDS_ASK: &str = "training_never_ends.ask";
     pub const TRAINING_STILL_NEVER_ENDS_ASK: &str = "training_still_never_ends.ask";
     pub const TRAINING_STILL_NEVER_ENDS_DECLINED: &str = "training_still_never_ends.declined";
+    pub const SURE_YOU_CAN_LEAVE_WEAK: &str = "sure_you_can_leave.weak";
+    pub const SURE_YOU_CAN_LEAVE_ASK: &str = "sure_you_can_leave.ask";
+    pub const SURE_YOU_CAN_LEAVE_DECLINED: &str = "sure_you_can_leave.declined";
+    pub const SURE_YOU_CAN_LEAVE_TRAIN: &str = "sure_you_can_leave.train";
+    pub const SURE_YOU_CAN_LEAVE_BLESSING: &str = "sure_you_can_leave.blessing";
+    pub const TRASH_CAN_MISSION_ASK: &str = "trash_can_mission.ask";
+    pub const TRASH_CAN_MISSION_DECLINED: &str = "trash_can_mission.declined";
+    pub const KERNING_TRASH_CAN_FOUND: &str = "kerning_trash_can.found";
+    pub const KERNING_TRASH_CAN_FULL: &str = "kerning_trash_can.full";
+    pub const KERNING_TRASH_CAN_EMPTY: &str = "kerning_trash_can.empty";
+    pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
     /// (`q21604s`), the end of the Field of Wolves (`clearRider`), the
@@ -4452,6 +4463,17 @@ mod tests {
                 keys::TRAINING_NEVER_ENDS_ASK,
                 keys::TRAINING_STILL_NEVER_ENDS_ASK,
                 keys::TRAINING_STILL_NEVER_ENDS_DECLINED,
+                keys::SURE_YOU_CAN_LEAVE_WEAK,
+                keys::SURE_YOU_CAN_LEAVE_ASK,
+                keys::SURE_YOU_CAN_LEAVE_DECLINED,
+                keys::SURE_YOU_CAN_LEAVE_TRAIN,
+                keys::SURE_YOU_CAN_LEAVE_BLESSING,
+                keys::TRASH_CAN_MISSION_ASK,
+                keys::TRASH_CAN_MISSION_DECLINED,
+                keys::KERNING_TRASH_CAN_FOUND,
+                keys::KERNING_TRASH_CAN_FULL,
+                keys::KERNING_TRASH_CAN_EMPTY,
+                keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
                 keys::PUCCI_WOLF_REQUEST[2],
