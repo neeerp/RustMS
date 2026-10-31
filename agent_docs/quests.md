@@ -1014,6 +1014,19 @@ Training Never Ends (20600, level 100) and Training Still Never Ends
 (20610, level 110), for third and fourth-job Knights, start on the yes and
 are handed back to Neinheart, who asks for nothing.
 
+On the way out of Ereve:
+
+- Neinheart's Are You Sure You Can Leave? (20700, `q20700s`, levels 10 to
+  15) tells a new Knight-in-Training to keep training and completes on the
+  yes.
+- Matthias's (1103002, Kerning City) Hidden Inside the Trash Can (20710,
+  `q20710s`, level 16, after 20709) starts on the yes. The trash can in the
+  back alley (1052111 on 103000101, Npc.nx script `givebubbleDoll3`) gives
+  the clue (4032136) to a Knight on 20710 who hasn't one, and Matthias
+  takes it back for the data's 800 EXP.
+- Neinheart's Before the Mission in Perion (20720, `q20720s`, level 25,
+  after 20719) starts on the yes.
+
 Each brother's start points the guide at a part of the screen
 (`Effect::GuideHint`, TALK_GUIDE mode 1), as Cosmic's `guideHint` does.
 Clicking the guide (CLICK_GUIDE) is not handled.

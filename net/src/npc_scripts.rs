@@ -2222,6 +2222,9 @@ impl NpcScript {
         if npc_id == DOJO_BOARD {
             return Some(dojo_board(player));
         }
+        if npc_id == KERNING_TRASH_CAN {
+            return Some(kerning_trash_can(player));
+        }
         if npc_id == DRILL_HALL_GATEKEEPER {
             return Some(ask_warp(
                 npc_id,
@@ -3049,10 +3052,30 @@ impl NpcScript {
             "q20400s" | "q20401s" | "q20405s" | "q20406s" => knights_target(script),
             "q20408s" => Some(chief_knight(player)),
             "q20520s" => Some(knights_dignity()),
-            "q20600s" => Some(training_never_ends(TRAINING_NEVER_ENDS, None)),
-            "q20610s" => Some(training_never_ends(
+            "q20600s" => Some(ask_start(
+                NEINHEART,
+                TRAINING_NEVER_ENDS,
+                keys::TRAINING_NEVER_ENDS_ASK,
+                None,
+            )),
+            "q20610s" => Some(ask_start(
+                NEINHEART,
                 TRAINING_STILL_NEVER_ENDS,
-                Some(text(keys::TRAINING_STILL_NEVER_ENDS_DECLINED)),
+                keys::TRAINING_STILL_NEVER_ENDS_ASK,
+                Some(keys::TRAINING_STILL_NEVER_ENDS_DECLINED),
+            )),
+            "q20700s" => Some(sure_you_can_leave()),
+            "q20710s" => Some(ask_start(
+                MATTHIAS,
+                HIDDEN_INSIDE_THE_TRASH_CAN,
+                keys::TRASH_CAN_MISSION_ASK,
+                Some(keys::TRASH_CAN_MISSION_DECLINED),
+            )),
+            "q20720s" => Some(ask_start(
+                NEINHEART,
+                BEFORE_THE_MISSION_IN_PERION,
+                keys::PERION_MISSION_ASK,
+                None,
             )),
             "q20201e" | "q20202e" | "q20203e" | "q20204e" | "q20205e" => {
                 knight_exam(script, player)
@@ -5047,6 +5070,14 @@ const CHIEF_KNIGHT_OF_THE_EMPRESS: i16 = 20408;
 const KNIGHTS_DIGNITY: i16 = 20520;
 const TRAINING_NEVER_ENDS: i16 = 20600;
 const TRAINING_STILL_NEVER_ENDS: i16 = 20610;
+const ARE_YOU_SURE_YOU_CAN_LEAVE: i16 = 20700;
+const HIDDEN_INSIDE_THE_TRASH_CAN: i16 = 20710;
+const BEFORE_THE_MISSION_IN_PERION: i16 = 20720;
+const MATTHIAS: i32 = 1103002;
+/// The trash can in Kerning City's back alley (103000101), whose Npc.nx
+/// script is `givebubbleDoll3`, and the clue in it.
+const KERNING_TRASH_CAN: i32 = 1052111;
+const TRASH_CAN_CLUE: i32 = 4032136;
 
 /// `q20311s` to `q20315s`: the third job and the quest done on the yes,
 /// unless the Knight keeps more SP than 3 for each level past 70
@@ -5127,20 +5158,54 @@ fn knights_dignity() -> NpcScript {
     NpcScript::new(NEINHEART, pages)
 }
 
-/// `q20600s` and `q20610s`: Neinheart's push to train, which starts the
-/// quest on the yes; Neinheart completes it without asking for anything.
-fn training_never_ends(quest: i16, on_no: Option<String>) -> NpcScript {
-    let key = if quest == TRAINING_NEVER_ENDS {
-        keys::TRAINING_NEVER_ENDS_ASK
-    } else {
-        keys::TRAINING_STILL_NEVER_ENDS_ASK
-    };
+/// A start script that only asks, starting the quest on the yes: Training
+/// Never Ends (20600) and Training Still Never Ends (20610), which
+/// Neinheart completes without asking for anything, Matthias's Hidden
+/// Inside the Trash Can (20710) and Before the Mission in Perion (20720).
+fn ask_start(npc: i32, quest: i16, key: &str, on_no: Option<&str>) -> NpcScript {
     let ask = Page::Ask {
         text: text(key),
         on_yes: vec![Effect::StartQuest(quest)],
-        on_no,
+        on_no: on_no.map(text),
     };
-    NpcScript::new(NEINHEART, vec![ask])
+    NpcScript::new(npc, vec![ask])
+}
+
+/// `q20700s`: Neinheart keeps a new Knight-in-Training training, which
+/// completes the quest on the yes.
+fn sure_you_can_leave() -> NpcScript {
+    let pages = vec![
+        Page::Say(text(keys::SURE_YOU_CAN_LEAVE_WEAK)),
+        Page::Ask {
+            text: text(keys::SURE_YOU_CAN_LEAVE_ASK),
+            on_yes: vec![Effect::FinishQuest(ARE_YOU_SURE_YOU_CAN_LEAVE)],
+            on_no: Some(text(keys::SURE_YOU_CAN_LEAVE_DECLINED)),
+        },
+        Page::Say(text(keys::SURE_YOU_CAN_LEAVE_TRAIN)),
+        Page::Say(text(keys::SURE_YOU_CAN_LEAVE_BLESSING)),
+    ];
+    NpcScript::new(NEINHEART, pages)
+}
+
+/// Kerning City's trash can: the clue for a Knight on Hidden Inside the
+/// Trash Can (20710) who hasn't one yet, and nothing for anyone else.
+fn kerning_trash_can(player: &Player) -> NpcScript {
+    let searching = player.quests.state(HIDDEN_INSIDE_THE_TRASH_CAN) == QuestState::Started
+        && player.inventory.count(TRASH_CAN_CLUE) == 0;
+    let key = if searching {
+        keys::KERNING_TRASH_CAN_FOUND
+    } else {
+        keys::KERNING_TRASH_CAN_EMPTY
+    };
+    let mut script = NpcScript::new(KERNING_TRASH_CAN, vec![Page::Say(text(key))]);
+    if searching {
+        script.on_end = vec![Effect::GiveItem {
+            item_id: TRASH_CAN_CLUE,
+            quantity: 1,
+        }];
+        script.inventory_full = Some(text(keys::KERNING_TRASH_CAN_FULL));
+    }
+    script
 }
 
 /// The titles of medals won elsewhere (29910 to 29928 and 29933): each
@@ -18487,6 +18552,34 @@ mod tests {
         let orders = NpcScript::for_quest("q20400s", &knight).unwrap();
         let heard = vec![Effect::FinishQuest(20400)];
         assert_eq!(yes_through(orders), (NEINHEART, heard));
+    }
+
+    #[test]
+    fn a_knight_on_matthiass_mission_finds_the_clue_in_kerning_trash_can() {
+        let mut knight = player(50);
+        (knight.stats.job, knight.stats.level) = (1100, 16);
+        let run =
+            |knight: &Player| yes_through(NpcScript::for_npc(KERNING_TRASH_CAN, knight).unwrap());
+        assert_eq!(run(&knight), (KERNING_TRASH_CAN, vec![]));
+        let started = vec![Effect::StartQuest(HIDDEN_INSIDE_THE_TRASH_CAN)];
+        let mission = NpcScript::for_quest("q20710s", &knight).unwrap();
+        assert_eq!(yes_through(mission), (MATTHIAS, started));
+        knight.quests.upsert(game::QuestRecord {
+            quest_id: HIDDEN_INSIDE_THE_TRASH_CAN,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let clue = vec![Effect::GiveItem {
+            item_id: TRASH_CAN_CLUE,
+            quantity: 1,
+        }];
+        assert_eq!(run(&knight), (KERNING_TRASH_CAN, clue));
+
+        let leave = NpcScript::for_quest("q20700s", &knight).unwrap();
+        let done = vec![Effect::FinishQuest(ARE_YOU_SURE_YOU_CAN_LEAVE)];
+        assert_eq!(yes_through(leave), (NEINHEART, done));
     }
 
     #[test]
