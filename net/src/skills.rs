@@ -942,9 +942,17 @@ impl MpEater {
 }
 
 /// What this attack takes. A spell has the MP Eater of the player's own
-/// branch; Mortal Blow rolls its `y` percent chance of a kill here.
+/// branch, a weapon hit Combo Drain's heal; Mortal Blow rolls its `y`
+/// percent chance of a kill here.
 pub fn takes(player: &Player, skill: Option<&Learned>, magic: bool, roll: f64) -> Takes {
     let mut takes = Takes::default();
+    // Combo Drain heals from every weapon hit while it lasts.
+    if !magic {
+        takes.hp = player
+            .buffs
+            .value(BuffStat::ComboDrain)
+            .map_or(0, i32::from);
+    }
     if let Some(skill) = skill {
         if DRAINS.contains(&skill.skill_id) {
             takes.hp = skill.effect.x;
@@ -1275,6 +1283,12 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         // Power Stance, and the Aran's Freeze Standing, which the client
         // takes for the same stance (0x958aa9).
         1121002 | 1221002 | 1321002 | 21121003 => vec![(BuffStat::Stance, effect.prop)],
+        // The Aran's Combo Drain, Combo Barrier, Body Pressure and Smart
+        // Knockback.
+        21100005 => vec![(BuffStat::ComboDrain, effect.x)],
+        21120007 => vec![(BuffStat::ComboBarrier, effect.x)],
+        crate::aran_combo::BODY_PRESSURE => vec![(BuffStat::BodyPressure, effect.x)],
+        21111001 => vec![(BuffStat::SmartKnockback, effect.x)],
         2001002 | 12001001 => vec![(BuffStat::MagicGuard, effect.x)],
         2301003 => vec![(BuffStat::Invincible, effect.x)],
         2311003 => vec![(BuffStat::HolySymbol, effect.x)],
@@ -1488,6 +1502,10 @@ mod tests {
         }
         assert_eq!(stats(21121000, 30), [(BuffStat::MapleWarrior, 15)]);
         assert_eq!(stats(21121003, 30), [(BuffStat::Stance, 90)]);
+        assert_eq!(stats(21100005, 20), [(BuffStat::ComboDrain, 5)]);
+        assert_eq!(stats(21120007, 30), [(BuffStat::ComboBarrier, 800)]);
+        assert_eq!(stats(21101003, 20), [(BuffStat::BodyPressure, 5)]);
+        assert_eq!(stats(21111001, 20), [(BuffStat::SmartKnockback, 10)]);
     }
 
     #[test]

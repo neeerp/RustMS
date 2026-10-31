@@ -1,3 +1,4 @@
+use crate::aran_combo;
 use crate::beacon;
 use crate::charge;
 use crate::combat::{self, AttackKind};
@@ -313,6 +314,7 @@ impl WorldHandler for AttackHandler {
         let combo = combo::after_attack(ctx.player, &attack, rand::random());
         let energy = energy::after_attack(ctx.player, &attack);
         let spent = charge::after_attack(ctx.player, &attack, rand::random());
+        let combo_spent = aran_combo::needs(attack.skill) > 0 && aran_combo::spend(ctx.player);
         let pockets = skills::pickpocket(ctx.player, &attack, rand::random);
         let beacon = beacon::after_attack(ctx.player, &attack);
         let (skill, lines) = (attack.skill, attack.hit_count);
@@ -353,6 +355,9 @@ impl WorldHandler for AttackHandler {
         }
         if let Some(charge) = spent {
             result = end_charge(ctx.player, charge, result)?;
+        }
+        if combo_spent {
+            result = result.with_reply(buff::build_cancel_buff(&[BuffStat::AranCombo])?);
         }
         if let Some((replaced, beacon)) = beacon {
             // A new mark doesn't take the old one off its mob (0xa20607).

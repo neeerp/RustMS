@@ -90,6 +90,14 @@ pub fn build_give_buff(
     Ok(p)
 }
 
+/// SHOW_COMBO: the Aran's combo is `count`.
+pub fn build_show_combo(count: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowCombo as i16)?;
+    p.write_int(count)?;
+    Ok(p)
+}
+
 /// CANCEL_BUFF: these buffs ended.
 pub fn build_cancel_buff(stats: &[BuffStat]) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -480,6 +488,14 @@ pub fn build_magnet_effect(
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn the_combo_is_one_int() {
+        let packet = build_show_combo(31).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowCombo as i16).int(31);
+        expect.end();
+    }
 
     #[test]
     fn a_beacon_marks_its_mob_in_seventeen_bytes() {
