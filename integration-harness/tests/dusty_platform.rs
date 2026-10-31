@@ -64,6 +64,9 @@ async fn ride_train_999(player: &mut WorldSession, mut seen: Trace) {
         seen.field.mobs.iter().all(|m| m.1 == METRO_BUBBLING),
         "{seen:?}"
     );
+    assert!(seen
+        .field_effects
+        .contains(&(3, "killing/bonus/bonus".to_string())));
     until(&mut player.connection, &mut seen, |t| {
         t.arrivals.iter().any(|a| a.0 == SUBWAY_LOBBY)
     })
@@ -152,6 +155,11 @@ async fn a_party_runs_the_dusty_platforms_three_stages_to_its_result() {
     assert_eq!(seen.pyramid_scores, [(4, 2)]);
     let stages: Vec<i32> = (1..=SUBWAY_STAGES).map(|n| run.stage_map(n)).collect();
     assert_eq!(seen.warps, [stages, vec![SUBWAY_RESULT]].concat());
+    // Each stage opens with "Stage N" and "Start!".
+    for n in 1..=SUBWAY_STAGES {
+        let number = format!("killing/first/number/{n}");
+        assert!(seen.field_effects.contains(&(3, number)), "{n}");
+    }
 
     // Mr. Lim on the result map gives a pass for later and sends one back
     // to the station.

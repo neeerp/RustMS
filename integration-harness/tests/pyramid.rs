@@ -69,6 +69,23 @@ async fn a_run_alone_goes_through_five_timed_stages_to_its_result_map() {
     // The later stages' clocks give 3 minutes (3 s).
     assert_eq!(seen.countdowns.len(), 5, "{:?}", seen.countdowns);
     assert!(seen.countdowns[1..].iter().all(|&s| (2..=3).contains(&s)));
+    // Each stage opens with "Stage N" and "Start!".
+    let banners: Vec<&str> = seen
+        .field_effects
+        .iter()
+        .filter(|(mode, name)| *mode == 3 && name.starts_with("killing/first/"))
+        .map(|(_, name)| name.as_str())
+        .collect();
+    let expected: Vec<String> = (1..=PYRAMID_STAGES)
+        .flat_map(|n| {
+            [
+                "killing/first/stage".to_string(),
+                format!("killing/first/number/{n}"),
+                "killing/first/start".to_string(),
+            ]
+        })
+        .collect();
+    assert_eq!(banners, expected);
 }
 
 const RAGE_OF_PHARAOH: i32 = 1020;
@@ -234,6 +251,10 @@ async fn a_run_through_every_stage_gives_a_gem_for_pharaoh_yetis_tomb() {
         t.warps.contains(&tomb.entry) && !t.field.alive(PYRAMID_YETI).is_empty()
     })
     .await;
+    // It opens with "Bonus Stage".
+    for part in ["killing/bonus/bonus", "killing/bonus/stage"] {
+        assert!(seen.field_effects.contains(&(3, part.to_string())));
+    }
     assert!(
         seen.removed.iter().any(|&(kind, _)| kind == 4),
         "{:?}",

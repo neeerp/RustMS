@@ -2387,6 +2387,42 @@ impl ClientActor {
         .await
     }
 
+    /// On a stage of a Massacre run, the Pyramid's or the Dusty Platform's,
+    /// the player sees "Stage N" and "Start!" as they arrive (Map.nx
+    /// `onFirstUserEnter` `killing_MapSetting`, `Effect.img/killing/first`);
+    /// in its bonus room, Pharaoh Yeti's Tomb or Train 999, "Bonus Stage"
+    /// (`killing_BonusSetting`, `killing/bonus`). Each part waits out its
+    /// own blank first frame, so they are sent together.
+    pub(super) async fn show_massacre_stage(&mut self) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(kind) = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.holds(map_id))
+            .map(|ticket| ticket.kind)
+        else {
+            return Ok(());
+        };
+        let mut packets = if kind.massacre() {
+            let Some(stage) = kind.event().stage_on(map_id) else {
+                return Ok(());
+            };
+            vec![
+                build_field_effect("killing/first/stage")?,
+                build_field_effect(&format!("killing/first/number/{stage}"))?,
+                build_field_effect("killing/first/start")?,
+            ]
+        } else if matches!(kind, EventKind::PyramidTomb(_) | EventKind::SubwayTrain) {
+            vec![
+                build_field_effect("killing/bonus/bonus")?,
+                build_field_effect("killing/bonus/stage")?,
+            ]
+        } else {
+            return Ok(());
+        };
+        self.send_all(&mut packets).await
+    }
+
     /// Arriving on a Monster Carnival battle field, the player's screen
     /// takes the battle's score from the event (Cosmic
     /// `startMonsterCarnival`).
