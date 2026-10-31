@@ -108,6 +108,19 @@ impl ClientActor {
         Ok(())
     }
 
+    /// Whether anyone is on `map_id` in the player's channel; a lost reply
+    /// counts as someone.
+    async fn map_occupied(&self, map_id: i32) -> Result<bool, RuntimeError> {
+        let (reply, occupied) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::MapOccupied {
+            channel_id: self.channel_id,
+            map_id,
+            reply,
+        })
+        .await?;
+        Ok(occupied.await.unwrap_or(true))
+    }
+
     /// Apply script effects. Changes to the player (with any quest change)
     /// commit together or not at all; screen effects follow them.
     pub(super) async fn apply_effects(
@@ -565,17 +578,30 @@ impl ClientActor {
                     changed = true;
                 }
                 Effect::RequireEmptyMap(map_id) => {
-                    let (reply, occupied) = oneshot::channel();
-                    self.send_to_directory(DirectoryMessage::MapOccupied {
-                        channel_id: self.channel_id,
-                        map_id: *map_id,
-                        reply,
-                    })
-                    .await?;
-                    if occupied.await.unwrap_or(true) {
+                    if self.map_occupied(*map_id).await? {
                         debug!(map_id, "Map occupied; nothing applied");
                         return Ok(Applied::Refused);
                     }
+                }
+                Effect::WarpToFreeCopy {
+                    maps,
+                    beside,
+                    portal,
+                } => {
+                    let mut free = None;
+                    for &map_id in maps.iter() {
+                        if !self.map_occupied(map_id).await?
+                            && !self.map_occupied(map_id + beside).await?
+                        {
+                            free = Some(map_id);
+                            break;
+                        }
+                    }
+                    let Some(map_id) = free else {
+                        debug!(?maps, "Every copy occupied; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    warp = Some((map_id, Some(*portal)));
                 }
                 Effect::RequireNoMobs => {
                     let (reply, count) = oneshot::channel();

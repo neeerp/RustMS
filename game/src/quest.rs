@@ -41,7 +41,9 @@ pub const INFO_QUESTS: &[i16] = &[
 /// stone taken from its Warehouse (21764, for "The Lost Seal Stone of
 /// Ellin Forest", 21753) and finding Athena Pierce in their own time
 /// (21765, for "Info on Another Seal Stone", 21754), and the Puppeteer's
-/// warning heard in its cave (21760, for "The Puppeteer's Warning", 21720);
+/// warning heard in its cave (21760, for "The Puppeteer's Warning", 21720)
+/// and stepping through the Mirror of Desire (21203, for "In Search of the
+/// Ultimate Weapon", 21202);
 /// also an Aran's runs with the wolves: through the Field of Wolves (21619,
 /// for "Scadur's Advice", 21610) and out of the wolves' test room (21620,
 /// for "The Wolves' Test", 21613); and a Romeo and Juliet run won (7072,
@@ -55,8 +57,8 @@ pub const INFO_QUESTS: &[i16] = &[
 /// (`crate::quest_ex`).
 pub const RECORDS: &[i16] = &[
     1200, 1201, 1202, 1203, 1204, 1205, 1206, 1301, 1302, 2311, 6331, 6364, 6371, 6401, 6411, 7067,
-    7072, 7081, 7402, 7662, 7760, 7762, 20022, 20731, 20732, 21619, 21620, 21760, 21761, 21762,
-    21763, 21764, 21765,
+    7072, 7081, 7402, 7662, 7760, 7762, 20022, 20731, 20732, 21203, 21619, 21620, 21760, 21761,
+    21762, 21763, 21764, 21765,
 ];
 
 /// The record a new Noblesse is created with, set to "1".

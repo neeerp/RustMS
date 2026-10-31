@@ -350,6 +350,27 @@ const GUIDE_WORLD_MAP: i32 = 11;
 const TRAINING_GROUNDS: [(i16, i32); 3] =
     [(21701, 914010000), (21702, 914010100), (21703, 914010200)];
 const MIRROR_CAVE: i32 = 140030000;
+/// The Mirror of Desire's rooms in the past (Map.nx 108000700-108000708,
+/// links of the first), each with its Scarred Bears' room 10 on
+/// (108000710-108000718). The Mirror Cave's `in00` (`enterMCave`) sends an
+/// Aran on The Mirror of Desire (21201) into the first room of a pair
+/// nobody is in, and sets the record In Search of the Ultimate Weapon
+/// (21202) starts on; `moveNext` and `moveBefore` lead between the two.
+/// Cosmic passes over a pair only when both are taken.
+const MIRROR_ROOMS: [i32; 9] = [
+    108_000_700,
+    108_000_701,
+    108_000_702,
+    108_000_703,
+    108_000_704,
+    108_000_705,
+    108_000_706,
+    108_000_707,
+    108_000_708,
+];
+const BEARS_ROOM: i32 = 10;
+const THE_MIRROR_OF_DESIRE: i16 = 21201;
+pub const MIRROR_RECORD: i16 = 21203;
 /// Fox Ridge's way back to Tiger Ridge (`foxLaidy_map`) leads into the
 /// Gloomy Forest instead for a player on quest 3647 who holds the Old Fox's
 /// Tail.
@@ -861,6 +882,15 @@ pub enum Effect {
     /// Nothing is applied while anyone is on this map in the player's
     /// channel; the script says its `refused` text instead.
     RequireEmptyMap(i32),
+    /// To `portal` of the first of `maps` that nobody is on in the
+    /// player's channel, nor on the map `beside` on from it, as the Mirror
+    /// of Desire's rooms go in pairs. Nothing is applied if every one is
+    /// taken; the script says its `occupied` text instead.
+    WarpToFreeCopy {
+        maps: &'static [i32],
+        beside: i32,
+        portal: u8,
+    },
     /// Nothing is applied while a monster is left on the player's map; the
     /// script says its `refused` text instead.
     RequireNoMobs,
@@ -2351,6 +2381,31 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(MIRROR_CAVE, 1))
         }
         "rienCaveEnter" => refused(keys::MIRROR_CAVE_BLOCKED),
+        "enterMCave" if quest(THE_MIRROR_OF_DESIRE) == QuestState::Started => ScriptOutcome {
+            effects: vec![
+                Effect::WarpToFreeCopy {
+                    maps: &MIRROR_ROOMS,
+                    beside: BEARS_ROOM,
+                    portal: named(MIRROR_ROOMS[0], "out00"),
+                },
+                Effect::SetRecord {
+                    record: MIRROR_RECORD,
+                    value: "0",
+                },
+                Effect::PortalSound,
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::MIRROR_ROOMS_FULL, &[])),
+        },
+        "enterMCave" => refused(keys::MIRROR_ALREADY_PASSED),
+        "moveNext" if MIRROR_ROOMS.contains(&player.stats.map_id) => {
+            let bears = player.stats.map_id + BEARS_ROOM;
+            through(Effect::WarpToPortal(bears, named(bears, "east00")))
+        }
+        "moveBefore" if MIRROR_ROOMS.contains(&(player.stats.map_id - BEARS_ROOM)) => {
+            let room = player.stats.map_id - BEARS_ROOM;
+            through(Effect::WarpToPortal(room, named(room, "west00")))
+        }
         // Cosmic also starts quest 23647 here, which isn't in Quest.nx.
         "foxLaidy_map"
             if quest(3647) == QuestState::Started && player.inventory.count(OLD_FOX_TAIL) > 0 =>
@@ -5436,6 +5491,50 @@ mod tests {
         assert_eq!(warp_of(&go("ariant_Agit", &bandits)), Some((260000201, 1)));
         assert_ne!(named(240040612, "out00"), 0);
         assert_ne!(named(105100101, "in00"), 0);
+    }
+
+    #[test]
+    fn the_mirror_of_desire_leads_into_a_free_pair_of_rooms_in_the_past() {
+        let looking = player_with(&[(THE_MIRROR_OF_DESIRE, QuestState::Started)]);
+        let entered = portal("enterMCave", &looking).unwrap();
+        assert_eq!(
+            entered.effects,
+            [
+                Effect::WarpToFreeCopy {
+                    maps: &MIRROR_ROOMS,
+                    beside: BEARS_ROOM,
+                    portal: named(108_000_700, "out00"),
+                },
+                Effect::SetRecord {
+                    record: MIRROR_RECORD,
+                    value: "0",
+                },
+                Effect::PortalSound,
+            ]
+        );
+        assert!(entered.occupied.is_some());
+        assert_ne!(named(108_000_700, "out00"), 0);
+        assert!(pink(&portal("enterMCave", &player_with(&[])).unwrap()));
+
+        // Each room leads to its own bears' room and back, the copies too.
+        let mut inside = looking.clone();
+        inside.stats.map_id = 108_000_703;
+        let next = portal("moveNext", &inside).unwrap();
+        assert_eq!(
+            warp_of(&next),
+            Some((108_000_713, named(108_000_713, "east00")))
+        );
+        assert_ne!(named(108_000_713, "east00"), 0);
+        inside.stats.map_id = 108_000_713;
+        let back = portal("moveBefore", &inside).unwrap();
+        assert_eq!(
+            warp_of(&back),
+            Some((108_000_703, named(108_000_703, "west00")))
+        );
+        assert_ne!(named(108_000_703, "west00"), 0);
+        // Elsewhere the scripts do nothing.
+        inside.stats.map_id = 108_000_703;
+        assert!(portal("moveBefore", &inside).is_none());
     }
 
     fn holding(quests: &[(i16, QuestState)], item: i32) -> Player {

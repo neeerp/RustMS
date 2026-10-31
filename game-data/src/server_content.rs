@@ -1205,6 +1205,49 @@ pub mod keys {
     pub const POLEARM_HERO_DECLINED: &str = "polearm.hero.declined";
     pub const POLEARM_HERO_FULL: &str = "polearm.hero.full";
     pub const POLEARM_SILENT: &str = "polearm.hero.silent";
+    pub const LILIN_POLEARM_CALLING: [&str; 2] =
+        ["lilin.polearm_calling.ask", "lilin.polearm_calling.go"];
+    pub const MAHA_RIGHTFUL_OWNER: [&str; 8] = [
+        "maha.rightful_owner.echo",
+        "maha.rightful_owner.stranger",
+        "maha.rightful_owner.angry",
+        "maha.rightful_owner.who",
+        "maha.rightful_owner.weapon",
+        "maha.rightful_owner.sorry",
+        "maha.rightful_owner.ask",
+        "maha.rightful_owner.lilin",
+    ];
+    pub const BLACKSMITH_ULTIMATE_WEAPON: [&str; 6] = [
+        "blacksmith.ultimate_weapon.secluded",
+        "blacksmith.ultimate_weapon.best",
+        "blacksmith.ultimate_weapon.buy",
+        "blacksmith.ultimate_weapon.only_you",
+        "blacksmith.ultimate_weapon.ask",
+        "blacksmith.ultimate_weapon.test",
+    ];
+    pub const BLACKSMITH_WEAPON_HANDED: [&str; 3] = [
+        "blacksmith.weapon_handed.brought",
+        "blacksmith.weapon_handed.wrapped",
+        "blacksmith.weapon_handed.ask",
+    ];
+    pub const MAHA_IN_MEMORY: [&str; 6] = [
+        "maha.in_memory.abandoned",
+        "maha.in_memory.blacksmith",
+        "maha.in_memory.begged",
+        "maha.in_memory.little",
+        "maha.in_memory.ask",
+        "maha.in_memory.train",
+    ];
+    pub const LILIN_POLEARM_CALLING_DECLINED: &str = "lilin.polearm_calling.declined";
+    pub const MAHA_RIGHTFUL_OWNER_DECLINED: &str = "maha.rightful_owner.declined";
+    pub const BLACKSMITH_ULTIMATE_WEAPON_DECLINED: &str = "blacksmith.ultimate_weapon.declined";
+    pub const BLACKSMITH_WEAPON_HANDED_DECLINED: &str = "blacksmith.weapon_handed.declined";
+    pub const BLACKSMITH_SIGNS_SHORT: &str = "blacksmith.signs_short";
+    pub const MAHA_IN_MEMORY_DECLINED: &str = "maha.in_memory.declined";
+    pub const MAHA_IN_MEMORY_FULL: &str = "maha.in_memory.full";
+    pub const MAHA_IN_MEMORY_NOT_YET: &str = "maha.in_memory.not_yet";
+    pub const MIRROR_ROOMS_FULL: &str = "mirror_cave.rooms_full";
+    pub const MIRROR_ALREADY_PASSED: &str = "mirror_cave.already_passed";
     pub const PUO_TARGET_PIGS: [&str; 3] = [
         "puo.target_pigs.lesson",
         "puo.target_pigs.ask",
@@ -4395,6 +4438,41 @@ mod tests {
                 keys::POLEARM_HERO_DECLINED,
                 keys::POLEARM_HERO_FULL,
                 keys::POLEARM_SILENT,
+                keys::LILIN_POLEARM_CALLING[0],
+                keys::LILIN_POLEARM_CALLING[1],
+                keys::MAHA_RIGHTFUL_OWNER[0],
+                keys::MAHA_RIGHTFUL_OWNER[1],
+                keys::MAHA_RIGHTFUL_OWNER[2],
+                keys::MAHA_RIGHTFUL_OWNER[3],
+                keys::MAHA_RIGHTFUL_OWNER[4],
+                keys::MAHA_RIGHTFUL_OWNER[5],
+                keys::MAHA_RIGHTFUL_OWNER[6],
+                keys::MAHA_RIGHTFUL_OWNER[7],
+                keys::BLACKSMITH_ULTIMATE_WEAPON[0],
+                keys::BLACKSMITH_ULTIMATE_WEAPON[1],
+                keys::BLACKSMITH_ULTIMATE_WEAPON[2],
+                keys::BLACKSMITH_ULTIMATE_WEAPON[3],
+                keys::BLACKSMITH_ULTIMATE_WEAPON[4],
+                keys::BLACKSMITH_ULTIMATE_WEAPON[5],
+                keys::BLACKSMITH_WEAPON_HANDED[0],
+                keys::BLACKSMITH_WEAPON_HANDED[1],
+                keys::BLACKSMITH_WEAPON_HANDED[2],
+                keys::MAHA_IN_MEMORY[0],
+                keys::MAHA_IN_MEMORY[1],
+                keys::MAHA_IN_MEMORY[2],
+                keys::MAHA_IN_MEMORY[3],
+                keys::MAHA_IN_MEMORY[4],
+                keys::MAHA_IN_MEMORY[5],
+                keys::LILIN_POLEARM_CALLING_DECLINED,
+                keys::MAHA_RIGHTFUL_OWNER_DECLINED,
+                keys::BLACKSMITH_ULTIMATE_WEAPON_DECLINED,
+                keys::BLACKSMITH_WEAPON_HANDED_DECLINED,
+                keys::BLACKSMITH_SIGNS_SHORT,
+                keys::MAHA_IN_MEMORY_DECLINED,
+                keys::MAHA_IN_MEMORY_FULL,
+                keys::MAHA_IN_MEMORY_NOT_YET,
+                keys::MIRROR_ROOMS_FULL,
+                keys::MIRROR_ALREADY_PASSED,
                 keys::PUO_TARGET_PIGS[0],
                 keys::PUO_TARGET_PIGS[1],
                 keys::PUO_TARGET_PIGS[2],

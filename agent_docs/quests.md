@@ -1053,6 +1053,27 @@ At level 10 a Legend (2000) takes the first:
   slots, as a Knight's first job adds, and the Aran medal (1142129).
   Cosmic does all this on the start and adds no rows.
 
+At level 30 an Aran (2100) takes the second:
+
+- Lilin's In Search of Its Rightful Owner (21200, `q21200s`) starts by
+  itself (`autoStart`) and sends the Aran to the Polearm in Rien, where
+  Maha (1201002) speaks up and ends it (`q21200e`).
+- Lilin starts The Mirror of Desire (21201) from the data. The Mirror
+  Cave's (140030000) `in00` (`enterMCave`) then leads into the first of
+  the Mirror of Desire's rooms in the past (108000700 to 108000708) whose
+  pair, with its Scarred Bears' room 10 on, nobody is in
+  (`Effect::WarpToFreeCopy`), and sets record 21203 to "0". Cosmic
+  passes over a pair only when both are taken.
+- Sir Blacksmith (1203000) in the room starts In Search of the Ultimate
+  Weapon (21202, `q21202s`), which waits on that record
+  (`START_RECORD_QUESTS`). The room's `west00` (`moveNext`) leads to its
+  bears' room and `east00` there (`moveBefore`) back. The bears (9001012)
+  drop the Signs of Acceptance (4032311, `reward_overrides.toml`), and
+  with 30 the smith's end (`q21202e`) takes them all.
+- Maha's end of 21201 (`q21201e`) makes the Aran a 2110
+  (`Player::take_second_job`) with the Aran in Memory medal (1142130).
+  Cosmic also teaches some skills behind a setting, which is left out.
+
 Some titles go with medals won elsewhere: the job medals at level 180
 (29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor
 medals (29916 to 29921 and 29933). Each quest's start needs the medal held,
