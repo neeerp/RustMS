@@ -198,6 +198,13 @@ namespace ms
 		// Whether the gauge is full and the player has Energy Charge.
 		bool energy_full() const;
 
+		// The Aran's combo SHOW_COMBO gave, kept with when it came and shown on the HUD (FUN_009602cb).
+		void show_aran_combo(int32_t count);
+		int32_t get_aran_combo() const;
+		// Forget the combo and tell the server, as its time running out or a combo skill does
+		// (FUN_00960f21).
+		void end_aran_combo();
+
 		// Check Berserk against the player's HP, and tell the server when
 		// it turns on or off (FUN_00a292bb); `reset` forgets it first.
 		void update_berserk(bool reset);
@@ -595,6 +602,9 @@ namespace ms
 		int32_t wings_left = 0;
 		// The Energy Charge gauge, 0 to 10000.
 		int32_t energy = 0;
+		// The Aran's combo and when the server last showed it (+0x3220, +0x3224).
+		int32_t aran_combo = 0;
+		int64_t aran_combo_shown = 0;
 		// Berserk's damage percent while it is on, else 0 (+0x372c).
 		int32_t berserk = 0;
 		// Homing Beacon's mark (+0xcc8 of the temporary stats).

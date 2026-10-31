@@ -420,6 +420,11 @@ namespace ms
 			bufflist->cancel_buff(bs);
 	}
 
+	void ShowComboHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().show_aran_combo(recv.read_int());
+	}
+
 	void RecalculateStatsHandler::handle(InPacket&) const
 	{
 		Stage::get().get_player().recalc_stats();

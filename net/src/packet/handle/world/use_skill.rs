@@ -400,9 +400,10 @@ impl WorldHandler for CancelBuffHandler {
     }
 }
 
-/// How long the client is told the combo lasts as stat 68; the server's
+/// How long the client is told the combo lasts as stat 68, as Cosmic tells
+/// it; the buff list shows it under Combo Ability's icon, and the server's
 /// own 3 seconds end it with CANCEL_BUFF.
-const COMBO_SHOWN_MS: i32 = 86_400_000;
+const COMBO_SHOWN_MS: i32 = 99_999;
 
 /// `ARAN_COMBO_COUNTER` (0xA3): an Aran's polearm landed a hit. Count it
 /// and show the combo; at the first and every tenth hit, give it as stat

@@ -77,6 +77,13 @@ namespace ms
 		void handle_two_state(InPacket& recv, const BuffParser::Flags& flags) const override;
 	};
 
+	// The Aran's combo, as the server counts it (FUN_009602cb)
+	// Opcode: SHOW_COMBO(225)
+	class ShowComboHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Force a stat recalculation
 	// Opcode: RECALCULATE_STATS(35)
 	class RecalculateStatsHandler : public PacketHandler
