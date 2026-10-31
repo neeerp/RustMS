@@ -1317,6 +1317,12 @@ pub mod keys {
         "knight_exam.after.go",
     ];
     pub const DRILL_HALL_LEAVE: &str = "drill_hall.leave";
+    pub const TEARDROP_ABOUT: &str = "teardrop.about";
+    pub const TEARDROP_ASK: &str = "teardrop.ask";
+    pub const TEARDROP_DECLINED: &str = "teardrop.declined";
+    pub const TEARDROP_TOO_MUCH_SP: &str = "teardrop.too_much_sp";
+    pub const TEARDROP_ADVANCED: &str = "teardrop.advanced";
+    pub const KNIGHT_TARGET_GO: &str = "knight_target.go";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
     /// (`q21604s`), the end of the Field of Wolves (`clearRider`), the
@@ -4412,6 +4418,12 @@ mod tests {
                 keys::KNIGHT_EXAM_AFTER[0],
                 keys::KNIGHT_EXAM_AFTER[1],
                 keys::KNIGHT_EXAM_AFTER[2],
+                keys::TEARDROP_ABOUT,
+                keys::TEARDROP_ASK,
+                keys::TEARDROP_DECLINED,
+                keys::TEARDROP_TOO_MUCH_SP,
+                keys::TEARDROP_ADVANCED,
+                keys::KNIGHT_TARGET_GO,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
                 keys::PUCCI_WOLF_REQUEST[2],

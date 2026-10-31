@@ -3045,6 +3045,8 @@ impl NpcScript {
             "q20100s" => Some(time_to_choose()),
             "q20101e" | "q20102e" | "q20103e" | "q20104e" | "q20105e" => knight_job(script, player),
             "q20200s" => Some(knighthood()),
+            "q20311s" | "q20312s" | "q20313s" | "q20314s" | "q20315s" => teardrop(script, player),
+            "q20400s" => Some(knights_target()),
             "q20201e" | "q20202e" | "q20203e" | "q20204e" | "q20205e" => {
                 knight_exam(script, player)
             }
@@ -5008,6 +5010,59 @@ fn knight_exam(script: &str, player: &Player) -> Option<NpcScript> {
         ),
     }
     Some(NpcScript::new(npc, pages))
+}
+
+/// A Knight's third job (b310): at level 70, once the Master of Disguise
+/// quest of their job (20301-20305) is done, the Chief Knight's Shinsoo's
+/// Teardrop (20311-20315) makes them an Advanced Knight as it starts, as
+/// Cosmic's `20311.js` to `20315.js` do. The quest, its Chief Knight, the
+/// third job, and the name the lines give it. Cosmic gives the Advanced
+/// Knight medal (1142068) too, but that is the reward of its title (29908,
+/// `KNIGHT_TITLES`), which Cygnus gives.
+const KNIGHT_TEARDROPS: [(i16, i32, i16, &str); 5] = [
+    (20311, 1101003, 1111, "Dawn Warrior"),
+    (20312, 1101004, 1211, "Blaze Wizard"),
+    (20313, 1101005, 1311, "Wind Archer"),
+    (20314, 1101006, 1411, "Night Walker"),
+    (20315, 1101007, 1511, "Thunder Breaker"),
+];
+/// Chasing the Knight's Target (20400), which the data starts by itself
+/// for an Advanced Knight of 120.
+const KNIGHTS_TARGET: i16 = 20400;
+
+/// `q20311s` to `q20315s`: the third job and the quest done on the yes,
+/// unless the Knight keeps more SP than 3 for each level past 70
+/// (`Character::can_take_third_job`).
+fn teardrop(script: &str, player: &Player) -> Option<NpcScript> {
+    let &(quest, npc, job, name) = KNIGHT_TEARDROPS
+        .iter()
+        .find(|(quest, ..)| script[1..].starts_with(&quest.to_string()))?;
+    let content = content::text();
+    let line = |key: &str| content.get(key, &[("job", name)]);
+    let (on_yes, after) = if player.can_take_third_job(job) {
+        let on_yes = vec![Effect::TakeThirdJob(job), Effect::FinishQuest(quest)];
+        (on_yes, line(keys::TEARDROP_ADVANCED))
+    } else {
+        (Vec::new(), line(keys::TEARDROP_TOO_MUCH_SP))
+    };
+    let pages = vec![
+        Page::Say(line(keys::TEARDROP_ABOUT)),
+        Page::Ask {
+            text: line(keys::TEARDROP_ASK),
+            on_yes,
+            on_no: Some(line(keys::TEARDROP_DECLINED)),
+        },
+        Page::Say(after),
+    ];
+    Some(NpcScript::new(npc, pages))
+}
+
+/// `q20400s`: Neinheart's orders, which complete the quest once heard
+/// (Cosmic's `forceCompleteQuest`).
+fn knights_target() -> NpcScript {
+    let mut script = NpcScript::new(NEINHEART, vec![Page::Say(text(keys::KNIGHT_TARGET_GO))]);
+    script.on_end = vec![Effect::FinishQuest(KNIGHTS_TARGET)];
+    script
 }
 
 /// The titles of medals won elsewhere (29910 to 29928 and 29933): each
@@ -18339,6 +18394,21 @@ mod tests {
         ]);
         let walker = NpcScript::for_quest("q20104e", &noblesse).unwrap();
         assert_eq!(yes_through(walker), (1101006, knight));
+    }
+
+    #[test]
+    fn shinsoos_teardrop_makes_an_advanced_knight_with_little_sp_left() {
+        let mut knight = player(50);
+        (knight.stats.job, knight.stats.level, knight.stats.sp) = (1410, 72, 7);
+        let run = |knight: &Player| yes_through(NpcScript::for_quest("q20314s", knight).unwrap());
+        assert_eq!(run(&knight), (1101006, vec![]));
+        knight.stats.sp = 6;
+        let advanced = vec![Effect::TakeThirdJob(1411), Effect::FinishQuest(20314)];
+        assert_eq!(run(&knight), (1101006, advanced));
+
+        let orders = NpcScript::for_quest("q20400s", &knight).unwrap();
+        let heard = vec![Effect::FinishQuest(KNIGHTS_TARGET)];
+        assert_eq!(yes_through(orders), (NEINHEART, heard));
     }
 
     #[test]

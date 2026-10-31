@@ -983,6 +983,21 @@ At level 30 a Knight takes a second job:
   gives the Official Knight medal (1142067), but the server leaves that
   to its title (29907).
 
+At level 70 an official Knight takes a third job:
+
+- Neinheart's The Lost Treasure (20300) and the Chief Knights' The
+  Master of Disguise (20301 to 20305) come first, from the data alone.
+- The Chief Knight's Shinsoo's Teardrop (20311 to 20315, `q20311s` to
+  `q20315s`) waits on that Knight's Master of Disguise done. The start script tells of
+  the Teardrop and asks; the yes makes the player a 1111, 1211, 1311, 1411
+  or 1511 (`Player::take_third_job`) and completes the quest as it starts.
+  As at the second job, a Knight keeping more SP than 3 for each level past
+  70 is told to spend it first. Cosmic's script gives the Advanced Knight
+  medal (1142068) too, which the server leaves to its title (29908).
+- At level 120 Neinheart's Chasing the Knight's Target (20400, `q20400s`,
+  `autoStart`) gives an advanced Knight their orders and completes once
+  heard.
+
 Each brother's start points the guide at a part of the screen
 (`Effect::GuideHint`, TALK_GUIDE mode 1), as Cosmic's `guideHint` does.
 Clicking the guide (CLICK_GUIDE) is not handled.
