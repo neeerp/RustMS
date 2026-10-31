@@ -121,7 +121,9 @@ look like others (I, O, S, Z, B, Q, U, and the digits 0-2, 5, 6 and 8).
   "You cannot use it in the middle of the Lie Detector Test.", and an
   Aran's combo stays frozen. The counter stops being sent, the combo
   skills are refused, the combo doesn't time out, and a thaw restarts the
-  clock.
+  clock. Freezing shows the count again without its fade or bounce
+  (`UIAranCombo::hold`); a thaw leaves it so, and it goes all at once when
+  the combo ends 3 seconds later.
 - The layout follows UIClassic's art rather than the 2025 client's
   positions, which suit other art. UIClassic's art has no "tries left"
   label, so the client draws it as text.
@@ -130,4 +132,3 @@ look like others (I, O, S, Z, B, Q, U, and the digits 0-2, 5, 6 and 8).
 
 - The client's own check that the person named is fighting (it shows
   type 1 code 1); the server's check answers instead.
-- The 2025 client also keeps the combo HUD from fading while frozen.

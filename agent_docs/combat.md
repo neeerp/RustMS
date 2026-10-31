@@ -781,8 +781,9 @@ A few skills do more than buff:
   as Energy Charge's are. A local hit with Smart Knockback makes a mob that
   isn't a boss flinch at its percent of the mob's `pushed`
   (`aran_combo::pushed`); the Aran's Achilles (21120004) and Combo Barrier
-  count in the damage the client predicts over its head. The mini-room's
-  freeze of the combo isn't modelled.
+  count in the damage the client predicts over its head. The Lie Detector
+  freezes the combo (FUN_00a265c2, which b360 took for the mini room's; see
+  `lie-detector.md`).
   Still open: the GIVE_BUFF layout of stats 68 to 72 is inferred. The
   server takes 0xA3 on trust and doesn't hold Body Pressure to once a
   second, Body Pressure's `prop` status isn't modelled, and Combo Drain

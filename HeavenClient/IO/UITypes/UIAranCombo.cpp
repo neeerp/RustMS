@@ -22,7 +22,7 @@ namespace ms
 
 	UIAranCombo::UIAranCombo()
 			: UIElement(Point<int16_t>(), Point<int16_t>()), count(0), first_shown(false), second_shown(false),
-			  elapsed(0)
+			  elapsed(0), held(false)
 	{
 	}
 
@@ -41,10 +41,20 @@ namespace ms
 			hud->set(count, first, second);
 	}
 
+	void UIAranCombo::hold()
+	{
+		if (auto hud = UI::get().get_element<UIAranCombo>())
+		{
+			hud->set(hud->count, false, false);
+			hud->held = true;
+		}
+	}
+
 	void UIAranCombo::set(int32_t c, bool first, bool second)
 	{
 		count = c;
 		elapsed = 0;
+		held = false;
 
 		nl::node src = nl::nx::effect["BasicEff.img"];
 		nl::node tier = src["Combo"][std::to_string(aran_combo::tier(count))];
@@ -79,7 +89,7 @@ namespace ms
 	void UIAranCombo::draw(float alpha) const
 	{
 		// The digits and the word fade from the moment the count comes until it ends.
-		float opacity = 1.0f - static_cast<float>(elapsed) / aran_combo::IDLE;
+		float opacity = held ? 1.0f : 1.0f - static_cast<float>(elapsed) / aran_combo::IDLE;
 
 		if (opacity < 0.0f)
 			opacity = 0.0f;
@@ -87,7 +97,7 @@ namespace ms
 		for (size_t i = 0; i < digits.size(); i++)
 		{
 			int16_t x = DIGIT_X - static_cast<int16_t>(DIGIT_ADVANCE * i);
-			int32_t down = aran_combo::bounce(aran_combo::bounce_height(count, i), elapsed);
+			int32_t down = held ? 0 : aran_combo::bounce(aran_combo::bounce_height(count, i), elapsed);
 			int16_t y = aran_combo::digit_y(i, digits.size()) + static_cast<int16_t>(down);
 			digits[i].draw(DrawArgument(Point<int16_t>(x, y), opacity));
 		}
