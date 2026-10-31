@@ -166,6 +166,11 @@ pub enum BuffStat {
     /// Items heal half as much HP. It shares Puppet's bit 46 in the client
     /// (as Cosmic's ZOMBIFY and PUPPET do); 128 + 46 keeps it apart here.
     Undead = 174,
+    /// The icon of a summon that goes with the player (the Cygnus Knights'
+    /// souls, Silver Hawk, Elquines, ...). It shares Combo's bit 21 in the
+    /// client, as Cosmic's SUMMON and COMBO do; 128 + 21 keeps a Dawn
+    /// Warrior's Soul and Combo Attack apart here.
+    Summon = 149,
 }
 
 impl BuffStat {
@@ -352,6 +357,13 @@ impl Buffs {
 
     pub fn active(&self) -> &[Buff] {
         &self.active
+    }
+
+    /// Whether the player's client hears of `stat`: the client has one
+    /// slot for Combo's bit, so a summon's icon is kept from it while
+    /// Combo Attack's orbs are there.
+    pub fn heard(&self, stat: BuffStat) -> bool {
+        stat != BuffStat::Summon || !self.has(BuffStat::Combo)
     }
 
     /// The running buffs the rest of the map sees, in the client's order.

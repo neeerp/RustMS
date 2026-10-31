@@ -376,7 +376,13 @@ impl WorldHandler for CancelBuffHandler {
         if ended.is_empty() {
             return Ok(HandlerResult::empty());
         }
-        let mut result = HandlerResult::reply(buff::build_cancel_buff(&ended)?);
+        let heard: Vec<_> = (ended.iter().copied())
+            .filter(|&stat| ctx.player.buffs.heard(stat))
+            .collect();
+        let mut result = HandlerResult::empty();
+        if !heard.is_empty() {
+            result = result.with_reply(buff::build_cancel_buff(&heard)?);
+        }
         if ctx.player.fit_hp_mp() {
             result = result.with_reply(stat::build_hp_mp(&ctx.player.stats)?);
         }
@@ -980,7 +986,9 @@ fn give(
             .buffs
             .give(Buff::new(skill.skill_id, stat, value, now, duration));
     }
-    stats
+    (stats.into_iter())
+        .filter(|&(stat, _)| player.buffs.heard(stat))
+        .collect()
 }
 
 /// The GIVE_FOREIGN_BUFF showing the others the buffs among `stats` they
@@ -1085,7 +1093,7 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     if !items.is_empty() {
         result = result.with_reply(inventory::build_inventory_operation(false, items)?);
     }
-    if *buffs {
+    if *buffs && !stats.is_empty() {
         result = result.with_reply(buff::build_give_buff(
             skill.skill_id,
             effect.duration * 1000,

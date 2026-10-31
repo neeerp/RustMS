@@ -69,14 +69,15 @@ pub fn stationary(skill_id: i32) -> bool {
 }
 
 /// The buff a summon's skill gives, its icon: Puppet's own stat for the
-/// summons that stay put, the combo counter at no orbs for the others
-/// (as OdinMS-family servers do). A Ranger can keep a Puppet and a Silver
-/// Hawk at once, each with its own stat.
+/// summons that stay put, `Summon` (Combo's bit, at no orbs, as
+/// OdinMS-family servers send it) for the others. A Ranger can keep a
+/// Puppet and a Silver Hawk at once, and a Dawn Warrior a Soul and Combo
+/// Attack, each with its own stat.
 pub fn stat(skill_id: i32) -> BuffStat {
     if stationary(skill_id) {
         BuffStat::Puppet
     } else {
-        BuffStat::Combo
+        BuffStat::Summon
     }
 }
 
@@ -403,7 +404,24 @@ mod tests {
         assert_eq!(kind(BEHOLDER), Some((Moves::Follow, Assist::Support)));
         assert_eq!(kind(3111003), None);
         assert_eq!(stat(3211002), BuffStat::Puppet);
-        assert_eq!(stat(3211005), BuffStat::Combo);
+        assert_eq!(stat(3211005), BuffStat::Summon);
+    }
+
+    #[test]
+    fn a_dawn_warriors_soul_and_combo_attack_keep_each_other() {
+        let mut player = knowing(&[]);
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        let soul = game::Buff::new(11001004, stat(11001004), 1, now, lasts);
+        player.buffs.give(soul);
+        assert!(player.buffs.heard(BuffStat::Summon));
+        let orbs = game::Buff::new(11111001, BuffStat::Combo, 3, now, lasts);
+        player.buffs.give(orbs);
+        assert_eq!(player.buffs.active().len(), 2);
+        assert_eq!(player.buffs.value(BuffStat::Combo), Some(3));
+        // The client's one slot for the bit keeps the orbs.
+        assert!(!player.buffs.heard(BuffStat::Summon));
+        assert!(player.buffs.heard(BuffStat::Combo));
     }
 
     #[test]
@@ -429,7 +447,7 @@ mod tests {
         let lasts = std::time::Duration::from_secs(60);
         player
             .buffs
-            .give(game::Buff::new(3111005, BuffStat::Combo, 1, now, lasts));
+            .give(game::Buff::new(3111005, BuffStat::Summon, 1, now, lasts));
         let limits = limits(&player);
         assert_eq!(limits.len(), 1);
         assert_eq!(limits[0].skill_id, 3111005);

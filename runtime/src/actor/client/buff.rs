@@ -243,8 +243,11 @@ impl ClientActor {
         if bled {
             packets.push(buff::build_own_special(net::skills::DRAGON_BLOOD)?);
         }
-        if !tick.expired.is_empty() {
-            packets.push(buff::build_cancel_buff(&tick.expired)?);
+        let heard: Vec<_> = (tick.expired.iter().copied())
+            .filter(|&stat| player.buffs.heard(stat))
+            .collect();
+        if !heard.is_empty() {
+            packets.push(buff::build_cancel_buff(&heard)?);
             if player.fit_hp_mp() {
                 packets.push(stat::build_hp_mp(&player.stats)?);
             }
@@ -380,8 +383,14 @@ impl ClientActor {
     /// Tell the player their buffs among `ended` ended, and bring HP and MP
     /// down to the max they left.
     pub(super) async fn send_cancelled(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
-        let mut packets = vec![buff::build_cancel_buff(ended)?];
         let player = &mut self.in_game_mut()?.player;
+        let heard: Vec<_> = (ended.iter().copied())
+            .filter(|&stat| player.buffs.heard(stat))
+            .collect();
+        let mut packets = Vec::new();
+        if !heard.is_empty() {
+            packets.push(buff::build_cancel_buff(&heard)?);
+        }
         if player.fit_hp_mp() {
             packets.push(stat::build_hp_mp(&player.stats)?);
         }
