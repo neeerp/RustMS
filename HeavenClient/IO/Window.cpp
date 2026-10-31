@@ -26,6 +26,7 @@
 #include "UiControl.h"
 
 #include <cmath>
+#include <ctime>
 #include <fstream>
 #include <vector>
 
@@ -298,6 +299,13 @@ namespace ms
 	void Window::screenshot()
 	{
 		screenshot_pending = true;
+		screenshot_name.reset();
+	}
+
+	void Window::screenshot(const std::string &name)
+	{
+		screenshot_pending = true;
+		screenshot_name = name;
 	}
 
 	void Window::save_screenshot() const
@@ -307,17 +315,28 @@ namespace ms
 		// v83 asks for the first free index before every shot and writes the
 		// 800x600 frame as a quality 75 JPEG (IJL jquality 0x4b, FUN_00744d77).
 		std::string folder = GetCurrentWorkingDir() + "/";
-		int32_t index = Screenshot::first_free([&](int32_t i)
+		std::string file;
+
+		if (screenshot_name)
 		{
-			return std::ifstream(folder + Screenshot::file_name(i)).good();
-		});
+			std::time_t now = std::time(nullptr);
+			file = Screenshot::named_file(*screenshot_name, *std::localtime(&now));
+			screenshot_name.reset();
+		}
+		else
+		{
+			file = Screenshot::file_name(Screenshot::first_free([&](int32_t i)
+			{
+				return std::ifstream(folder + Screenshot::file_name(i)).good();
+			}));
+		}
 
 		std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 3);
 		glPixelStorei(GL_PACK_ALIGNMENT, 1);
 		glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
 
 		stbi_flip_vertically_on_write(1);
-		stbi_write_jpg((folder + Screenshot::file_name(index)).c_str(), width, height, 3, pixels.data(), 75);
+		stbi_write_jpg((folder + file).c_str(), width, height, 3, pixels.data(), 75);
 	}
 
 	void Window::fadeout(std::function<void()> fadeproc)

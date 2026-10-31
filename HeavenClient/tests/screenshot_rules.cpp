@@ -32,6 +32,15 @@ int main()
 		require(file_name(0) == "Maple0000.jpg", "names have four digits");
 		require(file_name(12345) == "Maple12345.jpg", "and grow past them");
 
+		std::tm at{};
+		at.tm_year = 108;
+		at.tm_mon = 2;
+		at.tm_mday = 7;
+		at.tm_hour = 9;
+		at.tm_min = 5;
+		at.tm_sec = 3;
+		require(named_file("Bo", at) == "Bo_20080307_090503.jpg", "a Lie Detector's shot names its player and time");
+
 		auto first_free_of = [](int32_t count)
 		{
 			return first_free([count](int32_t index) { return index < count; });

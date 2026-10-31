@@ -1363,6 +1363,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::Claim, InGame(&world::ClaimHandler)),
             (Op::UseLieDetector, InGame(&world::UseLieDetectorHandler)),
             (
+                Op::UseLieDetectorSkill,
+                InGame(&world::UseLieDetectorSkillHandler),
+            ),
+            (
                 Op::AnswerLieDetector,
                 InGame(&world::AnswerLieDetectorHandler),
             ),

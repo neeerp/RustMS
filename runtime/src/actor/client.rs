@@ -2075,6 +2075,9 @@ impl ClientActor {
                 self.lie_detected(test, outcome).await?
             }
             ServerMessage::LieDetectorFine { fine } => self.lie_detector_fine(fine).await?,
+            ServerMessage::LieDetectorJudged { name, passed } => {
+                self.lie_detector_judged(name, passed).await?
+            }
             ServerMessage::MapleTvPartner { tv, reply } => {
                 // Not in game (yet): the dropped reply refuses it.
                 if let Ok(in_game) = self.in_game() {

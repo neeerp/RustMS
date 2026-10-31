@@ -162,6 +162,8 @@ pub enum RecvOpcode {
     TeleportRockList = 0x66,
     /// A Lie Detector used on someone (FUN_00a262d9).
     UseLieDetector = 0x67,
+    /// A GM's Lie Detector skill used on someone (FUN_0096d0d1).
+    UseLieDetectorSkill = 0x68,
     /// The text a tested player typed (0x7e76b2, 0x7e872f).
     AnswerLieDetector = 0x69,
     /// A report of a player (CWvsContext::SendClaim, FUN_00a2719c).

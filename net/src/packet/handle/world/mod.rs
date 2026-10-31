@@ -134,7 +134,10 @@ pub use self::hired_merchant::{
 pub use self::item_effect::UseItemEffectHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
-pub use self::lie_detector::{AnswerLieDetectorHandler, LieDetectorUse, UseLieDetectorHandler};
+pub use self::lie_detector::{
+    AnswerLieDetectorHandler, LieDetectorBy, LieDetectorUse, UseLieDetectorHandler,
+    UseLieDetectorSkillHandler,
+};
 pub use self::logged_in::PlayerLoggedInHandler;
 pub use self::maker::ItemMakeHandler;
 pub use self::map_transfer::PlayerMapTransferHandler;

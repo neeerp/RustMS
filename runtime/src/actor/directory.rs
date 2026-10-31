@@ -46,7 +46,7 @@ use net::packet::build::world::party::{
     Departure, PartyMemberView, PartyStatus, PartyView,
 };
 use net::packet::handle::world::lie_detector::TESTED_FOR;
-use net::packet::handle::world::{DoorExit, LieDetectorUse, PartyPotion, Rock};
+use net::packet::handle::world::{DoorExit, LieDetectorBy, LieDetectorUse, PartyPotion, Rock};
 use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
 use std::cmp::Reverse;
@@ -1204,8 +1204,8 @@ impl WorldDirectory {
     }
 
     /// Hand a Lie Detector to the character it names, if they are on the
-    /// user's channel and weren't tested in the last `TESTED_FOR`;
-    /// otherwise tell the user why not.
+    /// user's channel and, unless a GM's skill tests them, weren't tested in
+    /// the last `TESTED_FOR`; otherwise tell the user why not.
     fn lie_detect(&mut self, from: ClientId, test: LieDetectorUse, field: FieldKey) {
         self.lie_tested
             .retain(|_, ended| ended.elapsed() < TESTED_FOR);
@@ -1223,7 +1223,10 @@ impl WorldDirectory {
             });
         let refused = match target {
             None => AntiMacroResult::NotFound,
-            Some(target) if self.lie_tested.contains_key(&target.handle.client_id) => {
+            Some(target)
+                if test.by != LieDetectorBy::Skill
+                    && self.lie_tested.contains_key(&target.handle.client_id) =>
+            {
                 AntiMacroResult::TestedBefore
             }
             Some(target) => {

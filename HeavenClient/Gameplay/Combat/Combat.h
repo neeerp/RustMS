@@ -188,6 +188,9 @@ namespace ms
 		// portal forbids it (FUN_00969bf9).
 		bool request_door(const SpecialMove &move, int32_t level);
 
+		// Ask whom a GM's Lie Detector skill tests (FUN_0096d0d1).
+		void request_lie_detector();
+
 		// What one of a summon's attacks is like: its
 		// `summon/attack1/info`.
 		struct SummonInfo

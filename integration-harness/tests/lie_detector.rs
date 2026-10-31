@@ -2,10 +2,12 @@
 //! user's map who has just attacked, it shows them a picture to read
 //! within a minute and uses the item up. A wrong answer gets them a new
 //! picture, and a second fails them: up to 7000 of their mesos go to the
-//! tester, and for an hour after, they can't be tested again.
+//! tester, and for an hour after, they can't be tested again. A GM's
+//! Lie Detector skill tests for nothing won or lost, an hour or not, and
+//! tells the GM how it went.
 
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::{grant_stack, set_meso};
+use integration_harness::database::{grant_skill, grant_stack, set_gm_level, set_meso};
 use integration_harness::hunting::attack;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{barrier, send, warp, Trace};
@@ -18,6 +20,7 @@ use std::io::Cursor;
 use tokio::time::{timeout, Duration};
 
 const LIE_DETECTOR: i32 = 2_190_000;
+const LIE_DETECTOR_SKILL: i32 = 9_001_009;
 /// Henesys Hunting Ground I, not a town.
 const HUNTING_GROUND: i32 = 100_010_000;
 /// MESO's flag in a stat update.
@@ -66,6 +69,21 @@ fn use_lie_detector(name: &str) -> Packet {
     p.write_short(1).unwrap();
     p.write_int(LIE_DETECTOR).unwrap();
     p
+}
+
+fn use_lie_detector_skill(name: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseLieDetectorSkill as i16)
+        .unwrap();
+    p.write_str_with_length(name).unwrap();
+    p
+}
+
+/// A GM line's body: type, the skill's code and `name`.
+fn named(kind: u8, name: &str) -> Vec<u8> {
+    let mut body = vec![kind, 2, name.len() as u8, 0];
+    body.extend(name.as_bytes());
+    body
 }
 
 fn answer(typed: &str) -> Packet {
@@ -162,4 +180,75 @@ async fn a_wrong_answer_fines_the_tested_player_for_the_tester() {
     let after = relogin(&tester_config).await;
     assert_eq!(after.meso, 7100);
     assert_eq!(after.items.get(&LIE_DETECTOR), Some(&2));
+}
+
+#[tokio::test]
+async fn a_gms_skill_tests_for_nothing_and_tells_the_gm() {
+    let gm_config = load_harness_config_or_fail().await;
+    let gm_id = login_to_world_session(&gm_config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    let tested_config = load_harness_config_or_fail().await;
+    let tested_id = login_to_world_session(&tested_config)
+        .await
+        .expect("second login failed")
+        .character_id;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_gm_level(&gm_config.username, 3)
+        .await
+        .expect("make a GM");
+    grant_skill(gm_id, LIE_DETECTOR_SKILL, 1)
+        .await
+        .expect("the skill");
+    set_meso(tested_id, 10_000).await.expect("tested mesos");
+    let name = tested_config.character_name.clone();
+
+    let mut tested = relogin(&tested_config).await;
+    let mut gm = relogin(&gm_config).await;
+    let b = &mut tested.connection;
+    let a = &mut gm.connection;
+    let mut trace = Trace::default();
+    assert_eq!(
+        warp(b, HUNTING_GROUND, "", &mut trace).await,
+        HUNTING_GROUND
+    );
+    assert_eq!(
+        warp(a, HUNTING_GROUND, "", &mut trace).await,
+        HUNTING_GROUND
+    );
+
+    // The refusals carry the skill's code.
+    send(a, use_lie_detector_skill(&name)).await;
+    assert_eq!(result(a).await, [1, 2]);
+    send(a, use_lie_detector_skill("nobody")).await;
+    assert_eq!(result(a).await, [0, 2]);
+
+    // Unannounced to the tested player, whose picture comes by the skill;
+    // the GM hears whom it tests.
+    send(b, attack(0, 1)).await;
+    barrier(b, &name, &mut Trace::default()).await;
+    send(a, use_lie_detector_skill(&name)).await;
+    assert_eq!(result(a).await, named(5, &name));
+    let challenge = result(b).await;
+    assert_eq!(challenge[..3], [6, 2, 1]);
+
+    // Two wrong answers fail it, for no mesos; the GM hears.
+    send(b, answer("wrong!")).await;
+    assert_eq!(result(b).await[..3], [6, 2, 0]);
+    send(b, answer("wrong again")).await;
+    assert_eq!(result(b).await, [7, 2]);
+    assert_eq!(result(a).await, named(8, &name));
+
+    // The hour doesn't bind a GM.
+    send(b, attack(0, 1)).await;
+    barrier(b, &name, &mut Trace::default()).await;
+    send(a, use_lie_detector_skill(&name)).await;
+    assert_eq!(result(a).await, named(5, &name));
+    assert_eq!(result(b).await[..3], [6, 2, 1]);
+    drop(gm);
+    drop(tested);
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(relogin(&tested_config).await.meso, 10_000);
 }
