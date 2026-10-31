@@ -729,7 +729,17 @@ A few skills do more than buff:
   Charged Blow (1211002) is refused without a charge (`charge::refused`)
   and spends it when it reaches a mob. A Paladin's Advanced Charge
   (1220010) keeps the charge by its `x` percent, and its `damage` replaces
-  Charged Blow's own on both sides.
+  Charged Blow's own on both sides. The Dawn Warrior's Soul Charge
+  (11111007, holy), the Thunder Breaker's Lightning Charge (15101006) and
+  the Aran's Snow Charge (21111005, ice) are charges too; the client reads
+  each one's element from its skill (FUN_007908e7). Snow Charge also slows
+  every mob it hits by its `x` for `y` seconds (`skills::on_hit`).
+- **Cygnus and Aran buffs** share the Explorer arms in `skills::buffs`:
+  Iron Body, Rage, Magic Armor, Meditation, Focus and Haste give their
+  leveled stats; the boosters, Magic Guard, Dark Sight, Combo Attack and
+  the Aran's Maple Warrior give the same stat as their Explorer twins; and
+  Freeze Standing (21121003) is the Aran's Power Stance, which the client
+  picks for job 2112 (0x958aa9).
 - **Berserk** (`net::berserk`, 1320006) is a Dark Knight's passive. The
   client keeps the state: Berserk is on while HP is at most `x` percent
   of max HP, rechecked when HP changes and anew on entering the game. Each

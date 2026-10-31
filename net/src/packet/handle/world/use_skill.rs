@@ -1161,6 +1161,25 @@ mod tests {
     }
 
     #[test]
+    fn the_knights_and_the_arans_buffs_are_used() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        for (skill_id, stat) in [
+            (12101000, BuffStat::Mad),
+            (14101003, BuffStat::Speed),
+            (21121000, BuffStat::MapleWarrior),
+            (21121003, BuffStat::Stance),
+        ] {
+            let mut player = beginner_with(skill_id, 1);
+            (player.stats.mp, player.stats.max_mp) = (100, 100);
+            use_skill(&mut player, skill_id, 1, now).unwrap();
+            assert!(player.buffs.has(stat), "{skill_id}");
+        }
+    }
+
+    #[test]
     fn nimble_feet_spends_mp_and_gives_speed_until_it_cools_down() {
         if skills::data().is_err() {
             return;
