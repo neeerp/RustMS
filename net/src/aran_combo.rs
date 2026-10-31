@@ -69,6 +69,29 @@ pub fn landed(player: &Player) -> Option<i16> {
     Some((count(player) as i16).saturating_add(1).min(MOST))
 }
 
+/// The skill whose level one of Full or Over Swing's hidden skills takes.
+/// The client casts those in Double and Triple Swing's place once either is
+/// learned, Over Swing first (FUN_00966f7a, report b365).
+pub fn swing_owner(skill_id: i32) -> Option<i32> {
+    match skill_id {
+        21110007 | 21110008 => Some(21110002),
+        21120009 | 21120010 => Some(21120002),
+        _ => None,
+    }
+}
+
+/// How many mobs an attack without a skill may hit: an Aran's with a
+/// polearm two more than a twentieth of their level, anyone else's one
+/// (report b365, §3).
+pub fn plain_mob_count(player: &Player) -> i32 {
+    let aran = player.stats.job / 100 == 21 || player.stats.job == ARAN_BEGINNER;
+    if aran && crate::combat::weapon(player) / 10_000 == POLEARM {
+        i32::from(player.stats.level) / 20 + 2
+    } else {
+        1
+    }
+}
+
 /// Whether the client hears the combo as stat 68 too: once it starts, and
 /// at every ten, where what it adds changes. SHOW_COMBO tells it the rest.
 pub fn shown_as_stat(count: i16) -> bool {
@@ -297,5 +320,76 @@ mod tests {
             .give(Buff::new(21100005, BuffStat::ComboDrain, 5, now, lasts));
         assert_eq!(skills::takes(&player, None, false, 0.0).hp, 5);
         assert_eq!(skills::takes(&player, None, true, 0.0).hp, 0);
+    }
+
+    fn spread(mut attack: Attack, mobs: i32) -> Attack {
+        attack.mob_count = mobs as u8;
+        attack.hits = (1..=mobs)
+            .map(|object_id| AttackHit {
+                object_id,
+                damage: vec![1],
+            })
+            .collect();
+        attack
+    }
+
+    #[test]
+    fn an_arans_plain_polearm_swing_reaches_more_mobs_with_level() {
+        let rejection = |player: &Player, attack: &Attack| combat::validate(attack, player).err();
+        let mut player = holding(aran(&[]), POLEARM_ITEM);
+        player.stats.level = 120;
+        // 120 / 20 + 2.
+        assert_eq!(plain_mob_count(&player), 8);
+        let plain = swing(AttackKind::Close, 0);
+        assert_eq!(rejection(&player, &spread(plain.clone(), 8)), None);
+        assert_eq!(
+            rejection(&player, &spread(plain.clone(), 9)),
+            Some(AttackRejection::TooManyTargets)
+        );
+        player.stats.job = 110;
+        assert_eq!(plain_mob_count(&player), 1);
+        assert_eq!(
+            rejection(&player, &spread(plain, 2)),
+            Some(AttackRejection::TooManyTargets)
+        );
+        player.stats.job = 2112;
+        assert_eq!(plain_mob_count(&aran(&[])), 1);
+    }
+
+    #[test]
+    fn full_and_over_swing_lend_their_level_to_their_hidden_swings() {
+        if skills::info(21110007).is_none() {
+            return;
+        }
+        let rejection = |player: &Player, attack: &Attack| combat::validate(attack, player).err();
+        let mut player = holding(aran(&[(21000002, 20), (21100001, 20)]), POLEARM_ITEM);
+        let double = swing(AttackKind::Close, 21110007);
+        assert_eq!(rejection(&player, &double), Some(AttackRejection::Skill));
+        player.skills.set(SkillRecord {
+            skill_id: 21110002,
+            level: 5,
+            master_level: 0,
+            expiration: None,
+        });
+        assert_eq!(
+            skills::learned(&player, 21110007).map(|skill| skill.level),
+            Some(5)
+        );
+        assert_eq!(
+            skills::learned(&player, 21110008).map(|skill| skill.level),
+            Some(5)
+        );
+        assert_eq!(rejection(&player, &double), None);
+        assert!(skills::learned(&player, 21120009).is_none());
+        player.skills.set(SkillRecord {
+            skill_id: 21120002,
+            level: 3,
+            master_level: 10,
+            expiration: None,
+        });
+        assert_eq!(
+            skills::learned(&player, 21120010).map(|skill| skill.level),
+            Some(3)
+        );
     }
 }

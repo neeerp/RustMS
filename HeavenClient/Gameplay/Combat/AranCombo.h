@@ -429,6 +429,53 @@ namespace ms
 			}
 		}
 
+		// Full Swing and Over Swing make Double and Triple Swing cast their own hidden skills, at their own
+		// level, Over Swing first; the Legend's copies stay as they are (FUN_00966f7a, report b365).
+		constexpr int32_t FULL_SWING = 21110002;
+		constexpr int32_t OVER_SWING = 21120002;
+
+		inline int32_t swing_cast(int32_t skill_id, int32_t over_level, int32_t full_level)
+		{
+			bool triple = skill_id == 21100001;
+
+			if (skill_id != 21000002 && !triple)
+				return skill_id;
+
+			if (over_level > 0)
+				return triple ? 21120010 : 21120009;
+
+			if (full_level > 0)
+				return triple ? 21110008 : 21110007;
+
+			return skill_id;
+		}
+
+		// How many mobs an attack with no skill hits: an Aran's with a polearm two more than a twentieth of
+		// their level, anyone else's one (0x9514c3, report b365).
+		inline int32_t plain_mob_count(int32_t job, int32_t weapon_type, int32_t level)
+		{
+			if ((job / 100 != 21 && job != ARAN_BEGINNER) || weapon_type != POLEARM)
+				return 1;
+
+			return level / 20 + 2;
+		}
+
+		// The skill whose level a hidden swing takes, or 0 for any other skill (FUN_007616f6, report b365).
+		inline int32_t swing_owner(int32_t skill_id)
+		{
+			switch (skill_id)
+			{
+				case 21110007:
+				case 21110008:
+					return FULL_SWING;
+				case 21120009:
+				case 21120010:
+					return OVER_SWING;
+				default:
+					return 0;
+			}
+		}
+
 		// What the player's body is doing, for the swings: an attack with the polearm, a Double Swing (or its
 		// Full or Over Swing), a Triple Swing (likewise), or anything else.
 		enum class Doing

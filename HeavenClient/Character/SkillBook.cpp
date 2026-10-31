@@ -18,6 +18,7 @@
 #include "SkillBook.h"
 
 #include "../Data/SkillData.h"
+#include "../Gameplay/Combat/AranCombo.h"
 #include "../Gameplay/Combat/PqSkills.h"
 
 namespace ms
@@ -37,6 +38,10 @@ namespace ms
 		// The secret skills are always at level 1 (FUN_007616f6).
 		if (pq_skills::kind(id) != pq_skills::Kind::NONE)
 			return 1;
+
+		// Full and Over Swing's hidden skills are at theirs.
+		if (int32_t owner = aran_combo::swing_owner(id))
+			id = owner;
 
 		auto iter = skillentries.find(id);
 

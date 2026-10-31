@@ -678,7 +678,12 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         if attack.kind == AttackKind::Magic {
             return Err(AttackRejection::Skill);
         }
-        (None, 1, 1, base_cap)
+        (
+            None,
+            crate::aran_combo::plain_mob_count(player),
+            1,
+            base_cap,
+        )
     } else {
         let skill = skills::learned(player, attack.skill).ok_or(AttackRejection::Skill)?;
         let effect = &skill.effect;

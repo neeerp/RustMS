@@ -41,7 +41,9 @@ pub fn learned(player: &Player, skill_id: i32) -> Option<Learned> {
     let level = match pq_skill(skill_id) {
         Some(kind) if pq_skill_allowed(kind, player) => 1,
         Some(_) => return None,
-        None => player.skills.level(skill_id),
+        None => player
+            .skills
+            .level(crate::aran_combo::swing_owner(skill_id).unwrap_or(skill_id)),
     };
     let mut effect = info(skill_id)?.level(level)?.clone();
     effect.morph = crate::morph::template(effect.morph, player.stats.gender);
