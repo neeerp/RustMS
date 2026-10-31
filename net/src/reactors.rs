@@ -558,6 +558,21 @@ pub fn action(reactor_id: i32) -> Action {
             notice: None,
             music: None,
         },
+        // The Spooky World's two (`myboss0`, `myboss1`) each take a Spirit
+        // of Fantasy Theme Park and bring out Targa or Scarlion (Cosmic
+        // `5511000`, `5511001`).
+        crate::events::TARGA_REACTOR => Action::SpawnAt {
+            mob_id: crate::events::TARGA,
+            at: crate::events::TARGA_AT,
+            notice: Some(keys::SCARGA_TARGA_SUMMONED),
+            music: Some("Bgm09/TimeAttack"),
+        },
+        crate::events::SCARLION_REACTOR => Action::SpawnAt {
+            mob_id: crate::events::SCARLION,
+            at: crate::events::SCARLION_AT,
+            notice: Some(keys::SCARGA_SCARLION_SUMMONED),
+            music: Some("Bgm09/TimeAttack"),
+        },
         // The sixth stage's altar (Cosmic `3001000`), which takes the stone.
         ELLIN_ALTAR => Action::SpawnAt {
             mob_id: crate::events::ELLIN_GOLEM,
@@ -911,6 +926,20 @@ mod tests {
                 music: None
             }
         );
+        // The Spooky World's two, each to its boss's first form.
+        assert_eq!(
+            action(5511000),
+            Action::SpawnAt {
+                mob_id: 9420542,
+                at: (-527, 637),
+                notice: Some(keys::SCARGA_TARGA_SUMMONED),
+                music: Some("Bgm09/TimeAttack")
+            }
+        );
+        let Action::SpawnAt { mob_id, at, .. } = action(5511001) else {
+            panic!("{:?}", action(5511001));
+        };
+        assert_eq!((mob_id, at), (9420547, (-238, 636)));
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);
     }

@@ -2057,8 +2057,8 @@ impl NpcScript {
     /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
     /// Ludibrium, Minerva's in the Tower of Goddess, Rolly's in the
     /// Ludibrium Maze's clear room, Konpei's in Showa's arena, Mu Young's
-    /// in the Balrog's tomb, Bob's in the ghost ship's Engine Room, the
-    /// Temple Keeper's at Pink Bean.
+    /// in the Balrog's tomb, Bob's in the ghost ship's Engine Room, Aldol's
+    /// in the Spooky World, the Temple Keeper's at Pink Bean.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
@@ -2097,6 +2097,9 @@ impl NpcScript {
                 Some(kenta_hog_room(player))
             }
             BOB if player.stats.map_id == events::ENGINE_ROOM => Some(bob(won)),
+            ALDOL_SPOOKY if player.stats.map_id == events::SPOOKY_WORLD => {
+                Some(aldol_spooky(player, won, &mut rand::thread_rng()))
+            }
             TEMPLE_KEEPER if events::PINK_BEAN.holds(player.stats.map_id) => {
                 Some(temple_keeper(won))
             }
@@ -12134,6 +12137,9 @@ pub const CWK_RECRUITER: i32 = 9201113;
 /// Konpei (9120201) in the Armory of Showa's gang hideout.
 pub const SHOWA_RECRUITER: i32 = 9120201;
 
+/// Aldol (9270047) at the Spooky World's entrance in Malaysia.
+pub const SCARGA_RECRUITER: i32 = 9270047;
+
 /// The gatherer (2141001, no name in String.nx) at the Temple of Time's
 /// last gate.
 pub const PINK_BEAN_RECRUITER: i32 = 2141001;
@@ -12169,6 +12175,10 @@ pub fn recruiter(kind: EventKind) -> Option<Recruiter> {
         EventKind::Balrog => Some(Recruiter {
             npc: MU_YOUNG,
             needs: None,
+        }),
+        EventKind::Scarga => Some(Recruiter {
+            npc: SCARGA_RECRUITER,
+            needs: Some((events::SPIRIT_OF_THEME_PARK, keys::SCARGA_SQUAD_NO_SPIRIT)),
         }),
         EventKind::PinkBean => Some(Recruiter {
             npc: PINK_BEAN_RECRUITER,
@@ -15532,6 +15542,41 @@ fn konpei_arena(player: &Player, won: bool, rng: &mut impl Rng) -> NpcScript {
         vec![Page::Say(text(keys::SHOWA_KONPEI_ARENA_WON)), last],
     );
     script.inventory_full = Some(text(keys::SHOWA_KONPEI_ARENA_FULL));
+    script
+}
+
+/// Aldol in the Spooky World (Cosmic `9201134`), to a member of the
+/// expedition: before the win, back out to the entrance, with no way back;
+/// once Targa and Scarlion both fall, a prize from `SCARGA_REWARDS` and
+/// back out, if they have room for any.
+const ALDOL_SPOOKY: i32 = 9201134;
+
+fn aldol_spooky(player: &Player, won: bool, rng: &mut impl Rng) -> NpcScript {
+    if !won {
+        return NpcScript::new(
+            ALDOL_SPOOKY,
+            vec![Page::Ask {
+                text: text(keys::SCARGA_ALDOL_LEAVE_ASK),
+                on_yes: vec![Effect::Warp(events::SPOOKY_ENTRANCE)],
+                on_no: None,
+            }],
+        );
+    }
+    let prize = (has_reward_slot(&player.inventory))
+        .then(|| events::SCARGA_REWARDS.choose(rng))
+        .flatten();
+    let last = match prize {
+        Some(&(item_id, quantity)) => Page::Done(vec![
+            Effect::GiveItem { item_id, quantity },
+            Effect::Warp(events::SPOOKY_ENTRANCE),
+        ]),
+        None => Page::Say(text(keys::SCARGA_ALDOL_FULL)),
+    };
+    let mut script = NpcScript::new(
+        ALDOL_SPOOKY,
+        vec![Page::Say(text(keys::SCARGA_ALDOL_WON)), last],
+    );
+    script.inventory_full = Some(text(keys::SCARGA_ALDOL_FULL));
     script
 }
 
@@ -23509,6 +23554,24 @@ mod tests {
         assert_eq!(page_text(&low.begin()), level);
         let ask = event_terms(&events::BALROG, keys::BALROG_SQUAD_ASK);
         assert_eq!(question(&gather(EventKind::Balrog, 50).begin()), ask);
+        // Aldol wants a Spirit of Fantasy Theme Park, from level 100.
+        let low = gather(EventKind::Scarga, 99);
+        assert_eq!(low.npc_id, SCARGA_RECRUITER);
+        let level = event_terms(&events::SCARGA, keys::SCARGA_SQUAD_LEVEL);
+        assert_eq!(page_text(&low.begin()), level);
+        assert_eq!(
+            page_text(&gather(EventKind::Scarga, 100).begin()),
+            text(keys::SCARGA_SQUAD_NO_SPIRIT)
+        );
+        let mut spirited = at(100);
+        spirited.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(events::SPIRIT_OF_THEME_PARK, 1),
+        );
+        let open = NpcScript::squad(EventKind::Scarga, SquadView::None, &spirited).unwrap();
+        let ask = event_terms(&events::SCARGA, keys::SCARGA_SQUAD_ASK);
+        assert_eq!(question(&open.begin()), ask);
         // The temple's gatherer gathers Pink Bean's from level 120, wanting
         // nothing.
         let low = gather(EventKind::PinkBean, 119);

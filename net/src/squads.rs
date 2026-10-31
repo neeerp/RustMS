@@ -90,6 +90,17 @@ const BALROG: SquadText = SquadText {
     notice_started: keys::BALROG_SQUAD_NOTICE_STARTED,
 };
 
+const SCARGA: SquadText = SquadText {
+    level: keys::SCARGA_SQUAD_LEVEL,
+    ask: keys::SCARGA_SQUAD_ASK,
+    start_choice: keys::SCARGA_SQUAD_START_CHOICE,
+    join_ask: keys::SCARGA_SQUAD_JOIN_ASK,
+    rejoin_ask: keys::SCARGA_SQUAD_REJOIN_ASK,
+    taken: keys::SCARGA_SQUAD_TAKEN,
+    notice_opened: keys::SCARGA_SQUAD_NOTICE_OPENED,
+    notice_started: keys::SCARGA_SQUAD_NOTICE_STARTED,
+};
+
 const PINK_BEAN: SquadText = SquadText {
     level: keys::PINK_BEAN_SQUAD_LEVEL,
     ask: keys::PINK_BEAN_SQUAD_ASK,
@@ -109,6 +120,7 @@ pub fn text(kind: EventKind) -> Option<&'static SquadText> {
         EventKind::Cwk => Some(&CWK),
         EventKind::Showa => Some(&SHOWA),
         EventKind::Balrog => Some(&BALROG),
+        EventKind::Scarga => Some(&SCARGA),
         EventKind::PinkBean => Some(&PINK_BEAN),
         _ => None,
     }
