@@ -493,6 +493,10 @@ namespace ms
 		if (player.get_aran_combo() < aran_combo::needs(move.get_id()))
 			return false;
 
+		// Nor during a Lie Detector test (0x967046).
+		if (player.aran_combo_frozen() && aran_combo::needs(move.get_id()) > 0)
+			return false;
+
 		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
 			return false;
 
@@ -2103,7 +2107,8 @@ namespace ms
 		// Each of the Aran's polearm hits that lands counts toward the combo the server keeps (0x668c11).
 		int32_t ability = player.get_skills().get_level(aran_combo::ability(player.get_stats().get_job().get_id()));
 
-		if (aran_combo::counts(effect.user.own, effect.damage, ability, player.get_weapontype()))
+		if (aran_combo::counts(effect.user.own, effect.damage, ability, player.get_weapontype()) &&
+			!player.aran_combo_frozen())
 			AranComboCounterPacket().dispatch();
 	}
 

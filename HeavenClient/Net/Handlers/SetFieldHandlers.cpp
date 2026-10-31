@@ -28,6 +28,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Character/Carnival.h"
+#include "../../Gameplay/LieDetector.h"
 #include "../../Character/Inventory/ItemExpiry.h"
 #include "../../Character/Ariant.h"
 #include "../../Character/Coconut.h"
@@ -152,6 +153,9 @@ namespace ms
 		// The second says whether the character's data follows.
 		Stage::get().set_field_key(recv.read_byte());
 		bool chardata = recv.read_bool();
+
+		// A new field ends the Lie Detector's lockout (report c025, 0xa047cb).
+		lie_detector::time_left = 0;
 
 		if (chardata)
 			set_field(recv);

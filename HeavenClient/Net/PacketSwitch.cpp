@@ -83,6 +83,7 @@ namespace ms
 		SKILL_USE_RESULT = 37,
 		FAME_RESPONSE = 38,
 		MAP_TRANSFER_RESULT = 42,
+		ANTI_MACRO_RESULT = 43,
 		ENTRUSTED_SHOP_CHECK_RESULT = 50,
 		SKILL_LEARN_ITEM_RESULT = 51,
 
@@ -549,6 +550,7 @@ namespace ms
 		emplace<GATHER_RESULT, GatherResultHandler>();
 		emplace<SORT_RESULT, SortResultHandler>();
 		emplace<MAP_TRANSFER_RESULT, MapTransferResultHandler>();
+		emplace<ANTI_MACRO_RESULT, AntiMacroResultHandler>();
 
 		// NPC Interaction Handlers
 		emplace<NPC_DIALOGUE, NpcDialogueHandler>();

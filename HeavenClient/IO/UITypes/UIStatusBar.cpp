@@ -50,6 +50,7 @@
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
+#include "../../Gameplay/LieDetector.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/NxFiles.h"
@@ -602,7 +603,15 @@ namespace ms
 				toggle_menu(Menu::SHORTCUT);
 				return Button::State::NORMAL;
 			case Buttons::BT_GAME_CHANNEL:
-				// v83 FUN_00a06735: not during a quiz.
+				// v83 FUN_00a06735: not during a Lie Detector test, nor a quiz.
+				if (lie_detector::testing())
+				{
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+						chatbar->send_chatline(lie_detector::IN_TEST, UIChatBar::LineType::SKILL);
+
+					break;
+				}
+
 				if (taking_quiz())
 				{
 					if (auto chatbar = UI::get().get_element<UIChatBar>())

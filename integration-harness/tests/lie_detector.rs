@@ -1,8 +1,8 @@
 //! The Lie Detector (2190000, report c025): used on a character on the
 //! user's map who has just attacked, it shows them a picture to read
-//! within a minute and uses the item up. A wrong answer fails them, and
-//! up to 7000 of their mesos go to the tester; for an hour after, they
-//! can't be tested again.
+//! within a minute and uses the item up. A wrong answer gets them a new
+//! picture, and a second fails them: up to 7000 of their mesos go to the
+//! tester, and for an hour after, they can't be tested again.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_stack, set_meso};
@@ -139,8 +139,11 @@ async fn a_wrong_answer_fines_the_tested_player_for_the_tester() {
     send(a, use_lie_detector(&name)).await;
     assert_eq!(result(a).await, [3, 1]);
 
-    // A wrong answer fails: 7000 mesos from one to the other.
+    // A wrong answer gets a second picture, in the time left; another
+    // fails: 7000 mesos from one to the other.
     send(b, answer("wrong!")).await;
+    assert_eq!(result(b).await[..3], [6, 1, 0]);
+    send(b, answer("wrong again")).await;
     assert_eq!(mesos(b).await, 3000);
     assert_eq!(result(b).await, [7, 1]);
     assert_eq!(mesos(a).await, 7100);

@@ -128,6 +128,15 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The Lie Detector's news (FUN_00a265c2, report c025): a test begun, a
+	// picture to read, how it ended or why it couldn't begin. The GM
+	// skill's (code 2) is left out.
+	// Opcode: ANTI_MACRO_RESULT(43)
+	class AntiMacroResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Whether the Equip window has the second pendant cell (0xa13c7b). v83
 	// reads it only when it builds the window (report b178).
 	// Opcode: EXTRA_PENDANT_SLOT(121)

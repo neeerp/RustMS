@@ -20,6 +20,7 @@
 #include "../Configuration.h"
 #include "../Character/ItemEffectRules.h"
 #include "../Character/Pets.h"
+#include "LieDetector.h"
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
@@ -2230,6 +2231,15 @@ namespace ms
 
 		if (!player.can_request(ExclRequest::WAIT, true))
 			return;
+
+		// v83 FUN_00a04dca: not during a Lie Detector test, nor a quiz.
+		if (lie_detector::testing())
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(lie_detector::IN_TEST, UIChatBar::LineType::SKILL);
+
+			return;
+		}
 
 		if (taking_quiz())
 		{

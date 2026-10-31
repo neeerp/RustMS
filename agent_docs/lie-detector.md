@@ -30,8 +30,10 @@ lanes/QUESTIONS.md.
 5. The client closes the picture when it sends `ANSWER_LIE_DETECTOR`
    (`0x69`) with the text, so every answer is judged at once. The case and
    spaces around the answer don't count. A right answer passes, with 5000
-   mesos (`PASS_REWARD`) and type 9. A wrong one fails, with type 7. The
-   client doesn't end the test itself, so the actor fails it after 60
+   mesos (`PASS_REWARD`) and type 9. A test takes two answers (`TRIES`),
+   as the client's "tries left" counts: a first wrong one gets a new
+   picture, type 6 with `first` 0, in the time left, and a second fails,
+   with type 7. The client doesn't end the test itself, so the actor fails it after 60
    seconds (`TEST_TIME`, `lie_due`). Disconnecting in the middle fails it
    too, before the save.
 6. A failed player loses up to 7000 mesos (`FAIL_FINE`). They go to the
@@ -58,13 +60,40 @@ whatever the type carries (`build_anti_macro_result`):
 | 9 | | tested | passed, with the 5000 mesos line |
 | 11 | | tester | "The user has failed... rewarded 7000 mesos" |
 
-The picture is 220x70, a baseline JPEG, which the client decodes with
+The picture is 192x42, the size of the box in the challenge's art, as a
+baseline JPEG, which the client decodes with
 IJL. It is drawn in Rust from 5x7 glyphs, scaled, slanted and coloured at
 random, over noise lines and dots. The glyphs leave out characters that
-look like others (I, O, S, Z, B, Q, and the digits 0-2, 5, 6 and 8).
+look like others (I, O, S, Z, B, Q, U, and the digits 0-2, 5, 6 and 8).
+
+## HeavenClient
+
+- Double-clicking a 219xxxx item (`UIItemInventory`, `use_lie_detector`)
+  checks the request gate, an open mini room, a ride, a town, and the
+  field limit `LIE_DETECTOR` (0x10000). It then opens
+  `UILieDetectorName` on `Macro/backgrnd`. The typed name must match
+  someone on the map exactly, or the client shows type 0 itself without
+  sending anything. Otherwise it sends `USE_LIE_DETECTOR`.
+- `AntiMacroResultHandler` (`InventoryHandlers`) puts type 5 in chat. For
+  type 6 it decodes the JPEG (`Graphics/Jpeg`, stb_image) into a
+  `PixelTexture` and opens `UILieDetector` on `Macro/backgrnd4` at the
+  top right, with the `num1` clock and the tries left. Types 7 and 9
+  close it, and every type with a text opens `UILieDetectorResult` on
+  `MacroSkill/backgrnd3` with a `Macro/admin` face.
+- `lie_detector::time_left` (`Gameplay/LieDetector.h`) is the test's
+  clock. A first picture sets it to 60 seconds, an answer keeps what is
+  left for the next picture, and a result or a new field clears it.
+  While it runs, the Cash Shop and the status bar's channel button say
+  "You cannot use it in the middle of the Lie Detector Test.", and an
+  Aran's combo stays frozen. The counter stops being sent, the combo
+  skills are refused, the combo doesn't time out, and a thaw restarts the
+  clock.
+- The layout follows UIClassic's art rather than the 2025 client's
+  positions, which suit other art. UIClassic's art has no "tries left"
+  label, so the client draws it as text.
 
 ## Not yet
 
 - The GM skill 9001009 (`0x68`), code 2, and the screenshots its types
   take.
-- HeavenClient's side: the name prompt, the dialogs and the lock.
+- The 2025 client also keeps the combo HUD from fading while frozen.

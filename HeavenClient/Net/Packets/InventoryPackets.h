@@ -140,6 +140,32 @@ namespace ms
 		}
 	};
 
+	// Uses the Lie Detector in USE slot `slot` on the character named, on
+	// the user's map (FUN_00a262d9). The server takes the item.
+	// Opcode: USE_LIE_DETECTOR(103)
+	class UseLieDetectorPacket : public OutPacket
+	{
+	public:
+		UseLieDetectorPacket(const std::string &name, int16_t slot, int32_t itemid)
+				: OutPacket(OutPacket::Opcode::USE_LIE_DETECTOR)
+		{
+			write_string(name);
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
+	// What the tested player typed for the Lie Detector's picture (0x7e76b2).
+	// Opcode: ANSWER_LIE_DETECTOR(105)
+	class AnswerLieDetectorPacket : public OutPacket
+	{
+	public:
+		AnswerLieDetectorPacket(const std::string &answer) : OutPacket(OutPacket::Opcode::ANSWER_LIE_DETECTOR)
+		{
+			write_string(answer);
+		}
+	};
+
 	// Feeds the pet food (212xxxx) in USE slot `slot` to the pet out that
 	// is least full (FUN_00a09905)
 	// Opcode: PET_FOOD(76)

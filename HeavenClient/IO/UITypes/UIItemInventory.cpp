@@ -39,6 +39,7 @@
 #include "UITradingRoom.h"
 #include "UIMiniGameCreate.h"
 #include "UIRaise.h"
+#include "UILieDetector.h"
 #include "UITransform.h"
 #include "UIVegaSpell.h"
 #include "UIViciousHammer.h"
@@ -70,6 +71,7 @@
 #include "../../Data/NameChange.h"
 #include "../../Data/PetData.h"
 #include "../../Gameplay/FieldEffectRules.h"
+#include "../../Gameplay/LieDetector.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/WeatherRules.h"
 #include "../../Gameplay/MapleMap/FieldLimit.h"
@@ -358,6 +360,49 @@ namespace ms
 				{});
 
 				return false;
+			});
+		}
+
+		// v83 FUN_00a262d9: a Lie Detector asks whom to test, after the 500 ms gate (0x4f0465), unless a mini
+		// room is open, the player rides, or the map is a town or forbids it. Someone of that name must be on
+		// the map; the server takes the item once the test begins, or says why it doesn't.
+		void use_lie_detector(int16_t slot, int32_t item_id)
+		{
+			if (!Stage::get().get_player().can_request(ExclRequest::USE_WAIT) || in_dialog() ||
+				Stage::get().get_player().ride_refuses())
+				return;
+
+			if (Stage::get().get_mapinfo().is_town())
+			{
+				UI::get().emplace<UIOk>("You can't do it here in this map.", [](bool)
+				{});
+				return;
+			}
+
+			if (Stage::get().get_mapinfo().get_fieldlimit() & field_limit::LIE_DETECTOR)
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(lie_detector::NOT_HERE, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			UI::get().emplace<UILieDetectorName>([=](const std::string &name)
+			{
+				// FUN_009727ab looks among the others on the map for the name as typed.
+				for (auto &mmo : *Stage::get().get_chars().get_chars())
+				{
+					auto character = static_cast<const Char *>(mmo.second.get());
+
+					if (character->get_name() == name)
+					{
+						UseLieDetectorPacket(name, slot, item_id).dispatch();
+						return;
+					}
+				}
+
+				auto shown = lie_detector::result(lie_detector::NOT_FOUND, 1);
+				UI::get().emplace<UILieDetectorResult>(shown->portrait, shown->lines);
 			});
 		}
 
@@ -1424,6 +1469,8 @@ namespace ms
 							use_owl(slot, item_id);
 						else if (item_id / 10000 == 237)
 							use_solomon_writ(slot, item_id);
+						else if (item_id / 10000 == 219)
+							use_lie_detector(slot, item_id);
 						// v83 0x4f085b: the server runs its script (FUN_00a09b26).
 						else if (item_id / 10000 == 243)
 							Stage::get().get_player().request(UseScriptedItemPacket(slot, item_id), ExclRequest::WAIT);

@@ -529,7 +529,7 @@ namespace ms
 		update_recovery();
 
 		// The combo goes 3 seconds after the server last showed it (0x94bdba).
-		if (aran_combo::idle(aran_combo, aran_combo_shown, now_ms()) &&
+		if (!aran_frozen && aran_combo::idle(aran_combo, aran_combo_shown, now_ms()) &&
 			skillbook.get_level(aran_combo::ability(stats.get_job().get_id())) > 0)
 			end_aran_combo();
 
@@ -1567,10 +1567,27 @@ namespace ms
 
 	void Player::end_aran_combo()
 	{
+		if (aran_frozen)
+			return;
+
 		aran_combo = 0;
 		aran_combo_shown = now_ms();
 		UIAranCombo::show(0, false, false);
 		CancelBuffPacket(aran_combo::ability(stats.get_job().get_id())).dispatch();
+	}
+
+	void Player::freeze_aran_combo(bool frozen)
+	{
+		// Thawing restarts the 3 seconds.
+		if (aran_frozen && !frozen)
+			aran_combo_shown = now_ms();
+
+		aran_frozen = frozen;
+	}
+
+	bool Player::aran_combo_frozen() const
+	{
+		return aran_frozen;
 	}
 
 	void Player::update_berserk(bool reset)

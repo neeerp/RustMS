@@ -24,6 +24,8 @@ namespace ms
 		// A guest's wedding invitation can't be opened (0xa103f4).
 		constexpr int32_t INVITATIONS = 0x2000;
 		constexpr int32_t WEATHER_ITEMS = 0x4000;
+		// No Lie Detector (FUN_00a262d9).
+		constexpr int32_t LIE_DETECTOR = 0x10000;
 		constexpr int32_t DOWN_JUMP = 0x20000;
 		// Miu Miu's merchant (5450000) doesn't come (0xa0ecab).
 		constexpr int32_t MIU_MIU = 0x40000;

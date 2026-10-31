@@ -204,6 +204,10 @@ namespace ms
 		// Forget the combo and tell the server, as its time running out or a combo skill does
 		// (FUN_00960f21).
 		void end_aran_combo();
+		// A Lie Detector test holds the combo where it is (FUN_00960fa4): it doesn't run out, isn't counted and
+		// takes no combo skill until the result comes.
+		void freeze_aran_combo(bool frozen);
+		bool aran_combo_frozen() const;
 
 		// Check Berserk against the player's HP, and tell the server when
 		// it turns on or off (FUN_00a292bb); `reset` forgets it first.
@@ -605,6 +609,8 @@ namespace ms
 		// The Aran's combo and when the server last showed it (+0x3220, +0x3224).
 		int32_t aran_combo = 0;
 		int64_t aran_combo_shown = 0;
+		// +0x3228.
+		bool aran_frozen = false;
 		// Berserk's damage percent while it is on, else 0 (+0x372c).
 		int32_t berserk = 0;
 		// Homing Beacon's mark (+0xcc8 of the temporary stats).
