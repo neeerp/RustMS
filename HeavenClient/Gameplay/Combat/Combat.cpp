@@ -524,13 +524,6 @@ namespace ms
 		if (player.get_aran_combo() < aran_combo::needs(move.get_id()))
 			return false;
 
-		// Nor during a Lie Detector test (0x967046).
-		if (player.aran_combo_frozen() && aran_combo::needs(move.get_id()) > 0)
-			return false;
-
-		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
-			return false;
-
 		// The secret skills go only on their own maps, and a map's noSkill
 		// takes skills away, which v83 checks first (FUN_00587f5f); the
 		// attacks need ground under the player, and no ride or
@@ -544,6 +537,14 @@ namespace ms
 			InChatMessage(Messages::SKILL_FIELD).drop();
 			return false;
 		}
+
+		// Nor during a Lie Detector test (0x967046), and a map's bit 0x2
+		// stops the moving attacks (0x969465); both after noSkill.
+		if (player.aran_combo_frozen() && aran_combo::needs(move.get_id()) > 0)
+			return false;
+
+		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
+			return false;
 
 		// Rage of Pharaoh goes only with a use left, and says nothing (0x74d841).
 		if (pq == pq_skills::Kind::RAGE_OF_PHARAOH && !massacre::rage_ready(massacre::session().skill))
