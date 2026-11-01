@@ -696,6 +696,31 @@ pub fn tame_first_pet(player: &mut Player, amount: i16) -> Option<(Vec<Inventory
     Some((changes, levelled))
 }
 
+/// An NPC's closeness for every pet out, as Cosmic's `gainTameness` gives
+/// it: the changed pets' items re-sent and the indices of those that
+/// levelled, or `None` with no pet out.
+pub fn tame_pets(player: &mut Player, amount: i16) -> Option<(Vec<InventoryChange>, Vec<u8>)> {
+    let out: Vec<_> = pets_out(player).collect();
+    if out.is_empty() {
+        return None;
+    }
+    let mut changes = Vec::new();
+    let mut levelled = Vec::new();
+    for (index, slot, mut item) in out {
+        let Some(pet) = item.pet.as_mut() else {
+            continue;
+        };
+        let closeness = pet.closeness;
+        if pet.add_closeness(amount) {
+            levelled.push(index as u8);
+        }
+        if pet.closeness != closeness {
+            changes.extend(put_back(player, slot, item));
+        }
+    }
+    Some((changes, levelled))
+}
+
 /// A quest's `petSkill` bits (`petskill`) and owner's speed (`petspeed`,
 /// attribute bit 1) for the first pet out: its item re-sent if it changed,
 /// so the client's own quest checks see it; nothing with no pet out.
@@ -847,6 +872,17 @@ mod tests {
         assert_eq!(tame_first_pet(&mut player, 15), Some((vec![], false)));
         player.pets.clear();
         assert_eq!(tame_first_pet(&mut player, 15), None);
+    }
+
+    #[test]
+    fn an_npc_brings_every_pet_out_closer() {
+        let mut player = owner();
+        let (changes, levelled) = tame_pets(&mut player, 2).unwrap();
+        assert_eq!((changes.len(), levelled), (2, vec![0]));
+        assert_eq!((tiger(&player).closeness, tiger(&player).level), (2, 2));
+        assert_eq!(tame_pets(&mut player, 0), Some((vec![], vec![])));
+        player.pets.clear();
+        assert_eq!(tame_pets(&mut player, 2), None);
     }
 
     #[test]

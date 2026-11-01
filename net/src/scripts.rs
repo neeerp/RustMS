@@ -890,6 +890,9 @@ pub enum Effect {
         into: i32,
         days: i32,
     },
+    /// Raise the closeness of every pet out by this much; refused with no
+    /// pet out.
+    TamePets(i16),
     /// Nothing is applied if the player no longer has that much.
     SpendMeso(i32),
     /// Up to the most a player may hold.

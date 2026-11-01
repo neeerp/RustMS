@@ -19,7 +19,7 @@ use net::packet::build::world::messaging::{
 use net::packet::build::world::pet::PetGone;
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{
-    drop, effect, guild, inventory, marriage, npc, quest, skill, stat,
+    drop, effect, guild, inventory, marriage, npc, pet, quest, skill, stat,
 };
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
@@ -475,6 +475,23 @@ impl ClientActor {
                             index,
                             serial: *serial,
                         });
+                    }
+                }
+                Effect::TamePets(amount) => {
+                    let Some((changes, levelled)) =
+                        net::packet::handle::world::tame_pets(&mut next, *amount)
+                    else {
+                        debug!("No pet out to grow closer; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    if !changes.is_empty() {
+                        changed = true;
+                        packets.push(inventory::build_inventory_operation(true, &changes)?);
+                    }
+                    for index in levelled {
+                        packets.push(pet::build_pet_level_up(None, index)?);
+                        let seen = pet::build_pet_level_up(Some(next.id()), index)?;
+                        to_field.push(FieldRequest::Broadcast(seen));
                     }
                 }
                 Effect::SpendMeso(amount) => {
