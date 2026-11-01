@@ -1580,7 +1580,10 @@ hall (610030010). It lets a player who holds the Crimsonwood Keystone
 (3992041, from quest 8223) through to the Sanctum's entrance, 610030020
 (`CWK_LOBBY`, portal `out00`). Anyone else hears in pink that it won't
 move (`cwk.gate.no_key`). Map.nx has no `glpqEnter` portal on the hall,
-so the NPC is the only way through.
+so the NPC is the only way through. Ridley (`RIDLEY`, 9201103) by the
+Keep's entrance (610020006) tells a player of `CWK`'s level about the
+expeditions, and anyone lower to train first (Cosmic's `9201103.js`, which
+says 100).
 
 The team is an expedition squad (`Event::squad`, `net/src/squads.rs`).
 Anyone of level 90 or more gathers one at the recruiter (`CWK_RECRUITER`,

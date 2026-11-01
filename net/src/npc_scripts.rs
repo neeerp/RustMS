@@ -2526,6 +2526,9 @@ impl NpcScript {
         if npc_id == HOTEL_RECEPTIONIST {
             return Some(hotel_receptionist(player));
         }
+        if npc_id == RIDLEY {
+            return Some(ridley(player));
+        }
         if npc_id == OPENING_NEINHEART {
             return Some(opening_neinheart());
         }
@@ -13057,6 +13060,22 @@ pub const BOSS_SWITCHES: [(i32, i32, &str, &str); 3] = [
     ),
 ];
 
+/// Ridley in Crimsonwood Keep (610020006, Npc.nx `tcg4_6_8241`): one of the
+/// Keep's party quest's level hears of its expeditions, and anyone else to
+/// train first (Cosmic's `9201103.js`, at `events::CWK`'s level).
+pub const RIDLEY: i32 = 9201103;
+
+fn ridley(player: &Player) -> NpcScript {
+    let low = *events::CWK.levels.start();
+    let key = if player.stats.level >= low {
+        keys::RIDLEY_EXPEDITIONS
+    } else {
+        keys::RIDLEY_TOO_LOW
+    };
+    let line = content::text().get(key, &[("level", &low.to_string())]);
+    NpcScript::new(RIDLEY, vec![Page::Say(line)])
+}
+
 /// Neinheart at the end of the Cygnus Knights' opening (913040006, Npc.nx
 /// `erebWarp`): yes takes the player to Ereve, and no back to Henesys
 /// (Cosmic's `1103005.js`, whose saved `CYGNUSINTRO` spot nothing sets).
@@ -22513,6 +22532,19 @@ mod tests {
         let short = script.respond(ScriptInput::Yes).unwrap();
         assert!(short.effects.is_empty());
         assert_eq!(page_text(&short), text(keys::HOTEL_SHORT));
+    }
+
+    #[test]
+    fn ridley_tells_one_of_the_keeps_level_of_its_expeditions() {
+        let low = *events::CWK.levels.start();
+        let mut visitor = player(50);
+        visitor.stats.level = low;
+        let script = NpcScript::for_npc(RIDLEY, &visitor).unwrap();
+        assert_eq!(page_text(&script.begin()), text(keys::RIDLEY_EXPEDITIONS));
+        visitor.stats.level = low - 1;
+        let script = NpcScript::for_npc(RIDLEY, &visitor).unwrap();
+        let too_low = content::text().get(keys::RIDLEY_TOO_LOW, &[("level", &low.to_string())]);
+        assert_eq!(page_text(&script.begin()), too_low);
     }
 
     #[test]
