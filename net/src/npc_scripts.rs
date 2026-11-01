@@ -3022,6 +3022,7 @@ impl NpcScript {
             PACK_WOLF if retakes_the_wolves_test(player) => {
                 return Some(the_wolves_test_again());
             }
+            WOLF_GUARD => return Some(wolf_guard(player)),
             PILL_DESK if takes_a_pill(player) => return Some(pill_desk()),
             SWALLOW if player.quests.state(THE_SEED_SWALLOW_LOST) == QuestState::Started => {
                 return Some(swallow_new_seed());
@@ -8360,6 +8361,10 @@ const PUCCI: i32 = 1202007;
 const SCADUR: i32 = 2020007;
 const PACK_WOLF: i32 = 1202008;
 const MAHA: i32 = 1201002;
+/// The Wolf Guard at the Field of Wolves' gate in Rien (140010200), whose
+/// Npc.nx script is `enterWolf`, and the Werewolf (1902016) it lets in.
+pub const WOLF_GUARD: i32 = 1202009;
+const WEREWOLF: i32 = 1902016;
 const PUCCIS_REQUEST: i16 = 21600;
 const WOLF_MOUNT: i16 = 21604;
 const THE_WOLFS_EVOLUTION: i16 = 21618;
@@ -8395,6 +8400,20 @@ fn wolf_mount() -> NpcScript {
     );
     script.on_end = vec![Effect::StartQuest(WOLF_MOUNT)];
     script
+}
+
+/// The Wolf Guard lets one with the Werewolf (1902016), in the bag or
+/// ridden, into the Field of Wolves (140010210), where the pack's wolf ends
+/// A Visit from the Wolf Herd (21612), and turns anyone else away (Cosmic
+/// `1202009.js`).
+fn wolf_guard(player: &Player) -> NpcScript {
+    let inv = &player.inventory;
+    let page = if inv.count(WEREWOLF) > 0 || inv.equipped_ids().any(|(_, id)| id == WEREWOLF) {
+        Page::Done(vec![Effect::WarpToPortal(scripts::WOLVES_DEN, 0)])
+    } else {
+        Page::Say(text(keys::WOLF_GUARD_AWAY))
+    };
+    NpcScript::new(WOLF_GUARD, vec![page])
 }
 
 /// `q21613s`: the pack's wolf wants its pup back and puts the Aran to the
@@ -20305,6 +20324,20 @@ mod tests {
                 ]
             )
         );
+    }
+
+    #[test]
+    fn the_wolf_guard_lets_in_only_one_with_the_werewolf() {
+        let begin = |aran: &Player| NpcScript::for_npc(WOLF_GUARD, aran).unwrap().begin();
+        let mut aran = traveller(150, 0, false);
+        assert_eq!(page_text(&begin(&aran)), text(keys::WOLF_GUARD_AWAY));
+        let into_the_den = [Effect::WarpToPortal(scripts::WOLVES_DEN, 0)];
+        aran.inventory
+            .insert(InventoryType::Equipped, -18, game::Item::stack(WEREWOLF, 1));
+        assert_eq!(begin(&aran).effects, into_the_den);
+        let mut carrying = traveller(150, 0, false);
+        (carrying.inventory).insert(InventoryType::Equip, 1, game::Item::stack(WEREWOLF, 1));
+        assert_eq!(begin(&carrying).effects, into_the_den);
     }
 
     #[test]
