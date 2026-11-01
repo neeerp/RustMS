@@ -1277,6 +1277,14 @@ none of these makings, so `reward_overrides.toml` adds them at the
 community servers' mobs and rates (QUESTIONS b385). Casey's lines are
 placeholders (`casey.*`).
 
+Arwen the Fairy (1032100, Ellinia, 101000000) makes, from level 40, a
+Moon Rock (4011007) of one of each refined plate (4011000-4011006) and
+10,000 mesos, a Star Rock (4021009) of one of each refined jewel
+(4021000-4021008) and 15,000 mesos, and a Black Feather (4031042) of a
+Flaming Feather, a Moon Rock and a Black Crystal and 30,000 mesos
+(`item_makers::ARWEN`). Below level 40 Arwen says only that strangers
+get nothing (QUESTIONS b386). The lines are placeholders (`arwen.*`).
+
 ### Refiners
 
 Refiners make plates, jewels, crystals, materials and arrows in batches.

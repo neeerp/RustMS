@@ -380,6 +380,7 @@ const SARAH: i32 = 2040020;
 const TARA: i32 = 2040021;
 const RYDOLE: i32 = 2040022;
 pub const CASEY: i32 = 1012008;
+pub const ARWEN: i32 = 1032100;
 /// Mos makes Cornian's Dagger while either of these quests is under way.
 const CORNIAN_QUESTS: [i16; 2] = [7301, 7303];
 /// The money sack drawn beside a price.
@@ -2585,6 +2586,7 @@ impl NpcScript {
             }
             MOS => return Some(mos(player, &mut rand::thread_rng())),
             CASEY => return Some(casey()),
+            ARWEN => return Some(arwen(player)),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9775,6 +9777,21 @@ fn casey() -> NpcScript {
         ],
     };
     with_maker_words(NpcScript::new(CASEY, vec![menu]))
+}
+
+/// Arwen the Fairy: from `ARWEN_LEVEL`, a Moon Rock, a Star Rock or a
+/// Black Feather for its makings and mesos; below it, nothing.
+fn arwen(player: &Player) -> NpcScript {
+    if player.stats.level < item_makers::ARWEN_LEVEL {
+        return NpcScript::new(ARWEN, vec![Page::Say(text(keys::ARWEN_STRANGER))]);
+    }
+    let recipes = item_makers::ARWEN;
+    let pages = recipes.iter().map(|recipe| make(recipe, None)).collect();
+    let hello = Page::Say(text(keys::ARWEN_HELLO));
+    with_maker_words(NpcScript::new(
+        ARWEN,
+        vec![hello, recipe_menu(recipes, pages)],
+    ))
 }
 
 /// The menu of one kind's items, each leading to its `pages`.
@@ -26197,6 +26214,46 @@ mod tests {
         casey.begin();
         let rules = casey.respond(ScriptInput::Select(2)).unwrap();
         assert_eq!(page_text(&rules), text(keys::CASEY_OMOK_RULES));
+    }
+
+    #[test]
+    fn arwen_makes_rocks_and_the_black_feather_from_level_forty() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let take = |item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        };
+        // Below level 40, Arwen makes nothing.
+        let stranger = NpcScript::for_npc(ARWEN, &traveller(39, 0, false)).unwrap();
+        assert_eq!(page_text(&stranger.begin()), text(keys::ARWEN_STRANGER));
+
+        let player = traveller(40, 0, false);
+        let mut arwen = NpcScript::for_npc(ARWEN, &player).unwrap();
+        assert_eq!(page_text(&arwen.begin()), text(keys::ARWEN_HELLO));
+        let picks = menu(arwen.respond(ScriptInput::Next).unwrap());
+        assert!(["#t4011007#", "#t4021009#", "#t4031042#"]
+            .iter()
+            .all(|item| picks.contains(item)));
+        // The Black Feather.
+        arwen.respond(ScriptInput::Select(2));
+        let made = arwen.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                Effect::SpendMeso(30_000),
+                take(4001006),
+                take(4011007),
+                take(4021008),
+                Effect::GiveItem {
+                    item_id: 4031042,
+                    quantity: 1
+                }
+            ]
+        );
+        assert!(arwen.refused().is_some() && arwen.inventory_full().is_some());
     }
 
     #[test]

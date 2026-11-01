@@ -3050,6 +3050,8 @@ pub mod keys {
     pub const CASEY_ABOUT_MATCH_CARDS: &str = "casey.about_match_cards";
     pub const CASEY_OMOK_RULES: &str = "casey.omok_rules";
     pub const CASEY_MATCH_CARDS_RULES: &str = "casey.match_cards_rules";
+    pub const ARWEN_HELLO: &str = "arwen.hello";
+    pub const ARWEN_STRANGER: &str = "arwen.stranger";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5177,6 +5179,8 @@ mod tests {
                 keys::CASEY_ABOUT_MATCH_CARDS,
                 keys::CASEY_OMOK_RULES,
                 keys::CASEY_MATCH_CARDS_RULES,
+                keys::ARWEN_HELLO,
+                keys::ARWEN_STRANGER,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
