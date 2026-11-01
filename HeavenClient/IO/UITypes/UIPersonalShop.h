@@ -264,7 +264,7 @@ namespace ms
 		static constexpr bool FOCUSED = true;
 		static constexpr bool TOGGLED = false;
 
-		UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity, bool merchant);
+		UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity, bool whole, bool cash, bool merchant);
 
 		void draw(float inter) const override;
 
@@ -302,6 +302,7 @@ namespace ms
 		int16_t quantity;
 		bool merchant;
 		bool whole;
+		bool cash;
 		bool bundled;
 
 		Textfield count;

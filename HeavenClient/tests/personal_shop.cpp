@@ -118,26 +118,40 @@ int main()
 
 		// Selling: the boxes are checked bundle size first, then the count,
 		// then the price.
-		SellCheck stack = check_sale({ "100", "1500", "1", false }, 2000000, 100);
+		SellCheck stack = check_sale({ "100", "1500", "1", false }, 100, false, false);
 
 		require(stack.box == Box::NONE && stack.sale.bundles == 100 && stack.sale.per_bundle == 1, "loose items sell one a bundle");
 		require(stack.sale.price == 1500, "the price is read");
 
-		SellCheck tens = check_sale({ "100", "1500", "10", true }, 2000000, 100);
+		SellCheck tens = check_sale({ "100", "1500", "10", true }, 100, false, false);
 
 		require(tens.box == Box::NONE && tens.sale.bundles == 10 && tens.sale.per_bundle == 10, "bundles divide the count");
 
-		SellCheck uneven = check_sale({ "95", "1500", "10", true }, 2000000, 100);
+		SellCheck uneven = check_sale({ "95", "1500", "10", true }, 100, false, false);
 
 		require(uneven.box == Box::COUNT && uneven.problem == BUNDLE_ONLY, "the count must fill whole bundles");
-		require(check_sale({ "10", "1500", "200", true }, 2000000, 100).box == Box::PER_BUNDLE, "a bundle can't be over the stack");
-		require(check_sale({ "101", "1500", "1", false }, 2000000, 100).box == Box::COUNT, "the count can't be over the stack");
-		require(check_sale({ "x", "1500", "1", false }, 2000000, 100).problem == "Only numbers are allowed.", "the count is a number");
-		require(check_sale({ "10", "0", "1", false }, 2000000, 100).box == Box::PRICE, "the price is at least 1");
+		require(check_sale({ "10", "1500", "200", true }, 100, false, false).box == Box::PER_BUNDLE, "a bundle can't be over the stack");
+		require(check_sale({ "101", "1500", "1", false }, 100, false, false).box == Box::COUNT, "the count can't be over the stack");
+		require(check_sale({ "x", "1500", "1", false }, 100, false, false).problem == "Only numbers are allowed.", "the count is a number");
+		require(check_sale({ "10", "0", "1", false }, 100, false, false).box == Box::PRICE, "the price is at least 1");
 
-		SellCheck sword = check_sale({ "1", "70000", "1", false }, 1302000, 1);
+		SellCheck sword = check_sale({ "1", "70000", "1", false }, 1, true, false);
 
 		require(sword.box == Box::NONE && sword.sale.bundles == 1 && sword.sale.per_bundle == 1, "an equip sells whole");
+
+		SellCheck timed = check_sale({ "1", "500", "1", false }, 5, true, false);
+
+		require(timed.box == Box::NONE && timed.sale.bundles == 1 && timed.sale.per_bundle == 1, "a timed stack sells one");
+
+		SellCheck megaphones = check_sale({ "10", "9000", "10", true }, 10, true, true);
+
+		require(megaphones.box == Box::NONE && megaphones.sale.bundles == 1 && megaphones.sale.per_bundle == 10,
+				"a cash stack goes up as one bundle of it all");
+
+		SellCheck tagged = check_sale({ "20", "300", "1", true }, 20, false, true);
+
+		require(tagged.box == Box::NONE && tagged.sale.bundles == 20 && tagged.sale.per_bundle == 1,
+				"a cash etc stack goes up in bundles of one");
 		require(sells_whole(1302000) && sells_whole(2070000) && !sells_whole(2000000), "equips and stars sell whole");
 		require(sells_whole(5072000) && sells_whole(2330000) && !sells_whole(4000000) && !sells_whole(3010000),
 				"so do cash items and bullets, but not etc or setup stacks");
