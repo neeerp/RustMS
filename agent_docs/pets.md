@@ -192,6 +192,10 @@ beside it.
   any level-ups to the owner and the map. It is refused, and the letter
   kept, if no pet is out. Nothing checks that the player climbed the
   course (QUESTIONS b392).
+  The grassy lumps along Henesys's road (`npc_scripts::GRASSY_LUMP`,
+  9102101, thirteen of them) ask whether to pull out what they hide; a yes
+  gives Pet poop (4031922), which no quest uses, if an Etc slot is free
+  (`grassy_lump.*`, Cosmic `9102101.js`).
 
 ## Client
 

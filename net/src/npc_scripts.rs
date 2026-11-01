@@ -536,6 +536,11 @@ pub struct PetCourse {
     pub closeness: i16,
 }
 
+/// The grassy lumps along Henesys's Pet-Walking Road, which hide Pet poop
+/// (Cosmic `9102101.js`).
+pub const GRASSY_LUMP: i32 = 9102101;
+pub const PET_POOP: i32 = 4031922;
+
 /// Henesys's Pet-Walking Road (100000202).
 pub const HENESYS_PET_COURSE: PetCourse = PetCourse {
     giver: BARTOS,
@@ -2794,6 +2799,7 @@ impl NpcScript {
             WISP => return Some(wisp()),
             BARTOS => return Some(bartos(player)),
             FROD => return Some(pet_course_end(&HENESYS_PET_COURSE, player)),
+            GRASSY_LUMP => return Some(grassy_lump(player)),
             WEAVER => return Some(pet_course_start(&LUDIBRIUM_PET_COURSE, player)),
             NERU => return Some(pet_course_end(&LUDIBRIUM_PET_COURSE, player)),
             HIKARI => return Some(hikari(player)),
@@ -12959,6 +12965,32 @@ fn rupi(player: &Player) -> NpcScript {
             ],
             on_no: None,
         }],
+    )
+}
+
+/// A grassy lump asks whether to pull out what it hides: on a yes, Pet
+/// poop, if an Etc slot is free.
+fn grassy_lump(player: &Player) -> NpcScript {
+    let room = crate::items::give(&mut player.inventory.clone(), PET_POOP, 1).is_ok();
+    let (on_yes, found) = if room {
+        let poop = Effect::GiveItem {
+            item_id: PET_POOP,
+            quantity: 1,
+        };
+        (vec![poop], keys::GRASSY_LUMP_POOP)
+    } else {
+        (Vec::new(), keys::GRASSY_LUMP_FULL)
+    };
+    NpcScript::new(
+        GRASSY_LUMP,
+        vec![
+            Page::Ask {
+                text: text(keys::GRASSY_LUMP_ASK),
+                on_yes,
+                on_no: Some(text(keys::GRASSY_LUMP_LEAVE)),
+            },
+            Page::Say(text(found)),
+        ],
     )
 }
 
@@ -23569,6 +23601,27 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn a_grassy_lump_hides_pet_poop() {
+        let mut script = NpcScript::for_npc(GRASSY_LUMP, &player(50)).unwrap();
+        assert_eq!(question(&script.begin()), text(keys::GRASSY_LUMP_ASK));
+        let step = script.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            step.effects,
+            [Effect::GiveItem {
+                item_id: PET_POOP,
+                quantity: 1,
+            }]
+        );
+        assert_eq!(page_text(&step), text(keys::GRASSY_LUMP_POOP));
+
+        let mut script = NpcScript::for_npc(GRASSY_LUMP, &player(50)).unwrap();
+        script.begin();
+        let left = script.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&left), text(keys::GRASSY_LUMP_LEAVE));
+        assert!(left.effects.is_empty());
     }
 
     #[test]
