@@ -500,6 +500,10 @@ const YETIS_THIEF_ROOM: i32 = 108_010_702;
 /// Where a fourth-job Aran fights an enraged Maha (9001014) on Taming the
 /// Polearm (21401), one at a time; `outMaha` leads back to Rien.
 pub const MAHAS_BATTLE: i32 = 914_020_000;
+/// Where the Dark Lord sends a Night Lord or Shadower on The Night Warrior
+/// (6141) to defeat the six Dark Lord's Disciples (9300088, `mobTime` -1),
+/// one at a time; its `out00` leads back to Kerning City.
+pub const DISCIPLES_ROOM: i32 = 910_300_000;
 /// Fox Ridge's way back to Tiger Ridge (`foxLaidy_map`) leads into the
 /// Gloomy Forest instead for a player on quest 3647 who holds the Old Fox's
 /// Tail.
@@ -634,7 +638,7 @@ pub const WOLVES_TEST_RECORD: i16 = 21620;
 pub const WOLVES_DEN: i32 = 140010210;
 /// What both records read once their run is done (`Check/1 infoex`).
 pub const WOLF_RUN_DONE: &str = "0";
-pub const SOLO_MAPS: [i32; 24] = [
+pub const SOLO_MAPS: [i32; 25] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -659,6 +663,7 @@ pub const SOLO_MAPS: [i32; 24] = [
     THIEF_CROWS_ROOM,
     YETIS_THIEF_ROOM,
     MAHAS_BATTLE,
+    DISCIPLES_ROOM,
 ];
 
 /// The Puppeteer `player` is out to beat, while a hunt for him is under

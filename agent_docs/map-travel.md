@@ -129,6 +129,17 @@ under way, with one line (`fountain_of_life.pour`; Cosmic `2083005.js`).
 Both do nothing without the item or the room for the new one.
 `skill_quest_items.rs` checks both through the network harness.
 
+The Dark Lord (`1052001`) in Kerning City's hideout (`103000003`) is
+otherwise the thieves' instructor; while The Night Warrior (6141) is under
+way, talking to the Dark Lord silently sends a Night Lord or Shadower to
+the disciples' room (`910300000`, `out00`, `DISCIPLES_ROOM`). There, the six
+Dark Lord's Disciples (`9300088`, `mobTime` -1) count toward the quest.
+Cosmic (`1052001.js`) shares the room. Here it is one player's at a time
+and resets once empty (`SOLO_MAPS`), so the disciples are back for the next
+player. A busy room refuses with `portal.solo_map.occupied` (QUESTIONS b383).
+The room's `out00` leads back to Kerning City. `skill_quest_items.rs`
+checks the trip and a kill through the network harness.
+
 Shane (`1032003`, `herb_in`) in Ellinia lets players from level 25 into the
 Forest of Patience for 5000 mesos (Yes/No, then a refusal if short). They
 start at Step 1 (`101000100`) while on Sabitrama's first herb quest (2050),

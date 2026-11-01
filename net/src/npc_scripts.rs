@@ -723,7 +723,7 @@ const INSTRUCTORS: [Instructor; 5] = [
     },
     // The Dark Lord: a claw, a dagger and two sets of throwing stars.
     Instructor {
-        npc_id: 1052001,
+        npc_id: DARK_LORD,
         job: 400,
         text: "thief",
         items: &[(1472061, 1), (1332063, 1), (2070015, 1000), (2070015, 1000)],
@@ -956,6 +956,10 @@ const FOUNTAIN_OF_LIFE: i32 = 2083005;
 const HOLY_KNIGHTS_SWORD: i16 = 6280;
 const HOLY_CUP: i32 = 4031454;
 const HOLY_WATER_OF_LIFE: i32 = 4031455;
+/// The Dark Lord, and The Night Warrior (6141), on which a Night Lord or
+/// Shadower defeats the disciples in `scripts::DISCIPLES_ROOM`.
+const DARK_LORD: i32 = 1052001;
+const THE_NIGHT_WARRIOR: i16 = 6141;
 const PAST_PAPULATUS: i32 = 2043000;
 /// Shulynch in the Nautilus's Training Room, who sends a Corsair on
 /// "Mission Free the Monsters" (6410) to look for Delli; Shulynch on
@@ -2358,6 +2362,9 @@ impl NpcScript {
         // once (Cosmic `1052115`).
         if npc_id == MR_LIM && player.stats.map_id == events::SUBWAY_RESULT {
             return Some(mr_lim_result(player));
+        }
+        if npc_id == DARK_LORD && player.quests.state(THE_NIGHT_WARRIOR) == QuestState::Started {
+            return Some(night_warrior());
         }
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -13665,6 +13672,22 @@ fn fountain_of_life(player: &Player) -> Option<NpcScript> {
             effects,
         }],
     ))
+}
+
+/// The Dark Lord sends one on The Night Warrior into the disciples' room
+/// without a word, one at a time (Cosmic `1052001.js` warps to its portal 3,
+/// `out00`).
+fn night_warrior() -> NpcScript {
+    let room = scripts::DISCIPLES_ROOM;
+    let mut script = NpcScript::new(
+        DARK_LORD,
+        vec![Page::Done(vec![
+            Effect::RequireEmptyMap(room),
+            Effect::WarpToPortal(room, scripts::named(room, "out00")),
+        ])],
+    );
+    script.refused = Some(text(keys::SOLO_MAP_OCCUPIED));
+    script
 }
 
 /// Takes one `take` for one `give`, or `None` without a `take` or the room
@@ -26502,6 +26525,36 @@ mod tests {
                 .insert(InventoryType::Use, slot, game::Item::stack(2000000, 100));
         }
         assert!(NpcScript::for_npc(ANCIENT_ICY_STONE, &mage).is_none());
+    }
+
+    #[test]
+    fn the_dark_lord_sends_a_night_warrior_into_the_disciples_room() {
+        let mut thief = player(120);
+        thief.stats.job = 412;
+        // Without the quest, the instructor's talk.
+        let mut script = NpcScript::for_npc(DARK_LORD, &thief).unwrap();
+        assert!(script.begin().prompt.is_some());
+
+        thief.quests.upsert(game::QuestRecord {
+            quest_id: THE_NIGHT_WARRIOR,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let mut script = NpcScript::for_npc(DARK_LORD, &thief).unwrap();
+        let step = script.begin();
+        assert!(step.prompt.is_none());
+        let room = scripts::DISCIPLES_ROOM;
+        assert_eq!(
+            step.effects,
+            [Effect::RequireEmptyMap(room), Effect::WarpToPortal(room, 3),]
+        );
+        assert_eq!(
+            page_text(&script.refused().unwrap()),
+            text(keys::SOLO_MAP_OCCUPIED)
+        );
+        assert!(resets_when_empty(room));
     }
 
     #[test]
