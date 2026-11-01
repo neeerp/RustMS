@@ -634,6 +634,12 @@ pub const SEALED_SHRINE: i32 = 925040100;
 pub const CATCH_THE_SHADOW_KNIGHT: i16 = 21747;
 const SHADOW_KNIGHT: i32 = 9300351;
 const SHADOW_KNIGHT_AT: (i16, i16) = (897, 51);
+/// Astaroth (9400633), who comes out in the Hiding Place in Astaroth's
+/// woods to one hunting him for the Doorway's quest (28283) until he
+/// falls; the data's `astaroth_summon` is a first-entry script, which the
+/// server doesn't read (Cosmic map script `677000012`).
+const ASTAROTH: i32 = 9400633;
+const ASTAROTH_AT: (i16, i16) = (842, 0);
 /// Ellin Forest's Warehouse (300000011): an Aran who has opened it for
 /// Athena Pierce (21751) sees the Gentleman of the Black Wings make off
 /// with its seal stone, which sets the record The Lost Seal Stone of Ellin
@@ -1378,6 +1384,16 @@ pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
             vec![Effect::BringOutMob {
                 mob_id: SHADOW_KNIGHT,
                 at: SHADOW_KNIGHT_AT,
+            }]
+        }
+        npc_scripts::ASTAROTH_HIDING_PLACE
+            if player.quests.state(npc_scripts::ASTAROTH_QUEST) == QuestState::Started
+                && (player.quests.kills(npc_scripts::ASTAROTH_QUEST).iter())
+                    .all(|&count| count == 0) =>
+        {
+            vec![Effect::BringOutMob {
+                mob_id: ASTAROTH,
+                at: ASTAROTH_AT,
             }]
         }
         ELLIN_WAREHOUSE
@@ -7177,6 +7193,32 @@ mod tests {
         );
         *aran.quests.kills_mut(CATCH_THE_SHADOW_KNIGHT).unwrap() = vec![1];
         assert!(unscripted_map_enter(&aran).is_empty(), "beaten");
+    }
+
+    #[test]
+    fn astaroth_comes_out_in_the_hiding_place_to_his_hunter_until_he_falls() {
+        let in_hiding = |quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = npc_scripts::ASTAROTH_HIDING_PLACE;
+            player
+        };
+        let data = crate::get_game_data().unwrap();
+        let field = data.field(npc_scripts::ASTAROTH_HIDING_PLACE).unwrap();
+        assert_eq!(field.on_user_enter, None);
+        assert!(unscripted_map_enter(&in_hiding(&[])).is_empty());
+        let mut hunter = in_hiding(&[(npc_scripts::ASTAROTH_QUEST, QuestState::Started)]);
+        assert_eq!(
+            unscripted_map_enter(&hunter),
+            [Effect::BringOutMob {
+                mob_id: ASTAROTH,
+                at: ASTAROTH_AT
+            }]
+        );
+        *hunter
+            .quests
+            .kills_mut(npc_scripts::ASTAROTH_QUEST)
+            .unwrap() = vec![1];
+        assert!(unscripted_map_enter(&hunter).is_empty(), "beaten");
     }
 
     #[test]
