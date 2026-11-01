@@ -1432,7 +1432,14 @@ impl EventActor {
             }
             Stage::Waiting | Stage::Over => None,
             Stage::Closing if self.carnival_outcome.is_some() => Some(members.is_empty()),
-            Stage::Ready => Some(!self.carnival.both_sides(members)),
+            Stage::Ready => {
+                // Nobody is told before the battle, but a leader's side
+                // passes on.
+                let over = !self.carnival.both_sides(members);
+                let members = members.to_vec();
+                let _ = self.carnival.quit(member, &members);
+                Some(over)
+            }
             Stage::Battle | Stage::Closing => {
                 let over = !self.carnival.both_sides(members);
                 if over {
