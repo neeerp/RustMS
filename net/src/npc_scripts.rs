@@ -382,6 +382,7 @@ const RYDOLE: i32 = 2040022;
 pub const CASEY: i32 = 1012008;
 pub const ARWEN: i32 = 1032100;
 pub const CHIEF_TATAMO: i32 = 2081000;
+pub const EUREK: i32 = 2040050;
 /// The Magic Seed Chief Tatamo sells, its price, and the most at once.
 pub const MAGIC_SEED: i32 = 4031346;
 pub const MAGIC_SEED_PRICE: i32 = 30_000;
@@ -2596,6 +2597,7 @@ impl NpcScript {
             CASEY => return Some(casey()),
             ARWEN => return Some(arwen(player)),
             CHIEF_TATAMO => return Some(chief_tatamo()),
+            EUREK => return Some(eurek()),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -17033,6 +17035,43 @@ fn refining(refine: &Refine, percent: i32, batches: i32) -> Vec<Effect> {
     effects
 }
 
+/// Eurek the Alchemist, in Leafre, Ludibrium, El Nath and Sleepywood:
+/// five Magic Rocks or Summoning Rocks, each made one of five ways.
+fn eurek() -> NpcScript {
+    let ways = |refines: &'static [Refine]| {
+        let item = refines[0].item.to_string();
+        let choices = refines
+            .iter()
+            .map(|refine| {
+                let (first, second) = (refine.materials[0].0, refine.materials[1].0);
+                let (first, second) = (first.to_string(), second.to_string());
+                let label = content::text().get(
+                    keys::EUREK_WAY,
+                    &[("first", first.as_str()), ("second", second.as_str())],
+                );
+                (label, refine_batches(refine, 100, 1))
+            })
+            .collect();
+        let text = content::text().get(keys::EUREK_WAYS, &[("item", item.as_str())]);
+        vec![Page::Menu { text, choices }]
+    };
+    let menu = Page::Menu {
+        text: text(keys::EUREK_OFFER),
+        choices: vec![
+            (
+                text(keys::EUREK_MAGIC_ROCK),
+                ways(refiners::EUREK_MAGIC_ROCKS),
+            ),
+            (
+                text(keys::EUREK_SUMMONING_ROCK),
+                ways(refiners::EUREK_SUMMONING_ROCKS),
+            ),
+        ],
+    };
+    let hello = Page::Say(text(keys::EUREK_HELLO));
+    with_maker_words(NpcScript::new(EUREK, vec![hello, menu]))
+}
+
 /// Chief Tatamo in Leafre, who sells Magic Seeds, any number up to
 /// `MAGIC_SEEDS_AT_ONCE` at once (`OnNumber::MagicSeeds`).
 fn chief_tatamo() -> NpcScript {
@@ -26308,6 +26347,40 @@ mod tests {
             ]
         );
         assert!(arwen.refused().is_some() && arwen.inventory_full().is_some());
+    }
+
+    #[test]
+    fn eurek_makes_five_rocks_of_one_of_five_ways() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let player = traveller(50, 0, false);
+        let mut eurek = NpcScript::for_npc(EUREK, &player).unwrap();
+        assert_eq!(page_text(&eurek.begin()), text(keys::EUREK_HELLO));
+        let offer = menu(eurek.respond(ScriptInput::Next).unwrap());
+        assert_eq!(offer.matches("#L").count(), 2);
+        let ways = menu(eurek.respond(ScriptInput::Select(1)).unwrap());
+        assert_eq!(ways.matches("#L").count(), 5);
+        assert!(ways.contains("#t4000080#") && ways.contains("#t4000079#"));
+        let asked = question(&eurek.respond(ScriptInput::Select(4)).unwrap());
+        assert!(asked.contains("#i4011004# 1 #t4011004#"), "{asked}");
+        let made = eurek.respond(ScriptInput::Yes).unwrap();
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        assert_eq!(
+            made.effects,
+            [
+                Effect::GiveItem {
+                    item_id: 4006001,
+                    quantity: 5
+                },
+                Effect::SpendMeso(4_000),
+                take(4000080, 7),
+                take(4000079, 7),
+                take(4011004, 1),
+            ]
+        );
+        assert!(eurek.refused().is_some() && eurek.inventory_full().is_some());
     }
 
     #[test]

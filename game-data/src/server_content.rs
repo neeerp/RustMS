@@ -3059,6 +3059,12 @@ pub mod keys {
     pub const TATAMO_SHORT: &str = "tatamo.short";
     pub const TATAMO_THINK: &str = "tatamo.think";
     pub const TATAMO_BYE: &str = "tatamo.bye";
+    pub const EUREK_HELLO: &str = "eurek.hello";
+    pub const EUREK_OFFER: &str = "eurek.offer";
+    pub const EUREK_MAGIC_ROCK: &str = "eurek.magic_rock";
+    pub const EUREK_SUMMONING_ROCK: &str = "eurek.summoning_rock";
+    pub const EUREK_WAYS: &str = "eurek.ways";
+    pub const EUREK_WAY: &str = "eurek.way";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5195,6 +5201,12 @@ mod tests {
                 keys::TATAMO_SHORT,
                 keys::TATAMO_THINK,
                 keys::TATAMO_BYE,
+                keys::EUREK_HELLO,
+                keys::EUREK_OFFER,
+                keys::EUREK_MAGIC_ROCK,
+                keys::EUREK_SUMMONING_ROCK,
+                keys::EUREK_WAYS,
+                keys::EUREK_WAY,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,

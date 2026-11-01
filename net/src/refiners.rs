@@ -6,7 +6,7 @@
 //! Mr. Smith in Perion (1022004), Vicious in Henesys (1012002) and JM in
 //! Kerning City (1052002), who also make materials and arrows; and the
 //! five in Altaire Camp who trade a hundred of something for a Perfect
-//! Pitch.
+//! Pitch; and Eurek the Alchemist (2040050), who makes skill rocks.
 //! Items, materials and prices follow Cosmic's scripts.
 
 use crate::item_makers::{recipe, Recipe};
@@ -120,6 +120,35 @@ pub const CRYSTALS_AND_DARK: &[Refine] = &[
     refine(4005002, &[(4004002, 10)], 5000),
     refine(4005003, &[(4004003, 10)], 5000),
     refine(4005004, &[(4004004, 10)], 1_000_000),
+];
+
+/// Eurek's five rocks of `item` for `materials` and 4,000 mesos.
+const fn rocks(item: i32, materials: &'static [(i32, i16)]) -> Refine {
+    Refine {
+        item,
+        yields: 5,
+        materials,
+        cost: 4_000,
+    }
+}
+
+/// Eurek's five ways to make Magic Rocks: two kinds of monster drop and a
+/// jewel.
+pub const EUREK_MAGIC_ROCKS: &[Refine] = &[
+    rocks(4006000, &[(4000046, 20), (4000027, 20), (4021001, 1)]),
+    rocks(4006000, &[(4000025, 20), (4000049, 20), (4021006, 1)]),
+    rocks(4006000, &[(4000129, 15), (4000130, 15), (4021002, 1)]),
+    rocks(4006000, &[(4000074, 15), (4000057, 15), (4021005, 1)]),
+    rocks(4006000, &[(4000054, 7), (4000053, 7), (4021003, 1)]),
+];
+
+/// And Summoning Rocks: two kinds of monster drop and a plate.
+pub const EUREK_SUMMONING_ROCKS: &[Refine] = &[
+    rocks(4006001, &[(4000046, 20), (4000027, 20), (4011001, 1)]),
+    rocks(4006001, &[(4000014, 20), (4000049, 20), (4011003, 1)]),
+    rocks(4006001, &[(4000132, 15), (4000128, 15), (4011005, 1)]),
+    rocks(4006001, &[(4000074, 15), (4000069, 15), (4011002, 1)]),
+    rocks(4006001, &[(4000080, 7), (4000079, 7), (4011004, 1)]),
 ];
 
 /// Processed Wood from Tree Branches or Firewood, and Screws.
