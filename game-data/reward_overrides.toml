@@ -614,7 +614,10 @@ add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
 
 [mobs.4230115]
 # Master Chronos, likewise.
-add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
+add = [
+    { item = 4031992, prob = 0.1, quest = 3250 },
+    { item = 4030012, prob = 0.125 },
+]
 
 [mobs.9300378]
 # The Giant Nependeaths of Orbis's Neglected Strolling Path, for
@@ -1279,7 +1282,11 @@ replace = [{ item = 4000471, prob = 0.3 }]
 replace = [{ item = 4000472, prob = 0.3 }]
 
 [mobs.9420535]
-replace = [{ item = 4000473, prob = 0.3 }]
+replace = [
+    { item = 4000473, prob = 0.3 },
+    { item = 4030009, prob = 0.028 },
+    { item = 4030012, prob = 0.125 },
+]
 
 [mobs.9420536]
 replace = [{ item = 4000474, prob = 0.3 }]
@@ -1318,3 +1325,408 @@ add = [{ item = 4031873, prob = 0.06, quest = 6380 }]
 
 [mobs.8141100]
 add = [{ item = 4031874, prob = 0.06, quest = 6390 }]
+
+# The minigame makings that Casey (net::npc_scripts::CASEY) makes Omok sets
+# and Match Cards from: the Monster Card 4030012, the Omok pieces 4030000,
+# 4030001, 4030010 and 4030011, and the Omok Table 4030009. The pack has
+# none of them; the mobs and rates are the community servers' (QUESTIONS
+# b385).
+
+[mobs.100101]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.130100]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.210100]
+add = [{ item = 4030000, prob = 0.01 }]
+
+[mobs.1110101]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.1120100]
+add = [
+    { item = 4030010, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.1140100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.1210100]
+add = [
+    { item = 4030011, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.1210101]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.1210102]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.2100103]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.2110200]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.2220100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.2230100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.2230103]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.2230105]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.2230110]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3210200]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3210201]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3210202]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3210208]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3210800]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3230100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3230102]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3230104]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3230200]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3230305]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.3230400]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.4110300]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4130101]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4130103]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230102]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230106]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230107]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230109]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230110]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230111]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230112]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230116]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230120]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230121]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230123]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230124]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.4230505]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.5130100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.5300000]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.5300100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.6130101]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.6230100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.6230600]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.6230601]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.6230602]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.6400006]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.6400008]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.6400009]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.7130002]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.7130003]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.7130020]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.7130402]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.8130100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.8140102]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.8140110]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.8140111]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.8150000]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.8150100]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9200016]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.9300011]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.9300058]
+add = [
+    { item = 4030011, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.9300059]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9300155]
+add = [
+    { item = 4030011, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.9300274]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.9300332]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9300336]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9300337]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9300341]
+add = [{ item = 4030000, prob = 0.01 }]
+
+[mobs.9300342]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.9300343]
+add = [
+    { item = 4030011, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.9303004]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.9303006]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9303010]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9303013]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400200]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400238]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.9400241]
+add = [
+    { item = 4030011, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.9400242]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400246]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400247]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.9400500]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400502]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400509]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.9400538]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400539]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400547]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400550]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400583]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9400644]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9420500]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9420501]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9420504]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9420505]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500101]
+add = [
+    { item = 4030011, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.9500102]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.9500104]
+add = [
+    { item = 4030010, prob = 0.077 },
+    { item = 4030012, prob = 0.125 },
+]
+
+[mobs.9500106]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500107]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.9500110]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500115]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500119]
+add = [{ item = 4030009, prob = 0.028 }]
+
+[mobs.9500120]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500121]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500124]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.9500126]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500139]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500140]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500156]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500160]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500165]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500169]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500171]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500326]
+add = [{ item = 4030001, prob = 0.01 }]
+
+[mobs.9500327]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500328]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500366]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500370]
+add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.9500372]
+add = [{ item = 4030012, prob = 0.125 }]
