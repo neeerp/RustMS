@@ -240,7 +240,7 @@ namespace ms
 		return duration > 0;
 	}
 
-	ChatBalloonHorizontal::ChatBalloonHorizontal()
+	ChatBalloonHorizontal::ChatBalloonHorizontal(Text::Font font)
 	{
 		nl::node Balloon = NxFiles::ui_classic["Login.img"]["WorldNotice"]["Balloon"];
 
@@ -258,7 +258,7 @@ namespace ms
 		xtile = std::max<int16_t>(north.width(), 1);
 		ytile = std::max<int16_t>(west.height(), 1);
 
-		textlabel = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK, "", 300);
+		textlabel = Text(font, Text::Alignment::LEFT, Color::Name::BLACK, "", 300);
 	}
 
 	void ChatBalloonHorizontal::draw(Point<int16_t> position) const

@@ -140,7 +140,8 @@ namespace ms
 		PageArrow page_left;
 		PageArrow page_right;
 
-		ChatBalloonHorizontal chatballoon;
+		// The Tab hint is in font 1, Arial 12 regular (0x604e9b).
+		ChatBalloonHorizontal chatballoon{ Text::Font::A12M };
 		ChatBalloonHorizontal hintballoon;
 	};
 }

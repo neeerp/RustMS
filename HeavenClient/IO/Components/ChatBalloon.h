@@ -96,7 +96,8 @@ namespace ms
 	class ChatBalloonHorizontal
 	{
 	public:
-		ChatBalloonHorizontal();
+		// v83 draws most of these hints in font 0x25, Arial 12 bold.
+		ChatBalloonHorizontal(Text::Font font = Text::Font::A12B);
 
 		void draw(Point<int16_t> position) const;
 
