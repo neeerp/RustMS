@@ -375,6 +375,11 @@ Password" (an info quest) with it as the info (Cosmic `3360.js`): a script's
 quest starts with. The Secret Passage (2111024) asks for it at the secret
 door, and the right one sets the info to `1`, which the data's end checks (see
 `map-travel.md`). Their text is unsourced.
+"Phyllia's Pendant" (3322) ends on the Silver Pendant (4031697) at Phyllia
+(2111004). The picture frame in the Home of the Missing Alchemist (2111013,
+261000001, `hide` 1 in the map data but spawned like any NPC) gives it,
+after one line, to a player on 3322 who holds none; otherwise clicking it
+does nothing (Cosmic `2111013.js`).
 "Life Alchemy, and the Missing Alchemist" (3314) starts from the data, with
 Alcadno's cape (1102136) worn. The desk in Alcadno's upper lab (2111015,
 261020200) gives one of Russellon's Pills (2022198) to a player on 3314 who

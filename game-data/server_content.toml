@@ -1379,6 +1379,8 @@ unsourced = [
     "icebyrd.lita_told",
     "icebyrd.boroughs",
     "icebyrd.boroughs_told",
+    "picture_frame.found",
+    "picture_frame.full",
     "ellin.menu",
     "ellin.enter",
     "ellin.about",
