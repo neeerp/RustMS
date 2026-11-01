@@ -667,8 +667,8 @@ pub mod keys {
     pub const VETERAN_HUNTER_NOT_YET: &str = "veteran_hunter.not_yet";
     pub const VETERAN_HUNTER_TOO_LATE: &str = "veteran_hunter.too_late";
     /// A job instructor's recommendation letter to the Mushking Empire
-    /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
-    /// (`q2300e`-`q2304e`), the player answering him.
+    /// (`q2300s`-`q2310s`), and the Head Security Officer reading it
+    /// (`q2300e`-`q2310e`), the player answering him.
     pub const MC_LETTER_ASK: &str = "mc_letter.ask";
     pub const MC_LETTER_LATER: &str = "mc_letter.later";
     pub const MC_LETTER_FULL: &str = "mc_letter.full";

@@ -314,16 +314,16 @@ completes 21719 on accepting.
 HeavenClient checks the same record before offering the quest, unless the
 record is itself a quest in `QuestInfo.img` (Meren's 6030-6032 read 6029's
 string, which the server doesn't keep, so the client leaves those to it).
-"Endangered Mushking Empire" (2300-2304, levels 30-38) leads an Explorer to
-the kingdom: each branch's instructor (Dances with Balrog, Grendel, the Dark
-Lord, Athena Pierce, Kyrin) offers it through the quest alert, and the start
-scripts `q2300s`-`q2304s` (Edelstein's `q2300s`) give the recommendation
+"Endangered Mushking Empire" (2300-2310, levels 30-38) leads a second-job
+character to the kingdom: each branch's instructor (Dances with Balrog,
+Grendel, the Dark Lord, Athena Pierce, Kyrin; the Knight Commanders
+1101003-1101007 for 2305-2309; Lilin 1201000 for an Aran, 2310) offers it
+through the quest alert, and the start scripts `q2300s`-`q2310s` (Edelstein's `q2300s`) give the recommendation
 letter (4032375, needing an ETC slot), which starts the quest, then offer to
 send the player straight to the opening scene (106020001). The Head Security
-Officer's (1300005) end scripts `q2300e`-`q2304e` take the letter, complete
+Officer's (1300005) end scripts `q2300e`-`q2310e` take the letter, complete
 the quest and give 1,200 EXP; the data has no rewards. The player answers
-him on one page (`Page::Reply`, speaker bit 0x2). The Cygnus Knights'
-2305-2310 are left out with their other quests.
+him on one page (`Page::Reply`, speaker bit 0x2).
 "James's Whereabouts" (2325-2327) follows the officer's brother James
 (1300008, in 106021201): his end script `q2325e` has the player answer him
 too and gives the 6,000 EXP of its `Act` (a script's completion applies no
