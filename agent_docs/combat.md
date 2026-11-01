@@ -1891,6 +1891,15 @@ controller's client plays the cast and the server applies it
   `count` players to the mob's `info/ban` map, of the players in its area,
   each cast landing by its `prop`. **Poison Mist** (131) lays a mob mist over
   its area by its `prop`; each client in it hurts itself (see above).
+- **Touch banish:** a mob whose `ban/banType` is 1 (Delli's serpents
+  9300160/61, Hogul 9500182/83, the Mirror Ghosts, the Cat 9500323/24)
+  banishes a player by touch. The client sends MOB_BANISH_PLAYER (0x38,
+  the template id) each time it takes the touch, before the hit
+  (`MapMobs::touch_banisher` in Stage.cpp); the field banishes them to the
+  `ban` map with the pink `banMsg` if such a mob of that template is
+  there (`FieldRequest::TouchBanish`). A packet for a mob that banishes
+  only by skill does nothing (Cosmic checks no `banType`). Report
+  `v83ref/reports/b414-touch-banish.md`.
 - **Boss switches:** three NPCs weaken a boss on their map when a player
   says yes to them (`BOSS_SWITCHES`, Cosmic's `weakenAreaBoss`): the
   Small Street Light (1052107) by Shade (5090000) in Kerning City's

@@ -143,6 +143,9 @@ pub struct Banish {
     pub map_id: i32,
     pub portal: String,
     pub message: String,
+    /// `banType` 1: touching the mob banishes too, as the client says
+    /// with MOB_BANISH_PLAYER (0x38); otherwise only its skill 129 does.
+    pub touch: bool,
 }
 
 /// One of a mob's skills (`skill/<n>`).
@@ -376,6 +379,7 @@ impl MobData {
             map_id,
             portal: nx.string_child(to, "portal")?.unwrap_or_default(),
             message: nx.string_child(ban, "banMsg")?.unwrap_or_default(),
+            touch: nx.int_child(ban, "banType")? == Some(1),
         }))
     }
 
@@ -455,6 +459,10 @@ mod tests {
         let banish = data.info(5090000).unwrap().unwrap().banish.unwrap();
         assert_eq!((banish.map_id, banish.portal.as_str()), (103000100, "sp"));
         assert!(banish.message.ends_with("Subway Ticketing Booth."));
+        assert!(!banish.touch);
+        // Delli's serpents banish by touch (banType 1).
+        let serpent = data.info(9300160).unwrap().unwrap().banish.unwrap();
+        assert_eq!((serpent.map_id, serpent.touch), (925010000, true));
         assert_eq!(data.info(100100).unwrap().unwrap().banish, None);
     }
 

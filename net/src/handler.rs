@@ -878,6 +878,9 @@ pub enum FieldRequest {
     MobDistance { object_id: i32, distance: i32 },
     /// A mob that bombs has a player in reach.
     MobBomb { object_id: i32 },
+    /// The player touched a mob of template `mob_id` that banishes by
+    /// touch.
+    TouchBanish { mob_id: i32 },
     /// A trap that hurts mobs hurt one for `damage`, as the client saw it.
     FieldDamageMob { object_id: i32, damage: i32 },
     /// A mob touched a friendly mob (`damagedByMob`), which the server
@@ -1305,6 +1308,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MoveLife, InGame(&world::MoveLifeHandler)),
             (Op::MobDistance, InGame(&world::MobDistanceHandler)),
             (Op::MobBomb, InGame(&world::MobBombHandler)),
+            (Op::MobBanishPlayer, InGame(&world::MobBanishHandler)),
             (Op::FieldDamageMob, InGame(&world::FieldDamageMobHandler)),
             (
                 Op::MobDamageMobFriendly,
@@ -1414,7 +1418,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 146);
+        assert_eq!(world_routes().len(), 147);
     }
 
     #[test]

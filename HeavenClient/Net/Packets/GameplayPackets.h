@@ -1285,6 +1285,17 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOB_BANISH_PLAYER(56)
+	class MobBanishPlayerPacket : public OutPacket
+	{
+	public:
+		// Tells the server the player touched a mob that banishes by touch: its template id
+		MobBanishPlayerPacket(int32_t mobid) : OutPacket(OutPacket::Opcode::MOB_BANISH_PLAYER)
+		{
+			write_int(mobid);
+		}
+	};
+
 	// Opcode: MOB_BOMB(193)
 	class MobBombPacket : public OutPacket
 	{

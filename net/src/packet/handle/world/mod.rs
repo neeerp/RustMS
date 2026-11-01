@@ -114,8 +114,8 @@ pub use self::click_guide::ClickGuideHandler;
 pub use self::coconut::CoconutHandler;
 pub use self::combat::{
     absorbed, catch_disease, countered, death_penalty, hurt_by_hazard, AttackHandler,
-    FieldDamageMobHandler, MobBombHandler, MobDamageMobFriendlyHandler, MobDamageMobHandler,
-    MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
+    FieldDamageMobHandler, MobBanishHandler, MobBombHandler, MobDamageMobFriendlyHandler,
+    MobDamageMobHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
 };
 pub use self::conti::ContiStateRequestHandler;
 pub use self::death_item::UseDeathItemHandler;

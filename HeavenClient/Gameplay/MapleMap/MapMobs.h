@@ -148,6 +148,8 @@ namespace ms
 
 		// A mob's template id, or 0 if there is no such mob.
 		int32_t get_mob_id(int32_t oid) const;
+		// A mob's template id if touching it banishes the player, or 0.
+		int32_t touch_banisher(int32_t oid) const;
 
 		// The last HP percent of the first boss to have entered the map, but for the Dojo's 9300216 and
 		// 9999999, which the Dojo's monster gauge shows (0x679025); -1 for none.

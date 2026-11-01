@@ -92,6 +92,7 @@ namespace ms
 		flyspeed = info["flySpeed"];
 		chasespeed = info["chaseSpeed"];
 		touchdamage = info["bodyAttack"].get_bool();
+		touchbanish = static_cast<int32_t>(info["ban"]["banType"]) == 1;
 		undead = info["undead"].get_bool();
 		noflip = info["noFlip"].get_bool();
 		blocksteleport = info["cantPassByTeleport"].get_bool();
@@ -2789,6 +2790,11 @@ namespace ms
 	bool Mob::can_move() const
 	{
 		return canmove;
+	}
+
+	bool Mob::banishes_by_touch() const
+	{
+		return touchbanish;
 	}
 
 	bool Mob::deals_touch_damage() const
