@@ -1081,16 +1081,17 @@ namespace ms
 		}
 	}
 
-	// v83 lets Flash Jump go only in the air, and leaves its effect where
-	// the player was (FUN_0096be38). The map's ban spares a GM.
+	// v83 lets Flash Jump go only in the air and Soul Rush only from the
+	// ground, and leaves the effect where the player was (FUN_0096be38).
+	// The map's ban spares a GM.
 	void Stage::use_flash_jump(int32_t skill)
 	{
 		bool allowed = mapinfo.can_use_movement_skills() || Configuration::get().get_grade().gm();
 
-		if (!combat.use_flash_jump(skill, allowed, player.may_flash_jump()))
+		if (!combat.use_flash_jump(skill, allowed, player.may_flash_jump(skill)))
 			return;
 
-		player.flash_jump(player.get_skills().get_level(skill));
+		player.flash_jump(skill, player.get_skills().get_level(skill));
 		show_flash_jump(flash_jump::effect(skill), player.get_position(), player.getflip());
 	}
 
@@ -1463,7 +1464,7 @@ namespace ms
 			case KeyType::Id::SKILL:
 				if (down && teleport::teleports(action))
 					use_teleport(action);
-				else if (down && flash_jump::jumps(action))
+				else if (down && (flash_jump::jumps(action) || action == flash_jump::SOUL_RUSH))
 					use_flash_jump(action);
 				else if (down && wings::is_wings(action))
 					use_wings(action);

@@ -898,6 +898,11 @@ for every four levels, records path element 6 before the push, and leaves
 Another player's client shows that effect, picked by the jumper's job, when
 their path arrives with element 6 (FUN_0097fdf8).
 
+The Dawn Warrior's Soul Rush (11101005) takes the same path on both sides,
+with three differences: it goes only from a foothold, off any rope or
+ladder; it may go again only 1.5 s after it went (0x9535e3); and it pushes
+as a Flash Jump of twice its level, leaving `BasicEff.img/SoulRush`.
+
 A Gunslinger's Recoil Shot (5201006) is a plain gun shot to the server.
 HeavenClient follows v83 (FUN_009537d5): as the shot goes, it records path
 element 13 and throws the player 250 px/s back, away from where they
@@ -2226,4 +2231,4 @@ loses 10 HP at the next tick, after an HP_TAKEN of 10. After a Red Bean Porridge
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
 gates and the notices; `combo_tests` cover the orbs' damage table and
 `combo_orbs_tests` what they show; `flash_jump_tests` cover Flash Jump's
-push, its gates and its effects.
+and Soul Rush's push, their gates and their effects.

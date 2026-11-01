@@ -31,6 +31,12 @@ int main()
 		require(!may_jump(false, true, false, false, 0.0), "not from a rope");
 		require(!may_jump(false, false, true, false, -1.0), "once until landing");
 
+		require(push_level(4111006, 20) == 20 && push_level(SOUL_RUSH, 10) == 20, "Soul Rush pushes at twice its level");
+		require(may_rush(true, false, false, 1500, 1500), "Soul Rush from the ground once ready");
+		require(!may_rush(false, false, false, 1500, 0), "not from the air");
+		require(!may_rush(true, true, false, 1500, 0), "not from a rope");
+		require(!may_rush(true, false, false, 1499, 1500), "not before its delay is up");
+		require(std::strcmp(effect(SOUL_RUSH), "SoulRush") == 0, "Soul Rush's effect");
 		require(std::strcmp(effect(4111006), "Flying") == 0, "a Hermit's effect");
 		require(std::strcmp(effect(14101004), "Flying1") == 0, "a Night Walker's effect");
 		require(std::strcmp(remote_effect(411), "Flying") == 0, "another Hermit's");

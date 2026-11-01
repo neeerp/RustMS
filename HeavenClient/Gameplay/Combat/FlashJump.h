@@ -5,9 +5,15 @@
 namespace ms
 {
 	// Flash Jump, which throws the user on through the air, as in the
-	// MapleRoyals client (FUN_0096be38).
+	// MapleRoyals client (FUN_0096be38), and the Dawn Warrior's Soul Rush,
+	// which throws them off the ground the same way.
 	namespace flash_jump
 	{
+		constexpr int32_t SOUL_RUSH = 11101005;
+
+		// Soul Rush may go again 1.5 s after it went (0x9535e3).
+		constexpr int64_t RUSH_DELAY = 1500;
+
 		inline bool jumps(int32_t skill)
 		{
 			switch (skill)
@@ -28,6 +34,12 @@ namespace ms
 			double vy;
 		};
 
+		// Soul Rush pushes as Flash Jump at twice its level (0x96bfe5).
+		inline int32_t push_level(int32_t skill, int32_t level)
+		{
+			return skill == SOUL_RUSH ? level * 2 : level;
+		}
+
 		inline Impulse impulse(int32_t level, bool left)
 		{
 			int32_t steps = level / 4;
@@ -44,9 +56,19 @@ namespace ms
 			return !onground && !climbing && !used && (swimming || vspeed <= 0.0);
 		}
 
-		// The effect left where the user jumped (0x96c0d4).
+		// Soul Rush goes only from a foothold, off any rope or ladder, once
+		// ready (0x96bf14-0x96bf4b).
+		inline bool may_rush(bool onground, bool climbing, bool used, int64_t now, int64_t ready_at)
+		{
+			return onground && !climbing && !used && now >= ready_at;
+		}
+
+		// The effect left where the user jumped (0x96c0d4, 0x96c0a4).
 		inline const char *effect(int32_t skill)
 		{
+			if (skill == SOUL_RUSH)
+				return "SoulRush";
+
 			return skill == 14101004 ? "Flying1" : "Flying";
 		}
 

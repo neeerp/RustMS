@@ -77,10 +77,10 @@ namespace ms
 		// element `command` of no duration (v83 FUN_0052ef17).
 		void record_move(uint8_t command);
 
-		// Whether a Flash Jump may go now, and throw the player on through
-		// the air at its `level` (FUN_0096be38).
-		bool may_flash_jump() const;
-		void flash_jump(int32_t level);
+		// Whether a Flash Jump or Soul Rush `skill` may go now, and throw
+		// the player on at its `level` (FUN_0096be38).
+		bool may_flash_jump(int32_t skill) const;
+		void flash_jump(int32_t skill, int32_t level);
 
 		// Recoil Shot's push back and up, away from where the player faces,
 		// at its `level`; no Flash Jump follows it in the air.
@@ -610,8 +610,9 @@ namespace ms
 		// Whether the player has Flash Jumped since last on the ground or a
 		// rope (+0x2b58).
 		bool flash_jumped = false;
-		// When Combat Step may go again (+0x3158).
+		// When Combat Step and Soul Rush may go again (+0x3158).
 		int64_t step_ready_at = 0;
+		int64_t rush_ready_at = 0;
 		// How long Wings may still glide, in milliseconds (+0x3130).
 		int32_t wings_left = 0;
 		// The Energy Charge gauge, 0 to 10000.

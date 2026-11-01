@@ -457,7 +457,7 @@ namespace ms
 		return target;
 	}
 
-	bool Combat::use_flash_jump(int32_t move_id, bool allowed, bool airborne)
+	bool Combat::use_flash_jump(int32_t move_id, bool allowed, bool may)
 	{
 		const SpecialMove &move = get_move(move_id);
 
@@ -472,7 +472,7 @@ namespace ms
 			return false;
 		}
 
-		if (!airborne || !player.can_request(ExclRequest::SKILL_WAIT))
+		if (!may || !player.can_request(ExclRequest::SKILL_WAIT))
 			return false;
 
 		// With no action and no position (0x96d565, FUN_0096d6ca).

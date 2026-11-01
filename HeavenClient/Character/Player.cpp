@@ -580,8 +580,11 @@ namespace ms
 		path.add(current_move(command));
 	}
 
-	bool Player::may_flash_jump() const
+	bool Player::may_flash_jump(int32_t skill) const
 	{
+		if (skill == flash_jump::SOUL_RUSH)
+			return flash_jump::may_rush(phobj.onground, is_climbing(), flash_jumped, now_ms(), rush_ready_at);
+
 		bool swimming = phobj.type == PhysicsObject::Type::SWIMMING || phobj.type == PhysicsObject::Type::FLYING;
 
 		return flash_jump::may_jump(phobj.onground, is_climbing(), flash_jumped, swimming, phobj.vspeed);
@@ -589,13 +592,16 @@ namespace ms
 
 	// Element 6 marks the jump in the path, before the push lands on the
 	// next step (0x96bff3).
-	void Player::flash_jump(int32_t level)
+	void Player::flash_jump(int32_t skill, int32_t level)
 	{
-		flash_jump::Impulse push = flash_jump::impulse(level, !facing_right);
+		flash_jump::Impulse push = flash_jump::impulse(flash_jump::push_level(skill, level), !facing_right);
 
 		record_move(6);
 		Physics::knockback(phobj, push.vx, push.vy);
 		flash_jumped = true;
+
+		if (skill == flash_jump::SOUL_RUSH)
+			rush_ready_at = now_ms() + flash_jump::RUSH_DELAY;
 	}
 
 	void Player::recoil_shot(int32_t level)
