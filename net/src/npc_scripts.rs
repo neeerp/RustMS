@@ -392,6 +392,13 @@ pub const WISP: i32 = 2040030;
 pub const FROD: i32 = 1012007;
 pub const WEAVER: i32 = 2040032;
 pub const NERU: i32 = 2040033;
+pub const HIKARI: i32 = 9120003;
+/// What Hikari charges to enter Showa's bathhouse.
+pub const BATHHOUSE_PRICE: i32 = 300;
+/// The bathhouse's locker rooms, a man's then a woman's, entered by their
+/// `out00` (portal 2).
+pub const LOCKER_ROOMS: [i32; 2] = [801000100, 801000200];
+const LOCKER_ROOM_DOOR: u8 = 2;
 
 /// A pet-walking road's two trainers: the one at its foot gives a letter,
 /// and the brother at its top takes it and brings every pet out closer.
@@ -2639,6 +2646,7 @@ impl NpcScript {
             FROD => return Some(pet_course_end(&HENESYS_PET_COURSE, player)),
             WEAVER => return Some(pet_course_start(&LUDIBRIUM_PET_COURSE, player)),
             NERU => return Some(pet_course_end(&LUDIBRIUM_PET_COURSE, player)),
+            HIKARI => return Some(hikari(player)),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9960,6 +9968,27 @@ fn pet_course_end(course: &PetCourse, player: &Player) -> NpcScript {
     let letter = Page::Say(text(keys::PET_COURSE_LETTER));
     let mut script = NpcScript::new(course.taker, vec![letter, closer]);
     script.refused = Some(text(keys::PET_COURSE_NO_PET));
+    script
+}
+
+/// Hikari at Showa's bathhouse lets one into the locker room for their
+/// gender, for a fee.
+fn hikari(player: &Player) -> NpcScript {
+    let room = LOCKER_ROOMS[usize::from(player.stats.gender.min(1))];
+    let price = BATHHOUSE_PRICE.to_string();
+    let priced = |key| content::text().get(key, &[("price", price.as_str())]);
+    let mut script = NpcScript::new(
+        HIKARI,
+        vec![Page::Ask {
+            text: priced(keys::HIKARI_ASK),
+            on_yes: vec![
+                Effect::SpendMeso(BATHHOUSE_PRICE),
+                Effect::WarpToPortal(room, LOCKER_ROOM_DOOR),
+            ],
+            on_no: Some(text(keys::HIKARI_LATER)),
+        }],
+    );
+    script.refused = Some(priced(keys::HIKARI_SHORT));
     script
 }
 
@@ -26644,6 +26673,25 @@ mod tests {
         neru.begin();
         let closer = neru.respond(ScriptInput::Next).unwrap();
         assert_eq!(closer.effects[1], Effect::TamePets(4));
+    }
+
+    #[test]
+    fn hikari_lets_one_into_the_locker_room_for_their_gender() {
+        for (gender, room) in [(0, LOCKER_ROOMS[0]), (1, LOCKER_ROOMS[1])] {
+            let mut player = traveller(30, 0, false);
+            player.stats.gender = gender;
+            let mut hikari = NpcScript::for_npc(HIKARI, &player).unwrap();
+            assert!(question(&hikari.begin()).contains("300"));
+            let paid = hikari.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(
+                paid.effects,
+                [
+                    Effect::SpendMeso(BATHHOUSE_PRICE),
+                    Effect::WarpToPortal(room, LOCKER_ROOM_DOOR)
+                ]
+            );
+            assert!(hikari.refused().is_some());
+        }
     }
 
     #[test]

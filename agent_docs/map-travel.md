@@ -93,6 +93,14 @@ to without a portal. All of this text is `unsourced` placeholder text
 `rupi.*`). `world_tour.rs` checks the tour over a relogin, Florina Beach
 both ways, Thomas Swift, Happyville and Audrey's rides.
 
+Hikari (`9120003`) in Showa Town (`801000000`) asks for 300 mesos to enter
+the bathhouse. A Yes spends them and warps the player to the locker room
+for their gender: the men's (`801000100`) or the women's (`801000200`),
+each at portal 2 (`out00`), the door back to town. Without the mesos,
+nothing is taken and Hikari names the price (Cosmic `9120003.js`). The
+keys `hikari.*` are `unsourced`. `bathhouse.rs` checks the entry through
+the network harness (QUESTIONS b393).
+
 ## Guards
 
 Jeff (`2030000`, `goDungeon`) stands in Ice Valley II (`211040200`), where

@@ -3097,6 +3097,9 @@ pub mod keys {
     pub const PET_COURSE_LETTER: &str = "pet_course.letter";
     pub const PET_COURSE_NO_PET: &str = "pet_course.no_pet";
     pub const PET_COURSE_CLOSER: &str = "pet_course.closer";
+    pub const HIKARI_ASK: &str = "hikari.ask";
+    pub const HIKARI_LATER: &str = "hikari.later";
+    pub const HIKARI_SHORT: &str = "hikari.short";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5271,6 +5274,9 @@ mod tests {
                 keys::PET_COURSE_LETTER,
                 keys::PET_COURSE_NO_PET,
                 keys::PET_COURSE_CLOSER,
+                keys::HIKARI_ASK,
+                keys::HIKARI_LATER,
+                keys::HIKARI_SHORT,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
