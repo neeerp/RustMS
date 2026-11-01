@@ -75,6 +75,8 @@ namespace ms
 		int32_t item_id = 0;
 		nl::node effect;
 		bool keyed = false;
+		bool taming_mob = true;
+		bool acting = false;
 		std::string action;
 		std::optional<Layer> layer;
 		std::vector<Follower> followers;

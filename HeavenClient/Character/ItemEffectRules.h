@@ -40,6 +40,15 @@ namespace ms::item_effect
 		return next == 0 || last_shown < 0 || now - last_shown >= THROTTLE;
 	}
 
+	// An action item has no actions on a tamed monster (190xxxx) or a vehicle (193xxxx) unless its `tamingMob`, 1
+	// by default, says it keeps them there (0x93bb72); it plays `default` then.
+	constexpr bool acts(bool keyed, bool taming_mob, int32_t vehicle)
+	{
+		int32_t kind = vehicle / 10000;
+
+		return keyed && (taming_mob || (kind != 190 && kind != 193));
+	}
+
 	// An item with `action` set plays the node named after the action under way, and `default` in any action it
 	// has no node for (FUN_0093beb9). The others always play `default`.
 	inline std::string key(bool keyed, bool has_action, const std::string &action)
