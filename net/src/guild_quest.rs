@@ -28,6 +28,11 @@ pub const GATE_PORTAL: &str = "join00";
 
 pub const SHUANG: i32 = 9_040_000;
 pub const NURIS: i32 = 9_040_001;
+/// Shawn at the camp, who tells of Sharenian, the Rubian and the quest.
+pub const SHAWN: i32 = 9_040_002;
+/// The Bulletin Board at the camp and in the waiting room, with the
+/// quest's rules.
+pub const BULLETIN_BOARD: i32 = 9_040_011;
 /// On every stage, offering the way out of the quest.
 pub const EXIT_GUIDE: i32 = 9_040_005;
 

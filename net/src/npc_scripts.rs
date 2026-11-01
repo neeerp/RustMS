@@ -2854,6 +2854,27 @@ impl NpcScript {
                 };
                 return Some(NpcScript::new(npc_id, vec![page]));
             }
+            guild_quest::SHAWN => {
+                let answer = |label, lines: &[&str]| {
+                    let pages = lines.iter().map(|&line| Page::Say(text(line)));
+                    (text(label), pages.collect())
+                };
+                let page = Page::Menu {
+                    text: text(keys::SHAWN_MENU),
+                    choices: vec![
+                        answer(keys::SHAWN_SHARENIAN_LABEL, &keys::SHAWN_SHARENIAN),
+                        answer(keys::SHAWN_RUBIAN_LABEL, &[keys::SHAWN_RUBIAN]),
+                        answer(keys::SHAWN_QUEST_LABEL, &keys::SHAWN_QUEST),
+                        answer(keys::SHAWN_FINE_LABEL, &[keys::SHAWN_FINE]),
+                    ],
+                };
+                return Some(NpcScript::new(npc_id, vec![page]));
+            }
+            guild_quest::BULLETIN_BOARD => {
+                let least = events::GUILD_QUEST.least().to_string();
+                let rules = content::text().get(keys::GUILD_QUEST_BOARD, &[("least", &least)]);
+                return Some(NpcScript::new(npc_id, vec![Page::Say(rules)]));
+            }
             AMES_AT_THE_EXIT => {
                 let back = Page::Done(vec![Effect::Warp(wedding::AMORIA)]);
                 let pages = vec![Page::Say(text(keys::WEDDING_EXIT_BACK)), back];
@@ -23801,6 +23822,34 @@ mod tests {
             let said = talk.respond(ScriptInput::Select(choice as i32)).unwrap();
             assert_eq!(page_text(&said), text(line));
         }
+    }
+
+    #[test]
+    fn shawn_tells_of_sharenian_and_the_board_gives_the_guild_quests_rules() {
+        let [ruler, king] = keys::SHAWN_SHARENIAN;
+        let [explorers, aim] = keys::SHAWN_QUEST;
+        for (choice, first, second) in [
+            (0, ruler, Some(king)),
+            (1, keys::SHAWN_RUBIAN, None),
+            (2, explorers, Some(aim)),
+            (3, keys::SHAWN_FINE, None),
+        ] {
+            let mut talk = NpcScript::for_npc(guild_quest::SHAWN, &player(50)).unwrap();
+            assert_eq!(kind(&talk.begin()), Some(4));
+            let said = talk.respond(ScriptInput::Select(choice)).unwrap();
+            assert_eq!(page_text(&said), text(first));
+            if let Some(second) = second {
+                let said = talk.respond(ScriptInput::Next).unwrap();
+                assert_eq!(page_text(&said), text(second));
+            }
+        }
+
+        let mut board = NpcScript::for_npc(guild_quest::BULLETIN_BOARD, &player(50)).unwrap();
+        let least = events::GUILD_QUEST.least().to_string();
+        assert_eq!(
+            page_text(&board.begin()),
+            content::text().get(keys::GUILD_QUEST_BOARD, &[("least", &least)])
+        );
     }
 
     #[test]

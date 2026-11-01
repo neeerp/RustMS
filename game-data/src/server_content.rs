@@ -276,6 +276,16 @@ pub mod keys {
     pub const AMES_MARRY_LABEL: &str = "ames.marry.label";
     pub const AMES_MARRY: &str = "ames.marry";
     pub const AMES_BREAK_OFF_LABEL: &str = "ames.break_off.label";
+    pub const SHAWN_MENU: &str = "shawn.menu";
+    pub const SHAWN_SHARENIAN_LABEL: &str = "shawn.sharenian.label";
+    pub const SHAWN_SHARENIAN: [&str; 2] = ["shawn.sharenian.0", "shawn.sharenian.1"];
+    pub const SHAWN_RUBIAN_LABEL: &str = "shawn.rubian.label";
+    pub const SHAWN_RUBIAN: &str = "shawn.rubian";
+    pub const SHAWN_QUEST_LABEL: &str = "shawn.quest.label";
+    pub const SHAWN_QUEST: [&str; 2] = ["shawn.quest.0", "shawn.quest.1"];
+    pub const SHAWN_FINE_LABEL: &str = "shawn.fine.label";
+    pub const SHAWN_FINE: &str = "shawn.fine";
+    pub const GUILD_QUEST_BOARD: &str = "guild_quest.board";
     pub const AMES_BREAK_OFF: &str = "ames.break_off";
     /// A Lith Harbor job statue, by job (`warrior`, `bowman`, `magician`,
     /// `thief`, `pirate`): `ask` (to go to the instructor) and `weak`.
@@ -4249,6 +4259,18 @@ mod tests {
             keys::AMES_MARRY_LABEL,
             keys::AMES_MARRY,
             keys::AMES_BREAK_OFF_LABEL,
+            keys::SHAWN_MENU,
+            keys::SHAWN_SHARENIAN_LABEL,
+            keys::SHAWN_SHARENIAN[0],
+            keys::SHAWN_SHARENIAN[1],
+            keys::SHAWN_RUBIAN_LABEL,
+            keys::SHAWN_RUBIAN,
+            keys::SHAWN_QUEST_LABEL,
+            keys::SHAWN_QUEST[0],
+            keys::SHAWN_QUEST[1],
+            keys::SHAWN_FINE_LABEL,
+            keys::SHAWN_FINE,
+            keys::GUILD_QUEST_BOARD,
             keys::AMES_BREAK_OFF,
             keys::SAGE_STATUE,
             keys::SAGE_SIGILS,

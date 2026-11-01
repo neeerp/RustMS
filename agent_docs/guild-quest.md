@@ -27,6 +27,10 @@ All dialogue is placeholder text (`guild_quest.*` keys in
 - Shuang (9040000) stands at the Excavation Site's camp (101030104,
   `CAMP`). Nuris (9040001) stands on the Returning Path (990001100,
   `RETURNING_PATH`).
+- Also at the camp, Shawn (9040002, `SHAWN`) answers a menu on Sharenian,
+  the Rubian and the quest, as Cosmic's `9040002.js` does. The Bulletin
+  Board (9040011, `BULLETIN_BOARD`, at the camp and in the waiting room)
+  gives the rules with the event's own least number of members.
 - A guild's master or Jr. Master (ranks 1 and 2, `REGISTRANT_RANKS`)
   registers it. That member is its registrant.
 - `Line` is one channel's line: the guild playing, if any, and up to ten
