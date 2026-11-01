@@ -1037,7 +1037,30 @@ to 13), and who the knights are, as Cosmic's `1101008.js`. Mimo's lines
 are placeholders. Anyone else gets nothing: Cosmic opens Lilin's Aran
 tutorial, which isn't played.
 
-Before that, in Rien, Lilin (1201000) has a Legend train. Lilin's Account
+The Aran's story begins on the Black Road (914000000 to 914000500), though
+a new Aran still starts in Amherst until the whole tutorial is in. Its
+first portal (`aranTutorAloneX`) leads to the ark (914000100). Entering
+that map sets record 21002 to "1" (`scripts::unscripted_map_enter`, as
+Cosmic's `914000100.js`), which Find the Missing Kid 1 (21000) waits for.
+Athena Pierce (1209000) starts it (`q21000s`) and points the way with
+`tutorialArrow1`. Talked to, she says three lines and plays the scene of
+the three heroes (`Direction1.img/aranTutorial/Trio`, an
+`Effect::ScenePart`). The refugees 1209001 to 1209005 each say one line
+(`ONE_LINERS`). The ark's way out (`aranTutorOut1`) stays shut with a pink
+line until 21000 is started. It and the next two (`aranTutorOut2`, `3`)
+each teach a tutorial skill or two at level 1 (`BLACK_ROAD_STRETCHES`):
+20000017 and 20000018, then 20000014 and 20000015, then 20000016. The
+Lost Kid (1209006, in 914000300) ends 21000 from the data. The kid's start
+of Find the Missing Kid 2 (21001, `q21001s`) gives the Lost Child (4001271)
+and puts the Aran back at the map's start. The map's way out (`outChild`)
+then leads back toward the ark (914000400) instead of the road taken
+there. At the gangway (914000500), Athena (1209007) takes the child
+(`q21001e`), the worn weapon is taken (`Effect::TakeWorn`, Cosmic's
+`removeEquipFromSlot(-11)`), and the Aran goes straight to Snow Island's
+Ice Cave (140090000). Cosmic plays a cinematic first (914090010), which we
+skip. All these lines are placeholders.
+
+Later, in Rien, Lilin (1201000) has a Legend train. Lilin's Account
 (21014, level 5) runs from the data. Basic Fitness Training 1 to 3 (21015
 to 21017) and the Basic Fitness Test (21018) each start on the yes of
 Lilin's start script (`q21015s` to `q21018s`). Their hunts and rewards come
