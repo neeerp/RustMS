@@ -24,8 +24,9 @@ CP window for spending CP, with its side panel counting the mobs summoned
   (2042000). Its `mc_out` portal leads back to the map kept in
   `CARNIVAL_RETURN` (5), or Kerning City.
 - Room n (1 to 6) is 980000n00 (`room_map`), its waiting room, with
-  2042001, who tells the party to wait, and 2042003, who takes a member
-  back to the Carnival Field. Its battle field is 980000n01 (`battle_map`),
+  2042001, who tells the party to wait, and Assistant Red (2042003, rooms
+  1, 3 and 5) or Assistant Blue (2042004, rooms 2, 4 and 6), who takes a
+  member back to the Carnival Field. Its battle field is 980000n01 (`battle_map`),
   then the revive room (n02), the winners' (n03) and the losers' (n04). The
   revive rooms' `MCrevive<n>` portals go back to the battle field.
 - The exit room, 980000010 (`CARNIVAL_EXIT`), has 2042002, who sends

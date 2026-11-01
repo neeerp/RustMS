@@ -25,7 +25,8 @@ use net::carnival::{
     CARNIVAL2_LOBBY, CARNIVAL_EXIT, CARNIVAL_LOBBY,
 };
 use net::npc_scripts::{
-    CARNIVAL2_GUIDE, CARNIVAL2_HOST, CARNIVAL_GUIDE, CARNIVAL_ROOM_NPC, SPIEGELMANN,
+    CARNIVAL2_GUIDE, CARNIVAL2_HOST, CARNIVAL_GUIDE, CARNIVAL_ROOM_EXIT_BLUE, CARNIVAL_ROOM_NPC,
+    SPIEGELMANN,
 };
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
@@ -202,6 +203,19 @@ async fn a_party_not_challenged_goes_back_to_the_carnival_field() {
         .await;
         assert_eq!(carnival(&drawn, SendOpcode::CarnivalResult), [vec![10]]);
     }
+}
+
+#[tokio::test]
+async fn assistant_blue_takes_one_out_of_an_even_rooms_waiting_room() {
+    let player = &mut leader().await;
+    take(player, 2).await;
+    let asked = told(player, talk(room_map(2), CARNIVAL_ROOM_EXIT_BLUE)).await;
+    assert_eq!(asked.prompts, [(CARNIVAL_ROOM_EXIT_BLUE, 1)], "{asked:?}");
+    let mut seen = told(player, answer(1, 1, None)).await;
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&CARNIVAL_LOBBY)
+    })
+    .await;
 }
 
 #[tokio::test]
