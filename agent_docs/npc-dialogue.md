@@ -166,6 +166,14 @@ never sent to the client. The chiefs also approve players for Zakum: a
 second job of 70 picks the test or Zakum from a menu (see
 [zakum](./zakum.md)).
 
+Boss Kitty (9120013) in Showa Town asks the same kind of quiz (both are
+built by `npc_scripts::quiz`) of a player on Sakura, the Kitty, and the
+Orange Marble (8012) who lacks the marble (4031064): for 300 Fried Chicken
+(2020001), taken on Yes, five questions from the `boss_kitty.q.<n>` keys.
+All right earns the marble; a wrong answer ends the try with the chicken
+spent. Short of chicken it says so and takes none. Off the quest it has no
+script, as in Cosmic `9120013.js`.
+
 The fourth job (`FOURTH_JOBS`) is one talk with the line's instructor in
 Leafre's 240010501 (Harmonia 2081100, Gritto 2081200, Legor 2081300, Hellin
 2081400, Samuel 2081500), once a third job is level 120 and has completed

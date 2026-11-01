@@ -3151,6 +3151,27 @@ pub mod keys {
     pub const SIMON_TEMPLE_ASK: &str = "simon.temple_ask";
     pub const SIMON_BACK_ASK: &str = "simon.back_ask";
     pub const SIMON_NO: &str = "simon.no";
+    /// Boss Kitty's quiz for the Orange Marble: its lines, then questions
+    /// `0`, `1`, ... (the placeholders decide how many), each with one
+    /// right answer and its wrong ones.
+    pub const BOSS_KITTY_ETC_FULL: &str = "boss_kitty.etc_full";
+    pub const BOSS_KITTY_ASK: &str = "boss_kitty.ask";
+    pub const BOSS_KITTY_NO_CHICKEN: &str = "boss_kitty.no_chicken";
+    pub const BOSS_KITTY_START: &str = "boss_kitty.start";
+    pub const BOSS_KITTY_PASS: &str = "boss_kitty.pass";
+    pub const BOSS_KITTY_FAIL: &str = "boss_kitty.fail";
+
+    pub fn boss_kitty_question(question: usize) -> String {
+        format!("boss_kitty.q.{question}")
+    }
+
+    pub fn boss_kitty_right(question: usize) -> String {
+        format!("boss_kitty.q.{question}.right")
+    }
+
+    pub fn boss_kitty_wrong(question: usize, answer: usize) -> String {
+        format!("boss_kitty.q.{question}.wrong.{answer}")
+    }
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5369,6 +5390,12 @@ mod tests {
                 keys::SIMON_TEMPLE_ASK,
                 keys::SIMON_BACK_ASK,
                 keys::SIMON_NO,
+                keys::BOSS_KITTY_ETC_FULL,
+                keys::BOSS_KITTY_ASK,
+                keys::BOSS_KITTY_NO_CHICKEN,
+                keys::BOSS_KITTY_START,
+                keys::BOSS_KITTY_PASS,
+                keys::BOSS_KITTY_FAIL,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
@@ -5913,6 +5940,7 @@ mod tests {
         assert!(text.contains(&keys::trader("joko", "done_mesos")));
         assert!(text.contains(keys::FOURTH_JOB_INVENTORY_FULL));
         assert!(text.contains(&keys::holy_stone_wrong(4, 3)));
+        assert!(text.contains(&keys::boss_kitty_wrong(6, 1)));
         assert!(text
             .get(keys::LEAVE_AREA_WARNING, &[])
             .starts_with("[placeholder]"));

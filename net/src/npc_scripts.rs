@@ -1219,6 +1219,13 @@ const SPIRUNA_QUEST: i16 = 3034;
 const QUIZ_LENGTH: usize = 5;
 /// How long a challenger has with the clone (upstream).
 const CLONE_TIME_LIMIT: u32 = 20 * 60;
+/// Boss Kitty in Showa Town quizzes the player on Sakura, the Kitty, and
+/// the Orange Marble (8012) for the marble, for 300 Fried Chicken a try.
+pub const BOSS_KITTY: i32 = 9120013;
+pub const ORANGE_MARBLE_QUEST: i16 = 8012;
+pub const ORANGE_MARBLE: i32 = 4031064;
+pub const FRIED_CHICKEN: i32 = 2020001;
+const BOSS_KITTY_FEE: i32 = 300;
 
 /// The player's answer to the current prompt.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2956,6 +2963,7 @@ impl NpcScript {
             DOOR_OF_DIMENSION => Some(door_of_dimension(player)),
             SPARKLING_CRYSTAL => sparkling_crystal(player),
             HOLY_STONE => Some(holy_stone(player, &mut rand::thread_rng())),
+            BOSS_KITTY => boss_kitty(player, &mut rand::thread_rng()),
             SPIRUNA => Some(spiruna(player)),
             MR_THUNDER => Some(refiner(&THUNDER)),
             CHRIS => Some(refiner(&CHRIS_REFINER)),
@@ -17791,26 +17799,16 @@ fn holy_stone(player: &Player, rng: &mut impl Rng) -> NpcScript {
     if crate::items::give(&mut player.inventory.clone(), NECKLACE_OF_WISDOM, 1).is_err() {
         return say(keys::HOLY_STONE_ETC_FULL);
     }
-    let content = content::text();
-    let questions: Vec<usize> = (0..)
-        .take_while(|&n| content.contains(&keys::holy_stone_question(n)))
-        .collect();
-    let fail = vec![Page::End(text(keys::HOLY_STONE_FAIL))];
-    let mut next = vec![Page::Say(text(keys::HOLY_STONE_PASS))];
-    for &n in questions.choose_multiple(rng, QUIZ_LENGTH) {
-        let mut choices = vec![(text(&keys::holy_stone_right(n)), next)];
-        choices.extend(
-            (0..)
-                .map(|k| keys::holy_stone_wrong(n, k))
-                .take_while(|key| content.contains(key))
-                .map(|key| (text(&key), fail.clone())),
-        );
-        choices.shuffle(rng);
-        next = vec![Page::Menu {
-            text: text(&keys::holy_stone_question(n)),
-            choices,
-        }];
-    }
+    let next = quiz(
+        rng,
+        Quiz {
+            question: keys::holy_stone_question,
+            right: keys::holy_stone_right,
+            wrong: keys::holy_stone_wrong,
+            pass: keys::HOLY_STONE_PASS,
+            fail: keys::HOLY_STONE_FAIL,
+        },
+    );
     let mut pages = vec![Page::Ask {
         text: text(keys::HOLY_STONE_ASK),
         on_yes: vec![Effect::TakeItem {
@@ -17827,6 +17825,94 @@ fn holy_stone(player: &Player, rng: &mut impl Rng) -> NpcScript {
     }];
     script.inventory_full = Some(text(keys::THIRD_JOB_INVENTORY_FULL));
     script
+}
+
+/// A quiz's text: questions `0`, `1`, ... (the text decides how many),
+/// each with one right answer and its wrong ones, and the lines for
+/// passing and failing.
+struct Quiz {
+    question: fn(usize) -> String,
+    right: fn(usize) -> String,
+    wrong: fn(usize, usize) -> String,
+    pass: &'static str,
+    fail: &'static str,
+}
+
+/// `QUIZ_LENGTH` of `quiz`'s questions, in a random order, their answers
+/// shuffled: any wrong answer ends the script, and all right ones lead to
+/// the line for passing.
+fn quiz(rng: &mut impl Rng, quiz: Quiz) -> Vec<Page> {
+    let content = content::text();
+    let questions: Vec<usize> = (0..)
+        .take_while(|&n| content.contains(&(quiz.question)(n)))
+        .collect();
+    let fail = vec![Page::End(text(quiz.fail))];
+    let mut next = vec![Page::Say(text(quiz.pass))];
+    for &n in questions.choose_multiple(rng, QUIZ_LENGTH) {
+        let mut choices = vec![(text(&(quiz.right)(n)), next)];
+        choices.extend(
+            (0..)
+                .map(|k| (quiz.wrong)(n, k))
+                .take_while(|key| content.contains(key))
+                .map(|key| (text(&key), fail.clone())),
+        );
+        choices.shuffle(rng);
+        next = vec![Page::Menu {
+            text: text(&(quiz.question)(n)),
+            choices,
+        }];
+    }
+    next
+}
+
+/// Boss Kitty (Cosmic `9120013`), to one on quest 8012 without the
+/// Orange Marble: for 300 Fried Chicken, `QUIZ_LENGTH` questions about
+/// Zipangu; all right earns the marble, any wrong ends the try (the
+/// chicken is spent either way). Nothing to anyone else, as in Cosmic.
+fn boss_kitty(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
+    if player.quests.state(ORANGE_MARBLE_QUEST) != QuestState::Started
+        || holds(player, ORANGE_MARBLE)
+    {
+        return None;
+    }
+    let say = |key| Some(NpcScript::new(BOSS_KITTY, vec![Page::Say(text(key))]));
+    if crate::items::give(&mut player.inventory.clone(), ORANGE_MARBLE, 1).is_err() {
+        return say(keys::BOSS_KITTY_ETC_FULL);
+    }
+    let ask = |on_yes| Page::Ask {
+        text: text(keys::BOSS_KITTY_ASK),
+        on_yes,
+        on_no: None,
+    };
+    if player.inventory.count(FRIED_CHICKEN) < BOSS_KITTY_FEE {
+        let pages = vec![
+            ask(Vec::new()),
+            Page::Say(text(keys::BOSS_KITTY_NO_CHICKEN)),
+        ];
+        return Some(NpcScript::new(BOSS_KITTY, pages));
+    }
+    let fee = Effect::TakeItem {
+        item_id: FRIED_CHICKEN,
+        quantity: BOSS_KITTY_FEE as i16,
+    };
+    let mut pages = vec![ask(vec![fee]), Page::Say(text(keys::BOSS_KITTY_START))];
+    pages.extend(quiz(
+        rng,
+        Quiz {
+            question: keys::boss_kitty_question,
+            right: keys::boss_kitty_right,
+            wrong: keys::boss_kitty_wrong,
+            pass: keys::BOSS_KITTY_PASS,
+            fail: keys::BOSS_KITTY_FAIL,
+        },
+    ));
+    let mut script = NpcScript::new(BOSS_KITTY, pages);
+    script.on_end = vec![Effect::GiveItem {
+        item_id: ORANGE_MARBLE,
+        quantity: 1,
+    }];
+    script.inventory_full = Some(text(keys::BOSS_KITTY_ETC_FULL));
+    Some(script)
 }
 
 /// Spiruna refines Dark Crystal Ore into Dark Crystals, as many as asked,
@@ -26167,6 +26253,82 @@ mod tests {
             assert_eq!(kind(&stone.begin()), Some(0));
             assert_eq!(stone.respond(ScriptInput::Next).unwrap().effects, []);
         }
+    }
+
+    #[test]
+    fn boss_kitty_quizzes_for_the_orange_marble_for_three_hundred_chicken() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+        let on_quest = |chicken: i16| {
+            let mut player = player(50);
+            let fried = game::Item::stack(FRIED_CHICKEN, chicken);
+            player.inventory.insert(InventoryType::Use, 1, fried);
+            player.quests.upsert(game::QuestRecord {
+                quest_id: ORANGE_MARBLE_QUEST,
+                status: game::QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: None,
+                },
+            });
+            player
+        };
+        let fee = Effect::TakeItem {
+            item_id: FRIED_CHICKEN,
+            quantity: 300,
+        };
+
+        let mut kitty = boss_kitty(&on_quest(300), &mut rng).unwrap();
+        assert_eq!(question(&kitty.begin()), text(keys::BOSS_KITTY_ASK));
+        assert_eq!(
+            kitty.respond(ScriptInput::Yes).unwrap().effects,
+            [fee.clone()]
+        );
+        kitty.respond(ScriptInput::Next).unwrap();
+        let mut asked = Vec::new();
+        for _ in 0..QUIZ_LENGTH {
+            let Page::Menu { text, choices } = &kitty.pages[kitty.page] else {
+                panic!("a question");
+            };
+            assert_eq!(choices.len(), 3);
+            asked.push(text.clone());
+            let right = right_answer(&kitty);
+            kitty.respond(ScriptInput::Select(right)).unwrap();
+        }
+        asked.sort();
+        asked.dedup();
+        assert_eq!(asked.len(), QUIZ_LENGTH, "no question twice");
+        assert_eq!(
+            kitty.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::GiveItem {
+                item_id: ORANGE_MARBLE,
+                quantity: 1
+            }]
+        );
+
+        // A wrong answer ends it, the chicken spent.
+        let mut kitty = boss_kitty(&on_quest(300), &mut rng).unwrap();
+        kitty.begin();
+        kitty.respond(ScriptInput::Yes).unwrap();
+        kitty.respond(ScriptInput::Next).unwrap();
+        let wrong = (right_answer(&kitty) + 1) % 3;
+        kitty.respond(ScriptInput::Select(wrong)).unwrap();
+        assert_eq!(kitty.respond(ScriptInput::Next).unwrap().effects, []);
+
+        // Short of chicken, Boss Kitty says so and takes none.
+        let mut kitty = boss_kitty(&on_quest(299), &mut rng).unwrap();
+        kitty.begin();
+        let short = kitty.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(short.effects, []);
+        assert_eq!(page_text(&short), text(keys::BOSS_KITTY_NO_CHICKEN));
+
+        // Nothing off the quest, or with the marble.
+        let mut done = on_quest(300);
+        done.inventory
+            .insert(InventoryType::Etc, 2, game::Item::stack(ORANGE_MARBLE, 1));
+        assert!(boss_kitty(&done, &mut rng).is_none());
+        let mut off = on_quest(300);
+        off.quests.remove(ORANGE_MARBLE_QUEST);
+        assert!(boss_kitty(&off, &mut rng).is_none());
     }
 
     #[test]
