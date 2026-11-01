@@ -36,6 +36,8 @@ namespace ms
 		AccountGrade grade;
 		std::string name;
 		bool muted;
+		// Whether the login screens show their hint balloons for a new player
+		bool hints;
 		bool pin;
 		int8_t pic;
 	};

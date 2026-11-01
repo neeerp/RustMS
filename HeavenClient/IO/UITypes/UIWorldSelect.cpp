@@ -212,7 +212,9 @@ namespace ms
 
 		UIElement::draw_buttons(alpha);
 
-		chatballoon.draw(position + BALLOON_POS);
+		// Only for an account the login result marks for hints (0x625270).
+		if (Configuration::get().get_login_hints())
+			chatballoon.draw(position + BALLOON_POS);
 	}
 
 	void UIWorldSelect::update()

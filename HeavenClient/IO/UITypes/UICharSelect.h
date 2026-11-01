@@ -141,5 +141,6 @@ namespace ms
 		PageArrow page_right;
 
 		ChatBalloonHorizontal chatballoon;
+		ChatBalloonHorizontal hintballoon;
 	};
 }

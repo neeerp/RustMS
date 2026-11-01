@@ -445,4 +445,14 @@ namespace ms
 	{
 		grade = value;
 	}
+
+	bool Configuration::get_login_hints() const
+	{
+		return login_hints;
+	}
+
+	void Configuration::set_login_hints(bool value)
+	{
+		login_hints = value;
+	}
 }

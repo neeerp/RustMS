@@ -117,6 +117,7 @@ namespace ms
 				Account account = LoginParser::parse_account(recv);
 
 				Configuration::get().set_grade(account.grade);
+				Configuration::get().set_login_hints(account.hints);
 
 				if (account.female == 10)
 				{

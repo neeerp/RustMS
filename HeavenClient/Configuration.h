@@ -176,6 +176,9 @@ namespace ms
 		// The current account's login grade
 		const AccountGrade& get_grade() const;
 		void set_grade(AccountGrade value);
+		// Whether the login screens show their hint balloons
+		bool get_login_hints() const;
+		void set_login_hints(bool value);
 
 		// Base class for an entry in the settings file
 		class Entry
@@ -315,6 +318,7 @@ namespace ms
 		std::map<uint8_t, uint8_t> world_channel_counts;
 		std::map<uint8_t, std::vector<std::string>> world_channel_names;
 		AccountGrade grade;
+		bool login_hints = false;
 		TypeMap<Entry> settings;
 	};
 

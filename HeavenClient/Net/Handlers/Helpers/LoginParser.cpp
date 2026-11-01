@@ -40,7 +40,9 @@ namespace ms
 		recv.skip_long(); // muted until
 		recv.skip_long(); // creation date
 
-		recv.skip_int(); // Remove "Select the world you want to play in"
+		// 0 shows the hint balloons: "Please select the World..." and "Double-click on a
+		// character..." (CWvsContext +0x2088, 0x625270 and 0x60162b).
+		account.hints = recv.read_int() == 0;
 
 		account.pin = recv.read_bool(); // 0 - Enabled, 1 - Disabled
 		account.pic = recv.read_byte(); // 0 - Register, 1 - Ask, 2 - Disabled

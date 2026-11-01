@@ -64,6 +64,9 @@ namespace ms
 
 		// The bottom centre of the balloon under the step sign.
 		const Point<int16_t> BALLOON_POS = Point<int16_t>(380, 78);
+		// The hint balloon's box: v83 puts it 227 x 34 at (-305, -65) from the
+		// sign window, so just under the first (0x602727).
+		const Point<int16_t> HINT_BALLOON_POS = Point<int16_t>(380, 118);
 
 		// From a character's feet: the top of the light that falls on it
 		// when picked, and the top left of its stats scroll.
@@ -201,6 +204,7 @@ namespace ms
 		LoginScene::get().set_world(world, "CH." + std::to_string(channel_id + 1));
 
 		chatballoon.change_text("Use the Tab key to toggle the menu.");
+		hintballoon.change_text("Double-click on a character to login.");
 
 		for (auto &entry : characters)
 		{
@@ -287,7 +291,7 @@ namespace ms
 
 				auto ranking = [&](int16_t y, const std::pair<int32_t, int8_t> &rank)
 				{
-					std::string line = ranked ? rank_line(rank) : "Ranking not available";
+					std::string line = ranked ? rank_line(rank) : "Ranking Not Available";
 					Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::BLACK, line)
 						.draw(table + Point<int16_t>(CHARINFO_WIDTH / 2, y - 4));
 
@@ -355,6 +359,10 @@ namespace ms
 			focus_hand[menu_focus].draw(position + MENU_POS[menu_focus], alpha);
 
 		chatballoon.draw(position + BALLOON_POS);
+
+		// Only for an account the login result marks for hints (0x60162b).
+		if (Configuration::get().get_login_hints())
+			hintballoon.draw(position + HINT_BALLOON_POS);
 	}
 
 	void UICharSelect::update()
