@@ -2971,6 +2971,13 @@ impl NpcScript {
             PI => Some(refiner(&PI_REFINER)),
             MUHAMAD => Some(refiner(&MUHAMAD_REFINER)),
             MR_SMITH => Some(refiner(&SMITH_REFINER)),
+            FIONA if player.quests.state(JOKO_QUEST) == QuestState::Completed => {
+                Some(refiner(&FIONA_REFINER))
+            }
+            FIONA => Some(NpcScript::new(
+                FIONA,
+                vec![Page::Say(text(keys::REFINER_FIONA_NOT_YET))],
+            )),
             VICIOUS => Some(refiner(&VICIOUS_REFINER)),
             JM => Some(refiner(&JM_REFINER)),
             id if refiners::PITCH_TRADERS.iter().any(|&(npc, _)| npc == id) => {
@@ -18048,6 +18055,21 @@ const SMITH_REFINER: Refiner = Refiner {
     ],
 };
 
+/// Fiona (Cosmic `9201095`) in Dead Man's Gorge, for those who finished
+/// The Right Path (8225).
+pub const FIONA: i32 = 9201095;
+
+const FIONA_REFINER: Refiner = Refiner {
+    npc: FIONA,
+    hello: keys::REFINER_FIONA_HELLO,
+    goodbye: None,
+    percent: 100,
+    offers: &[
+        Offer::Equips(keys::REFINER_FIONA_FORGE, refiners::FIONA_WEAPONS),
+        Offer::Equips(keys::REFINER_FIONA_UPGRADE, refiners::FIONA_UPGRADES),
+    ],
+};
+
 const VICIOUS_REFINER: Refiner = Refiner {
     npc: VICIOUS,
     hello: keys::REFINER_VICIOUS_HELLO,
@@ -26547,6 +26569,45 @@ mod tests {
                     quantity: 200
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn fiona_forges_and_upgrades_after_the_right_path() {
+        let stranger = player(90);
+        let mut fiona = NpcScript::for_npc(FIONA, &stranger).unwrap();
+        assert_eq!(page_text(&fiona.begin()), text(keys::REFINER_FIONA_NOT_YET));
+
+        let mut partner = player(90);
+        partner.quests.upsert(game::QuestRecord {
+            quest_id: JOKO_QUEST,
+            status: game::QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        // The Dawn Raven's Claw takes the Raven's Claw.
+        let mut fiona = NpcScript::for_npc(FIONA, &partner).unwrap();
+        assert_eq!(kind(&fiona.begin()), Some(4));
+        fiona.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(
+            kind(&fiona.respond(ScriptInput::Select(0)).unwrap()),
+            Some(1)
+        );
+        let effects = fiona.respond(ScriptInput::Yes).unwrap().effects;
+        assert_eq!(effects[0], Effect::SpendMeso(75000));
+        assert_eq!(
+            effects[1],
+            Effect::TakeItem {
+                item_id: 1472072,
+                quantity: 1
+            }
+        );
+        assert_eq!(
+            effects.last(),
+            Some(&Effect::GiveItem {
+                item_id: 1472074,
+                quantity: 1
+            })
         );
     }
 
