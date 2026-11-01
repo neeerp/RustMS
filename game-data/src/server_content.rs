@@ -2970,6 +2970,13 @@ pub mod keys {
     pub const BALROG_WORLD_JOB: &str = "balrog_world.job";
     pub const BALROG_WORLD_LEVEL: &str = "balrog_world.level";
     pub const BALROG_WORLD_BUSY: &str = "balrog_world.busy";
+    /// Moose (2081009) by the shield practice field (A Shield's True Power,
+    /// 6180): not on the quest or its kills done, the shield not worn, and
+    /// the way in; his twin (2081010) offering the way back out.
+    pub const SHIELD_FIELD_NOT_ALLOWED: &str = "shield_field.not_allowed";
+    pub const SHIELD_FIELD_WEAR: &str = "shield_field.wear";
+    pub const SHIELD_FIELD_ASK: &str = "shield_field.ask";
+    pub const SHIELD_FIELD_LEAVE: &str = "shield_field.leave";
     /// Papulatus in the past (2043000), sending a visitor back to their time.
     pub const PAST_PAPULATUS_SEND_BACK: &str = "papulatus.past.send_back";
     /// Delli's rescue (6410): Shulynch (1092008) in the Nautilus's Training
@@ -5085,6 +5092,10 @@ mod tests {
                 keys::BALROG_WORLD_JOB,
                 keys::BALROG_WORLD_LEVEL,
                 keys::BALROG_WORLD_BUSY,
+                keys::SHIELD_FIELD_NOT_ALLOWED,
+                keys::SHIELD_FIELD_WEAR,
+                keys::SHIELD_FIELD_ASK,
+                keys::SHIELD_FIELD_LEAVE,
                 keys::PAST_PAPULATUS_SEND_BACK,
                 keys::DELLI_SHULYNCH_ASK,
                 keys::DELLI_SHULYNCH_LEAVE,

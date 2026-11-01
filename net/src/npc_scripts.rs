@@ -931,6 +931,20 @@ const LORD_JONATHAN: i32 = 1092019;
 /// How long a Corsair has to find the real Bart (Cosmic's `4jaerial`).
 const BART_TIME_LIMIT: u32 = 2 * 60;
 const INSIGNIFICANT_BEING: i32 = 1061012;
+/// Moose in Leafre's Forest: Crossroad, his twin on the way to, in and out
+/// of the shield practice field, and A Shield's True Power (6180), which
+/// counts 200 kills there with the Skill-Earning Shield.
+const MOOSE: i32 = 2081009;
+const MOOSE_IN_THE_FIELD: i32 = 2081010;
+const SHIELDS_TRUE_POWER: i16 = 6180;
+const SHIELD_FIELD_KILLS: u16 = 200;
+const SKILL_EARNING_SHIELD: i32 = 1092041;
+const SHIELD_FIELD: i32 = 924000001;
+const SHIELD_FIELD_EXIT: i32 = 240010400;
+/// The Ancient Icy Stone in Ice Valley, and the Ancient Ice Powder it gives
+/// for the Orihalcon Hammer.
+const ANCIENT_ICY_STONE: i32 = 2030014;
+const ANCIENT_ICE_POWDER: i32 = 2280011;
 const PAST_PAPULATUS: i32 = 2043000;
 /// Shulynch in the Nautilus's Training Room, who sends a Corsair on
 /// "Mission Free the Monsters" (6410) to look for Delli; Shulynch on
@@ -2391,6 +2405,9 @@ impl NpcScript {
             JAKE => return Some(jake(player)),
             LORD_JONATHAN => return Some(lord_jonathan(player)),
             INSIGNIFICANT_BEING => return Some(insignificant_being(player)),
+            MOOSE => return Some(moose(player)),
+            MOOSE_IN_THE_FIELD => return Some(moose_in_the_field()),
+            ANCIENT_ICY_STONE => return ancient_icy_stone(player),
             PAST_PAPULATUS => return Some(past_papulatus(player)),
             SHULYNCH if player.quests.state(DELLI_QUEST) == QuestState::Started => {
                 return Some(ask_warp(
@@ -13562,6 +13579,70 @@ fn insignificant_being(player: &Player) -> NpcScript {
     );
     script.refused = Some(text(keys::BALROG_WORLD_BUSY));
     script
+}
+
+/// Moose (`s4blocking_enter`) sends a player on A Shield's True Power who
+/// is short of its kills into the practice field, once they wear the
+/// Skill-Earning Shield (Cosmic `2081009.js`). The field is shared, as in
+/// Cosmic, and the shield is checked only on the way in.
+fn moose(player: &Player) -> NpcScript {
+    let say = |key| NpcScript::new(MOOSE, vec![Page::Say(text(key))]);
+    let kills = player.quests.kills(SHIELDS_TRUE_POWER);
+    let on_quest = player.quests.state(SHIELDS_TRUE_POWER) == QuestState::Started
+        && kills.first().copied().unwrap_or(0) < SHIELD_FIELD_KILLS;
+    if !on_quest {
+        return say(keys::SHIELD_FIELD_NOT_ALLOWED);
+    }
+    let worn = (player.inventory.items(InventoryType::Equipped))
+        .any(|(_, item)| item.item_id == SKILL_EARNING_SHIELD);
+    if !worn {
+        return say(keys::SHIELD_FIELD_WEAR);
+    }
+    NpcScript::new(
+        MOOSE,
+        vec![Page::Ask {
+            text: text(keys::SHIELD_FIELD_ASK),
+            on_yes: vec![Effect::WarpToPortal(SHIELD_FIELD, 0)],
+            on_no: None,
+        }],
+    )
+}
+
+/// Moose's twin (`s4blocking`) offers the way back to the crossroad's
+/// `st00` (Cosmic `2081010.js`); the quest's kills stay.
+fn moose_in_the_field() -> NpcScript {
+    let exit = crate::scripts::named(SHIELD_FIELD_EXIT, "st00");
+    NpcScript::new(
+        MOOSE_IN_THE_FIELD,
+        vec![Page::Ask {
+            text: text(keys::SHIELD_FIELD_LEAVE),
+            on_yes: vec![Effect::WarpToPortal(SHIELD_FIELD_EXIT, exit)],
+            on_no: None,
+        }],
+    )
+}
+
+/// The Ancient Icy Stone (`s4freeze_item`) silently trades the Orihalcon
+/// Hammer for the Ancient Ice Powder, if it fits; otherwise it does nothing
+/// (Cosmic `2030014.js`).
+fn ancient_icy_stone(player: &Player) -> Option<NpcScript> {
+    let fits = crate::items::fits_until(&player.inventory, ANCIENT_ICE_POWDER, 1, None);
+    if player.inventory.count(ORIHALCON_HAMMER) == 0 || !fits {
+        return None;
+    }
+    Some(NpcScript::new(
+        ANCIENT_ICY_STONE,
+        vec![Page::Done(vec![
+            Effect::TakeItem {
+                item_id: ORIHALCON_HAMMER,
+                quantity: 1,
+            },
+            Effect::GiveItem {
+                item_id: ANCIENT_ICE_POWDER,
+                quantity: 1,
+            },
+        ])],
+    ))
 }
 
 /// `npc` asks `key`, and a yes takes the player to `to`'s first spawn point
@@ -26289,6 +26370,97 @@ mod tests {
         );
         assert_eq!(time_limit(BALROG_WORLD), Some(20 * 60));
         assert!(resets_when_empty(BALROG_WORLD));
+    }
+
+    #[test]
+    fn moose_sends_a_shield_bearer_short_of_the_kills_into_the_practice_field() {
+        let says = |player: &Player| page_text(&NpcScript::for_npc(MOOSE, player).unwrap().begin());
+        let on_quest = |kills: u16| {
+            let mut paladin = player(50);
+            (paladin.stats.job, paladin.stats.level) = (122, 120);
+            paladin.quests.upsert(game::QuestRecord {
+                quest_id: SHIELDS_TRUE_POWER,
+                status: QuestStatus::Started {
+                    kills: vec![kills],
+                    info: None,
+                },
+            });
+            paladin
+        };
+        assert_eq!(says(&player(50)), text(keys::SHIELD_FIELD_NOT_ALLOWED));
+        assert_eq!(
+            says(&on_quest(SHIELD_FIELD_KILLS)),
+            text(keys::SHIELD_FIELD_NOT_ALLOWED)
+        );
+        let mut paladin = on_quest(150);
+        assert_eq!(says(&paladin), text(keys::SHIELD_FIELD_WEAR));
+        paladin.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(SKILL_EARNING_SHIELD, 1),
+        );
+        assert_eq!(
+            says(&paladin),
+            text(keys::SHIELD_FIELD_WEAR),
+            "carried, not worn"
+        );
+
+        paladin.inventory.insert(
+            InventoryType::Equipped,
+            -10,
+            game::Item::stack(SKILL_EARNING_SHIELD, 1),
+        );
+        let mut script = NpcScript::for_npc(MOOSE, &paladin).unwrap();
+        assert_eq!(question(&script.begin()), text(keys::SHIELD_FIELD_ASK));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(SHIELD_FIELD, 0)]
+        );
+
+        // His twin offers the way back to the crossroad.
+        let mut twin = NpcScript::for_npc(MOOSE_IN_THE_FIELD, &paladin).unwrap();
+        assert_eq!(question(&twin.begin()), text(keys::SHIELD_FIELD_LEAVE));
+        let st00 = crate::scripts::named(SHIELD_FIELD_EXIT, "st00");
+        assert_eq!(
+            twin.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(SHIELD_FIELD_EXIT, st00)]
+        );
+    }
+
+    #[test]
+    fn the_ancient_icy_stone_trades_the_orihalcon_hammer_for_ice_powder() {
+        let mut mage = player(50);
+        assert!(NpcScript::for_npc(ANCIENT_ICY_STONE, &mage).is_none());
+        mage.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(ORIHALCON_HAMMER, 1),
+        );
+        let step = NpcScript::for_npc(ANCIENT_ICY_STONE, &mage)
+            .unwrap()
+            .begin();
+        assert!(step.prompt.is_none());
+        assert_eq!(
+            step.effects,
+            [
+                Effect::TakeItem {
+                    item_id: ORIHALCON_HAMMER,
+                    quantity: 1,
+                },
+                Effect::GiveItem {
+                    item_id: ANCIENT_ICE_POWDER,
+                    quantity: 1,
+                },
+            ]
+        );
+
+        // Not with a full USE inventory.
+        let slots = mage.inventory.slot_limit(InventoryType::Use);
+        for slot in 1..=i16::from(slots) {
+            mage.inventory
+                .insert(InventoryType::Use, slot, game::Item::stack(2000000, 100));
+        }
+        assert!(NpcScript::for_npc(ANCIENT_ICY_STONE, &mage).is_none());
     }
 
     #[test]

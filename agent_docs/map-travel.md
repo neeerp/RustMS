@@ -100,9 +100,22 @@ the El Nath Danger Zone Taxi stops. After a first page he asks a player of
 level 50 or more whether to go down, and Yes warps to Sharp Cliff I
 (`211040300`) portal 5 (`under00`); below level 50 he refuses. A holder of
 the Orihalcon Hammer (`4031450`) goes straight to Ice Valley (`921100100`)
-portal 1 (`west00`) without a word, though nothing hands the hammer out yet.
-His keys (`jeff.*`) are `unsourced`. `el_nath_dungeon.rs` checks all three
-through the network harness.
+portal 1 (`west00`) without a word; The Ultimate Icepick (6263, Vogen)
+hands the hammer out. There the Ancient Icy Stone (`2030014`,
+`s4freeze_item`) silently trades it for Ancient Ice Powder (`2280011`, the
+book of Ice Demon) if the powder fits, and does nothing otherwise (Cosmic
+`2030014.js`). His keys (`jeff.*`) are `unsourced`. `el_nath_dungeon.rs`
+checks all three through the network harness, `shield_field.rs` the stone.
+
+Moose (`2081009`, `s4blocking_enter`) in Leafre's Forest: Crossroad
+(`240010400`) sends a Hero or Paladin on A Shield's True Power (6180) who
+has fewer than its 200 kills, and wears the Skill-Earning Shield
+(`1092041`), into the practice field (`924000001`) after a Yes; without the
+shield on he says to wear it, and anyone else is refused. The field is
+shared, as in Cosmic, and the shield is checked only on the way in. His twin
+(`2081010`, `s4blocking`) on the way to, in and out of the field asks, and a
+Yes leads back to the crossroad's `st00`; the kills stay. Keys
+`shield_field.*`; `shield_field.rs` checks it through the network harness.
 
 Shane (`1032003`, `herb_in`) in Ellinia lets players from level 25 into the
 Forest of Patience for 5000 mesos (Yes/No, then a refusal if short). They
