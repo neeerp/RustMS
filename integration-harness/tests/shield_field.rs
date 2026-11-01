@@ -1,6 +1,6 @@
 //! Two fourth-job skill-quest stops: Moose sends a Paladin on A Shield's
 //! True Power (6180), wearing the Skill-Earning Shield, into the practice
-//! field, whose Practice Dummies count toward the quest, and his twin there
+//! field, whose Practice Dummies count toward the quest, and the twin there
 //! offers the way back; Ice Valley's Ancient Icy Stone trades the Orihalcon
 //! Hammer for Ancient Ice Powder.
 

@@ -2972,11 +2972,13 @@ pub mod keys {
     pub const BALROG_WORLD_BUSY: &str = "balrog_world.busy";
     /// Moose (2081009) by the shield practice field (A Shield's True Power,
     /// 6180): not on the quest or its kills done, the shield not worn, and
-    /// the way in; his twin (2081010) offering the way back out.
+    /// the way in; the twin (2081010) offering the way back out.
     pub const SHIELD_FIELD_NOT_ALLOWED: &str = "shield_field.not_allowed";
     pub const SHIELD_FIELD_WEAR: &str = "shield_field.wear";
     pub const SHIELD_FIELD_ASK: &str = "shield_field.ask";
     pub const SHIELD_FIELD_LEAVE: &str = "shield_field.leave";
+    /// The Fountain of Life (2083005) filling the Holy Cup.
+    pub const FOUNTAIN_OF_LIFE_POUR: &str = "fountain_of_life.pour";
     /// Papulatus in the past (2043000), sending a visitor back to their time.
     pub const PAST_PAPULATUS_SEND_BACK: &str = "papulatus.past.send_back";
     /// Delli's rescue (6410): Shulynch (1092008) in the Nautilus's Training
@@ -5096,6 +5098,7 @@ mod tests {
                 keys::SHIELD_FIELD_WEAR,
                 keys::SHIELD_FIELD_ASK,
                 keys::SHIELD_FIELD_LEAVE,
+                keys::FOUNTAIN_OF_LIFE_POUR,
                 keys::PAST_PAPULATUS_SEND_BACK,
                 keys::DELLI_SHULYNCH_ASK,
                 keys::DELLI_SHULYNCH_LEAVE,
@@ -5785,6 +5788,20 @@ mod tests {
         let drops = table.drops(8180000);
         assert_eq!(drops[0].item, Some(4031343));
         assert_eq!(drops[1..], [pirate(4031860)]);
+    }
+
+    #[test]
+    fn the_pirates_fourth_job_hunts_add_their_quest_items() {
+        let table = RewardTable::load(None).unwrap();
+        let drop = |prob, item, quest| RewardEntry {
+            prob,
+            ..quest_item(item, quest)
+        };
+        assert_eq!(table.drops(8500002), [drop(1.0, 4031869, 6360)]);
+        assert_eq!(table.drops(8140701), [drop(0.1, 4031872, 6340)]);
+        assert_eq!(table.drops(8140700), [drop(0.1, 4031871, 6350)]);
+        assert_eq!(table.drops(8141000), [drop(0.06, 4031873, 6380)]);
+        assert_eq!(table.drops(8141100), [drop(0.06, 4031874, 6390)]);
     }
 
     #[test]

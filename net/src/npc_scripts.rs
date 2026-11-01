@@ -931,7 +931,7 @@ const LORD_JONATHAN: i32 = 1092019;
 /// How long a Corsair has to find the real Bart (Cosmic's `4jaerial`).
 const BART_TIME_LIMIT: u32 = 2 * 60;
 const INSIGNIFICANT_BEING: i32 = 1061012;
-/// Moose in Leafre's Forest: Crossroad, his twin on the way to, in and out
+/// Moose in Leafre's Forest: Crossroad, the twin on the way to, in and out
 /// of the shield practice field, and A Shield's True Power (6180), which
 /// counts 200 kills there with the Skill-Earning Shield.
 const MOOSE: i32 = 2081009;
@@ -945,6 +945,17 @@ const SHIELD_FIELD_EXIT: i32 = 240010400;
 /// for the Orihalcon Hammer.
 const ANCIENT_ICY_STONE: i32 = 2030014;
 const ANCIENT_ICE_POWDER: i32 = 2280011;
+/// The Maple Leaf Marble in Orbis Tower, which makes the Glass Marble that
+/// Maple Marble (6230) starts with into the Maple Marble it ends on.
+const MAPLE_LEAF_MARBLE: i32 = 2012023;
+const GLASS_MARBLE: i32 = 4031476;
+const MAPLE_MARBLE: i32 = 4031456;
+/// The Fountain of Life in the Dragon Forest, which fills the Holy Cup with
+/// the Holy Water of Life for The Holy Knight's Sword (6280).
+const FOUNTAIN_OF_LIFE: i32 = 2083005;
+const HOLY_KNIGHTS_SWORD: i16 = 6280;
+const HOLY_CUP: i32 = 4031454;
+const HOLY_WATER_OF_LIFE: i32 = 4031455;
 const PAST_PAPULATUS: i32 = 2043000;
 /// Shulynch in the Nautilus's Training Room, who sends a Corsair on
 /// "Mission Free the Monsters" (6410) to look for Delli; Shulynch on
@@ -2408,6 +2419,8 @@ impl NpcScript {
             MOOSE => return Some(moose(player)),
             MOOSE_IN_THE_FIELD => return Some(moose_in_the_field()),
             ANCIENT_ICY_STONE => return ancient_icy_stone(player),
+            MAPLE_LEAF_MARBLE => return maple_leaf_marble(player),
+            FOUNTAIN_OF_LIFE => return fountain_of_life(player),
             PAST_PAPULATUS => return Some(past_papulatus(player)),
             SHULYNCH if player.quests.state(DELLI_QUEST) == QuestState::Started => {
                 return Some(ask_warp(
@@ -13626,23 +13639,51 @@ fn moose_in_the_field() -> NpcScript {
 /// Hammer for the Ancient Ice Powder, if it fits; otherwise it does nothing
 /// (Cosmic `2030014.js`).
 fn ancient_icy_stone(player: &Player) -> Option<NpcScript> {
-    let fits = crate::items::fits_until(&player.inventory, ANCIENT_ICE_POWDER, 1, None);
-    if player.inventory.count(ORIHALCON_HAMMER) == 0 || !fits {
+    let effects = swap(player, ORIHALCON_HAMMER, ANCIENT_ICE_POWDER)?;
+    Some(NpcScript::new(ANCIENT_ICY_STONE, vec![Page::Done(effects)]))
+}
+
+/// The Maple Leaf Marble (`s4tornado`) silently makes a Glass Marble into a
+/// Maple Marble, if it fits; otherwise it does nothing (Cosmic `2012023.js`).
+fn maple_leaf_marble(player: &Player) -> Option<NpcScript> {
+    let effects = swap(player, GLASS_MARBLE, MAPLE_MARBLE)?;
+    Some(NpcScript::new(MAPLE_LEAF_MARBLE, vec![Page::Done(effects)]))
+}
+
+/// The Fountain of Life (`s4holycharge`) fills a Paladin's Holy Cup with the
+/// Holy Water of Life while The Holy Knight's Sword (6280) is under way, if it
+/// fits; otherwise it does nothing (Cosmic `2083005.js`).
+fn fountain_of_life(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(HOLY_KNIGHTS_SWORD) != QuestState::Started {
         return None;
     }
+    let effects = swap(player, HOLY_CUP, HOLY_WATER_OF_LIFE)?;
     Some(NpcScript::new(
-        ANCIENT_ICY_STONE,
-        vec![Page::Done(vec![
-            Effect::TakeItem {
-                item_id: ORIHALCON_HAMMER,
-                quantity: 1,
-            },
-            Effect::GiveItem {
-                item_id: ANCIENT_ICE_POWDER,
-                quantity: 1,
-            },
-        ])],
+        FOUNTAIN_OF_LIFE,
+        vec![Page::Act {
+            text: text(keys::FOUNTAIN_OF_LIFE_POUR),
+            effects,
+        }],
     ))
+}
+
+/// Takes one `take` for one `give`, or `None` without a `take` or the room
+/// for a `give`.
+fn swap(player: &Player, take: i32, give: i32) -> Option<Vec<Effect>> {
+    let fits = crate::items::fits_until(&player.inventory, give, 1, None);
+    if player.inventory.count(take) == 0 || !fits {
+        return None;
+    }
+    Some(vec![
+        Effect::TakeItem {
+            item_id: take,
+            quantity: 1,
+        },
+        Effect::GiveItem {
+            item_id: give,
+            quantity: 1,
+        },
+    ])
 }
 
 /// `npc` asks `key`, and a yes takes the player to `to`'s first spawn point
@@ -26417,7 +26458,7 @@ mod tests {
             [Effect::WarpToPortal(SHIELD_FIELD, 0)]
         );
 
-        // His twin offers the way back to the crossroad.
+        // The twin offers the way back to the crossroad.
         let mut twin = NpcScript::for_npc(MOOSE_IN_THE_FIELD, &paladin).unwrap();
         assert_eq!(question(&twin.begin()), text(keys::SHIELD_FIELD_LEAVE));
         let st00 = crate::scripts::named(SHIELD_FIELD_EXIT, "st00");
@@ -26461,6 +26502,51 @@ mod tests {
                 .insert(InventoryType::Use, slot, game::Item::stack(2000000, 100));
         }
         assert!(NpcScript::for_npc(ANCIENT_ICY_STONE, &mage).is_none());
+    }
+
+    #[test]
+    fn the_maple_leaf_marble_and_the_fountain_of_life_make_their_quest_items() {
+        let swap = |take, give| {
+            vec![
+                Effect::TakeItem {
+                    item_id: take,
+                    quantity: 1,
+                },
+                Effect::GiveItem {
+                    item_id: give,
+                    quantity: 1,
+                },
+            ]
+        };
+        let mut thief = player(120);
+        assert!(NpcScript::for_npc(MAPLE_LEAF_MARBLE, &thief).is_none());
+        thief
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(GLASS_MARBLE, 1));
+        let step = NpcScript::for_npc(MAPLE_LEAF_MARBLE, &thief)
+            .unwrap()
+            .begin();
+        assert!(step.prompt.is_none());
+        assert_eq!(step.effects, swap(GLASS_MARBLE, MAPLE_MARBLE));
+
+        // The fountain fills the cup only while the quest is under way.
+        let mut paladin = player(120);
+        paladin
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(HOLY_CUP, 1));
+        assert!(NpcScript::for_npc(FOUNTAIN_OF_LIFE, &paladin).is_none());
+        paladin.quests.upsert(game::QuestRecord {
+            quest_id: HOLY_KNIGHTS_SWORD,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let step = NpcScript::for_npc(FOUNTAIN_OF_LIFE, &paladin)
+            .unwrap()
+            .begin();
+        assert_eq!(page_text(&step), text(keys::FOUNTAIN_OF_LIFE_POUR));
+        assert_eq!(step.effects, swap(HOLY_CUP, HOLY_WATER_OF_LIFE));
     }
 
     #[test]
