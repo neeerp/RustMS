@@ -33,6 +33,8 @@ const THOMAS_SWIFT: i32 = 9201022;
 const AUDREY: i32 = 9201135;
 const ROONEY: i32 = 1022101;
 const RUPI: i32 = 2002000;
+const ROODOLPH: i32 = 9220005;
+const SNOW_SPRINKLER: i32 = 209_080_000;
 const VIP_TICKET_TO_FLORINA: i32 = 4031134;
 const ETC: i16 = 4;
 
@@ -199,6 +201,20 @@ async fn rooney_takes_players_to_happyville_and_rupi_sees_them_home() {
         assert!(t.prompt_texts[0].contains(&format!("#m{home}#")));
         let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
         assert_eq!(t.warps, [home]);
+    }
+}
+
+#[tokio::test]
+async fn roodolph_goes_up_to_the_snow_sprinkler_and_back_to_happyville() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = traveller(&config, 0, None, HAPPYVILLE).await;
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    for (from, to) in [(HAPPYVILLE, SNOW_SPRINKLER), (SNOW_SPRINKLER, HAPPYVILLE)] {
+        let t = step(c, &format!("{m} talk"), talk(from, ROODOLPH)).await;
+        assert_eq!(t.prompts, [(ROODOLPH, 1)]);
+        let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+        assert_eq!(t.warps, [to]);
     }
 }
 

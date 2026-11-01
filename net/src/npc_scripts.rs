@@ -746,6 +746,9 @@ const PISON: i32 = 1081001;
 /// Rupi in Happyville (`go_victoria`), who takes players back where they
 /// came from, else to Ellinia.
 const RUPI: i32 = 2002000;
+/// Roodolph, between Happyville and the Snow Sprinkler (Cosmic `9220005.js`).
+pub const ROODOLPH: i32 = 9220005;
+pub const SNOW_SPRINKLER: i32 = 209_080_000;
 /// Thomas Swift, free between Henesys and Amoria: to Amoria's portal 0, and
 /// back to Henesys's portal 5, at the town's east end.
 const THOMAS_SWIFT: i32 = 9201022;
@@ -3096,6 +3099,7 @@ impl NpcScript {
             PISON => Some(pison(player)),
             npc_data::ROONEY => Some(rooney(player)),
             RUPI => Some(rupi(player)),
+            ROODOLPH => roodolph(player),
             THOMAS_SWIFT => thomas_swift(player),
             MOONY => Some(moony(player)),
             MOM_AND_DAD => mom_and_dad(player),
@@ -12956,6 +12960,24 @@ fn rupi(player: &Player) -> NpcScript {
             on_no: None,
         }],
     )
+}
+
+/// Roodolph takes a player from Happyville to the Snow Sprinkler, or back.
+/// `None` elsewhere.
+fn roodolph(player: &Player) -> Option<NpcScript> {
+    let (ask, to) = match player.stats.map_id {
+        events::HAPPYVILLE => (keys::ROODOLPH_SPRINKLER, SNOW_SPRINKLER),
+        SNOW_SPRINKLER => (keys::ROODOLPH_BACK, events::HAPPYVILLE),
+        _ => return None,
+    };
+    Some(NpcScript::new(
+        ROODOLPH,
+        vec![Page::Ask {
+            text: text(ask),
+            on_yes: vec![Effect::WarpToPortal(to, 0)],
+            on_no: None,
+        }],
+    ))
 }
 
 /// Thomas Swift, free from Henesys to Amoria and back. `None` elsewhere.
@@ -23547,6 +23569,22 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn roodolph_goes_between_happyville_and_the_snow_sprinkler() {
+        for (from, ask, to) in [
+            (events::HAPPYVILLE, keys::ROODOLPH_SPRINKLER, SNOW_SPRINKLER),
+            (SNOW_SPRINKLER, keys::ROODOLPH_BACK, events::HAPPYVILLE),
+        ] {
+            let mut trip = NpcScript::for_npc(ROODOLPH, &rider(100, 0, from)).unwrap();
+            assert_eq!(question(&trip.begin()), text(ask));
+            assert_eq!(
+                trip.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::WarpToPortal(to, 0)]
+            );
+        }
+        assert!(NpcScript::for_npc(ROODOLPH, &rider(100, 0, ELLINIA)).is_none());
     }
 
     #[test]
