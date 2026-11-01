@@ -24,6 +24,11 @@ that the client still lets the player click (Ryko, Adonis, Chloe's
 document roll, a practice chart, the Sharenian knight armor and Sharen
 III's will, and four grave markers). Those say one line from
 `npc_line.*` in the content pack (`ONE_LINERS` in `net::npc_scripts`).
+A few NPCs have a script but no `speak`, and their script only says a line
+(Cosmic's say one): the ships' attendants to and from Ereve and Rien, Andy,
+Sejan, Spindle, the Glimmer Man, Witch Malady, the Steward and Happyville's
+Santa. These say their own String.nx `d0` (`DEFAULT_LINE_NPCS` in
+`game-data`).
 
 `Quest.nx` contains conversation text (`Say.img`), descriptions
 (`QuestInfo.img`), requirements (`Check.img`), and actions (`Act.img`). The
