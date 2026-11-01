@@ -29,7 +29,9 @@ pub struct MobInfo {
     /// What every hit does to it, whatever the attack (`fixedDamage`), or
     /// 0.
     pub fixed_damage: i32,
-    /// Power Guard sends nothing back at it (`invincible`).
+    /// Nothing hurts it, and Power Guard sends nothing back at it
+    /// (`invincible`; v83 reads it only for Power Guard, so the first is
+    /// the server's rule).
     pub invincible: bool,
     /// The only skills that hurt it (`damagedBySelectedSkill`), or empty
     /// for any attack: the pirates' test Octopirates take only Flash Fist

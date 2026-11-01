@@ -2183,7 +2183,7 @@ impl FieldActor {
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
             };
-            let hurts = skill.is_none_or(|skill| mob.info.hurt_by(skill));
+            let hurts = !mob.info.invincible && skill.is_none_or(|skill| mob.info.hurt_by(skill));
             // A Monster Carnival side earns nothing for its own mobs.
             let cp = if mob.team == Some(side) {
                 0

@@ -256,6 +256,12 @@ Octopirates, 9001005 and 9001006) is hurt only by those skills. v83 rolls 0
 (MISS) for any other attack (`FUN_0068146c`), so the field applies none of
 its damage (`MobInfo::hurt_by`), and HeavenClient rolls MISS for it as well.
 
+A mob with `info/invincible` (the Super Slimes, Buff Rocky in the Hitman's
+boxes, the Coliseum's bombs, the Blood Stirges and two dozen more) takes no
+damage at all, from attacks or from poison and burns (`MobSet::damage`). v83
+reads the flag only to keep Power Guard from sending damage back, so the
+client still shows the numbers; that rule is the server's (b411).
+
 A shot fires from the USE slot the client names, as in v83 (`shot_ammo`). The
 item there must fit the weapon (stars for claws, arrows for bows and the
 Arrow claw 1472063, crossbow arrows, bullets for guns), need no more than
