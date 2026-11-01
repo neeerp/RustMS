@@ -1188,6 +1188,34 @@ pub mod keys {
     ];
     pub const LILIN_NEW_BEGINNINGS_DECLINED: &str = "lilin.new_beginnings.declined";
     pub const LILIN_NEW_BEGINNINGS_FULL: &str = "lilin.new_beginnings.full";
+    /// Lilin's Basic Fitness Training in Rien (`q21015s`-`q21018s`, quests
+    /// 21015-21018), after Lilin's Account (21014).
+    pub const LILIN_FITNESS_1: [&str; 4] = [
+        "lilin.fitness_1.enough",
+        "lilin.fitness_1.rusty",
+        "lilin.fitness_1.ask",
+        "lilin.fitness_1.go",
+    ];
+    pub const LILIN_FITNESS_1_DECLINED: &str = "lilin.fitness_1.declined";
+    pub const LILIN_FITNESS_2: [&str; 2] = ["lilin.fitness_2.ask", "lilin.fitness_2.go"];
+    pub const LILIN_FITNESS_2_DECLINED: &str = "lilin.fitness_2.declined";
+    pub const LILIN_FITNESS_3: [&str; 8] = [
+        "lilin.fitness_3.warmed_up",
+        "lilin.fitness_3.twenty",
+        "lilin.fitness_3.more",
+        "lilin.fitness_3.or_more",
+        "lilin.fitness_3.plenty",
+        "lilin.fitness_3.ask",
+        "lilin.fitness_3.accepted",
+        "lilin.fitness_3.go",
+    ];
+    pub const LILIN_FITNESS_3_DECLINED: &str = "lilin.fitness_3.declined";
+    pub const LILIN_FITNESS_TEST: [&str; 3] = [
+        "lilin.fitness_test.strongest",
+        "lilin.fitness_test.ask",
+        "lilin.fitness_test.go",
+    ];
+    pub const LILIN_FITNESS_TEST_DECLINED: &str = "lilin.fitness_test.declined";
     /// The Aran's first job: Lilin's The Five Heroes (`q21100s`) and the
     /// Polearm in the ice (1201001, `q21101s`/`e`).
     pub const LILIN_FIVE_HEROES: [&str; 8] = [
@@ -4485,6 +4513,27 @@ mod tests {
                 keys::LILIN_NEW_BEGINNINGS[3],
                 keys::LILIN_NEW_BEGINNINGS_DECLINED,
                 keys::LILIN_NEW_BEGINNINGS_FULL,
+                keys::LILIN_FITNESS_1[0],
+                keys::LILIN_FITNESS_1[1],
+                keys::LILIN_FITNESS_1[2],
+                keys::LILIN_FITNESS_1[3],
+                keys::LILIN_FITNESS_1_DECLINED,
+                keys::LILIN_FITNESS_2[0],
+                keys::LILIN_FITNESS_2[1],
+                keys::LILIN_FITNESS_2_DECLINED,
+                keys::LILIN_FITNESS_3[0],
+                keys::LILIN_FITNESS_3[1],
+                keys::LILIN_FITNESS_3[2],
+                keys::LILIN_FITNESS_3[3],
+                keys::LILIN_FITNESS_3[4],
+                keys::LILIN_FITNESS_3[5],
+                keys::LILIN_FITNESS_3[6],
+                keys::LILIN_FITNESS_3[7],
+                keys::LILIN_FITNESS_3_DECLINED,
+                keys::LILIN_FITNESS_TEST[0],
+                keys::LILIN_FITNESS_TEST[1],
+                keys::LILIN_FITNESS_TEST[2],
+                keys::LILIN_FITNESS_TEST_DECLINED,
                 keys::LILIN_FIVE_HEROES[0],
                 keys::LILIN_FIVE_HEROES[1],
                 keys::LILIN_FIVE_HEROES[2],
