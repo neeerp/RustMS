@@ -1481,8 +1481,8 @@ impl MobSet {
                 }
                 status.next_hurt += HURT_INTERVAL;
                 // Only its skills hurt a mob that only some skills hurt
-                // (v83 FUN_006675a8).
-                if !mob.info.hurt_by(status.skill_id) {
+                // (v83 FUN_006675a8), and nothing an invincible one.
+                if mob.info.invincible || !mob.info.hurt_by(status.skill_id) {
                     continue;
                 }
                 let damage = if mob.info.fixed_damage > 0 {
@@ -1522,8 +1522,9 @@ impl MobSet {
         damage: i64,
         now: Instant,
     ) -> Option<Result<u8, Kill>> {
-        let body = self.live.get(&object_id)?.link == Some(Link::Body);
-        if body || self.shielded(object_id) {
+        let mob = self.live.get(&object_id)?;
+        let body = mob.link == Some(Link::Body);
+        if body || mob.info.invincible || self.shielded(object_id) {
             return self.live.get(&object_id).map(|mob| Ok(mob.hp_percent()));
         }
         let mob = self.live.get_mut(&object_id)?;
@@ -2036,6 +2037,17 @@ mod tests {
         mobs.buy(info, (0, 0), 0, 1, now);
         assert_eq!((mobs.bought(0), mobs.bought(1)), (2, 1));
         assert_eq!(mobs.get(first).map(|mob| mob.team), Some(Some(0)));
+    }
+
+    #[test]
+    fn an_invincible_mob_takes_no_damage() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.invincible = true;
+        let mut mobs = MobSet::new([(template, info)]);
+        let rock = mobs.spawn_all(now)[0];
+        assert_eq!(mobs.damage(1, rock, 1000, now), Some(Ok(100)));
+        assert_eq!(mobs.get(rock).map(LiveMob::hp_percent), Some(100));
     }
 
     #[test]
