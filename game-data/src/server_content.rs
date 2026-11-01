@@ -3032,6 +3032,17 @@ pub mod keys {
     pub const TYLUS_BUSY: &str = "tylus.busy";
     pub const TYLUS_FALLEN: &str = "tylus.fallen";
     pub const TYLUS_THANKS: &str = "tylus.thanks";
+    /// Flo (2041023) on the Path of Time, who takes two mages to Elemental
+    /// Thanatos (6225, 6315), and to anyone else has no reason to.
+    pub const ELEMENTAL_NO_REASON: &str = "elemental.no_reason";
+    pub const ELEMENTAL_MENU: &str = "elemental.menu";
+    pub const ELEMENTAL_ENTER: &str = "elemental.enter";
+    pub const ELEMENTAL_ABOUT: &str = "elemental.about";
+    pub const ELEMENTAL_INFO: &str = "elemental.info";
+    pub const ELEMENTAL_NO_PARTY: &str = "elemental.no_party";
+    pub const ELEMENTAL_NOT_LEADER: &str = "elemental.not_leader";
+    pub const ELEMENTAL_NOT_ELIGIBLE: &str = "elemental.not_eligible";
+    pub const ELEMENTAL_BUSY: &str = "elemental.busy";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5143,6 +5154,15 @@ mod tests {
                 keys::TYLUS_BUSY,
                 keys::TYLUS_FALLEN,
                 keys::TYLUS_THANKS,
+                keys::ELEMENTAL_NO_REASON,
+                keys::ELEMENTAL_MENU,
+                keys::ELEMENTAL_ENTER,
+                keys::ELEMENTAL_ABOUT,
+                keys::ELEMENTAL_INFO,
+                keys::ELEMENTAL_NO_PARTY,
+                keys::ELEMENTAL_NOT_LEADER,
+                keys::ELEMENTAL_NOT_ELIGIBLE,
+                keys::ELEMENTAL_BUSY,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,

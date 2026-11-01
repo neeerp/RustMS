@@ -988,6 +988,8 @@ pub const ROLLY_PRESENT: i32 = 9103002;
 /// Tylus in the Chief's Residence, who takes a party in to protect him on
 /// "Protecting Tylus" (6192), and Tylus past the room, who thanks them.
 pub const TYLUS: i32 = 2020008;
+/// Flo on the Path of Time, who takes two mages to Elemental Thanatos.
+pub const FLO: i32 = 2041023;
 /// Charles in MV's Lair's lobby, who takes a party in, and Milla, on each
 /// of its maps, who lets a member out.
 pub const CHARLES: i32 = 9220018;
@@ -1796,6 +1798,12 @@ impl NpcScript {
         tylus(entry)
     }
 
+    /// Flo on the Path of Time, to a mage on 6225 or 6315 (`flo_offers`)
+    /// whose party may or may not go to Elemental Thanatos.
+    pub fn flo(entry: Entry) -> Self {
+        flo(entry)
+    }
+
     /// Ellin in the Deep Fairy Forest, for `player`, whose party may or
     /// may not go into the Forest of Poison Haze.
     pub fn ellin(entry: Entry, player: &Player) -> Self {
@@ -2436,6 +2444,13 @@ impl NpcScript {
             MAPLE_LEAF_MARBLE => return maple_leaf_marble(player),
             FOUNTAIN_OF_LIFE => return fountain_of_life(player),
             CARTA => return carta(player),
+            // To anyone Flo doesn't take to Elemental Thanatos.
+            FLO => {
+                return Some(NpcScript::new(
+                    FLO,
+                    vec![Page::Say(text(keys::ELEMENTAL_NO_REASON))],
+                ))
+            }
             PAST_PAPULATUS => return Some(past_papulatus(player)),
             SHULYNCH if player.quests.state(DELLI_QUEST) == QuestState::Started => {
                 return Some(ask_warp(
@@ -13892,6 +13907,49 @@ fn tylus(entry: Entry) -> NpcScript {
     );
     // Someone left or moved since Tylus checked, or another party went in.
     script.refused = Some(event_terms(&events::TYLUS, keys::TYLUS_NOT_ELIGIBLE));
+    script
+}
+
+/// Whether Flo offers Elemental Thanatos to `player`: one on either of its
+/// quests who has done the one Flo gives before it.
+pub fn flo_offers(player: &Player) -> bool {
+    let quests = &player.quests;
+    events::ELEMENTAL_QUESTS.iter().any(|&(quest, before)| {
+        quests.state(quest) == QuestState::Started && quests.state(before) == QuestState::Completed
+    })
+}
+
+/// Flo (Cosmic `2041023`) on the Path of Time: the leader takes the party
+/// to Elemental Thanatos, and anyone may hear what to do.
+fn flo(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::ELEMENTAL_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::ELEMENTAL_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(
+            &events::ELEMENTAL,
+            keys::ELEMENTAL_NOT_ELIGIBLE,
+        )),
+        Entry::Busy => Page::Say(text(keys::ELEMENTAL_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Elemental)]),
+    };
+    let mut script = NpcScript::new(
+        FLO,
+        vec![Page::Menu {
+            text: text(keys::ELEMENTAL_MENU),
+            choices: vec![
+                (text(keys::ELEMENTAL_ENTER), vec![enter]),
+                (
+                    text(keys::ELEMENTAL_ABOUT),
+                    vec![Page::Say(text(keys::ELEMENTAL_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Flo checked, or another party went in.
+    script.refused = Some(event_terms(
+        &events::ELEMENTAL,
+        keys::ELEMENTAL_NOT_ELIGIBLE,
+    ));
     script
 }
 
@@ -26554,6 +26612,45 @@ mod tests {
                 .insert(InventoryType::Use, slot, game::Item::stack(2000000, 100));
         }
         assert!(NpcScript::for_npc(ANCIENT_ICY_STONE, &mage).is_none());
+    }
+
+    #[test]
+    fn flo_offers_elemental_thanatos_to_a_mage_on_its_quests() {
+        let started = |quest_id| game::QuestRecord {
+            quest_id,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        };
+        let completed = |quest_id| game::QuestRecord {
+            quest_id,
+            status: QuestStatus::Completed {
+                at: SystemTime::UNIX_EPOCH,
+            },
+        };
+        let mut mage = player(120);
+        mage.stats.job = 212;
+        assert!(!flo_offers(&mage));
+        let step = NpcScript::for_npc(FLO, &mage).unwrap().begin();
+        assert_eq!(page_text(&step), text(keys::ELEMENTAL_NO_REASON));
+        // On 6225, not yet past Flo's own 6226.
+        mage.quests.upsert(started(6225));
+        assert!(!flo_offers(&mage));
+        mage.quests.upsert(completed(6226));
+        assert!(flo_offers(&mage));
+        // 6316 alone doesn't do for a Fire/Poison mage on 6225's way.
+        let mut other = player(120);
+        other.quests.upsert(completed(6316));
+        assert!(!flo_offers(&other));
+        other.quests.upsert(started(6315));
+        assert!(flo_offers(&other));
+
+        let mut ready = NpcScript::flo(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Elemental)]);
+        assert!(ready.refused().is_some());
     }
 
     #[test]
