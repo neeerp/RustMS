@@ -2371,6 +2371,7 @@ impl NpcScript {
         match npc_id {
             ALI => return Some(ali()),
             ATHENA_BY_THE_ARK => return Some(athena_by_the_ark()),
+            ICE_CAVE_LILIN => return Some(ice_cave_lilin(player)),
             LIRA => return Some(lira()),
             AMON => return Some(amon(player)),
             TOMBSTONE => {
@@ -2962,6 +2963,32 @@ impl NpcScript {
         )
     }
 
+    /// Lilin's menu, which double-clicking the guide opens for anyone else,
+    /// an Aran on the way to Rien (Cosmic `1202000.js` off the Ice Cave):
+    /// four answers, then a guide hint for each of six topics.
+    pub fn lilin_guide() -> Self {
+        let choices = keys::LILIN_GUIDE_TOPICS
+            .iter()
+            .enumerate()
+            .map(|(topic, &label)| {
+                let page = match keys::LILIN_GUIDE_ANSWERS.get(topic) {
+                    Some(&answer) => Page::Say(text(answer)),
+                    None => Page::Done(vec![Effect::GuideHint(
+                        LILIN_FIRST_HINT + (topic - keys::LILIN_GUIDE_ANSWERS.len()) as i32,
+                    )]),
+                };
+                (text(label), vec![page])
+            })
+            .collect();
+        Self::new(
+            ICE_CAVE_LILIN,
+            vec![Page::Menu {
+                text: text(keys::LILIN_GUIDE_MENU),
+                choices,
+            }],
+        )
+    }
+
     /// A quest's start or end script (`Check.img startscript`/`endscript`),
     /// as it plays for `player`.
     pub fn for_quest(script: &str, player: &Player) -> Option<Self> {
@@ -3193,6 +3220,13 @@ impl NpcScript {
             "q21000s" => Some(find_the_missing_kid()),
             "q21001s" => Some(lost_kid()),
             "q21001e" => Some(kid_safe()),
+            "q21010s" => Some(puka_potion(player)),
+            "q21010e" => Some(puka_thanks(player)),
+            "q21011e" => Some(puir_sword()),
+            "q21012s" => Some(purun_murus()),
+            "q21012e" => Some(purun_done()),
+            "q21013s" => Some(putzki_gift()),
+            "q21013e" => Some(putzki_chair()),
             "q21015s" => Some(basic_fitness_1()),
             "q21016s" => Some(basic_fitness_2()),
             "q21017s" => Some(basic_fitness_3()),
@@ -7402,6 +7436,258 @@ fn kid_safe() -> NpcScript {
         Effect::CompleteQuest(FIND_THE_MISSING_KID_2),
         Effect::WarpToPortal(ICE_CAVE, 0),
     ];
+    script
+}
+
+/// Lilin in the Ice Cave, 140090000.
+const ICE_CAVE_LILIN: i32 = 1202000;
+/// The record beside the quest log where Lilin marks the Aran met
+/// (`helper=clear`; no quest of its own).
+const LILIN_MET: i16 = 21019;
+/// The first of the six guide hints (`UI/tutorial.img/14`-`19`) the
+/// penguins' quests end on, one each, and Lilin's menu offers again.
+const LILIN_FIRST_HINT: i32 = 14;
+const COLD_FOREST_1: i32 = 140_090_100;
+/// The penguins of the Cold Forest on the way to Rien.
+const PUKA: i32 = 1202001;
+const PUIR: i32 = 1202003;
+const PURUN: i32 = 1202004;
+const PUTZKI: i32 = 1202005;
+const THE_RETURN_OF_THE_HERO: i16 = 21010;
+const THE_MISSING_WEAPON: i16 = 21011;
+const ABILITIES_LOST: i16 = 21012;
+const A_GIFT_FOR_THE_HERO: i16 = 21013;
+const SWORD: i32 = 1302000;
+/// The Piece of Bamboo and the Wood from the Cold Forest's boxes, which
+/// Putzki makes into a Bamboo Chair.
+const CHAIR_PARTS: [i32; 2] = [4032309, 4032310];
+const BAMBOO_CHAIR: i32 = 3010062;
+
+fn give(item_id: i32, quantity: i16) -> Effect {
+    Effect::GiveItem { item_id, quantity }
+}
+
+/// Lilin in the Ice Cave (Cosmic `1202000.js`): the first talk wakes the
+/// Aran and marks Lilin met; the next tells the Aran who they were, and
+/// Lilin comes along as the guide to the Cold Forest. Elsewhere, the
+/// guide's menu.
+fn ice_cave_lilin(player: &Player) -> NpcScript {
+    if player.stats.map_id != ICE_CAVE {
+        return NpcScript::lilin_guide();
+    }
+    if player.quest_ex.get(LILIN_MET, "helper") != Some("clear") {
+        let [awake, who, waited, what, head] = keys::ICE_CAVE_LILIN_WAKES;
+        let mut script = NpcScript::new(
+            ICE_CAVE_LILIN,
+            vec![
+                Page::Say(text(awake)),
+                Page::Reply(text(who)),
+                Page::Say(text(waited)),
+                Page::Reply(text(what)),
+                Page::Reply(text(head)),
+            ],
+        );
+        script.on_end = ["face", "ClickLilin"]
+            .map(|part| Effect::ScenePart(format!("Effect/Direction1.img/aranTutorial/{part}")))
+            .into_iter()
+            .chain([Effect::SetQuestEx {
+                quest: LILIN_MET,
+                key: "helper",
+                value: "clear".to_string(),
+            }])
+            .collect();
+        return script;
+    }
+    let [alright, where_am_i, rest @ ..] = keys::ICE_CAVE_LILIN_LEADS;
+    let pages = [Page::Say(text(alright)), Page::Reply(text(where_am_i))]
+        .into_iter()
+        .chain(rest.map(|key| Page::Say(text(key))))
+        .collect();
+    let mut script = NpcScript::new(ICE_CAVE_LILIN, pages);
+    script.on_end = vec![
+        Effect::SpawnGuide(String::new()),
+        Effect::WarpToPortal(COLD_FOREST_1, 0),
+    ];
+    script
+}
+
+/// `q21010s`: Puka finds the hero weak, hands over a potion and has the
+/// Aran drink it; the hurt is Cosmic's, as Roger's on Maple Island
+/// (`21010.js`).
+fn puka_potion(player: &Player) -> NpcScript {
+    let [human, hero, ask] = keys::PUKA_POTION;
+    let [first, how] = keys::PUKA_DRINK;
+    let mut on_yes = Vec::new();
+    if player.stats.hp >= 50 {
+        on_yes.push(Effect::SetHp(25));
+    }
+    on_yes.push(give(SPECIAL_RIEN_RED_POTION, 1));
+    on_yes.push(Effect::StartQuest(THE_RETURN_OF_THE_HERO));
+    let mut script = NpcScript::new(
+        PUKA,
+        vec![
+            Page::Say(text(human)),
+            Page::Say(text(hero)),
+            Page::Ask {
+                text: text(ask),
+                on_yes,
+                on_no: Some(text(keys::PUKA_POTION_DECLINED)),
+            },
+            Page::Say(text(first)),
+            Page::Reply(text(how)),
+        ],
+    );
+    script.on_end = vec![Effect::GuideHint(LILIN_FIRST_HINT)];
+    script
+}
+
+/// `q21010e`: once the potion is drunk (the data asks that none be left),
+/// Puka rejoices and rewards the hero (`21010.js`).
+fn puka_thanks(player: &Player) -> NpcScript {
+    if player.stats.hp < 50 {
+        return NpcScript::new(PUKA, vec![Page::Say(text(keys::PUKA_NOT_DRUNK))]);
+    }
+    let [prophecy, penguins, level_up, skills] = keys::PUKA_THANKS;
+    let mut script = NpcScript::new(
+        PUKA,
+        vec![
+            Page::Say(text(prophecy)),
+            Page::Act {
+                text: text(penguins),
+                effects: vec![
+                    give(SPECIAL_RIEN_RED_POTION, 5),
+                    give(SPECIAL_RIEN_BLUE_POTION, 5),
+                    Effect::GainExp(16),
+                    Effect::CompleteQuest(THE_RETURN_OF_THE_HERO),
+                ],
+            },
+            Page::Say(text(level_up)),
+            Page::Reply(text(skills)),
+        ],
+    );
+    script.on_end = vec![Effect::GuideHint(LILIN_FIRST_HINT + 1)];
+    script.inventory_full = Some(text(keys::COLD_FOREST_FULL));
+    script
+}
+
+/// `q21011e`: Puir, Puen's brother, gives the weaponless hero a sword
+/// (`21011.js`); Puen starts it from the data.
+fn puir_sword() -> NpcScript {
+    let [hero, tears, no_weapon, ask, thought] = keys::PUIR_SWORD;
+    let mut script = NpcScript::new(
+        PUIR,
+        vec![
+            Page::Say(text(hero)),
+            Page::Say(text(tears)),
+            Page::Say(text(no_weapon)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    give(SWORD, 1),
+                    Effect::GainExp(35),
+                    Effect::CompleteQuest(THE_MISSING_WEAPON),
+                ],
+                on_no: Some(text(keys::PUIR_SWORD_DECLINED)),
+            },
+            Page::Reply(text(thought)),
+        ],
+    );
+    script.on_end = vec![Effect::GuideHint(LILIN_FIRST_HINT + 2)];
+    script.inventory_full = Some(text(keys::COLD_FOREST_FULL));
+    script
+}
+
+/// `q21012s`: Purun asks the hero to beat three Tutorial Murus
+/// (`21012.js`).
+fn purun_murus() -> NpcScript {
+    let [welcome, try_it, ask, three, quick_slots] = keys::PURUN_MURUS;
+    let mut script = NpcScript::new(
+        PURUN,
+        vec![
+            Page::Say(text(welcome)),
+            Page::Say(text(try_it)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(ABILITIES_LOST)],
+                on_no: Some(text(keys::PURUN_MURUS_DECLINED)),
+            },
+            Page::Say(text(three)),
+            Page::Say(text(quick_slots)),
+        ],
+    );
+    script.on_end = vec![Effect::GuideHint(LILIN_FIRST_HINT + 3)];
+    script
+}
+
+/// `q21012e`: Purun's potions for the Murus beaten (`21012.js`).
+fn purun_done() -> NpcScript {
+    let [potions, thought] = keys::PURUN_DONE;
+    let mut script = NpcScript::new(
+        PURUN,
+        vec![
+            Page::Act {
+                text: text(potions),
+                effects: vec![
+                    give(SPECIAL_RIEN_RED_POTION, 10),
+                    give(SPECIAL_RIEN_BLUE_POTION, 10),
+                    Effect::GainExp(57),
+                    Effect::CompleteQuest(ABILITIES_LOST),
+                ],
+            },
+            Page::Reply(text(thought)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::COLD_FOREST_FULL));
+    script
+}
+
+/// `q21013s`: Putzki has a gift packed in the boxes nearby (`21013.js`).
+fn putzki_gift() -> NpcScript {
+    let [shy, ask, boxes] = keys::PUTZKI_GIFT;
+    let mut script = NpcScript::new(
+        PUTZKI,
+        vec![
+            Page::Say(text(shy)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(A_GIFT_FOR_THE_HERO)],
+                on_no: Some(text(keys::PUTZKI_GIFT_DECLINED)),
+            },
+            Page::Say(text(boxes)),
+        ],
+    );
+    script.on_end = vec![Effect::GuideHint(LILIN_FIRST_HINT + 4)];
+    script
+}
+
+/// `q21013e`: Putzki makes the bamboo and wood into a chair (`21013.js`).
+fn putzki_chair() -> NpcScript {
+    let [assemble, rest, hero] = keys::PUTZKI_CHAIR;
+    let mut on_yes: Vec<Effect> = (CHAIR_PARTS.into_iter())
+        .map(|item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        })
+        .collect();
+    on_yes.extend([
+        give(BAMBOO_CHAIR, 1),
+        Effect::GainExp(95),
+        Effect::CompleteQuest(A_GIFT_FOR_THE_HERO),
+    ]);
+    let mut script = NpcScript::new(
+        PUTZKI,
+        vec![
+            Page::Ask {
+                text: text(assemble),
+                on_yes,
+                on_no: None,
+            },
+            Page::Say(text(rest)),
+            Page::Say(text(hero)),
+        ],
+    );
+    script.on_end = vec![Effect::GuideHint(LILIN_FIRST_HINT + 5)];
+    script.inventory_full = Some(text(keys::COLD_FOREST_FULL));
     script
 }
 
@@ -17593,6 +17879,159 @@ mod tests {
             assert_eq!(page_text(&step), text(declined), "{script}");
             assert!(step.effects.is_empty(), "{script}");
             assert_eq!(npc.respond(ScriptInput::Next).unwrap().effects, []);
+        }
+    }
+
+    #[test]
+    fn lilin_wakes_the_aran_and_the_penguins_see_the_hero_to_rien() {
+        let mut aran = traveller(1, 0, false);
+        aran.stats.map_id = ICE_CAVE;
+        let scene =
+            |part: &str| Effect::ScenePart(format!("Effect/Direction1.img/aranTutorial/{part}"));
+        let wakes = NpcScript::for_npc(ICE_CAVE_LILIN, &aran).unwrap();
+        assert_eq!(
+            yes_through(wakes),
+            (
+                ICE_CAVE_LILIN,
+                vec![
+                    scene("face"),
+                    scene("ClickLilin"),
+                    Effect::SetQuestEx {
+                        quest: LILIN_MET,
+                        key: "helper",
+                        value: "clear".to_string(),
+                    },
+                ]
+            )
+        );
+        aran.quest_ex.set(LILIN_MET, "helper", "clear");
+        let leads = NpcScript::for_npc(ICE_CAVE_LILIN, &aran).unwrap();
+        assert_eq!(
+            yes_through(leads).1,
+            [
+                Effect::SpawnGuide(String::new()),
+                Effect::WarpToPortal(COLD_FOREST_1, 0),
+            ]
+        );
+
+        // Off the Ice Cave, and from the guide, the menu: answers, then
+        // the hints the quests end on.
+        aran.stats.map_id = COLD_FOREST_1;
+        let mut menu = NpcScript::for_npc(ICE_CAVE_LILIN, &aran).unwrap();
+        let Some(Prompt::Selection { text: topics, .. }) = menu.begin().prompt else {
+            panic!("Lilin's menu");
+        };
+        assert_eq!(topics.matches("#L").count(), 10);
+        assert_eq!(
+            kind(&menu.respond(ScriptInput::Select(0)).unwrap()),
+            Some(0)
+        );
+        let mut hint = NpcScript::lilin_guide();
+        hint.begin();
+        assert_eq!(
+            hint.respond(ScriptInput::Select(9)).unwrap().effects,
+            [Effect::GuideHint(19)]
+        );
+
+        // Puka hurts the Aran and hands over a potion, then wants it drunk.
+        let started = yes_through(NpcScript::for_quest("q21010s", &aran).unwrap());
+        assert_eq!(
+            started,
+            (
+                PUKA,
+                vec![
+                    Effect::SetHp(25),
+                    give(SPECIAL_RIEN_RED_POTION, 1),
+                    Effect::StartQuest(THE_RETURN_OF_THE_HERO),
+                    Effect::GuideHint(14),
+                ]
+            )
+        );
+        let mut hurt = aran.clone();
+        hurt.stats.hp = 25;
+        let mut not_drunk = NpcScript::for_quest("q21010e", &hurt).unwrap();
+        assert_eq!(page_text(&not_drunk.begin()), text(keys::PUKA_NOT_DRUNK));
+        assert_eq!(not_drunk.respond(ScriptInput::Next), Some(Step::default()));
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21010e", &aran).unwrap()).1,
+            [
+                give(SPECIAL_RIEN_RED_POTION, 5),
+                give(SPECIAL_RIEN_BLUE_POTION, 5),
+                Effect::GainExp(16),
+                Effect::CompleteQuest(THE_RETURN_OF_THE_HERO),
+                Effect::GuideHint(15),
+            ]
+        );
+
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21011e", &aran).unwrap()),
+            (
+                PUIR,
+                vec![
+                    give(SWORD, 1),
+                    Effect::GainExp(35),
+                    Effect::CompleteQuest(THE_MISSING_WEAPON),
+                    Effect::GuideHint(16),
+                ]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21012s", &aran).unwrap()),
+            (
+                PURUN,
+                vec![Effect::StartQuest(ABILITIES_LOST), Effect::GuideHint(17)]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21012e", &aran).unwrap()).1,
+            [
+                give(SPECIAL_RIEN_RED_POTION, 10),
+                give(SPECIAL_RIEN_BLUE_POTION, 10),
+                Effect::GainExp(57),
+                Effect::CompleteQuest(ABILITIES_LOST),
+            ]
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21013s", &aran).unwrap()),
+            (
+                PUTZKI,
+                vec![
+                    Effect::StartQuest(A_GIFT_FOR_THE_HERO),
+                    Effect::GuideHint(18)
+                ]
+            )
+        );
+        let take = |item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        };
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21013e", &aran).unwrap()).1,
+            [
+                take(CHAIR_PARTS[0]),
+                take(CHAIR_PARTS[1]),
+                give(BAMBOO_CHAIR, 1),
+                Effect::GainExp(95),
+                Effect::CompleteQuest(A_GIFT_FOR_THE_HERO),
+                Effect::GuideHint(19),
+            ]
+        );
+
+        // Declined, each says so and nothing is done.
+        for (script, declined) in [
+            ("q21010s", keys::PUKA_POTION_DECLINED),
+            ("q21011e", keys::PUIR_SWORD_DECLINED),
+            ("q21012s", keys::PURUN_MURUS_DECLINED),
+            ("q21013s", keys::PUTZKI_GIFT_DECLINED),
+        ] {
+            let mut npc = NpcScript::for_quest(script, &aran).unwrap();
+            let mut step = npc.begin();
+            while kind(&step) != Some(1) {
+                step = npc.respond(ScriptInput::Next).unwrap();
+            }
+            let step = npc.respond(ScriptInput::No).unwrap();
+            assert_eq!(page_text(&step), text(declined), "{script}");
+            assert!(step.effects.is_empty(), "{script}");
         }
     }
 

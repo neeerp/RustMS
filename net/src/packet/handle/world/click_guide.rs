@@ -1,7 +1,7 @@
 //! CLICK_GUIDE (0xA2, report b371): the guide following the player was
 //! double-clicked; no payload. A Noblesse's guide is Mimo, whose menu
-//! opens. Everyone else's would be Lilin's Aran tutorial, which isn't
-//! played, so nothing happens for them.
+//! opens. Anyone else's is Lilin, an Aran's on the way to Rien, whose menu
+//! opens (Cosmic `ClickGuideHandler`).
 
 use crate::dialogue::NpcInteraction;
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
@@ -13,11 +13,12 @@ const NOBLESSE: i16 = 1000;
 
 impl WorldHandler for ClickGuideHandler {
     fn handle(&self, _packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
-        Ok(if ctx.player.stats.job == NOBLESSE {
-            HandlerResult::empty().with(WorldAction::NpcInteraction(NpcInteraction::Mimo))
+        let guide = if ctx.player.stats.job == NOBLESSE {
+            NpcInteraction::Mimo
         } else {
-            HandlerResult::empty()
-        })
+            NpcInteraction::Lilin
+        };
+        Ok(HandlerResult::empty().with(WorldAction::NpcInteraction(guide)))
     }
 }
 
@@ -44,12 +45,14 @@ mod tests {
     }
 
     #[test]
-    fn only_a_noblesse_hears_from_mimo() {
+    fn a_noblesse_hears_from_mimo_and_anyone_else_from_lilin() {
         assert!(matches!(
             handle(NOBLESSE).as_slice(),
             [WorldAction::NpcInteraction(NpcInteraction::Mimo)]
         ));
-        assert!(handle(2000).is_empty());
-        assert!(handle(0).is_empty());
+        assert!(matches!(
+            handle(2000).as_slice(),
+            [WorldAction::NpcInteraction(NpcInteraction::Lilin)]
+        ));
     }
 }

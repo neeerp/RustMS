@@ -354,6 +354,20 @@ const BLACK_ROAD_STRETCHES: [(&str, i32, &[i32]); 3] = [
     ("aranTutorOut2", 914_000_210, &[20000014, 20000015]),
     ("aranTutorOut3", BLACK_ROAD_LAST_STRETCH, &[20000016]),
 ];
+/// The Ice Cave on Snow Island, where the Aran wakes without the
+/// tutorial's skills (Cosmic `iceCave`) and Lilin's guide hint (Direction1
+/// `aranTutorial/ClickLilin`) points at Lilin.
+const ICE_CAVE_FORGETS: [i32; 5] = [20000014, 20000015, 20000016, 20000017, 20000018];
+/// The Cold Forest from the Ice Cave to Rien: each map's way west waits on
+/// its penguin's quest being done (Cosmic `rienTutor1`-`4`), and leads to
+/// the next map's east side. On the last map, Lilin goes on ahead
+/// (`rienTutor5`) and leaves (`rienTutor6`).
+const COLD_FOREST_WAYS: [(&str, i16, i32); 4] = [
+    ("rienTutor1", 21010, 140_090_200),
+    ("rienTutor2", 21011, 140_090_300),
+    ("rienTutor3", 21012, 140_090_400),
+    ("rienTutor4", 21013, 140_090_500),
+];
 /// Ereve's tutorial maps whose west door (`tutorquest`) opens on a quest:
 /// Kiku's "Welcome to Ereve" (20010) started, then each brother's done.
 /// The door leads to the next map.
@@ -729,9 +743,13 @@ pub enum Effect {
         width: i16,
         height: i16,
     },
-    /// Bring out the tutorial guide (Mimo for a Noblesse) at the player's
-    /// feet and have it say a line.
+    /// Bring out the tutorial guide (Mimo for a Noblesse, Lilin for an
+    /// Aran) at the player's feet and have it say a line, if not empty.
     SpawnGuide(String),
+    /// Have the tutorial guide, if it's out, say a line.
+    GuideSays(String),
+    /// Send the tutorial guide away.
+    RemoveGuide,
     /// Show `UI/tutorial.img/<n>` over the tutorial guide, if it's out.
     GuideHint(i32),
     /// Offer to skip the tutorial (Maple Administrator), only to accounts
@@ -920,6 +938,9 @@ pub enum Effect {
         level: i32,
         master_level: i32,
     },
+    /// Forget a skill, as the Aran wakes in the Ice Cave without the
+    /// tutorial's (Cosmic `teachSkill` to level -1).
+    ForgetSkill(i32),
     /// Set or clear a script marker (`game::quest::SCRIPT_MARKERS`), which
     /// the client is not told about.
     Mark(i16),
@@ -1268,6 +1289,14 @@ pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
         // Leafre Station takes the dragon off whoever lands there, the
         // flight's timer included (no source; by its name).
         "undomorphdarco" => Some(vec![Effect::CancelItemBuff(MINI_DRACO)]),
+        "iceCave" => Some(
+            (ICE_CAVE_FORGETS.into_iter())
+                .map(Effect::ForgetSkill)
+                .chain([Effect::ScenePart(
+                    "Effect/Direction1.img/aranTutorial/ClickLilin".to_string(),
+                )])
+                .collect(),
+        ),
         // The Mushroom Kingdom's opening (Edelstein `TD_MC_Openning`): it
         // marks the scene seen (The Test, 2312, waits for that) and plays it.
         "TD_MC_Openning" => Some(vec![
@@ -2440,6 +2469,28 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(BLACK_ROAD_BACK, 2))
         }
         "outChild" => through(Effect::WarpToPortal(BLACK_ROAD_LAST_STRETCH, 2)),
+        script if COLD_FOREST_WAYS.iter().any(|&(name, ..)| name == script) => {
+            let &(_, quest_id, map) = COLD_FOREST_WAYS
+                .iter()
+                .find(|&&(name, ..)| name == script)?;
+            if quest(quest_id) == QuestState::Completed {
+                through(Effect::WarpToPortal(map, 1))
+            } else {
+                refused(keys::COLD_FOREST_WAY_LOCKED)
+            }
+        }
+        "rienTutor5" => ScriptOutcome {
+            effects: vec![Effect::GuideSays(
+                content::text().get(keys::LILIN_GOES_AHEAD, &[]),
+            )],
+            block: true,
+            occupied: None,
+        },
+        "rienTutor6" => ScriptOutcome {
+            effects: vec![Effect::RemoveGuide],
+            block: true,
+            occupied: None,
+        },
         "enterRienFirst" => {
             let start = if aran_in_tutorial() { "st00" } else { "west00" };
             through(Effect::WarpToPortal(RIEN, named(RIEN, start)))
@@ -5565,6 +5616,38 @@ mod tests {
             child((FIND_THE_MISSING_KID_2, QuestState::Started)),
             Some((BLACK_ROAD_BACK, 2))
         );
+    }
+
+    #[test]
+    fn the_cold_forest_opens_a_map_at_a_time_and_lilin_goes_ahead() {
+        let woken = map_enter("iceCave", &player_with(&[])).unwrap();
+        let forgotten: Vec<i32> = (woken.iter())
+            .filter_map(|effect| match effect {
+                Effect::ForgetSkill(skill_id) => Some(*skill_id),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(forgotten, ICE_CAVE_FORGETS);
+        assert!(matches!(woken.last(), Some(Effect::ScenePart(_))));
+
+        for (script, quest_id, map) in COLD_FOREST_WAYS {
+            let started = player_with(&[(quest_id, QuestState::Started)]);
+            let shut = portal(script, &started).unwrap();
+            assert!(
+                matches!(shut.effects.as_slice(), [Effect::Pink(_)]),
+                "{script}"
+            );
+            let done = player_with(&[(quest_id, QuestState::Completed)]);
+            assert_eq!(warp_of(&portal(script, &done).unwrap()), Some((map, 1)));
+        }
+
+        let fresh = player_with(&[]);
+        let ahead = portal("rienTutor5", &fresh).unwrap();
+        assert!(ahead.block);
+        assert!(matches!(ahead.effects.as_slice(), [Effect::GuideSays(_)]));
+        let gone = portal("rienTutor6", &fresh).unwrap();
+        assert!(gone.block);
+        assert_eq!(gone.effects, [Effect::RemoveGuide]);
     }
 
     #[test]

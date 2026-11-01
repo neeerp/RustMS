@@ -1243,6 +1243,82 @@ pub mod keys {
     pub const ATHENA_ARK: [&str; 3] =
         ["athena.ark.awake", "athena.ark.escape", "athena.ark.heroes"];
     pub const BLACK_ROAD_OUT_LOCKED: &str = "black_road.out_locked";
+    /// The Aran's waking on Snow Island: Lilin in the Ice Cave (1202000),
+    /// then the guide's menu; the Cold Forest penguins' quests on the way
+    /// to Rien (`q21010s`-`q21013e`); the ways west barred until each is
+    /// done, and Lilin going on ahead (`rienTutor5`).
+    pub const ICE_CAVE_LILIN_WAKES: [&str; 5] = [
+        "ice_cave_lilin.wakes.awake",
+        "ice_cave_lilin.wakes.who",
+        "ice_cave_lilin.wakes.waited",
+        "ice_cave_lilin.wakes.what",
+        "ice_cave_lilin.wakes.head",
+    ];
+    pub const ICE_CAVE_LILIN_LEADS: [&str; 7] = [
+        "ice_cave_lilin.leads.alright",
+        "ice_cave_lilin.leads.where",
+        "ice_cave_lilin.leads.calm",
+        "ice_cave_lilin.leads.hero",
+        "ice_cave_lilin.leads.island",
+        "ice_cave_lilin.leads.lilin",
+        "ice_cave_lilin.leads.town",
+    ];
+    pub const LILIN_GUIDE_MENU: &str = "lilin_guide.menu";
+    pub const LILIN_GUIDE_TOPICS: [&str; 10] = [
+        "lilin_guide.topic.who_am_i",
+        "lilin_guide.topic.where",
+        "lilin_guide.topic.who_are_you",
+        "lilin_guide.topic.what_now",
+        "lilin_guide.topic.inventory",
+        "lilin_guide.topic.skills",
+        "lilin_guide.topic.equip",
+        "lilin_guide.topic.quick_slots",
+        "lilin_guide.topic.boxes",
+        "lilin_guide.topic.chair",
+    ];
+    pub const LILIN_GUIDE_ANSWERS: [&str; 4] = [
+        "lilin_guide.answer.who_am_i",
+        "lilin_guide.answer.where",
+        "lilin_guide.answer.who_are_you",
+        "lilin_guide.answer.what_now",
+    ];
+    pub const PUKA_POTION: [&str; 3] = ["puka.potion.human", "puka.potion.hero", "puka.potion.ask"];
+    pub const PUKA_POTION_DECLINED: &str = "puka.potion.declined";
+    pub const PUKA_DRINK: [&str; 2] = ["puka.drink.first", "puka.drink.how"];
+    pub const PUKA_NOT_DRUNK: &str = "puka.not_drunk";
+    pub const PUKA_THANKS: [&str; 4] = [
+        "puka.thanks.prophecy",
+        "puka.thanks.penguins",
+        "puka.thanks.level_up",
+        "puka.thanks.skills",
+    ];
+    pub const PUIR_SWORD: [&str; 5] = [
+        "puir.sword.hero",
+        "puir.sword.tears",
+        "puir.sword.no_weapon",
+        "puir.sword.ask",
+        "puir.sword.thought",
+    ];
+    pub const PUIR_SWORD_DECLINED: &str = "puir.sword.declined";
+    pub const PURUN_MURUS: [&str; 5] = [
+        "purun.murus.welcome",
+        "purun.murus.try",
+        "purun.murus.ask",
+        "purun.murus.three",
+        "purun.murus.quick_slots",
+    ];
+    pub const PURUN_MURUS_DECLINED: &str = "purun.murus.declined";
+    pub const PURUN_DONE: [&str; 2] = ["purun.done.potions", "purun.done.thought"];
+    pub const PUTZKI_GIFT: [&str; 3] = ["putzki.gift.shy", "putzki.gift.ask", "putzki.gift.boxes"];
+    pub const PUTZKI_GIFT_DECLINED: &str = "putzki.gift.declined";
+    pub const PUTZKI_CHAIR: [&str; 3] = [
+        "putzki.chair.assemble",
+        "putzki.chair.rest",
+        "putzki.chair.hero",
+    ];
+    pub const COLD_FOREST_FULL: &str = "cold_forest.full";
+    pub const COLD_FOREST_WAY_LOCKED: &str = "cold_forest.way_locked";
+    pub const LILIN_GOES_AHEAD: &str = "lilin.goes_ahead";
     /// The Aran's first job: Lilin's The Five Heroes (`q21100s`) and the
     /// Polearm in the ice (1201001, `q21101s`/`e`).
     pub const LILIN_FIVE_HEROES: [&str; 8] = [
@@ -4589,6 +4665,68 @@ mod tests {
                 keys::ATHENA_ARK[1],
                 keys::ATHENA_ARK[2],
                 keys::BLACK_ROAD_OUT_LOCKED,
+                keys::ICE_CAVE_LILIN_WAKES[0],
+                keys::ICE_CAVE_LILIN_WAKES[1],
+                keys::ICE_CAVE_LILIN_WAKES[2],
+                keys::ICE_CAVE_LILIN_WAKES[3],
+                keys::ICE_CAVE_LILIN_WAKES[4],
+                keys::ICE_CAVE_LILIN_LEADS[0],
+                keys::ICE_CAVE_LILIN_LEADS[1],
+                keys::ICE_CAVE_LILIN_LEADS[2],
+                keys::ICE_CAVE_LILIN_LEADS[3],
+                keys::ICE_CAVE_LILIN_LEADS[4],
+                keys::ICE_CAVE_LILIN_LEADS[5],
+                keys::ICE_CAVE_LILIN_LEADS[6],
+                keys::LILIN_GUIDE_MENU,
+                keys::LILIN_GUIDE_TOPICS[0],
+                keys::LILIN_GUIDE_TOPICS[1],
+                keys::LILIN_GUIDE_TOPICS[2],
+                keys::LILIN_GUIDE_TOPICS[3],
+                keys::LILIN_GUIDE_TOPICS[4],
+                keys::LILIN_GUIDE_TOPICS[5],
+                keys::LILIN_GUIDE_TOPICS[6],
+                keys::LILIN_GUIDE_TOPICS[7],
+                keys::LILIN_GUIDE_TOPICS[8],
+                keys::LILIN_GUIDE_TOPICS[9],
+                keys::LILIN_GUIDE_ANSWERS[0],
+                keys::LILIN_GUIDE_ANSWERS[1],
+                keys::LILIN_GUIDE_ANSWERS[2],
+                keys::LILIN_GUIDE_ANSWERS[3],
+                keys::PUKA_POTION[0],
+                keys::PUKA_POTION[1],
+                keys::PUKA_POTION[2],
+                keys::PUKA_POTION_DECLINED,
+                keys::PUKA_DRINK[0],
+                keys::PUKA_DRINK[1],
+                keys::PUKA_NOT_DRUNK,
+                keys::PUKA_THANKS[0],
+                keys::PUKA_THANKS[1],
+                keys::PUKA_THANKS[2],
+                keys::PUKA_THANKS[3],
+                keys::PUIR_SWORD[0],
+                keys::PUIR_SWORD[1],
+                keys::PUIR_SWORD[2],
+                keys::PUIR_SWORD[3],
+                keys::PUIR_SWORD[4],
+                keys::PUIR_SWORD_DECLINED,
+                keys::PURUN_MURUS[0],
+                keys::PURUN_MURUS[1],
+                keys::PURUN_MURUS[2],
+                keys::PURUN_MURUS[3],
+                keys::PURUN_MURUS[4],
+                keys::PURUN_MURUS_DECLINED,
+                keys::PURUN_DONE[0],
+                keys::PURUN_DONE[1],
+                keys::PUTZKI_GIFT[0],
+                keys::PUTZKI_GIFT[1],
+                keys::PUTZKI_GIFT[2],
+                keys::PUTZKI_GIFT_DECLINED,
+                keys::PUTZKI_CHAIR[0],
+                keys::PUTZKI_CHAIR[1],
+                keys::PUTZKI_CHAIR[2],
+                keys::COLD_FOREST_FULL,
+                keys::COLD_FOREST_WAY_LOCKED,
+                keys::LILIN_GOES_AHEAD,
                 keys::LILIN_FIVE_HEROES[0],
                 keys::LILIN_FIVE_HEROES[1],
                 keys::LILIN_FIVE_HEROES[2],

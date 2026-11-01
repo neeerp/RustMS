@@ -593,11 +593,14 @@ impl ClientActor {
                     self.start_script(script).await?
                 }
             }
-            WorldAction::NpcInteraction(NpcInteraction::Mimo) => {
+            WorldAction::NpcInteraction(guide @ (NpcInteraction::Mimo | NpcInteraction::Lilin)) => {
                 // A conversation already open goes on.
                 if self.script.is_none() && self.conversation.is_none() {
-                    self.start_script(net::npc_scripts::NpcScript::mimo())
-                        .await?
+                    let script = match guide {
+                        NpcInteraction::Mimo => net::npc_scripts::NpcScript::mimo(),
+                        _ => net::npc_scripts::NpcScript::lilin_guide(),
+                    };
+                    self.start_script(script).await?
                 }
             }
             WorldAction::NpcInteraction(NpcInteraction::Respond {
