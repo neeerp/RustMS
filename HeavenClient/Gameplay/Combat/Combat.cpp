@@ -668,7 +668,8 @@ namespace ms
 			return false;
 
 		// Past its spot's limit a skill sent from where the player stands
-		// acts with no effect, and isn't sent (0x96d5a4).
+		// acts with no effect, isn't sent, and doesn't count as used
+		// (0x96d5a4).
 		Point<int16_t> at = player.get_position();
 		bool here = !skill_use::sends_position(moveid) || skill_spot.allows(at.x(), at.y());
 
@@ -678,9 +679,12 @@ namespace ms
 		std::string action = move.apply_actions(player, Attack::Type::MAGIC);
 		player.fix_action_speed(6);
 
+		if (!here)
+			return false;
+
 		// Resurrection with no one to raise plays out but isn't sent
 		// (0x96d567).
-		if (!here || !skill_use::sends(moveid, reach->party))
+		if (!skill_use::sends(moveid, reach->party))
 			return true;
 
 		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
@@ -1573,7 +1577,7 @@ namespace ms
 			// played out; Hurricane's and Rapid Fire's shots don't.
 			if (!close && (attack.type != Attack::Type::RANGED || same_spot::counts_shot(attack.skill))
 				&& !may_attack_here())
-				return true;
+				return false;
 
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
@@ -1642,9 +1646,10 @@ namespace ms
 		move.apply_actions(player, attack.type);
 		player.set_afterimage(ID);
 
-		// Past the spot's limit it acts but isn't sent (0x96b62a).
+		// Past the spot's limit it acts but isn't sent, nor counts as used
+		// (0x96b62a).
 		if (!may_attack_here())
-			return true;
+			return false;
 
 		AttackResult result = attack;
 		result.attacker = player.get_oid();
@@ -1895,7 +1900,9 @@ namespace ms
 		if (index < 0)
 			return false;
 
-		take_swing(*swing);
+		// Refused, the attack on the mobs is refused too.
+		if (!take_swing(*swing))
+			return false;
 
 		// The hit lands as the swing does.
 		int32_t flags = reactor_rules::flags(attack.toleft, player.get_phobj().onground);

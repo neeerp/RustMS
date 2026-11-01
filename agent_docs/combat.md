@@ -534,7 +534,8 @@ b377). A step of 6 px across or 150 px up or down makes a new spot.
 - From one spot, the player gets 100 attacks after the first. This counts
   swings, shots, spells, the body attacks, Meso Explosion and a basic
   attack in a special field or at a reactor. Hurricane's and Rapid Fire's
-  shots don't count.
+  shots don't count, and neither does a grenade's blast (none of v83's
+  senders).
 - A skill that sends the player's position (`skill_use::sends_position`)
   gets 20 uses after the first.
 
