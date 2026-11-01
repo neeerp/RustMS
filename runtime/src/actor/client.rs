@@ -160,6 +160,8 @@ pub struct ClientActor {
     last_moved: Option<tokio::time::Instant>,
     /// A quest action waiting for its field to confirm the NPC is near.
     pending_quest: Option<(u64, QuestRequest)>,
+    /// The stats the client was last told to pin (`net::forced_stats`).
+    forced_stats: Option<net::forced_stats::ForcedStats>,
     /// Portal scripts that already ran and won't run again this session.
     blocked_scripts: HashSet<String>,
     /// Picks which of each Ola Ola level's portals leads on for this
@@ -278,6 +280,7 @@ impl ClientActor {
             last_heal: (None, None),
             last_moved: None,
             pending_quest: None,
+            forced_stats: None,
             blocked_scripts: HashSet::new(),
             ola_seed: thread_rng().gen(),
             npc_request_id: 0,
@@ -1133,7 +1136,23 @@ impl ClientActor {
             .await?;
         }
         self.show_ghost().await?;
+        self.pin_forced_stats().await?;
         self.run_map_enter_script().await
+    }
+
+    /// Tell the client the stats its new map pins, or that it pins none
+    /// any more; v83 keeps them across maps until reset.
+    async fn pin_forced_stats(&mut self) -> Result<(), RuntimeError> {
+        let forced = net::forced_stats::on_map(self.in_game()?.player.stats.map_id);
+        if forced == self.forced_stats {
+            return Ok(());
+        }
+        let mut packet = match &forced {
+            Some(stats) => net::forced_stats::build_set(stats)?,
+            None => net::forced_stats::build_reset()?,
+        };
+        self.forced_stats = forced;
+        self.send(&mut packet).await
     }
 
     /// Hand the session to another channel: persist, reissue the ticket, and

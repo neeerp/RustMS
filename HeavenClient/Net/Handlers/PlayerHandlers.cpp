@@ -425,9 +425,21 @@ namespace ms
 		Stage::get().get_player().show_aran_combo(recv.read_int());
 	}
 
-	void RecalculateStatsHandler::handle(InPacket&) const
+	void ForcedStatSetHandler::handle(InPacket& recv) const
 	{
-		Stage::get().get_player().recalc_stats();
+		int32_t mask = recv.read_int();
+		auto values = forced_stat::decode(mask, [&]() { return recv.read_short(); }, [&]() { return recv.read_byte(); });
+
+		Player& player = Stage::get().get_player();
+		player.get_stats().set_forced(values);
+		player.recalc_stats();
+	}
+
+	void ForcedStatResetHandler::handle(InPacket&) const
+	{
+		Player& player = Stage::get().get_player();
+		player.get_stats().set_forced({});
+		player.recalc_stats();
 	}
 
 	void SetTamingMobInfoHandler::handle(InPacket& recv) const

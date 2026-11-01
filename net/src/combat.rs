@@ -6,6 +6,7 @@ use crate::berserk;
 use crate::charge;
 use crate::combo;
 use crate::energy;
+use crate::forced_stats;
 use crate::meso_explosion::{self, Blast, Explosion, MESO_EXPLOSION};
 use crate::skills::{self, Learned, HYPNOTIZE};
 use crate::{error::NetworkError, packet::op::SendOpcode};
@@ -337,9 +338,9 @@ fn bare_hands_attack(job: i32, level: i32) -> i32 {
 
 /// The most one hit of an attack can do before its skill, its orbs, and a
 /// critical (FUN_0078df87): the weapon's stats with what the player wears,
-/// times the attack of their equipment, buffs, expert mastery, and the ammo
-/// a shot throws, over 100; a pirate with no weapon that counts has its
-/// bare hands'.
+/// times the attack of their equipment (or what the map pins it to), buffs,
+/// expert mastery, and the ammo a shot throws, over 100; a pirate with no
+/// weapon that counts has its bare hands'.
 pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
     let weapon = weapon(player);
     let job = i32::from(player.stats.job);
@@ -348,10 +349,12 @@ pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
     } else {
         0
     };
-    let watk: i32 = player
+    let worn: i32 = player
         .worn_equips()
         .map(|equip| i32::from(equip.watk))
-        .sum::<i32>()
+        .sum();
+    let forced = forced_stats::on_map(player.stats.map_id).map_or(0, |stats| stats.pad);
+    let watk = if forced > 0 { i32::from(forced) } else { worn }
         + buff(player, BuffStat::Pad)
         + aran_combo::attack(player)
         + expert_attack(player, weapon)
@@ -1196,6 +1199,15 @@ mod tests {
             other.write_short(value).unwrap();
         }
         assert_eq!(parse_close_attack(&other).unwrap().grenade, None);
+    }
+
+    #[test]
+    fn a_burning_forest_caps_damage_by_the_stats_it_pins() {
+        let mut player = beginner_with_sword();
+        player.stats.map_id = 914000200;
+        // ceil((4.0 * 999 + 999) / 100 * 255) = 12738
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        assert_eq!(max_base_damage(&player, &basic), 12738);
     }
 
     #[test]

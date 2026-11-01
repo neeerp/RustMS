@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 namespace ms
 {
@@ -83,12 +84,41 @@ namespace ms
 			set_total(stat, total);
 		}
 
+		// A pinned STR, DEX, INT or LUK takes the place of the total, plus the percent of the player's
+		// own (FUN_0077ec9f).
+		constexpr std::pair<EquipStat::Id, MapleStat::Id> BASIC[] = {
+			{ EquipStat::Id::STR, MapleStat::Id::STR }, { EquipStat::Id::DEX, MapleStat::Id::DEX },
+			{ EquipStat::Id::INT, MapleStat::Id::INT }, { EquipStat::Id::LUK, MapleStat::Id::LUK }
+		};
+
+		for (size_t slot = 0; slot < std::size(BASIC); slot++)
+		{
+			auto [stat, own] = BASIC[slot];
+
+			if (forced[slot] > 0)
+				totalstats[stat] = forced_stat::basic(0, get_stat(own), percentages[stat], forced[slot]);
+		}
+
 		// DEX and LUK add to accuracy and avoid by the job (SetFrom).
 		int32_t id = job.get_id();
 		int32_t dex = get_total(EquipStat::Id::DEX);
 		int32_t luk = get_total(EquipStat::Id::LUK);
 		totalstats[EquipStat::Id::ACC] += secondary_stat::base_accuracy(id, dex, luk);
 		totalstats[EquipStat::Id::AVOID] += secondary_stat::base_avoid(id, dex, luk);
+
+		// The rest of what is pinned takes the place of its total, within v83's bounds (FUN_0077f4c9).
+		if (forced_stat::any(forced))
+		{
+			constexpr std::pair<forced_stat::Slot, EquipStat::Id> SECONDARY[] = {
+				{ forced_stat::PAD, EquipStat::Id::WATK }, { forced_stat::PDD, EquipStat::Id::WDEF },
+				{ forced_stat::MAD, EquipStat::Id::MAGIC }, { forced_stat::MDD, EquipStat::Id::MDEF },
+				{ forced_stat::ACC, EquipStat::Id::ACC }, { forced_stat::EVA, EquipStat::Id::AVOID },
+				{ forced_stat::SPEED, EquipStat::Id::SPEED }, { forced_stat::JUMP, EquipStat::Id::JUMP }
+			};
+
+			for (auto [slot, stat] : SECONDARY)
+				totalstats[stat] = forced_stat::secondary(slot, totalstats[stat], forced);
+		}
 
 		// The window's range (FUN_008c2870): the least roll of a stab, and
 		// the whole of a swing, between 1 and 199999.
@@ -100,6 +130,16 @@ namespace ms
 		auto shown = [](double damage) { return std::clamp(static_cast<int32_t>(damage), 1, 199999); };
 		mindamage = shown(pd::lowest(pd::wielded(weapon, id, 0, false, stats, pd::least(mastery)), pad));
 		maxdamage = shown(pd::highest(pd::wielded(weapon, id, 0, true, stats, 1.0), pad));
+	}
+
+	void CharStats::set_forced(const forced_stat::Values &values)
+	{
+		forced = values;
+	}
+
+	bool CharStats::is_forced() const
+	{
+		return forced_stat::any(forced);
 	}
 
 	void CharStats::set_stat(MapleStat::Id stat, uint16_t value)

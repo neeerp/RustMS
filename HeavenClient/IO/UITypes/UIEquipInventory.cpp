@@ -21,6 +21,7 @@
 
 #include "../Components/MapleButton.h"
 #include "../UITypes/UIItemInventory.h"
+#include "../UITypes/UINotice.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Character/MountRules.h"
@@ -498,6 +499,16 @@ namespace ms
 		return TYPE;
 	}
 
+	// The map's pinned stats keep the equipment on (0x4f101d, 0x4f1353).
+	static bool equips_pinned()
+	{
+		if (!Stage::get().get_player().get_stats().is_forced())
+			return false;
+
+		UI::get().emplace<UIOk>(forced_stat::EQUIP_LOCKED, [](bool) {});
+		return true;
+	}
+
 	void UIEquipInventory::doubleclick(Point<int16_t> cursorpos)
 	{
 		EquipSlot::Id slot = slot_by_position(cursorpos);
@@ -509,6 +520,9 @@ namespace ms
 		int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, shown);
 
 		if (slot == EquipSlot::Id::TAMEDMOB && mount::stays_on(item_id))
+			return;
+
+		if (equips_pinned())
 			return;
 
 		// v83 counts the free slots first, then gets off a tamed monster
@@ -654,6 +668,9 @@ namespace ms
 				}
 			}
 		}
+
+		if (equips_pinned())
+			return true;
 
 		Player &player = Stage::get().get_player();
 

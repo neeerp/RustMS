@@ -303,13 +303,29 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
+	// Pinned stats keep the AP unspent, before anything else is weighed (FUN_00a239b7).
+	static bool stats_pinned(const CharStats &stats)
+	{
+		if (!stats.is_forced())
+			return false;
+
+		UI::get().emplace<UIOk>(forced_stat::STATS_LOCKED, [](bool) {});
+		return true;
+	}
+
 	void UIStatsInfo::send_apup(MapleStat::Id stat) const
 	{
+		if (stats_pinned(stats))
+			return;
+
 		Stage::get().get_player().request(SpendApPacket(stat), ExclRequest::WAIT);
 	}
 
 	void UIStatsInfo::confirm_apup(MapleStat::Id stat) const
 	{
+		if (stats_pinned(stats))
+			return;
+
 		// v83 ignores AP for MaxHP and MaxMP below level 20, and asks first
 		// from then on (FUN_00a239b7).
 		if (stats.get_stat(MapleStat::Id::LEVEL) < 20)

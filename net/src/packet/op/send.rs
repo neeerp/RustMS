@@ -19,6 +19,9 @@ pub enum SendOpcode {
     InventoryGrow = 0x1E,
     GiveBuff = 0x20,
     CancelBuff = 0x21,
+    /// Pins some of a player's stats until reset (FUN_00a208ff).
+    ForcedStatSet = 0x22,
+    ForcedStatReset = 0x23,
     StatChange = 0x1F,
     UpdateSkills = 0x24,
     FameResponse = 0x26,

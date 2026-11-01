@@ -1118,7 +1118,16 @@ the three heroes (`Direction1.img/aranTutorial/Trio`, an
 (`ONE_LINERS`). The ark's way out (`aranTutorOut1`) stays shut with a pink
 line until 21000 is started. It and the next two (`aranTutorOut2`, `3`)
 each teach a tutorial skill or two at level 1 (`BLACK_ROAD_STRETCHES`):
-20000017 and 20000018, then 20000014 and 20000015, then 20000016. The
+20000017 and 20000018, then 20000014 and 20000015, then 20000016. Those
+three Burning Forests (914000200, 210 and 220) pin the Aran's stats at a
+hero's (`net::forced_stats`, FORCED_STAT_SET 0x22, Cosmic's
+`aranGodlyStats` as the data has none): STR, DEX, INT and LUK 999, attack
+255, accuracy and avoid 999, speed 120 and jump 140. The client puts each
+pinned stat in place of its total (jump stays within 123), and the
+server's damage cap counts them too. While stats are pinned, the client
+refuses equipment changes and AP. The first map outside the forests sends
+FORCED_STAT_RESET (0x23); the client actor sends either only when the pins
+change. The
 Lost Kid (1209006, in 914000300) ends 21000 from the data. The kid's start
 of Find the Missing Kid 2 (21001, `q21001s`) gives the Lost Child (4001271)
 and puts the Aran back at the map's start. The map's way out (`outChild`)
