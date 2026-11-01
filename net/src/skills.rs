@@ -1325,7 +1325,9 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         4211005 => vec![(BuffStat::MesoGuard, effect.x)],
         crate::morph::OAK_BARREL
         | crate::morph::TRANSFORMATION
-        | crate::morph::SUPER_TRANSFORMATION => vec![(BuffStat::Morph, effect.morph)],
+        | crate::morph::SUPER_TRANSFORMATION
+        | crate::morph::TB_TRANSFORMATION
+        | crate::morph::EAGLE_EYE => vec![(BuffStat::Morph, effect.morph)],
         _ => return None,
     };
     let leveled = [

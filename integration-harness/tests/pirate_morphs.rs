@@ -1,7 +1,8 @@
 //! The pirates' morph skills (reports 225b, 225c): Oak Barrel hides its
 //! user in Morph.nx 1002, shown to the map until cancelled, and
 //! Transformation gives its defense, speed and jump with a superman
-//! template, a woman's 100 on from a man's.
+//! template, a woman's 100 on from a man's. The Wind Archer's Eagle Eye
+//! does the same with 1003.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_skill, set_gender, set_job};
@@ -18,6 +19,7 @@ use tokio::time::{timeout, Duration};
 const LITH_HARBOR: i32 = 104_000_000;
 const OAK_BARREL: i32 = 5_101_007;
 const TRANSFORMATION: i32 = 5_111_005;
+const EAGLE_EYE: i32 = 13_111_005;
 /// Morph's flag (bit 33), in the second half of a buff mask.
 const MORPH: i64 = 2;
 
@@ -150,4 +152,28 @@ async fn a_womans_transformation_is_template_1100() {
     let values: Vec<i16> = stats.iter().map(|&(value, _)| value).collect();
     assert_eq!(values, vec![40, 40, 40, 20, 1100]);
     assert!(stats.iter().all(|&(_, reason)| reason == TRANSFORMATION));
+}
+
+#[tokio::test]
+async fn a_womans_eagle_eye_is_template_1103() {
+    let config = load_multi_harness_config_or_fail().await;
+    let archer_config = config.player("sender").unwrap();
+    let id = login_to_world_session(&archer_config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    drop(relogin(&archer_config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_job(id, 1311, 70, 2000).await.expect("wind archer");
+    set_gender(id, 1).await.expect("a woman");
+    grant_skill(id, EAGLE_EYE, 10)
+        .await
+        .expect("teach Eagle Eye");
+
+    let mut archer = relogin(&archer_config).await;
+    send(&mut archer.connection, use_skill(EAGLE_EYE, 10)).await;
+    let stats = expect(&mut archer.connection, given).await;
+    let values: Vec<i16> = stats.iter().map(|&(value, _)| value).collect();
+    assert_eq!(values, vec![30, 30, 40, 20, 1103]);
+    assert!(stats.iter().all(|&(_, reason)| reason == EAGLE_EYE));
 }

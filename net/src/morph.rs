@@ -1,15 +1,27 @@
 //! The Brawler's and Marauder's morphs (reports 225b, 225c): Oak Barrel
 //! hides its user in a barrel (Morph.nx 1002), Transformation and Super
-//! Transformation turn them into a superman (1000, 1001). The client draws
-//! them and keeps most of their rules; the server gives the morph and
-//! refuses what the v83 client never sends.
+//! Transformation turn them into a superman (1000, 1001). The Thunder
+//! Breaker's Transformation (1000) and the Wind Archer's Eagle Eye (1003)
+//! do too. The client draws them and keeps most of their rules; the server
+//! gives the morph and refuses what the v83 client never sends.
 
 use game::{BuffStat, Player};
 
 pub const OAK_BARREL: i32 = 5101007;
 pub const TRANSFORMATION: i32 = 5111005;
 pub const SUPER_TRANSFORMATION: i32 = 5121003;
+pub const TB_TRANSFORMATION: i32 = 15111002;
+pub const EAGLE_EYE: i32 = 13111005;
+/// The skills that turn their user into a superman (Morph.nx `superman`),
+/// which field limit 0x2 refuses (FUN_00969e21).
+pub const TRANSFORMS: [i32; 4] = [
+    TRANSFORMATION,
+    SUPER_TRANSFORMATION,
+    TB_TRANSFORMATION,
+    EAGLE_EYE,
+];
 const SHOCKWAVE: i32 = 5111006;
+const TB_SHOCKWAVE: i32 = 15111003;
 const DEMOLITION: i32 = 5121004;
 const SNATCH: i32 = 5121005;
 
@@ -43,7 +55,7 @@ pub fn ghosted(player: &Player) -> bool {
 }
 
 /// Whether the v83 client refuses `skill_id` (0 for a normal attack) for
-/// the player's morph, or because they are a ghost. Shockwave needs a
+/// the player's morph, or because they are a ghost. Both Shockwaves need a
 /// transformation and Demolition and Snatch Super Transformation
 /// (FUN_00969465); a superman can't use Double Shot, Oak Barrel or Burst
 /// Fire, and in the barrel nothing at all, as the attack key breaks it
@@ -53,9 +65,9 @@ pub fn refused(player: &Player, skill_id: i32) -> bool {
         return true;
     }
     let by = morphed_by(player);
-    let transformed = matches!(by, Some(TRANSFORMATION | SUPER_TRANSFORMATION));
+    let transformed = by.is_some_and(|by| TRANSFORMS.contains(&by));
     match skill_id {
-        SHOCKWAVE => !transformed,
+        SHOCKWAVE | TB_SHOCKWAVE => !transformed,
         DEMOLITION | SNATCH => by != Some(SUPER_TRANSFORMATION),
         _ if transformed => NOT_TRANSFORMED.contains(&skill_id),
         _ => by == Some(OAK_BARREL),
@@ -103,6 +115,20 @@ mod tests {
         assert!(refused(&superman, OAK_BARREL));
         assert!(!refused(&superman, 0));
         assert!(!refused(&plain, OAK_BARREL));
+    }
+
+    #[test]
+    fn the_cygnus_transformations_make_a_superman() {
+        let plain = morphed(None);
+        let breaker = morphed(Some(TB_TRANSFORMATION));
+        let eagle = morphed(Some(EAGLE_EYE));
+        assert!(refused(&plain, TB_SHOCKWAVE));
+        assert!(!refused(&breaker, TB_SHOCKWAVE));
+        assert!(!refused(&eagle, SHOCKWAVE));
+        assert!(refused(&breaker, DEMOLITION));
+        assert!(refused(&eagle, OAK_BARREL));
+        assert!(!refused(&eagle, 0));
+        assert_eq!(template(1003, 1), 1103);
     }
 
     #[test]
