@@ -259,6 +259,8 @@ namespace ms
 		// button as it was.
 		void set_button_help(uint16_t buttonid, const std::string &path, bool above = false);
 
+		bool button_under(uint16_t buttonid, Point<int16_t> pos) const;
+
 		std::map<uint16_t, std::unique_ptr<Button>> buttons;
 		std::vector<Sprite> sprites;
 		Point<int16_t> position;
@@ -268,8 +270,6 @@ namespace ms
 	private:
 		// Click the button and return the cursor's state after.
 		Cursor::State click_button(uint16_t buttonid);
-
-		bool button_under(uint16_t buttonid, Point<int16_t> pos) const;
 
 		// Let go of the pressed button without clicking it.
 		void release_button();

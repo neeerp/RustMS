@@ -199,6 +199,8 @@ namespace ms
 		right = VWIDTH - 800;
 		quickslot_active = true;
 		menu = Menu::NONE;
+		menu_focus = 0;
+		menu_hovered = false;
 
 		nl::node src = NxFiles::ui_classic["StatusBar.img"];
 		nl::node base = src["base"];
@@ -680,30 +682,19 @@ namespace ms
 				remove_menus();
 		} else if (keycode == KeyAction::Id::RETURN)
 		{
-			for (auto &iter : buttons)
-				if (iter.first >= Buttons::BT_GAME_CHANNEL && iter.second->is_active()
-					&& iter.second->get_state() == Button::State::MOUSEOVER)
-				{
-					button_pressed(iter.first);
-					break;
-				}
+			if (menu != Menu::NONE && menu_focus != 0)
+				button_pressed(menu_focus);
 		} else if (menu != Menu::NONE && (keycode == KeyAction::Id::UP || keycode == KeyAction::Id::DOWN))
 		{
 			uint16_t min_id = menu == Menu::GAME ? Buttons::BT_GAME_CHANNEL : Buttons::BT_SHORTCUT_ITEM;
 			uint16_t max_id = menu == Menu::GAME ? Buttons::BT_GAME_QUIT : Buttons::BT_SHORTCUT_MESSENGER;
 			uint16_t id = min_id;
-			bool found = false;
+			bool found = menu_focus >= min_id && menu_focus <= max_id;
 
-			for (uint16_t i = min_id; i <= max_id; i++)
+			if (found)
 			{
-				if (buttons[i]->get_state() != Button::State::NORMAL)
-				{
-					id = i;
-					found = true;
-
-					buttons[i]->set_state(Button::State::NORMAL);
-					break;
-				}
+				id = menu_focus;
+				buttons[id]->set_state(Button::State::NORMAL);
 			}
 
 			if (found && keycode == KeyAction::Id::DOWN)
@@ -713,7 +704,8 @@ namespace ms
 			else if (!found && keycode == KeyAction::Id::UP)
 				id = max_id;
 
-			buttons[id]->set_state(Button::State::MOUSEOVER);
+			menu_focus = id;
+			show_menu_focus();
 		}
 	}
 
@@ -803,7 +795,35 @@ namespace ms
 				show_quickslot(slot);
 		}
 
-		return UIElement::send_cursor(clicked, cursorpos);
+		Cursor::State state = UIElement::send_cursor(clicked, cursorpos);
+
+		if (menu != Menu::NONE)
+		{
+			uint16_t min_id = menu == Menu::GAME ? Buttons::BT_GAME_CHANNEL : Buttons::BT_SHORTCUT_ITEM;
+			uint16_t max_id = menu == Menu::GAME ? Buttons::BT_GAME_QUIT : Buttons::BT_SHORTCUT_MESSENGER;
+			uint16_t under = 0;
+
+			for (uint16_t i = min_id; i <= max_id; i++)
+				if (buttons[i]->is_active() && button_under(i, cursorpos))
+					under = i;
+
+			if (under != 0)
+				menu_focus = under;
+			else if (menu_hovered)
+				menu_focus = 0;
+
+			menu_hovered = under != 0;
+			show_menu_focus();
+		}
+
+		return state;
+	}
+
+	// The focused menu entry is drawn as the hovered one.
+	void UIStatusBar::show_menu_focus()
+	{
+		if (menu_focus != 0 && buttons[menu_focus]->get_state() == Button::State::NORMAL)
+			buttons[menu_focus]->set_state(Button::State::MOUSEOVER);
 	}
 
 	// The slot's skill with its levels, its item as Item.nx has it (no count or flags), or its macro. Other slots
@@ -845,6 +865,13 @@ namespace ms
 		UI::get().clear_tooltip(Tooltip::Parent::QUICKSLOT);
 
 		UIElement::remove_cursor();
+
+		// The cursor leaving the bar is a leave from the entry it was on.
+		if (menu_hovered)
+			menu_focus = 0;
+
+		menu_hovered = false;
+		show_menu_focus();
 	}
 
 	void UIStatusBar::doubleclick(Point<int16_t> cursorpos)
@@ -936,6 +963,18 @@ namespace ms
 			buttons[i]->set_active(menu == Menu::SHORTCUT);
 			buttons[i]->set_state(Button::State::NORMAL);
 		}
+
+		// Either menu opens with its first entry focused, so Enter picks it (FUN_00849f3e,
+		// FUN_0084a6bc); the arrows move the focus from there.
+		if (menu == Menu::GAME)
+			menu_focus = Buttons::BT_GAME_CHANNEL;
+		else if (menu == Menu::SHORTCUT)
+			menu_focus = Buttons::BT_SHORTCUT_ITEM;
+		else
+			menu_focus = 0;
+
+		menu_hovered = false;
+		show_menu_focus();
 	}
 
 	void UIStatusBar::remove_menus()

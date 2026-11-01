@@ -1,5 +1,6 @@
 #include "../Gameplay/WeatherRules.h"
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
