@@ -3133,6 +3133,11 @@ pub mod keys {
     pub const QUEENS_CABINET_SWIPED: &str = "queens_cabinet.swiped";
     pub const QUEENS_CABINET_FULL: &str = "queens_cabinet.full";
     pub const ALCADNO_CABINET_FULL: &str = "alcadno_cabinet.full";
+    pub const DEMONS_DOORWAY_SEALED: &str = "demons_doorway.sealed";
+    pub const DEMONS_DOORWAY_EMBLEM: &str = "demons_doorway.emblem";
+    pub const DEMONS_DOORWAY_ASK: &str = "demons_doorway.ask";
+    pub const ASTAROTHS_DOORWAY_MASK: &str = "astaroths_doorway.mask";
+    pub const ASTAROTHS_DOORWAY_LEAVE: &str = "astaroths_doorway.leave";
     pub const WIZ_NONE: &str = "wiz.none";
     pub const WIZ_RETURNED: &str = "wiz.returned";
     pub const WIZ_THANKS: &str = "wiz.thanks";
@@ -5391,6 +5396,11 @@ mod tests {
                 keys::QUEENS_CABINET_SWIPED,
                 keys::QUEENS_CABINET_FULL,
                 keys::ALCADNO_CABINET_FULL,
+                keys::DEMONS_DOORWAY_SEALED,
+                keys::DEMONS_DOORWAY_EMBLEM,
+                keys::DEMONS_DOORWAY_ASK,
+                keys::ASTAROTHS_DOORWAY_MASK,
+                keys::ASTAROTHS_DOORWAY_LEAVE,
                 keys::WIZ_NONE,
                 keys::WIZ_RETURNED,
                 keys::WIZ_THANKS,

@@ -435,6 +435,71 @@ pub const AN_INCIDENT: i16 = 3309;
 pub const SECRET_DOCUMENT: i32 = 4031708;
 /// The room of Alcadno's Cabinet, behind the dark pipe on 261020600.
 pub const ALCADNO_CABINET_ROOM: i32 = 926_120_000;
+/// A Demon's Doorway in Victoria Island, into the strolling path of one
+/// job's demon (Cosmic `9201128.js` to `9201132.js`).
+pub struct DemonsDoorway {
+    pub npc: i32,
+    /// The quest that sends the player to fight the demon.
+    pub quest: i16,
+    /// What that quest gives on its start, and the door asks for.
+    pub emblem: i32,
+    pub path: i32,
+    /// Items left from the quest line's earlier steps, taken on the way in.
+    pub leftovers: &'static [i32],
+}
+pub const DEMONS_DOORWAYS: [DemonsDoorway; 5] = [
+    // Andras, for warriors (Dances with Andras!).
+    DemonsDoorway {
+        npc: 9_201_128,
+        quest: 28179,
+        emblem: 4_032_491,
+        path: 677_000_004,
+        leftovers: &[4_001_341, 4_032_478],
+    },
+    // Marbas, for magicians (Marbas the Demon!).
+    DemonsDoorway {
+        npc: 9_201_129,
+        quest: 28198,
+        emblem: 4_032_495,
+        path: 677_000_000,
+        leftovers: &[],
+    },
+    // Valefor, for thieves (Catch Valefor!).
+    DemonsDoorway {
+        npc: 9_201_130,
+        quest: 28219,
+        emblem: 4_032_493,
+        path: 677_000_008,
+        leftovers: &[4_032_485, 4_001_355],
+    },
+    // Amdusias, for bowmen (The Final Battle with Amdusias).
+    DemonsDoorway {
+        npc: 9_201_131,
+        quest: 28238,
+        emblem: 4_032_492,
+        path: 677_000_002,
+        leftovers: &[4_032_481, 4_032_482, 4_032_483],
+    },
+    // Crocell, for pirates (Treasure, and Crocell the Demon).
+    DemonsDoorway {
+        npc: 9_201_132,
+        quest: 28256,
+        emblem: 4_032_494,
+        path: 677_000_006,
+        leftovers: &[4_032_486, 4_032_488, 4_032_489, 4_220_153],
+    },
+];
+/// Astaroth's Doorway, by Sleepywood's swamp (105050400) and in the demon's
+/// own strolling place and hiding place (Cosmic `9201133.js`).
+pub const ASTAROTHS_DOORWAY: i32 = 9_201_133;
+pub const ASTAROTH_QUEST: i16 = 28283;
+pub const WILD_EYES_GAS_MASK: i32 = 1_003_036;
+pub const FOG_FOREST: i32 = 677_000_010;
+pub const ASTAROTH_STROLLING_PLACE: i32 = 677_000_011;
+pub const ASTAROTH_HIDING_PLACE: i32 = 677_000_012;
+/// An unnamed room with a doorway, which no portal leads to.
+const ASTAROTH_BACK_ROOM: i32 = 677_000_013;
+pub const ASTAROTH_SWAMP: i32 = 105_050_400;
 /// Wiz the Librarian in the Helios Tower Library, and the storybook quests
 /// that end there with the book each brings back.
 pub const WIZ: i32 = 2040052;
@@ -2733,6 +2798,10 @@ impl NpcScript {
             PICTURE_FRAME => return picture_frame(player),
             QUEENS_CABINET => return queens_cabinet(player),
             ALCADNO_CABINET => return alcadno_cabinet(player),
+            ASTAROTHS_DOORWAY => return Some(astaroths_doorway(player)),
+            door if DEMONS_DOORWAYS.iter().any(|d| d.npc == door) => {
+                return Some(demons_doorway(door, player));
+            }
             pipe if STUDY_PIPES.contains(&pipe) => return study_pipe(pipe, player),
             WIZ => return Some(wiz(player)),
             ROBERT_HOLLY => return Some(robert_holly()),
@@ -10168,6 +10237,64 @@ fn alcadno_cabinet(player: &Player) -> Option<NpcScript> {
         }])
     };
     Some(NpcScript::new(ALCADNO_CABINET, vec![page]))
+}
+
+/// A Demon's Doorway lets one on its quest holding the emblem into the
+/// demon's strolling path, if they say yes, taking the quest line's
+/// leftovers; otherwise it is sealed.
+fn demons_doorway(npc: i32, player: &Player) -> NpcScript {
+    let door = DEMONS_DOORWAYS.iter().find(|d| d.npc == npc).unwrap();
+    let page = if player.quests.state(door.quest) != QuestState::Started {
+        Page::Say(text(keys::DEMONS_DOORWAY_SEALED))
+    } else if player.inventory.count(door.emblem) == 0 {
+        Page::Say(text(keys::DEMONS_DOORWAY_EMBLEM))
+    } else {
+        let mut effects: Vec<Effect> = (door.leftovers.iter())
+            .filter(|&&item| player.inventory.count(item) > 0)
+            .map(|&item_id| Effect::TakeItem {
+                item_id,
+                quantity: 1,
+            })
+            .collect();
+        effects.push(Effect::WarpToPortal(door.path, 0));
+        Page::Ask {
+            text: doorway_ask(door.path),
+            on_yes: effects,
+            on_no: None,
+        }
+    };
+    NpcScript::new(npc, vec![page])
+}
+
+/// Outside, Astaroth's Doorway lets one on its quest wearing Wild Eye's gas
+/// mask into the Fog Forest; in the strolling place it leads on to the
+/// hiding place, and from there (or the unused room past it) back out to
+/// the swamp.
+fn astaroths_doorway(player: &Player) -> NpcScript {
+    let map = player.stats.map_id;
+    let ask = |to: i32, text: String| Page::Ask {
+        text,
+        on_yes: vec![Effect::WarpToPortal(to, 0)],
+        on_no: None,
+    };
+    let page = if map == ASTAROTH_STROLLING_PLACE {
+        ask(ASTAROTH_HIDING_PLACE, doorway_ask(ASTAROTH_HIDING_PLACE))
+    } else if matches!(map, ASTAROTH_HIDING_PLACE | ASTAROTH_BACK_ROOM) {
+        ask(ASTAROTH_SWAMP, text(keys::ASTAROTHS_DOORWAY_LEAVE))
+    } else if player.quests.state(ASTAROTH_QUEST) != QuestState::Started {
+        Page::Say(text(keys::DEMONS_DOORWAY_SEALED))
+    } else if !(player.inventory.items(InventoryType::Equipped))
+        .any(|(_, item)| item.item_id == WILD_EYES_GAS_MASK)
+    {
+        Page::Say(text(keys::ASTAROTHS_DOORWAY_MASK))
+    } else {
+        ask(FOG_FOREST, doorway_ask(FOG_FOREST))
+    };
+    NpcScript::new(ASTAROTHS_DOORWAY, vec![page])
+}
+
+fn doorway_ask(to: i32) -> String {
+    content::text().get(keys::DEMONS_DOORWAY_ASK, &[("map", &to.to_string())])
 }
 
 /// While the study is still to be found, the pipes count in turn ("0" to
@@ -27702,6 +27829,89 @@ mod tests {
             game::Item::stack(SECRET_DOCUMENT, 1),
         );
         assert!(NpcScript::for_npc(ALCADNO_CABINET, &player).is_none());
+    }
+
+    #[test]
+    fn a_demons_doorway_lets_one_on_its_quest_with_the_emblem_in() {
+        let andras = &DEMONS_DOORWAYS[0];
+        let says =
+            |player: &Player| page_text(&NpcScript::for_npc(andras.npc, player).unwrap().begin());
+        let mut warrior = player(50);
+        assert_eq!(says(&warrior), text(keys::DEMONS_DOORWAY_SEALED));
+        warrior.quests.upsert(game::QuestRecord {
+            quest_id: andras.quest,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        assert_eq!(says(&warrior), text(keys::DEMONS_DOORWAY_EMBLEM));
+
+        // With the emblem, a yes takes the one leftover held and goes in.
+        for (slot, item) in [(1, andras.emblem), (2, andras.leftovers[1])] {
+            warrior
+                .inventory
+                .insert(InventoryType::Etc, slot, game::Item::stack(item, 1));
+        }
+        let mut script = NpcScript::for_npc(andras.npc, &warrior).unwrap();
+        assert_eq!(question(&script.begin()), doorway_ask(andras.path));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: andras.leftovers[1],
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(andras.path, 0),
+            ]
+        );
+    }
+
+    #[test]
+    fn astaroths_doorway_wants_the_gas_mask_worn_and_leads_on_and_out() {
+        let page = |player: &Player| {
+            NpcScript::for_npc(ASTAROTHS_DOORWAY, player)
+                .unwrap()
+                .begin()
+        };
+        let yes = |player: &Player| {
+            let mut script = NpcScript::for_npc(ASTAROTHS_DOORWAY, player).unwrap();
+            script.begin();
+            script.respond(ScriptInput::Yes).unwrap().effects
+        };
+        let mut hunter = player(70);
+        hunter.stats.map_id = ASTAROTH_SWAMP;
+        assert_eq!(page_text(&page(&hunter)), text(keys::DEMONS_DOORWAY_SEALED));
+        hunter.quests.upsert(game::QuestRecord {
+            quest_id: ASTAROTH_QUEST,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        assert_eq!(
+            page_text(&page(&hunter)),
+            text(keys::ASTAROTHS_DOORWAY_MASK)
+        );
+        hunter.inventory.insert(
+            InventoryType::Equipped,
+            -1,
+            game::Item::stack(WILD_EYES_GAS_MASK, 1),
+        );
+        assert_eq!(question(&page(&hunter)), doorway_ask(FOG_FOREST));
+        assert_eq!(yes(&hunter), [Effect::WarpToPortal(FOG_FOREST, 0)]);
+
+        // Inside, on to the hiding place, and from there out.
+        let mut inside = player(70);
+        inside.stats.map_id = ASTAROTH_STROLLING_PLACE;
+        assert_eq!(
+            yes(&inside),
+            [Effect::WarpToPortal(ASTAROTH_HIDING_PLACE, 0)]
+        );
+        inside.stats.map_id = ASTAROTH_HIDING_PLACE;
+        let leave = page(&inside);
+        assert_eq!(question(&leave), text(keys::ASTAROTHS_DOORWAY_LEAVE));
+        assert_eq!(yes(&inside), [Effect::WarpToPortal(ASTAROTH_SWAMP, 0)]);
     }
 
     #[test]
