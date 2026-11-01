@@ -7537,6 +7537,7 @@ fn puka_potion(player: &Player) -> NpcScript {
             Page::Reply(text(how)),
         ],
     );
+    script.inventory_full = Some(text(keys::COLD_FOREST_FULL));
     script.on_end = vec![Effect::GuideHint(LILIN_FIRST_HINT)];
     script
 }
