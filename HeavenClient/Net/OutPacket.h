@@ -86,6 +86,9 @@ namespace ms
 			SPOUSE_CHAT = 121,
 			MESSENGER = 122,
 
+			// Touching a mob whose `ban/banType` is 1 (FUN_0095ce8a)
+			MOB_BANISH_PLAYER = 56,
+
 			/// Monster Book
 			MONSTER_BOOK_COVER = 57,
 

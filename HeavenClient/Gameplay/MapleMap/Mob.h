@@ -277,6 +277,8 @@ namespace ms
 		bool is_alive() const;
 		// Its template id, as Mob.wz names it.
 		int32_t get_id() const;
+		// Whether touching it banishes the player: `ban/banType` 1 (FUN_0067cf06).
+		bool banishes_by_touch() const;
 
 		// Whether a Teleport can't take the player past this mob.
 		bool blocks_teleport() const;
@@ -620,6 +622,7 @@ namespace ms
 		magic_damage::Attributes elements;
 		bool undead;
 		bool touchdamage;
+		bool touchbanish;
 		bool noflip;
 		bool blocksteleport;
 		bool notattack;

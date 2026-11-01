@@ -1127,6 +1127,7 @@ impl FieldActor {
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
                 FieldRequest::MobBomb { object_id } => self.handle_mob_bomb(object_id),
+                FieldRequest::TouchBanish { mob_id } => self.handle_touch_banish(from, mob_id),
                 FieldRequest::FieldDamageMob { object_id, damage } => {
                     self.handle_field_damage_mob(from, object_id, damage)
                 }
@@ -4652,6 +4653,22 @@ impl FieldActor {
         }
         if let Ok(packet) = build_kill_mob(object_id, 4) {
             self.broadcast(None, packet);
+        }
+    }
+
+    /// A player touched a mob of template `mob_id` whose `banType` is 1: if
+    /// one is here, it banishes them where its `ban` says (Cosmic takes any
+    /// mob by the id; this one only those that banish by touch).
+    fn handle_touch_banish(&mut self, from: ClientId, mob_id: i32) {
+        let Some(to) = (self.mobs.live())
+            .filter(|mob| mob.info.mob_id == mob_id)
+            .find_map(|mob| mob.info.banish.clone().filter(|banish| banish.touch))
+        else {
+            return;
+        };
+        if let Some(occupant) = self.occupants.get(&from) {
+            let map_id = self.key.map_id;
+            occupant.handle.send(ServerMessage::Banished { to, map_id });
         }
     }
 

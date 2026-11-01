@@ -670,7 +670,14 @@ namespace ms
 				player.has_buff(Buffstat::Id::DARKSIGHT));
 
 		if (touching)
+		{
 			combat.body_attack(touching);
+
+			// A mob whose `ban/banType` is 1 banishes the player it touches, each touch, before the hit; the
+			// server says where (0x94b3bd).
+			if (int32_t banisher = mobs.touch_banisher(touching))
+				MobBanishPlayerPacket(banisher).dispatch();
+		}
 
 		if (touching && player.is_barrelled())
 		{

@@ -459,6 +459,15 @@ namespace ms
 		return 0;
 	}
 
+	int32_t MapMobs::touch_banisher(int32_t oid) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			if (mob->banishes_by_touch())
+				return mob->get_id();
+
+		return 0;
+	}
+
 	int16_t MapMobs::dojo_boss_percent() const
 	{
 		const Mob *first = nullptr;

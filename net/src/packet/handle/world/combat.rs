@@ -96,6 +96,24 @@ impl WorldHandler for MobBombHandler {
     }
 }
 
+/// `MOB_BANISH_PLAYER`: the player touched a mob whose `ban/banType` is 1
+/// (Delli's serpents, Hogul, the Mirror Ghosts, the Cat), which banishes
+/// them where its `ban` says. The mob's template id alone; the client
+/// sends it with each touch it takes damage from.
+pub struct MobBanishHandler;
+
+impl WorldHandler for MobBanishHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let mob_id = r.read_int()?;
+        if ctx.player.stats.hp <= 0 {
+            return Ok(HandlerResult::empty());
+        }
+        Ok(HandlerResult::empty().with(WorldAction::Field(FieldRequest::TouchBanish { mob_id })))
+    }
+}
+
 /// `MOB_DAMAGE_MOB_FRIENDLY`: a mob's body touched the friendly mob's
 /// (`damagedByMob`): the attacker's object id, the character's id, and the
 /// friendly's. The client says nothing of damage; the server rolls it. Only
@@ -1852,5 +1870,34 @@ mod tests {
         assert!(handle(&mut player, touch(most + 1, 4230103)).is_empty());
         handle(&mut player, touch(most, 4230103));
         assert_eq!(i32::from(player.stats.hp), 10_000 - most);
+    }
+
+    #[test]
+    fn a_touch_that_banishes_asks_the_field_unless_the_player_is_dead() {
+        let mut player = crate::codec::stats::sample_player();
+        let banish = |player: &mut game::Player| {
+            let mut packet = Packet::new_empty();
+            packet
+                .write_short(RecvOpcode::MobBanishPlayer as i16)
+                .unwrap();
+            packet.write_int(9300160).unwrap();
+            let mut ctx = WorldContext {
+                client_id: 1,
+                channel_id: 0,
+                player,
+            };
+            MobBanishHandler
+                .handle(&mut packet, &mut ctx)
+                .unwrap()
+                .actions
+        };
+        assert!(matches!(
+            banish(&mut player)[..],
+            [WorldAction::Field(FieldRequest::TouchBanish {
+                mob_id: 9300160
+            })]
+        ));
+        player.stats.hp = 0;
+        assert!(banish(&mut player).is_empty());
     }
 }

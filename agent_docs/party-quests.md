@@ -958,6 +958,10 @@ and stop coming (`FieldMessage::ClearMobs`, `MobSet::clear_hostile`, Cosmic
 The mobs come back on the field's usual seven seconds (Cosmic forces
 fifteen).
 
+The Red Flower Serpents (9300160/61) on Looking for Delli 2 and 3 banish
+by touch (`ban/banType` 1): a touch sends the player back to Looking for
+Delli 1 (925010000, `sp`) with their pink line ([combat](combat.md)).
+
 ## The Ludibrium Maze
 
 Cosmic `LudiMazePQ` (`v83ref/reports/a119-ludimaze.md`; defaults in

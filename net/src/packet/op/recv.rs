@@ -107,6 +107,9 @@ pub enum RecvOpcode {
     SpouseChat = 0x79,
     Messenger = 0x7A,
     PlayerInteraction = 0x7B,
+    /// The player touched a mob whose `ban/banType` is 1: its template id
+    /// (FUN_0095ce8a, from CUserLocal::Update).
+    MobBanishPlayer = 0x38,
     MonsterBookCover = 0x39,
     TalkToNpc = 0x3A,
     /// A Store Remote Controller was used; the client waits for
