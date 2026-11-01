@@ -389,6 +389,34 @@ pub const CLOY: i32 = 1012005;
 pub const PET_AP_RESET_SCROLL: i32 = 4160011;
 pub const PET_AP_RESET_PRICE: i32 = 250_000;
 pub const WISP: i32 = 2040030;
+pub const FROD: i32 = 1012007;
+pub const WEAVER: i32 = 2040032;
+pub const NERU: i32 = 2040033;
+
+/// A pet-walking road's two trainers: the one at its foot gives a letter,
+/// and the brother at its top takes it and brings every pet out closer.
+pub struct PetCourse {
+    pub giver: i32,
+    pub taker: i32,
+    pub letter: i32,
+    pub closeness: i16,
+}
+
+/// Henesys's Pet-Walking Road (100000202).
+pub const HENESYS_PET_COURSE: PetCourse = PetCourse {
+    giver: BARTOS,
+    taker: FROD,
+    letter: 4031035,
+    closeness: 2,
+};
+
+/// Ludibrium's Pet Walkway (220000006).
+pub const LUDIBRIUM_PET_COURSE: PetCourse = PetCourse {
+    giver: WEAVER,
+    taker: NERU,
+    letter: 4031128,
+    closeness: 4,
+};
 /// The Magic Seed Chief Tatamo sells, its price, and the most at once.
 pub const MAGIC_SEED: i32 = 4031346;
 pub const MAGIC_SEED_PRICE: i32 = 30_000;
@@ -2607,6 +2635,10 @@ impl NpcScript {
             CHICO => return Some(chico()),
             CLOY => return Some(cloy()),
             WISP => return Some(wisp()),
+            BARTOS => return Some(bartos(player)),
+            FROD => return Some(pet_course_end(&HENESYS_PET_COURSE, player)),
+            WEAVER => return Some(pet_course_start(&LUDIBRIUM_PET_COURSE, player)),
+            NERU => return Some(pet_course_end(&LUDIBRIUM_PET_COURSE, player)),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9858,6 +9890,77 @@ fn wisp() -> NpcScript {
         choices,
     };
     NpcScript::new(WISP, vec![menu])
+}
+
+/// Bartos at the foot of Henesys's Pet-Walking Road: the course, or a word
+/// for one who claims Mar the Fairy sent them.
+fn bartos(player: &Player) -> NpcScript {
+    let course = pet_course_start(&HENESYS_PET_COURSE, player);
+    let menu = Page::Menu {
+        text: text(keys::PET_COURSE_HELLO),
+        choices: vec![
+            (text(keys::PET_COURSE_ABOUT), course.pages),
+            (
+                text(keys::PET_COURSE_MAR),
+                vec![Page::Say(text(keys::PET_COURSE_MAR_TOLD))],
+            ),
+        ],
+    };
+    let mut script = NpcScript::new(BARTOS, vec![menu]);
+    script.inventory_full = course.inventory_full;
+    script
+}
+
+/// The trainer at a pet-walking road's foot offers its letter, or reminds
+/// one who holds it where to take it.
+fn pet_course_start(course: &PetCourse, player: &Player) -> NpcScript {
+    if player.inventory.count(course.letter) > 0 {
+        let held = Page::Say(text(keys::PET_COURSE_HELD));
+        return NpcScript::new(course.giver, vec![held]);
+    }
+    let mut script = NpcScript::new(
+        course.giver,
+        vec![
+            Page::Ask {
+                text: text(keys::PET_COURSE_ASK),
+                on_yes: vec![Effect::GiveItem {
+                    item_id: course.letter,
+                    quantity: 1,
+                }],
+                on_no: Some(text(keys::PET_COURSE_BUSY)),
+            },
+            Page::Say(text(keys::PET_COURSE_GIVEN)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::PET_COURSE_FULL));
+    script
+}
+
+/// The brother at the top takes the letter and brings every pet out
+/// closer, but not for one who came up without a pet out.
+fn pet_course_end(course: &PetCourse, player: &Player) -> NpcScript {
+    if player.inventory.count(course.letter) == 0 {
+        let idle = Page::Say(text(keys::PET_COURSE_IDLE));
+        return NpcScript::new(course.taker, vec![idle]);
+    }
+    let closer = if player.pets.is_empty() {
+        Page::Say(text(keys::PET_COURSE_NO_PET))
+    } else {
+        Page::Act {
+            text: text(keys::PET_COURSE_CLOSER),
+            effects: vec![
+                Effect::TakeItem {
+                    item_id: course.letter,
+                    quantity: 1,
+                },
+                Effect::TamePets(course.closeness),
+            ],
+        }
+    };
+    let letter = Page::Say(text(keys::PET_COURSE_LETTER));
+    let mut script = NpcScript::new(course.taker, vec![letter, closer]);
+    script.refused = Some(text(keys::PET_COURSE_NO_PET));
+    script
 }
 
 /// Chico in Ludibrium: Match Cards or one of Ludibrium's Omok sets, for
@@ -26488,6 +26591,59 @@ mod tests {
         let told = wisp.respond(ScriptInput::Select(4)).unwrap();
         assert_eq!(page_text(&told), text(keys::CLOY_COMMANDS_TOLD));
         assert!(told.effects.is_empty());
+    }
+
+    #[test]
+    fn the_pet_courses_trainers_trade_a_letter_for_closeness() {
+        let course = &HENESYS_PET_COURSE;
+        let letter = Effect::GiveItem {
+            item_id: course.letter,
+            quantity: 1,
+        };
+        let mut player = traveller(30, 0, false);
+        let mut bartos = NpcScript::for_npc(BARTOS, &player).unwrap();
+        bartos.begin();
+        let asked = bartos.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(question(&asked), text(keys::PET_COURSE_ASK));
+        let given = bartos.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(given.effects, [letter]);
+        assert_eq!(page_text(&given), text(keys::PET_COURSE_GIVEN));
+
+        // Frod idles until the letter comes, and wants a pet out.
+        let mut frod = NpcScript::for_npc(FROD, &player).unwrap();
+        assert_eq!(page_text(&frod.begin()), text(keys::PET_COURSE_IDLE));
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(course.letter, 1));
+        let mut frod = NpcScript::for_npc(FROD, &player).unwrap();
+        assert_eq!(page_text(&frod.begin()), text(keys::PET_COURSE_LETTER));
+        let petless = frod.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&petless), text(keys::PET_COURSE_NO_PET));
+        assert!(petless.effects.is_empty());
+        player.pets.push(7);
+        let mut frod = NpcScript::for_npc(FROD, &player).unwrap();
+        frod.begin();
+        let closer = frod.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&closer), text(keys::PET_COURSE_CLOSER));
+        let take = Effect::TakeItem {
+            item_id: course.letter,
+            quantity: 1,
+        };
+        assert_eq!(closer.effects, [take, Effect::TamePets(2)]);
+
+        // Weaver only reminds one who already holds Ludibrium's letter.
+        let mut weaver = NpcScript::for_npc(WEAVER, &player).unwrap();
+        assert_eq!(question(&weaver.begin()), text(keys::PET_COURSE_ASK));
+        let ludibrium = LUDIBRIUM_PET_COURSE.letter;
+        player
+            .inventory
+            .insert(InventoryType::Etc, 2, game::Item::stack(ludibrium, 1));
+        let mut weaver = NpcScript::for_npc(WEAVER, &player).unwrap();
+        assert_eq!(page_text(&weaver.begin()), text(keys::PET_COURSE_HELD));
+        let mut neru = NpcScript::for_npc(NERU, &player).unwrap();
+        neru.begin();
+        let closer = neru.respond(ScriptInput::Next).unwrap();
+        assert_eq!(closer.effects[1], Effect::TamePets(4));
     }
 
     #[test]

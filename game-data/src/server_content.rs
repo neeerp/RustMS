@@ -3084,6 +3084,19 @@ pub mod keys {
     pub const WISP_HELLO: &str = "wisp.hello";
     pub const WISP_DOLL: &str = "wisp.doll";
     pub const WISP_DOLL_TOLD: &str = "wisp.doll_told";
+    pub const PET_COURSE_HELLO: &str = "pet_course.hello";
+    pub const PET_COURSE_ABOUT: &str = "pet_course.about";
+    pub const PET_COURSE_MAR: &str = "pet_course.mar";
+    pub const PET_COURSE_MAR_TOLD: &str = "pet_course.mar_told";
+    pub const PET_COURSE_ASK: &str = "pet_course.ask";
+    pub const PET_COURSE_BUSY: &str = "pet_course.busy";
+    pub const PET_COURSE_GIVEN: &str = "pet_course.given";
+    pub const PET_COURSE_FULL: &str = "pet_course.full";
+    pub const PET_COURSE_HELD: &str = "pet_course.held";
+    pub const PET_COURSE_IDLE: &str = "pet_course.idle";
+    pub const PET_COURSE_LETTER: &str = "pet_course.letter";
+    pub const PET_COURSE_NO_PET: &str = "pet_course.no_pet";
+    pub const PET_COURSE_CLOSER: &str = "pet_course.closer";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5245,6 +5258,19 @@ mod tests {
                 keys::WISP_HELLO,
                 keys::WISP_DOLL,
                 keys::WISP_DOLL_TOLD,
+                keys::PET_COURSE_HELLO,
+                keys::PET_COURSE_ABOUT,
+                keys::PET_COURSE_MAR,
+                keys::PET_COURSE_MAR_TOLD,
+                keys::PET_COURSE_ASK,
+                keys::PET_COURSE_BUSY,
+                keys::PET_COURSE_GIVEN,
+                keys::PET_COURSE_FULL,
+                keys::PET_COURSE_HELD,
+                keys::PET_COURSE_IDLE,
+                keys::PET_COURSE_LETTER,
+                keys::PET_COURSE_NO_PET,
+                keys::PET_COURSE_CLOSER,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,

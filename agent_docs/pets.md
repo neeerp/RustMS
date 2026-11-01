@@ -181,6 +181,17 @@ beside it.
 - **Wisp.** Wisp (2040030) at Eos Tower's entrance (220000400) gives the
   same answers as Cloy, after a choice for a pet that has become a doll
   again, which Wisp can't help with (`wisp.*`, QUESTIONS b391).
+- **Pet-walking roads.** At the foot of Henesys's Pet-Walking Road
+  (100000202), Bartos (1012006) gives a letter (4031035). Brother Frod
+  (1012007) at the top takes it and makes every pet out 2 points closer.
+  Ludibrium's Pet Walkway (220000006) works the same way: Weaver (2040032)
+  gives letter 4031128, and Neru (2040033) takes it for 4 points. The pairs
+  share one `npc_scripts::PetCourse` and the `pet_course.*` placeholders.
+  The closeness comes from `Effect::TamePets`, which `world::tame_pets`
+  applies to every pet out: it re-sends the changed pets' items and shows
+  any level-ups to the owner and the map. It is refused, and the letter
+  kept, if no pet is out. Nothing checks that the player climbed the
+  course (QUESTIONS b392).
 
 ## Client
 

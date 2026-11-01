@@ -162,7 +162,7 @@ pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationH
 pub use self::party_search::{PartySearchStartHandler, PartySearchStopHandler};
 pub use self::pet::{
     evolve_pet, next_dry_up, pets_dry_up, pets_grow_hungry, revive_pet, rock_evolutions,
-    roll_evolution, tame_first_pet, train_first_pet, DeadPetHandler, MovePetHandler,
+    roll_evolution, tame_first_pet, tame_pets, train_first_pet, DeadPetHandler, MovePetHandler,
     PetChatHandler, PetCommandHandler, PetExcludeItemsHandler, PetFoodHandler, PetLootHandler,
     PetsAged, SpawnPetHandler, WaterOfLifeHandler, ROCK_OF_EVOLUTION,
 };
