@@ -150,6 +150,7 @@ namespace ms
 		itemicon = idata.get_icon(false);
 		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name(), WIDTH - 2 * tooltip::NAME_POS.x());
 		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, DESC_WIDTH, true, tooltip::LINE_ADJ);
+		desc.set_tooltip();
 
 		bool pet = itemid / 10000 == 500;
 		// A slot extender says what it does to the slot in its place.

@@ -19,6 +19,8 @@
 
 #include "Utf8.h"
 
+#include <cctype>
+
 namespace ms
 {
 	namespace
@@ -29,7 +31,7 @@ namespace ms
 			LayoutBuilder(const std::string &text, int16_t linespace,
 						  const std::function<int16_t(char32_t, bool)> &advance, Text::Alignment alignment,
 						  int16_t maxwidth, bool formatted, int16_t line_adj,
-						  const std::vector<Point<int16_t>> &boxes);
+						  const std::vector<Point<int16_t>> &boxes, bool tooltip);
 
 			size_t add(size_t prev, size_t first, size_t last);
 
@@ -56,6 +58,8 @@ namespace ms
 			bool highlight;
 			int16_t maxwidth;
 			bool formatted;
+			// v83's tooltip reading of '#' (0x8e40e4).
+			bool tooltip;
 
 			int16_t ax;
 			int16_t ay;
@@ -77,9 +81,10 @@ namespace ms
 
 		LayoutBuilder::LayoutBuilder(const std::string &t, int16_t ls, const std::function<int16_t(char32_t, bool)> &adv,
 									 Text::Alignment a, int16_t mw, bool fm, int16_t la,
-									 const std::vector<Point<int16_t>> &b) : text(t), linespace(ls), advance(adv),
-																			 alignment(a), maxwidth(mw), formatted(fm),
-																			 line_adj(la)
+									 const std::vector<Point<int16_t>> &b, bool tt) : text(t), linespace(ls),
+																					  advance(adv), alignment(a),
+																					  maxwidth(mw), formatted(fm),
+																					  tooltip(tt), line_adj(la)
 		{
 			fontid = Text::Font::NUM_FONTS;
 			color = Color::Name::NUM_COLORS;
@@ -135,13 +140,33 @@ namespace ms
 						skip++;
 						break;
 					case '#':
-						if (highlight)
+						if (tooltip)
+						{
+							// v83's tooltip text (0x8e4217) has one mark: each
+							// '#' turns the highlight on or off, and only an
+							// opening one also skips a 'c' after it. So
+							// "#Infinity#" and "A red #1 to ..." keep every letter.
+							if (!highlight && first + 1 < last && text[first + 1] == 'c')
+								skip++;
+
+							highlight = !highlight;
+							color = highlight ? Color::Name::ORANGE : Color::Name::NUM_COLORS;
+						}
+						else if (highlight)
 						{
 							// As v83's tooltip text (0x8e4217): a '#' after #c
 							// closes the run whatever follows, and only the
 							// '#' is skipped, so "#c%s#'s" keeps its "'s".
 							color = Color::Name::NUM_COLORS;
 							highlight = false;
+						}
+						else if (first + 1 < last && std::isdigit(static_cast<unsigned char>(text[first + 1])))
+						{
+							// A '#' before a digit, as in an item named "Box of
+							// Parts #2", is no mark: v83 draws both (type 0 at
+							// 0x9a184b). Before punctuation it is mostly the end
+							// of a code we don't expand, so that still goes.
+							break;
 						}
 						else if (first + 1 < last)
 						{
@@ -331,14 +356,14 @@ namespace ms
 	Text::Layout layout_text(const std::string &text, int16_t linespace,
 							 const std::function<int16_t(char32_t, bool)> &advance, Text::Alignment alignment,
 							 int16_t maxwidth, bool formatted, int16_t line_adj,
-							 const std::vector<Point<int16_t>> &boxes)
+							 const std::vector<Point<int16_t>> &boxes, bool tooltip)
 	{
 		size_t length = text.length();
 
 		if (length == 0)
 			return Text::Layout();
 
-		LayoutBuilder builder(text, linespace, advance, alignment, maxwidth, formatted, line_adj, boxes);
+		LayoutBuilder builder(text, linespace, advance, alignment, maxwidth, formatted, line_adj, boxes, tooltip);
 
 		const std::string separators = { ' ', '\\', '#', Text::BOX };
 

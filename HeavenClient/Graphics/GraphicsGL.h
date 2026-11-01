@@ -75,7 +75,8 @@ namespace ms
 		// Create a layout for the text with the parameters specified. The n-th
 		// Text::BOX character takes the n-th of `boxes` (width, height).
 		Text::Layout createlayout(const std::string &text, Text::Font font, Text::Alignment alignment, int16_t maxwidth,
-								  bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes);
+								  bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes,
+								  bool tooltip = false);
 
 		// Draw a text with the given parameters, up to character `reveal`,
 		// and the [first, last) ranges in `shown` whatever `reveal` is. A

@@ -42,7 +42,7 @@ namespace ms
 		if (text.empty())
 			return;
 
-		layout = GraphicsGL::get().createlayout(text, font, alignment, maxwidth, formatted, line_adj, boxes);
+		layout = GraphicsGL::get().createlayout(text, font, alignment, maxwidth, formatted, line_adj, boxes, tooltip);
 	}
 
 	void Text::change_text(const std::string &t)
@@ -51,6 +51,16 @@ namespace ms
 			return;
 
 		text = t;
+
+		reset_layout();
+	}
+
+	void Text::set_tooltip()
+	{
+		if (tooltip)
+			return;
+
+		tooltip = true;
 
 		reset_layout();
 	}

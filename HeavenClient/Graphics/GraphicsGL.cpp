@@ -705,7 +705,8 @@ namespace ms
 
 	Text::Layout
 	GraphicsGL::createlayout(const std::string &text, Text::Font id, Text::Alignment alignment, int16_t maxwidth,
-							 bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes)
+							 bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes,
+							 bool tooltip)
 	{
 		const Font &font = fonts[id];
 		const Font &bold = fonts[bold_font(id)];
@@ -713,7 +714,7 @@ namespace ms
 		return layout_text(text, font.linespace(), [&font, &bold](char32_t c, bool is_bold)
 		{
 			return (is_bold ? bold : font).glyph(c).ax;
-		}, alignment, maxwidth, formatted, line_adj, boxes);
+		}, alignment, maxwidth, formatted, line_adj, boxes, tooltip);
 	}
 
 	void GraphicsGL::drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,

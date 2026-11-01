@@ -24,6 +24,21 @@ namespace
 		return ms::layout_text(text, 15, advance, ms::Text::Alignment::LEFT, maxwidth, true, 0, boxes);
 	}
 
+	ms::Text::Layout tooltip(const std::string &text)
+	{
+		return ms::layout_text(text, 15, advance, ms::Text::Alignment::LEFT, 400, true, 0, {}, true);
+	}
+
+	const ms::Text::Layout::Word &word_holding(const ms::Text::Layout &l, size_t pos)
+	{
+		for (const auto &line : l)
+			for (const auto &word : line.words)
+				if (word.first <= pos && pos < word.last)
+					return word;
+
+		throw std::runtime_error("no word holds the character");
+	}
+
 	size_t line_count(const ms::Text::Layout &l)
 	{
 		size_t count = 0;
@@ -95,6 +110,37 @@ int main()
 		require(word_at(apostrophe).color == ms::Color::Name::NUM_COLORS, "the closing # ends the orange");
 		require(tip.advance(apostrophe + 1) - tip.advance(apostrophe) == 6, "the apostrophe is drawn");
 		require(word_at(blessing.find('e')).color == ms::Color::Name::NUM_COLORS, "the words after stay plain");
+
+		// In a tooltip each '#' turns the highlight on or off, skipping only
+		// itself and an opening one's 'c' (v83 0x8e4217): Infinity's book
+		// keeps its I, and an ornament's number shows.
+		const std::string book = "learn #Infinity# with";
+		auto infinity = tooltip(book);
+		require(infinity.advance(7) - infinity.advance(6) == 0, "the opening # takes no room");
+		require(infinity.advance(8) - infinity.advance(7) == 6, "the I after it is drawn");
+		require(word_holding(infinity, 7).color == ms::Color::Name::ORANGE, "the name is highlighted");
+		require(word_holding(infinity, book.find("with")).color == ms::Color::Name::NUM_COLORS,
+			"the closing # ends the highlight");
+		const std::string ornament = "A red #1 to";
+		auto red = tooltip(ornament);
+		require(red.advance(8) - red.advance(7) == 6, "the 1 is drawn");
+		require(word_holding(red, ornament.find("to")).color == ms::Color::Name::ORANGE,
+			"an unclosed # highlights the rest");
+		auto kept = tooltip("#bTerms#k");
+		require(kept.advance(2) - kept.advance(1) == 6 && kept.advance(9) - kept.advance(8) == 6,
+			"no other letter is a mark in a tooltip");
+		auto closing = tooltip("#cSib#cs");
+		require(closing.advance(7) - closing.advance(6) == 6, "a closing # leaves the c after it");
+
+		// In NPC text a '#' before a digit is drawn, as in
+		// "Box of Parts #2" (v83 0x9a184b).
+		const std::string parts = "Parts #2 now";
+		auto box_of_parts = layout(parts, 200);
+		require(box_of_parts.advance(7) - box_of_parts.advance(6) == 6 &&
+			box_of_parts.advance(8) - box_of_parts.advance(7) == 6, "the # and the 2 are drawn");
+		auto marked = layout("#bBlue", 200);
+		require(marked.advance(2) == 0 && word_holding(marked, 2).color == ms::Color::Name::BLUE,
+			"a letter after # is still a mark");
 
 		// Finding the character under the cursor, as for a name in the quest log.
 		auto words = layout("abc def", 24);
