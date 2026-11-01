@@ -1319,6 +1319,13 @@ pub mod keys {
     pub const COLD_FOREST_FULL: &str = "cold_forest.full";
     pub const COLD_FOREST_WAY_LOCKED: &str = "cold_forest.way_locked";
     pub const LILIN_GOES_AHEAD: &str = "lilin.goes_ahead";
+    /// The Black Road's tips (`aranTutorGuide0` to `2`): the regular
+    /// attack, consecutive attacks, and the command attack.
+    pub const BLACK_ROAD_TIPS: [&str; 3] = [
+        "black_road.tip.attack",
+        "black_road.tip.consecutive",
+        "black_road.tip.command",
+    ];
     /// The Aran's first job: Lilin's The Five Heroes (`q21100s`) and the
     /// Polearm in the ice (1201001, `q21101s`/`e`).
     pub const LILIN_FIVE_HEROES: [&str; 8] = [
@@ -4727,6 +4734,9 @@ mod tests {
                 keys::COLD_FOREST_FULL,
                 keys::COLD_FOREST_WAY_LOCKED,
                 keys::LILIN_GOES_AHEAD,
+                keys::BLACK_ROAD_TIPS[0],
+                keys::BLACK_ROAD_TIPS[1],
+                keys::BLACK_ROAD_TIPS[2],
                 keys::LILIN_FIVE_HEROES[0],
                 keys::LILIN_FIVE_HEROES[1],
                 keys::LILIN_FIVE_HEROES[2],

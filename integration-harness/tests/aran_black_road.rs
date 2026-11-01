@@ -60,6 +60,15 @@ async fn enter(c: &mut MapleTestConnection, m: &str, map: i32, portal: &str) -> 
     step(c, m, p).await
 }
 
+/// Stepping on the touch spot whose script is `script` on `map`.
+async fn touch(c: &mut MapleTestConnection, m: &str, map: i32, script: &str) -> Trace {
+    let field = maps().field(map).unwrap();
+    let at = (field.portals())
+        .find(|p| p.script.as_deref() == Some(script))
+        .unwrap();
+    enter(c, m, map, &at.name.clone()).await
+}
+
 #[tokio::test]
 async fn the_black_road_leads_an_aran_from_the_ark_to_the_ice_cave() {
     let config = load_harness_config_or_fail().await;
@@ -77,6 +86,13 @@ async fn the_black_road_leads_an_aran_from_the_ark_to_the_ice_cave() {
     let c = &mut session.connection;
     let mut t = Trace::default();
     assert_eq!(warp(c, BLACK_ROAD, "", &mut t).await, BLACK_ROAD);
+
+    // A touch spot shows its balloon once.
+    let t = touch(c, &m, BLACK_ROAD, "aranTutorMono0").await;
+    let balloon = "Effect/OnUserEff.img/guideEffect/aranTutorial/legendBalloon1";
+    assert_eq!(t.images, [balloon], "{t:?}");
+    let t = touch(c, &m, BLACK_ROAD, "aranTutorMono0").await;
+    assert!(t.images.is_empty(), "{t:?}");
 
     // To the ark, which marks it reached.
     let t = enter(c, &m, BLACK_ROAD, "out00").await;
