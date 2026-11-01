@@ -427,6 +427,14 @@ const ALCHEMISTS_HOME: i32 = 261_000_001;
 pub const QUEENS_CABINET: i32 = 2103002;
 const SAND_BANDITS_REQUEST: i16 = 3923;
 const QUEENS_RING: i32 = 4031578;
+/// Alcadno's Cabinet in the dark lab (261020700): while An Incident, and
+/// the Missing Alchemist (3309) is under way, it holds the Secret Document
+/// the quest ends on.
+pub const ALCADNO_CABINET: i32 = 2111010;
+pub const AN_INCIDENT: i16 = 3309;
+pub const SECRET_DOCUMENT: i32 = 4031708;
+/// The room of Alcadno's Cabinet, behind the dark pipe on 261020600.
+pub const ALCADNO_CABINET_ROOM: i32 = 926_120_000;
 /// Wiz the Librarian in the Helios Tower Library, and the storybook quests
 /// that end there with the book each brings back.
 pub const WIZ: i32 = 2040052;
@@ -2724,6 +2732,7 @@ impl NpcScript {
             ICEBYRD_SLIMM => return Some(icebyrd_slimm(player)),
             PICTURE_FRAME => return picture_frame(player),
             QUEENS_CABINET => return queens_cabinet(player),
+            ALCADNO_CABINET => return alcadno_cabinet(player),
             pipe if STUDY_PIPES.contains(&pipe) => return study_pipe(pipe, player),
             WIZ => return Some(wiz(player)),
             ROBERT_HOLLY => return Some(robert_holly()),
@@ -10139,6 +10148,26 @@ fn queens_cabinet(player: &Player) -> Option<NpcScript> {
     let mut script = NpcScript::new(QUEENS_CABINET, vec![page]);
     script.player_speaks = true;
     Some(script)
+}
+
+/// Alcadno's Cabinet gives up the Secret Document silently, once, while the
+/// quest is under way and none is held (Cosmic `2111010.js`), or says no
+/// Etc slot is free; otherwise clicking it does nothing.
+fn alcadno_cabinet(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(AN_INCIDENT) != QuestState::Started
+        || player.inventory.count(SECRET_DOCUMENT) > 0
+    {
+        return None;
+    }
+    let page = if crate::items::give(&mut player.inventory.clone(), SECRET_DOCUMENT, 1).is_err() {
+        Page::Say(text(keys::ALCADNO_CABINET_FULL))
+    } else {
+        Page::Done(vec![Effect::GiveItem {
+            item_id: SECRET_DOCUMENT,
+            quantity: 1,
+        }])
+    };
+    Some(NpcScript::new(ALCADNO_CABINET, vec![page]))
 }
 
 /// While the study is still to be found, the pipes count in turn ("0" to
@@ -27643,6 +27672,36 @@ mod tests {
             game::Item::stack(QUEENS_RING, 1),
         );
         assert!(NpcScript::for_npc(QUEENS_CABINET, &player).is_none());
+    }
+
+    #[test]
+    fn alcadnos_cabinet_gives_up_the_secret_document_once_on_the_quest() {
+        let mut player = traveller(52, 0, false);
+        assert!(NpcScript::for_npc(ALCADNO_CABINET, &player).is_none());
+        player.quests.upsert(game::QuestRecord {
+            quest_id: AN_INCIDENT,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let step = NpcScript::for_npc(ALCADNO_CABINET, &player)
+            .unwrap()
+            .begin();
+        assert!(step.prompt.is_none());
+        assert_eq!(
+            step.effects,
+            [Effect::GiveItem {
+                item_id: SECRET_DOCUMENT,
+                quantity: 1,
+            }]
+        );
+        player.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(SECRET_DOCUMENT, 1),
+        );
+        assert!(NpcScript::for_npc(ALCADNO_CABINET, &player).is_none());
     }
 
     #[test]

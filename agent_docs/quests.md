@@ -386,6 +386,13 @@ palace (2103002, 260000303) gives it, in the player's own words, to a
 player on 3923 who holds none and has an Etc slot free, or says no slot is
 free; otherwise clicking it does nothing (Cosmic `2103002.js`,
 `queens_cabinet.*`).
+"An Incident, and the Missing Alchemist" (3309) ends on the Secret
+Document (4031708) at Bedin (2111008). Alcadno's Cabinet (2111010), in
+the room the dark pipe leads to while the player is on 3309 without the
+document (926120000; see `map-travel.md`, `magatia_dark0`), gives it
+silently to a player on 3309 who holds none,
+or says to free an Etc slot (`alcadno_cabinet.full`); otherwise clicking
+it does nothing (Cosmic `2111010.js`).
 Wiz the Librarian (2040052, Helios Tower Library 222020000) ends the eight
 storybook quests (3615-3618, 3630, 3633, 3639, 3920). Talking to Wiz
 otherwise lists the books brought back, one per completed quest

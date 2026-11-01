@@ -3132,6 +3132,7 @@ pub mod keys {
     pub const STUDY_PIPE_WRONG: &str = "study_pipe.wrong";
     pub const QUEENS_CABINET_SWIPED: &str = "queens_cabinet.swiped";
     pub const QUEENS_CABINET_FULL: &str = "queens_cabinet.full";
+    pub const ALCADNO_CABINET_FULL: &str = "alcadno_cabinet.full";
     pub const WIZ_NONE: &str = "wiz.none";
     pub const WIZ_RETURNED: &str = "wiz.returned";
     pub const WIZ_THANKS: &str = "wiz.thanks";
@@ -3271,7 +3272,6 @@ pub mod keys {
     pub const MAGATIA_THANKS_REHAB: &str = "magatia.thanks.rehab";
     pub const MAGATIA_THANKS_JAIL: &str = "magatia.thanks.jail";
     pub const MAGATIA_THANKS_FULL: &str = "magatia.thanks.full";
-    pub const MAGATIA_PIPE_DARK: &str = "magatia.pipe_dark";
     pub const PIRATE_MENU: &str = "pirate.menu";
     pub const PIRATE_ENTER: &str = "pirate.enter";
     pub const PIRATE_ABOUT: &str = "pirate.about";
@@ -5390,6 +5390,7 @@ mod tests {
                 keys::STUDY_PIPE_WRONG,
                 keys::QUEENS_CABINET_SWIPED,
                 keys::QUEENS_CABINET_FULL,
+                keys::ALCADNO_CABINET_FULL,
                 keys::WIZ_NONE,
                 keys::WIZ_RETURNED,
                 keys::WIZ_THANKS,
@@ -5503,7 +5504,6 @@ mod tests {
                 keys::MAGATIA_THANKS_REHAB,
                 keys::MAGATIA_THANKS_JAIL,
                 keys::MAGATIA_THANKS_FULL,
-                keys::MAGATIA_PIPE_DARK,
                 keys::PIRATE_MENU,
                 keys::PIRATE_ENTER,
                 keys::PIRATE_ABOUT,

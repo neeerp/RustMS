@@ -28,6 +28,7 @@ const PINK: u8 = 5;
 /// leads: Yulete's lab, by its way out (`out00`).
 const PIPE_MAP: i32 = 261020600;
 const YULETE_LAB: i32 = 926130000;
+const DARK_LAB: i32 = 261020700;
 
 fn text(key: &str) -> String {
     net::content::text().get(key, &[])
@@ -314,14 +315,10 @@ async fn the_frankenroid_falls_and_romeo_sends_the_party_home_with_gifts() {
 }
 
 #[tokio::test]
-async fn the_dark_pipe_is_too_dark_for_those_the_traces_never_met() {
+async fn the_dark_pipe_leads_those_the_traces_never_met_into_the_dark_lab() {
     let mut player = armed_in(PIPE_MAP, 75).await;
     let dark = into_the_pipe(&mut player).await;
-    let line = (PINK, text(keys::MAGATIA_PIPE_DARK));
-    assert!(
-        dark.warps.is_empty() && dark.broadcasts.contains(&line),
-        "{dark:?}"
-    );
+    assert!(dark.warps.contains(&DARK_LAB), "{dark:?}");
 }
 
 #[tokio::test]
