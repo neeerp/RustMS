@@ -15,6 +15,7 @@ use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_
 use game::{BuffStat, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use game_data::PortalTemplate;
+use std::ops::RangeInclusive;
 use std::time::Duration;
 
 const FREE_MARKET: i32 = 910000000;
@@ -168,6 +169,39 @@ const SECOND_DRILL_HALLS: [i32; 3] = [108000600, 108000601, 108000602];
 /// (20404) opens, then the one each later quest moves on to.
 const STOLEN_EGG: i16 = 20404;
 const WITCH_CAVES: [(i16, i32); 2] = [(20407, 924010200), (20406, 924010100)];
+/// Ereve's Drill Halls off their Entrance, each for one at a time
+/// (`SOLO_MAPS`). The 1st has a hall for each of Kiku's Acclimation
+/// Trainings (`enterFirstDH`); the 3rd and 4th hold a boss, out afresh
+/// each time the hall empties, for a Cygnus Knight on A New Skill or
+/// Another New Skill (20601 to 20605, 20611 to 20615) who has not yet
+/// the Proof of Qualification or of Ability it drops (`enterthirdDH`,
+/// `enterfourthDH`).
+pub const FIRST_DRILL_HALLS: [(i16, i32); 3] =
+    [(20701, 913000000), (20702, 913000100), (20703, 913000200)];
+pub const THIRD_DRILL_HALL: DrillHall = DrillHall {
+    map: 913010200,
+    quests: 20601..=20605,
+    proofs: 4032120..=4032124,
+    closed: keys::THIRD_DRILL_HALL_CLOSED,
+};
+pub const FOURTH_DRILL_HALL: DrillHall = DrillHall {
+    map: 913020300,
+    quests: 20611..=20615,
+    proofs: 4032125..=4032129,
+    closed: keys::FOURTH_DRILL_HALL_CLOSED,
+};
+/// Quiet Ereve's way out (`outDarkEreb`), to the Cave of Black Witches
+/// The Curse of the Black Witch (20407) moves on to once done.
+const BLACK_WITCH_CURSE: i16 = 20407;
+
+/// A Drill Hall with a boss: its map, the quests it is for, the proofs
+/// that boss drops and the word to one on none of them.
+pub struct DrillHall {
+    pub map: i32,
+    pub quests: RangeInclusive<i16>,
+    pub proofs: RangeInclusive<i32>,
+    closed: &'static str,
+}
 const WITCH_CAVE: i32 = 924010000;
 /// The Mushroom Castle's Wedding Hall entrance (`TD_MC_enterboss1`).
 const WEDDING_HALL_ENTRANCE: i32 = 106021401;
@@ -643,7 +677,7 @@ pub const WOLVES_TEST_RECORD: i16 = 21620;
 pub const WOLVES_DEN: i32 = 140010210;
 /// What both records read once their run is done (`Check/1 infoex`).
 pub const WOLF_RUN_DONE: &str = "0";
-pub const SOLO_MAPS: [i32; 25] = [
+pub const SOLO_MAPS: [i32; 30] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -669,6 +703,11 @@ pub const SOLO_MAPS: [i32; 25] = [
     YETIS_THIEF_ROOM,
     MAHAS_BATTLE,
     DISCIPLES_ROOM,
+    FIRST_DRILL_HALLS[0].1,
+    FIRST_DRILL_HALLS[1].1,
+    FIRST_DRILL_HALLS[2].1,
+    THIRD_DRILL_HALL.map,
+    FOURTH_DRILL_HALL.map,
 ];
 
 /// The Puppeteer `player` is out to beat, while a hunt for him is under
@@ -2198,6 +2237,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(cave, named(cave, "out00")))
         }
         "enterWitch" => refused(keys::WITCH_CAVE_CREEPY),
+        "enterFirstDH" => {
+            let Some(&(_, hall)) = (FIRST_DRILL_HALLS.iter())
+                .find(|&&(training, _)| quest(training) == QuestState::Started)
+            else {
+                return Some(refused(keys::FIRST_DRILL_HALL_CLOSED));
+            };
+            solo_map(true, hall)
+        }
+        "enterthirdDH" => boss_drill_hall(&THIRD_DRILL_HALL, player),
+        "enterfourthDH" => boss_drill_hall(&FOURTH_DRILL_HALL, player),
+        "outDarkEreb" => {
+            let cave = if quest(BLACK_WITCH_CURSE) == QuestState::Completed {
+                924010200
+            } else {
+                924010100
+            };
+            through(Effect::WarpToPortal(cave, 0))
+        }
         // The doors between Horntail's trials, sealed until the trial's
         // head is down (Cosmic's `defeatedHead`; `events::HORNTAIL_HEADS`).
         "hontale_BR" => {
@@ -3373,6 +3430,23 @@ fn disguise(player: &Player, job: usize) -> ScriptOutcome {
     }
 }
 
+/// Into `hall` for one on its quests with none of its proofs, when
+/// nobody is in it.
+fn boss_drill_hall(hall: &DrillHall, player: &Player) -> ScriptOutcome {
+    if hall
+        .proofs
+        .clone()
+        .any(|proof| player.inventory.count(proof) > 0)
+    {
+        return refused(keys::DRILL_HALL_PROOF_HELD);
+    }
+    let on_quest = (hall.quests.clone()).any(|id| player.quests.state(id) == QuestState::Started);
+    if !on_quest {
+        return refused(hall.closed);
+    }
+    solo_map(true, hall.map)
+}
+
 /// Into `map`, one of `SOLO_MAPS`, when `open` and nobody is in it.
 fn solo_map(open: bool, map: i32) -> ScriptOutcome {
     solo_map_at(open, map, 0)
@@ -4258,6 +4332,53 @@ mod tests {
         };
         assert_eq!(*taken, tokens);
         assert!(SECOND_DRILL_HALLS.contains(hall));
+    }
+
+    #[test]
+    fn ereves_drill_halls_take_one_in_training_at_a_time() {
+        let into = |hall| {
+            vec![
+                Effect::RequireEmptyMap(hall),
+                Effect::PortalSound,
+                Effect::WarpToPortal(hall, 0),
+            ]
+        };
+        let fresh = player_with(&[]);
+        for script in ["enterFirstDH", "enterthirdDH", "enterfourthDH"] {
+            assert!(pink(&portal(script, &fresh).unwrap()), "{script}");
+        }
+        let kiku = player_with(&[(20702, QuestState::Started)]);
+        let first = portal("enterFirstDH", &kiku).unwrap();
+        assert_eq!(first.effects, into(913000100));
+        assert!(first.occupied.is_some());
+
+        for (script, hall) in [
+            ("enterthirdDH", &THIRD_DRILL_HALL),
+            ("enterfourthDH", &FOURTH_DRILL_HALL),
+        ] {
+            let mut player = player_with(&[(*hall.quests.end(), QuestState::Started)]);
+            let outcome = portal(script, &player).unwrap();
+            assert_eq!(outcome.effects, into(hall.map), "{script}");
+            assert!(outcome.occupied.is_some());
+            player.inventory.insert(
+                InventoryType::Etc,
+                1,
+                game::Item::stack(*hall.proofs.start(), 1),
+            );
+            assert!(pink(&portal(script, &player).unwrap()), "{script}");
+        }
+        assert!([913000000, 913000100, 913000200, 913010200, 913020300]
+            .iter()
+            .all(|hall| SOLO_MAPS.contains(hall)));
+    }
+
+    #[test]
+    fn quiet_ereve_leads_out_to_the_witches_cave_the_curse_has_reached() {
+        let go = |player: &Player| portal("outDarkEreb", player).unwrap().effects;
+        let out = |cave| vec![Effect::PortalSound, Effect::WarpToPortal(cave, 0)];
+        assert_eq!(go(&player_with(&[])), out(924010100));
+        let cursed = player_with(&[(BLACK_WITCH_CURSE, QuestState::Completed)]);
+        assert_eq!(go(&cursed), out(924010200));
     }
 
     #[test]

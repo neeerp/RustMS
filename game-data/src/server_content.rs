@@ -1682,6 +1682,10 @@ pub mod keys {
     pub const NEINHEART_OPENING_ASK: &str = "neinheart_opening.ask";
     pub const RIDLEY_EXPEDITIONS: &str = "ridley.expeditions";
     pub const RIDLEY_TOO_LOW: &str = "ridley.too_low";
+    pub const FIRST_DRILL_HALL_CLOSED: &str = "drill_hall.first_closed";
+    pub const THIRD_DRILL_HALL_CLOSED: &str = "drill_hall.third_closed";
+    pub const FOURTH_DRILL_HALL_CLOSED: &str = "drill_hall.fourth_closed";
+    pub const DRILL_HALL_PROOF_HELD: &str = "drill_hall.proof_held";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5273,6 +5277,10 @@ mod tests {
                 keys::NEINHEART_OPENING_ASK,
                 keys::RIDLEY_EXPEDITIONS,
                 keys::RIDLEY_TOO_LOW,
+                keys::FIRST_DRILL_HALL_CLOSED,
+                keys::THIRD_DRILL_HALL_CLOSED,
+                keys::FOURTH_DRILL_HALL_CLOSED,
+                keys::DRILL_HALL_PROOF_HELD,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
