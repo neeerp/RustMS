@@ -1882,6 +1882,15 @@ controller's client plays the cast and the server applies it
   `count` players to the mob's `info/ban` map, of the players in its area,
   each cast landing by its `prop`. **Poison Mist** (131) lays a mob mist over
   its area by its `prop`; each client in it hurts itself (see above).
+- **Boss switches:** three NPCs weaken a boss on their map when a player
+  says yes to them (`BOSS_SWITCHES`, Cosmic's `weakenAreaBoss`): the
+  Small Street Light (1052107) by Shade (5090000) in Kerning City's
+  subway, and in Magatia the Control Device (2111025) by the Security
+  Camera (7090000) and the Incomplete Magic Square (2111026) by Deet and
+  Roi (8090000). The first of the boss out gets Seal Skill (157 level 1)
+  and the avoidability cut (155 level 2) for their `time`, given by no
+  one, and the map reads the switch's line in blue
+  (`Effect::WeakenMob`); with none out, nothing happens.
 
 ### Diseases
 

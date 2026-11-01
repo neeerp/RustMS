@@ -120,6 +120,10 @@ pub struct FieldMapEntityNpc {
 const QUEST_NPC_REACH_X: i32 = 1200;
 const QUEST_NPC_REACH_Y: i32 = 800;
 
+/// The mob skills, with their levels, a switch weakens a boss with: Seal
+/// Skill and the avoidability cut of Cosmic's `weakenAreaBoss`.
+const WEAKENING: [(i32, i32); 2] = [(157, 1), (155, 2)];
+
 /// How long after a cast its mist starts, in 100 ms (OdinMS-family
 /// servers; v83's client starts the mist's time then).
 const MIST_DELAY: i16 = 8;
@@ -1259,6 +1263,7 @@ impl FieldActor {
                     self.npc_special_action(npc_id, action)
                 }
                 FieldRequest::ClearMobs => self.clear_mobs(),
+                FieldRequest::WeakenMob { mob_id, notice } => self.weaken(mob_id, notice),
                 FieldRequest::BringOutSnowman => self.bring_out_snowman(),
                 FieldRequest::BringOutScrooge => self.bring_out_scrooge(),
                 FieldRequest::SetReactorState { name, state } => {
@@ -4549,6 +4554,38 @@ impl FieldActor {
                 self.broadcast(None, packet);
             }
         }
+    }
+
+    /// The first live `mob_id` here has its skills sealed and its
+    /// avoidability cut, for as long as the mob skills that do so last, and
+    /// those here read `notice`; with none out, nothing happens (Cosmic
+    /// `weakenAreaBoss`).
+    fn weaken(&mut self, mob_id: i32, notice: &str) {
+        let Some(&object_id) = self.out(mob_id).first() else {
+            return;
+        };
+        let now = Instant::now();
+        for (skill, level) in WEAKENING {
+            let Some(effect) = net::mobs::skill_level(skill, level) else {
+                continue;
+            };
+            let Some(MobSkillEffect::Statuses(statuses)) = mob_skill::effect(skill, effect.x)
+            else {
+                continue;
+            };
+            let until = now + Duration::from_secs(effect.duration.max(0) as u64);
+            let skill_id = skill | level << 16;
+            let given = self.mobs.add_statuses(
+                object_id,
+                &statuses,
+                skill_id,
+                ClientId::default(),
+                now,
+                until,
+            );
+            self.show_statuses(object_id, &given, now);
+        }
+        self.announce(notice, &[]);
     }
 
     /// The mobs here that aren't friendly go, as if they left, and `only`

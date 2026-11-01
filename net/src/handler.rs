@@ -1055,6 +1055,9 @@ pub enum FieldRequest {
     /// A script sends away every mob here that isn't friendly
     /// (`scripts::Effect::ClearMobs`).
     ClearMobs,
+    /// A switch weakens the first live `mob_id` here, which those here
+    /// read of (`scripts::Effect::WeakenMob`).
+    WeakenMob { mob_id: i32, notice: &'static str },
     /// The Snow Spirit brings out a Holiday PQ arena's snowman
     /// (`scripts::Effect::BringOutSnowman`).
     BringOutSnowman,

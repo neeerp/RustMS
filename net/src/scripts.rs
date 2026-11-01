@@ -1145,6 +1145,13 @@ pub enum Effect {
     /// Every mob on the player's map that isn't friendly goes, and no more
     /// come, as Cosmic's `killAllMonsters`.
     ClearMobs,
+    /// The first live `mob_id` on the player's map has its skills sealed
+    /// and its avoidability cut, and the map reads `notice`; with none
+    /// out, nothing happens (Cosmic's `weakenAreaBoss`).
+    WeakenMob {
+        mob_id: i32,
+        notice: &'static str,
+    },
     /// A Holiday PQ arena's snowman comes out in its first form, and the
     /// mobs start to come (the arena Snow Spirit's second page).
     BringOutSnowman,
