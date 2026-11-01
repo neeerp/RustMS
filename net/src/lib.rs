@@ -25,6 +25,7 @@ pub mod duey;
 pub mod dungeons;
 pub mod energy;
 pub mod events;
+pub mod forced_stats;
 pub mod gachapon;
 mod game_data;
 pub mod gm_commands;

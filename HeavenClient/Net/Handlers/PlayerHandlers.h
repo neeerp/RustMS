@@ -84,9 +84,16 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
-	// Force a stat recalculation
-	// Opcode: RECALCULATE_STATS(35)
-	class RecalculateStatsHandler : public PacketHandler
+	// The stats the map pins, until reset (FUN_00a208ff)
+	// Opcode: FORCED_STAT_SET(34)
+	class ForcedStatSetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Lets go of the pinned stats (FUN_00a2091c)
+	// Opcode: FORCED_STAT_RESET(35)
+	class ForcedStatResetHandler : public PacketHandler
 	{
 		void handle(InPacket&) const override;
 	};

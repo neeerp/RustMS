@@ -21,6 +21,7 @@
 
 #include <cstdint>
 
+#include "ForcedStat.h"
 #include "Job.h"
 
 #include "../Net/Login.h"
@@ -134,6 +135,12 @@ namespace ms
 
 		bool get_female() const;
 
+		// What the map pins the stats to, kept through a change of map until reset.
+		void set_forced(const forced_stat::Values &values);
+
+		// Whether any stat is pinned, which keeps the equipment on and the AP unspent (FUN_0077c129).
+		bool is_forced() const;
+
 	private:
 		std::string name;
 		std::vector<int64_t> petids;
@@ -164,5 +171,6 @@ namespace ms
 		float resiststatus;
 		float reducedamage;
 		bool female;
+		forced_stat::Values forced{};
 	};
 }

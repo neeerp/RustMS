@@ -1,5 +1,6 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
+use crate::forced_stats;
 use crate::load::{self, asset_path};
 use crate::packet::build::world::mist::MistKind;
 use game::{BuffStat, Disease, MobStat, Player, SkillRecord};
@@ -687,30 +688,41 @@ impl Amount {
 /// percent of their own (BasicStat::SetFrom, 0x77f289).
 pub(crate) fn total_stats(player: &Player) -> (i32, i32, i32) {
     let stats = &player.stats;
-    let warrior = i32::from(player.buffs.value(BuffStat::MapleWarrior).unwrap_or(0));
-    let own = |stat: i16| i32::from(stat) + i32::from(stat) * warrior / 100;
-    player.worn_equips().fold(
-        (own(stats.str), own(stats.dex), own(stats.luk)),
-        |(str, dex, luk), equip| {
+    let forced = forced_stats::on_map(stats.map_id).unwrap_or_default();
+    let (str, dex, luk) = player
+        .worn_equips()
+        .fold((0, 0, 0), |(str, dex, luk), equip| {
             (
                 str + i32::from(equip.str),
                 dex + i32::from(equip.dex),
                 luk + i32::from(equip.luk),
             )
-        },
+        });
+    (
+        with_warrior(player, stats.str, str, forced.str),
+        with_warrior(player, stats.dex, dex, forced.dex),
+        with_warrior(player, stats.luk, luk, forced.luk),
     )
 }
 
 /// A player's INT with what they wear and Maple Warrior's percent of their
 /// own, as `total_stats` counts the others.
 pub(crate) fn total_int(player: &Player) -> i32 {
-    let int = i32::from(player.stats.int);
+    let forced = forced_stats::on_map(player.stats.map_id).unwrap_or_default();
+    let worn = player.worn_equips().map(|equip| i32::from(equip.int)).sum();
+    with_warrior(player, player.stats.int, worn, forced.int)
+}
+
+/// A stat of a player's own and what they wear of it, or what the map pins
+/// it to instead (0x77f1d9), then Maple Warrior's percent of their own.
+fn with_warrior(player: &Player, own: i16, worn: i32, forced: i16) -> i32 {
     let warrior = i32::from(player.buffs.value(BuffStat::MapleWarrior).unwrap_or(0));
-    player
-        .worn_equips()
-        .fold(int + int * warrior / 100, |total, equip| {
-            total + i32::from(equip.int)
-        })
+    let total = if forced > 0 {
+        i32::from(forced)
+    } else {
+        i32::from(own) + worn
+    };
+    total + i32::from(own) * warrior / 100
 }
 
 /// What a skill that reaches mobs puts on each it takes hold of. None for

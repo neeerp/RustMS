@@ -1889,6 +1889,14 @@ namespace ms
 			return false;
 		}
 
+		// Nor while the map pins the stats (0x4f1e3b).
+		if (player.get_stats().is_forced())
+		{
+			UI::get().emplace<UIOk>(forced_stat::EQUIP_LOCKED, [](bool)
+			{});
+			return false;
+		}
+
 		return true;
 	}
 

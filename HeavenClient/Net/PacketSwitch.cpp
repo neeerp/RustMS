@@ -77,7 +77,8 @@ namespace ms
 		CHANGE_STATS = 31,
 		GIVE_BUFF = 32,
 		CANCEL_BUFF = 33,
-		RECALCULATE_STATS = 35,
+		FORCED_STAT_SET = 34,
+		FORCED_STAT_RESET = 35,
 		SET_TAMING_MOB_INFO = 48,
 		QUEST_CLEAR = 49,
 		UPDATE_SKILL = 36,
@@ -515,7 +516,8 @@ namespace ms
 		emplace<CHANGE_STATS, ChangeStatsHandler>();
 		emplace<GIVE_BUFF, ApplyBuffHandler>();
 		emplace<CANCEL_BUFF, CancelBuffHandler>();
-		emplace<RECALCULATE_STATS, RecalculateStatsHandler>();
+		emplace<FORCED_STAT_SET, ForcedStatSetHandler>();
+		emplace<FORCED_STAT_RESET, ForcedStatResetHandler>();
 		emplace<SET_TAMING_MOB_INFO, SetTamingMobInfoHandler>();
 		emplace<UPDATE_SKILL, UpdateSkillHandler>();
 		emplace<SKILL_USE_RESULT, SkillUseResultHandler>();

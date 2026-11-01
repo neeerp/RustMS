@@ -16,7 +16,7 @@ use integration_harness::quests::{
 };
 use integration_harness::trace::{barrier, send, step, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
-use net::packet::op::RecvOpcode;
+use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
 use packet::Packet;
 use tokio::time::Duration;
@@ -35,6 +35,11 @@ const MISSING_KID_1: i16 = 21000;
 const MISSING_KID_2: i16 = 21001;
 const ARK_REACHED: i16 = 21002;
 const LOST_CHILD: i32 = 4001271;
+/// FORCED_STAT_SET's body in the Burning Forests: STR, DEX, INT and LUK
+/// 999, attack 255, accuracy and avoid 999, speed 120, jump 140.
+const BURNING_FOREST: [u8; 20] = [
+    0x1F, 0x0F, 0, 0, 0xE7, 3, 0xE7, 3, 0xE7, 3, 0xE7, 3, 0xFF, 0, 0xE7, 3, 0xE7, 3, 0x78, 0x8C,
+];
 const EQUIP: u8 = 1;
 const PINK: u8 = 5;
 
@@ -128,6 +133,13 @@ async fn the_black_road_leads_an_aran_from_the_ark_to_the_ice_cave() {
         assert_eq!(t.warps, [map], "{t:?}");
         let taught: Vec<i32> = t.skills.iter().map(|s| s.0).collect();
         assert_eq!(taught, skills, "{t:?}");
+        // The first pins the Aran's stats at a hero's for all three.
+        let pinned = if from == ARK {
+            vec![(SendOpcode::ForcedStatSet as i16, BURNING_FOREST.to_vec())]
+        } else {
+            vec![]
+        };
+        assert_eq!(t.forced_stats, pinned, "{t:?}");
         from = map;
     }
 
@@ -137,6 +149,9 @@ async fn the_black_road_leads_an_aran_from_the_ark_to_the_ice_cave() {
         warp(c, LOST_KIDS_FOREST, "", &mut t).await,
         LOST_KIDS_FOREST
     );
+    barrier(c, &m, &mut t).await;
+    let reset = (SendOpcode::ForcedStatReset as i16, vec![]);
+    assert_eq!(t.forced_stats, [reset], "{t:?}");
     let done = build_quest_completion(MISSING_KID_1, LOST_KID, -1);
     let t = quest(c, &m, LOST_KIDS_FOREST, LOST_KID, done).await;
     assert_eq!(t.states.get(&MISSING_KID_1), Some(&2));
