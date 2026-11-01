@@ -1381,6 +1381,8 @@ unsourced = [
     "icebyrd.boroughs_told",
     "picture_frame.found",
     "picture_frame.full",
+    "study_pipe.password",
+    "study_pipe.wrong",
     "wiz.none",
     "wiz.returned",
     "wiz.thanks",

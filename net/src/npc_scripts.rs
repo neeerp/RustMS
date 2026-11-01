@@ -412,6 +412,15 @@ const NLC_QUIZ_LEVEL: u8 = 10;
 pub const PICTURE_FRAME: i32 = 2111013;
 const PHYLLIAS_PENDANT: i16 = 3322;
 const SILVER_PENDANT: i32 = 4031697;
+/// The three pipes in the Home of the Missing Alchemist, in the order Dr.
+/// De Lang's Underground Study (3339) turns them (Cosmic `2111017.js` to
+/// `2111019.js`); the last asks for Phyllia's password to the study below
+/// (`sec00`).
+pub const STUDY_PIPES: [i32; 3] = [2111017, 2111019, 2111018];
+const UNDERGROUND_STUDY: i16 = 3339;
+/// Phyllia gives it in the quest's start (Quest.nx `Say.img/3339/0/yes/2`).
+pub const STUDY_PASSWORD: &str = "my love Phyllia";
+const ALCHEMISTS_HOME: i32 = 261_000_001;
 /// Wiz the Librarian in the Helios Tower Library, and the storybook quests
 /// that end there with the book each brings back.
 pub const WIZ: i32 = 2040052;
@@ -1254,6 +1263,9 @@ pub enum OnText {
     ShrinePillar { hunting: bool },
     /// The lobby's Cesar opens Ariant arena `arena` for as many as typed.
     AriantCap { arena: u8 },
+    /// A pipe in the missing alchemist's home opens the study for Phyllia's
+    /// password.
+    StudyPipe,
 }
 
 impl OnText {
@@ -1268,6 +1280,7 @@ impl OnText {
             OnText::ThiefDoor { told } => thief_door_opens(text, *told),
             OnText::ShrinePillar { hunting } => shrine_pillar_opens(text, *hunting),
             OnText::AriantCap { arena } => ariant_open(text, *arena),
+            OnText::StudyPipe => study_pipe_opens(text == STUDY_PASSWORD),
         }
     }
 }
@@ -2704,6 +2717,7 @@ impl NpcScript {
             HIKARI => return Some(hikari(player)),
             ICEBYRD_SLIMM => return Some(icebyrd_slimm(player)),
             PICTURE_FRAME => return picture_frame(player),
+            pipe if STUDY_PIPES.contains(&pipe) => return study_pipe(pipe, player),
             WIZ => return Some(wiz(player)),
             ROBERT_HOLLY => return Some(robert_holly()),
             STAFF_SERGEANT_CHARLIE | JOKO | FAITO => {
@@ -10092,6 +10106,70 @@ fn picture_frame(player: &Player) -> Option<NpcScript> {
     let mut script = NpcScript::new(PICTURE_FRAME, pages);
     script.inventory_full = Some(text(keys::PICTURE_FRAME_FULL));
     Some(script)
+}
+
+/// While the study is still to be found, the pipes count in turn ("0" to
+/// "3" in 3339's string), silently, and one out of turn starts over; the
+/// last in turn, or any once all three are turned, asks for the password.
+/// Once it is given ("4"), or the quest is done, a pipe leads down to the
+/// study.
+fn study_pipe(pipe: i32, player: &Player) -> Option<NpcScript> {
+    let page = match player.quests.state(UNDERGROUND_STUDY) {
+        QuestState::Completed => Page::Done(vec![study_down()]),
+        QuestState::Started => {
+            let turned = player
+                .quests
+                .info(UNDERGROUND_STUDY)
+                .and_then(|info| info.parse::<usize>().ok())
+                .unwrap_or(0);
+            let last = STUDY_PIPES.len() - 1;
+            if turned > last + 1 {
+                Page::Done(vec![study_down()])
+            } else if turned == last + 1 || turned == last && STUDY_PIPES[last] == pipe {
+                Page::AskText {
+                    text: text(keys::STUDY_PIPE_PASSWORD),
+                    min: 1,
+                    max: 20,
+                    on_text: OnText::StudyPipe,
+                }
+            } else {
+                let turned = if STUDY_PIPES[turned] == pipe {
+                    turned + 1
+                } else {
+                    0
+                };
+                Page::Done(vec![study_turned(turned)])
+            }
+        }
+        _ => return None,
+    };
+    Some(NpcScript::new(pipe, vec![page]))
+}
+
+/// 3339's string with `turned` pipes turned.
+fn study_turned(turned: usize) -> Effect {
+    Effect::SetQuestInfo {
+        quest: UNDERGROUND_STUDY,
+        value: turned.to_string(),
+    }
+}
+
+/// Down the pipe to the study.
+fn study_down() -> Effect {
+    Effect::WarpToPortal(ALCHEMISTS_HOME, 1)
+}
+
+/// The right password marks the study found and leads down to it; a wrong
+/// one leaves all three pipes turned.
+fn study_pipe_opens(right: bool) -> Vec<Page> {
+    let turned = STUDY_PIPES.len();
+    if !right {
+        return vec![Page::Act {
+            text: text(keys::STUDY_PIPE_WRONG),
+            effects: vec![study_turned(turned)],
+        }];
+    }
+    vec![Page::Done(vec![study_turned(turned + 1), study_down()])]
 }
 
 /// Robert Holly offers more buddy slots, then names the price; a yes to
@@ -27502,6 +27580,55 @@ mod tests {
         // Done, or off the quest, they say nothing of their own.
         assert!(NpcScript::for_npc(2111020, &on_info_quest(MAGIC_PENTAGRAM, "4")).is_none());
         assert!(NpcScript::for_npc(2111020, &traveller(85, 0, false)).is_none());
+    }
+
+    #[test]
+    fn the_study_pipes_count_in_turn_then_take_phyllias_password() {
+        let set = |value: &str| Effect::SetQuestInfo {
+            quest: UNDERGROUND_STUDY,
+            value: value.into(),
+        };
+        let down = Effect::WarpToPortal(ALCHEMISTS_HOME, 1);
+        let turn = |pipe: i32, info: &str| {
+            NpcScript::for_npc(pipe, &on_info_quest(UNDERGROUND_STUDY, info))
+                .unwrap()
+                .begin()
+        };
+        let [first, second, third] = STUDY_PIPES;
+        // In turn, silently; out of turn, over again.
+        assert_eq!(turn(first, "").effects, [set("1")]);
+        assert_eq!(turn(second, "1").effects, [set("2")]);
+        assert!(turn(second, "1").prompt.is_none());
+        assert_eq!(turn(third, "1").effects, [set("0")]);
+        assert_eq!(turn(first, "2").effects, [set("0")]);
+        // The last in turn, or any once all are turned, asks the password.
+        let ask = |pipe: i32, info: &str| {
+            let mut script =
+                NpcScript::for_npc(pipe, &on_info_quest(UNDERGROUND_STUDY, info)).unwrap();
+            let step = script.begin();
+            assert!(matches!(step.prompt, Some(Prompt::AskText { .. })));
+            script
+        };
+        let wrong = ask(third, "2")
+            .respond(ScriptInput::Text("my love".into()))
+            .unwrap();
+        assert_eq!(wrong.effects, [set("3")]);
+        let right = ask(first, "3")
+            .respond(ScriptInput::Text(STUDY_PASSWORD.into()))
+            .unwrap();
+        assert_eq!(right.effects, [set("4"), down.clone()]);
+        // Given, or the quest done, a pipe leads down; off it, nothing.
+        assert_eq!(turn(second, "4").effects, [down.clone()]);
+        let mut done = traveller(85, 0, false);
+        done.quests.upsert(game::QuestRecord {
+            quest_id: UNDERGROUND_STUDY,
+            status: QuestStatus::Completed {
+                at: std::time::UNIX_EPOCH,
+            },
+        });
+        let step = NpcScript::for_npc(third, &done).unwrap().begin();
+        assert_eq!(step.effects, [down]);
+        assert!(NpcScript::for_npc(first, &traveller(85, 0, false)).is_none());
     }
 
     #[test]
