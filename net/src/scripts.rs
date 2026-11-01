@@ -1287,8 +1287,8 @@ const THEME_BANNERS: [(i32, &str); 8] = [
 const LITH_HARBOR: i32 = 104000000;
 /// Where the Disciples of the Black Magician hide (quest 2175), and the
 /// one the player is out to find.
-const DISCIPLES_HIDEOUT: i32 = 100000006;
-const DISCIPLES_QUEST: i16 = 2175;
+pub const DISCIPLES_HIDEOUT: i32 = 100000006;
+pub const DISCIPLES_QUEST: i16 = 2175;
 const DISCIPLE: i32 = 9300156;
 
 /// Lith Harbor's Info Shop, where the Puppeteer lies in wait for an Aran

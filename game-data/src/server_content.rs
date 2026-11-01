@@ -1660,6 +1660,11 @@ pub mod keys {
     pub const POWER_B_FORE_CENTER: &str = "power_b_fore.center";
     pub const POWER_B_FORE_FULL: &str = "power_b_fore.full";
     pub const POWER_B_FORE_TOO_HIGH: &str = "power_b_fore.too_high";
+    pub const NAUTILUS_TRASH_CAN_FOUND: &str = "nautilus_trash_can.found";
+    pub const NAUTILUS_TRASH_CAN_FULL: &str = "nautilus_trash_can.full";
+    pub const MUIRHAT_SCROLL: &str = "muirhat.scroll";
+    pub const MUIRHAT_FULL: &str = "muirhat.full";
+    pub const MUIRHAT_CHASE: &str = "muirhat.chase";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5229,6 +5234,11 @@ mod tests {
                 keys::POWER_B_FORE_CENTER,
                 keys::POWER_B_FORE_FULL,
                 keys::POWER_B_FORE_TOO_HIGH,
+                keys::NAUTILUS_TRASH_CAN_FOUND,
+                keys::NAUTILUS_TRASH_CAN_FULL,
+                keys::MUIRHAT_SCROLL,
+                keys::MUIRHAT_FULL,
+                keys::MUIRHAT_CHASE,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
