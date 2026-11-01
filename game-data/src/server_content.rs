@@ -3137,6 +3137,14 @@ pub mod keys {
     pub const HOLLY_LATER: &str = "holly.later";
     pub const HOLLY_REFUSED: &str = "holly.refused";
     pub const HOLLY_DONE: &str = "holly.done";
+
+    /// An item trader's (`charlie`, `joko`, `faito`) `intro`, `deal`,
+    /// `no_deal`, `menu`, `confirm`, `lack`, `full`, `refused`, `done` and
+    /// `done_mesos`, and Joko's `not_yet`; those a trader doesn't say are
+    /// left out.
+    pub fn trader(name: &str, part: &str) -> String {
+        format!("trader.{name}.{part}")
+    }
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5892,6 +5900,7 @@ mod tests {
         assert!(text.contains(&keys::third_job("521", "accept")));
         assert!(text.contains(&keys::fourth_job("pirate", "trials")));
         assert!(text.contains(&keys::fourth_job("522", "accept")));
+        assert!(text.contains(&keys::trader("joko", "done_mesos")));
         assert!(text.contains(keys::FOURTH_JOB_INVENTORY_FULL));
         assert!(text.contains(&keys::holy_stone_wrong(4, 3)));
         assert!(text
