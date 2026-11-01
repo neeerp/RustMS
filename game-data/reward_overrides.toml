@@ -1326,11 +1326,12 @@ add = [{ item = 4031873, prob = 0.06, quest = 6380 }]
 [mobs.8141100]
 add = [{ item = 4031874, prob = 0.06, quest = 6390 }]
 
-# The minigame makings that Casey (net::npc_scripts::CASEY) makes Omok sets
-# and Match Cards from: the Monster Card 4030012, the Omok pieces 4030000,
-# 4030001, 4030010 and 4030011, and the Omok Table 4030009. The pack has
-# none of them; the mobs and rates are the community servers' (QUESTIONS
-# b385).
+# The minigame makings that Casey (net::npc_scripts::CASEY) and Chico
+# (CHICO) make Omok sets and Match Cards from: the Monster Card 4030012,
+# the Omok pieces 4030000, 4030001, 4030010, 4030011 and Ludibrium's
+# 4030013 to 4030016, and the Omok Table 4030009. The pack has none of
+# them; the mobs and rates are the community servers' (QUESTIONS b385,
+# b389).
 
 [mobs.100101]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1378,7 +1379,7 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.2230103]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [{ item = 4030012, prob = 0.125 }, { item = 4030016, prob = 0.077 }]
 
 [mobs.2230105]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1730,3 +1731,15 @@ add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.9500372]
 add = [{ item = 4030012, prob = 0.125 }]
+
+[mobs.3110101]
+add = [{ item = 4030014, prob = 0.077 }]
+
+[mobs.3210203]
+add = [{ item = 4030015, prob = 0.077 }]
+
+[mobs.3230302]
+add = [{ item = 4030013, prob = 0.077 }]
+
+[mobs.9500113]
+add = [{ item = 4030015, prob = 0.077 }]

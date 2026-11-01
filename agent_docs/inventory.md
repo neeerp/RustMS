@@ -1277,6 +1277,14 @@ none of these makings, so `reward_overrides.toml` adds them at the
 community servers' mobs and rates (QUESTIONS b385). Casey's lines are
 placeholders (`casey.*`).
 
+Chico (2040014, Ludibrium Village, 220000300) makes Match Cards of 99
+Monster Cards and 10,000 mesos, and Ludibrium's six Omok sets
+(4080006-4080011), each of an Omok Table and 99 each of two of the
+Ludibrium pieces (4030013-4030016) and 25,000 mesos
+(`item_makers::CHICO`), all from one menu. The overrides above also drop
+the Ludibrium pieces (QUESTIONS b389). The greeting is a placeholder
+(`chico.hello`).
+
 Arwen the Fairy (1032100, Ellinia, 101000000) makes, from level 40, a
 Moon Rock (4011007) of one of each refined plate (4011000-4011006) and
 10,000 mesos, a Star Rock (4021009) of one of each refined jewel

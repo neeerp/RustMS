@@ -3,9 +3,9 @@
 //! (2080000), Francois in Ellinia (1032002), Chrishrama in Sleepywood
 //! (1061000), Gordon in El Nath (2020002), and Sarah, Tara and Rydole in
 //! Ludibrium (2040020-2040022), Casey in Henesys (1012008), who makes
-//! minigame sets, and Arwen the Fairy in Ellinia (1032100), who makes the
-//! Moon Rock, the Star Rock and the Black Feather. Items, materials and
-//! prices follow Cosmic's scripts.
+//! minigame sets, as does Chico in Ludibrium (2040014), and Arwen the
+//! Fairy in Ellinia (1032100), who makes the Moon Rock, the Star Rock and
+//! the Black Feather. Items, materials and prices follow Cosmic's scripts.
 
 /// One thing a maker makes: an `item` for its `materials` (item and
 /// quantity) and `cost` mesos.
@@ -3071,6 +3071,42 @@ pub const CASEY_OMOK: &[Recipe] = &[
 
 /// Casey's set of Match Cards, of 15 Monster Cards.
 pub const CASEY_MATCH_CARDS: Recipe = recipe(4080100, &[(4030012, 15)], 0);
+
+/// Chico's Match Cards, of 99 Monster Cards, then Ludibrium's six Omok
+/// sets, each of an Omok Table and 99 each of two kinds of Ludibrium piece.
+pub const CHICO: &[Recipe] = &[
+    recipe(4080100, &[(4030012, 99)], 10_000),
+    recipe(
+        4080006,
+        &[(4030009, 1), (4030013, 99), (4030014, 99)],
+        25_000,
+    ),
+    recipe(
+        4080007,
+        &[(4030009, 1), (4030013, 99), (4030016, 99)],
+        25_000,
+    ),
+    recipe(
+        4080008,
+        &[(4030009, 1), (4030014, 99), (4030016, 99)],
+        25_000,
+    ),
+    recipe(
+        4080009,
+        &[(4030009, 1), (4030015, 99), (4030013, 99)],
+        25_000,
+    ),
+    recipe(
+        4080010,
+        &[(4030009, 1), (4030015, 99), (4030014, 99)],
+        25_000,
+    ),
+    recipe(
+        4080011,
+        &[(4030009, 1), (4030015, 99), (4030016, 99)],
+        25_000,
+    ),
+];
 
 /// The level from which Arwen makes anything.
 pub const ARWEN_LEVEL: u8 = 40;

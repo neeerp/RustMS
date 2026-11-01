@@ -383,6 +383,7 @@ pub const CASEY: i32 = 1012008;
 pub const ARWEN: i32 = 1032100;
 pub const CHIEF_TATAMO: i32 = 2081000;
 pub const EUREK: i32 = 2040050;
+pub const CHICO: i32 = 2040014;
 /// The Magic Seed Chief Tatamo sells, its price, and the most at once.
 pub const MAGIC_SEED: i32 = 4031346;
 pub const MAGIC_SEED_PRICE: i32 = 30_000;
@@ -2598,6 +2599,7 @@ impl NpcScript {
             ARWEN => return Some(arwen(player)),
             CHIEF_TATAMO => return Some(chief_tatamo()),
             EUREK => return Some(eurek()),
+            CHICO => return Some(chico()),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9788,6 +9790,22 @@ fn casey() -> NpcScript {
         ],
     };
     with_maker_words(NpcScript::new(CASEY, vec![menu]))
+}
+
+/// Chico in Ludibrium: Match Cards or one of Ludibrium's Omok sets, for
+/// makings and mesos.
+fn chico() -> NpcScript {
+    let menu = Page::Menu {
+        text: text(keys::CHICO_HELLO),
+        choices: item_makers::CHICO
+            .iter()
+            .map(|recipe| {
+                let label = format!("#i{0}# #t{0}#", recipe.item);
+                (label, make(recipe, None))
+            })
+            .collect(),
+    };
+    with_maker_words(NpcScript::new(CHICO, vec![menu]))
 }
 
 /// Arwen the Fairy: from `ARWEN_LEVEL`, a Moon Rock, a Star Rock or a
@@ -26347,6 +26365,37 @@ mod tests {
             ]
         );
         assert!(arwen.refused().is_some() && arwen.inventory_full().is_some());
+    }
+
+    #[test]
+    fn chico_makes_match_cards_and_ludibriums_omok_sets() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let player = traveller(30, 0, false);
+        let mut chico = NpcScript::for_npc(CHICO, &player).unwrap();
+        let sets = menu(chico.begin());
+        assert_eq!(sets.matches("#L").count(), 7);
+        assert!(sets.contains("#t4080100#") && sets.contains("#t4080011#"));
+        let asked = question(&chico.respond(ScriptInput::Select(6)).unwrap());
+        assert!(asked.contains("#i4030015# 99 #t4030015#"), "{asked}");
+        let made = chico.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                Effect::SpendMeso(25_000),
+                take(4030009, 1),
+                take(4030015, 99),
+                take(4030016, 99),
+                Effect::GiveItem {
+                    item_id: 4080011,
+                    quantity: 1
+                },
+            ]
+        );
+        assert!(chico.refused().is_some() && chico.inventory_full().is_some());
     }
 
     #[test]

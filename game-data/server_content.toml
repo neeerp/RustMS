@@ -1318,6 +1318,7 @@ unsourced = [
     "eurek.summoning_rock",
     "eurek.ways",
     "eurek.way",
+    "chico.hello",
     "ellin.menu",
     "ellin.enter",
     "ellin.about",
