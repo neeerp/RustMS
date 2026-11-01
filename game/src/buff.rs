@@ -113,6 +113,11 @@ pub enum BuffStat {
     /// No mob can hurt the player: the client dodges every hit
     /// (Invincibility, 1010).
     DivineBody = 60,
+    /// The Dawn Warrior's Final Attack (11101002): only under it does the
+    /// client roll the skill's swing after an attack (0x957891).
+    DawnFinalAttack = 63,
+    /// The Wind Archer's Final Attack (13101002), the same for its shot.
+    WindFinalAttack = 64,
     /// The Aran's combo, the count of hits their polearm has landed: Combo
     /// Ability adds to attack, and Combo Critical to criticals, for every
     /// ten (0x77df48, report b360). Never shown to others.

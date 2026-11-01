@@ -26,6 +26,7 @@ int main()
 		require(!shoots(48) && !shoots(44), "nothing else shoots");
 
 		require(needs_buff(11101002) && needs_buff(13101002) && !needs_buff(1100002), "the Cygnus Knights' need a buff");
+		require(buff_bit(11101002) == 63 && buff_bit(13101002) == 64, "the Dawn Warrior's bit 63, the Wind Archer's 64");
 
 		require(slash_blast(1001005) && slash_blast(11001003) && !slash_blast(1001004), "Slash Blast");
 		require(slash_blast_of(130) == 1001005 && slash_blast_of(1110) == 11001003, "a Dawn Warrior has their own");
