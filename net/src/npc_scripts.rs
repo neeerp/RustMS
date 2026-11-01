@@ -2370,6 +2370,7 @@ impl NpcScript {
         }
         match npc_id {
             ALI => return Some(ali()),
+            ATHENA_BY_THE_ARK => return Some(athena_by_the_ark()),
             LIRA => return Some(lira()),
             AMON => return Some(amon(player)),
             TOMBSTONE => {
@@ -3189,6 +3190,9 @@ impl NpcScript {
             "q21400s" => Some(polearm_starts_a_fight()),
             "q21401s" => Some(taming_the_polearm()),
             "q21401e" => Some(polearm_tamed(player)),
+            "q21000s" => Some(find_the_missing_kid()),
+            "q21001s" => Some(lost_kid()),
+            "q21001e" => Some(kid_safe()),
             "q21015s" => Some(basic_fitness_1()),
             "q21016s" => Some(basic_fitness_2()),
             "q21017s" => Some(basic_fitness_3()),
@@ -7289,6 +7293,115 @@ fn basic_fitness_test() -> NpcScript {
         ],
     );
     script.on_end = vec![tutorial_arrow(1)];
+    script
+}
+
+/// Athena Pierce by the ark on the Black Road, 914000100.
+const ATHENA_BY_THE_ARK: i32 = 1209000;
+/// In the forest, 914000300.
+const LOST_KID: i32 = 1209006;
+/// Athena again at the ark's gangway, 914000500.
+const ATHENA_AT_THE_GANGWAY: i32 = 1209007;
+const FIND_THE_MISSING_KID_1: i16 = 21000;
+const FIND_THE_MISSING_KID_2: i16 = 21001;
+/// The Lost Child, which the Lost Kid's quest gives (Cosmic `21001.js`;
+/// the data's start gives it too) and Athena's end takes.
+const LOST_CHILD: i32 = 4001271;
+const LOST_KIDS_FOREST: i32 = 914_000_300;
+/// Snow Island's Ice Cave, where the Aran wakes: the cinematic between
+/// (914090010) is skipped.
+const ICE_CAVE: i32 = 140_090_000;
+const WEAPON_SLOT: i16 = -11;
+
+/// `talkHelena`: Athena by the ark, before the search, ending on the scene
+/// of the three heroes (Cosmic `1209000.js`).
+fn athena_by_the_ark() -> NpcScript {
+    let mut script = NpcScript::new(
+        ATHENA_BY_THE_ARK,
+        keys::ATHENA_ARK
+            .iter()
+            .map(|&key| Page::Say(text(key)))
+            .collect(),
+    );
+    script.on_end = vec![Effect::ScenePart(
+        "Effect/Direction1.img/aranTutorial/Trio".to_string(),
+    )];
+    script
+}
+
+/// `q21000s`: Athena asks the Aran to find a child left in the forest
+/// (Cosmic `21000.js`); the Lost Kid ends it from the data.
+fn find_the_missing_kid() -> NpcScript {
+    let [ask, forest, quest_window, begging] = keys::ATHENA_MISSING_KID;
+    let mut script = NpcScript::new(
+        ATHENA_BY_THE_ARK,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(FIND_THE_MISSING_KID_1)],
+                on_no: Some(text(keys::ATHENA_MISSING_KID_DECLINED)),
+            },
+            Page::Say(text(forest)),
+            Page::Say(text(quest_window)),
+            Page::Say(text(begging)),
+        ],
+    );
+    script.on_end = vec![tutorial_arrow(1)];
+    script
+}
+
+/// `q21001s`: the Lost Kid asks to be taken to the ark, comes along as the
+/// Lost Child, and the Aran starts back from the forest's edge (Cosmic
+/// `21001.js`).
+fn lost_kid() -> NpcScript {
+    NpcScript::new(
+        LOST_KID,
+        vec![Page::Ask {
+            text: text(keys::LOST_KID_ASK),
+            on_yes: vec![
+                Effect::GiveItem {
+                    item_id: LOST_CHILD,
+                    quantity: 1,
+                },
+                Effect::StartQuest(FIND_THE_MISSING_KID_2),
+                Effect::WarpToPortal(LOST_KIDS_FOREST, 0),
+            ],
+            on_no: Some(text(keys::LOST_KID_DECLINED)),
+        }],
+    )
+}
+
+/// `q21001e`: Athena takes the child, and the Aran stays behind to fight.
+/// The weapon is lost in the battle, and the Aran wakes in Snow Island's
+/// Ice Cave (Cosmic `21001.js`, less the cinematic).
+fn kid_safe() -> NpcScript {
+    let [ask, relief, board, no_time, leave_now, please, cannot, go_first] = keys::ATHENA_KID_SAFE;
+    let mut script = NpcScript::new(
+        ATHENA_AT_THE_GANGWAY,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: Vec::new(),
+                on_no: Some(text(keys::ATHENA_KID_SAFE_DECLINED)),
+            },
+            Page::Say(text(relief)),
+            Page::Reply(text(board)),
+            Page::Say(text(no_time)),
+            Page::Reply(text(leave_now)),
+            Page::Say(text(please)),
+            Page::Reply(text(cannot)),
+            Page::Reply(text(go_first)),
+        ],
+    );
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: LOST_CHILD,
+            quantity: 1,
+        },
+        Effect::TakeWorn(WEAPON_SLOT),
+        Effect::CompleteQuest(FIND_THE_MISSING_KID_2),
+        Effect::WarpToPortal(ICE_CAVE, 0),
+    ];
     script
 }
 
@@ -12104,8 +12217,8 @@ const ALI: i32 = 2030011;
 /// NPCs with no speech in String.nx and nothing else to do, and their one
 /// line: Wolf Spirit Ryko in the Hall of Bowmen, Adonis in El Nath, the
 /// Document Roll in Chloe's house, Mu Lung's Practice Chart, Sharenian's
-/// Knight Armor and Sharen III's Will, and the Sunstone, Moonstone, Enigma
-/// and Hollowed Ground graves.
+/// Knight Armor and Sharen III's Will, the Sunstone, Moonstone, Enigma and
+/// Hollowed Ground graves, and the refugees by the ark on the Black Road.
 const ONE_LINERS: &[(i32, &str)] = &[
     (9010021, keys::LINE_RYKO),
     (9201106, keys::LINE_ADONIS),
@@ -12117,6 +12230,11 @@ const ONE_LINERS: &[(i32, &str)] = &[
     (9201072, keys::LINE_GRAVE_LIGHT),
     (9201073, keys::LINE_ENIGMA_TOMBSTONE),
     (9201084, keys::LINE_WORN_TOMBSTONE),
+    (1209001, keys::LINE_REFUGEES[0]),
+    (1209002, keys::LINE_REFUGEES[1]),
+    (1209003, keys::LINE_REFUGEES[2]),
+    (1209004, keys::LINE_REFUGEES[3]),
+    (1209005, keys::LINE_REFUGEES[4]),
 ];
 const LIRA: i32 = 2032003;
 const AMON: i32 = 2030010;
@@ -17408,6 +17526,74 @@ mod tests {
                 ]
             )
         );
+    }
+
+    #[test]
+    fn athena_and_the_lost_kid_lead_the_aran_off_the_black_road() {
+        let aran = traveller(1, 0, false);
+        let athena = NpcScript::for_npc(ATHENA_BY_THE_ARK, &aran).unwrap();
+        assert_eq!(
+            yes_through(athena),
+            (
+                ATHENA_BY_THE_ARK,
+                vec![Effect::ScenePart(
+                    "Effect/Direction1.img/aranTutorial/Trio".to_string()
+                )]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21000s", &aran).unwrap()),
+            (
+                ATHENA_BY_THE_ARK,
+                vec![
+                    Effect::StartQuest(FIND_THE_MISSING_KID_1),
+                    tutorial_arrow(1)
+                ]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21001s", &aran).unwrap()),
+            (
+                LOST_KID,
+                vec![
+                    Effect::GiveItem {
+                        item_id: LOST_CHILD,
+                        quantity: 1,
+                    },
+                    Effect::StartQuest(FIND_THE_MISSING_KID_2),
+                    Effect::WarpToPortal(LOST_KIDS_FOREST, 0),
+                ]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21001e", &aran).unwrap()),
+            (
+                ATHENA_AT_THE_GANGWAY,
+                vec![
+                    Effect::TakeItem {
+                        item_id: LOST_CHILD,
+                        quantity: 1,
+                    },
+                    Effect::TakeWorn(WEAPON_SLOT),
+                    Effect::CompleteQuest(FIND_THE_MISSING_KID_2),
+                    Effect::WarpToPortal(ICE_CAVE, 0),
+                ]
+            )
+        );
+
+        // Declined, each says so and nothing is done.
+        for (script, declined) in [
+            ("q21000s", keys::ATHENA_MISSING_KID_DECLINED),
+            ("q21001s", keys::LOST_KID_DECLINED),
+            ("q21001e", keys::ATHENA_KID_SAFE_DECLINED),
+        ] {
+            let mut npc = NpcScript::for_quest(script, &aran).unwrap();
+            assert_eq!(kind(&npc.begin()), Some(1), "{script}");
+            let step = npc.respond(ScriptInput::No).unwrap();
+            assert_eq!(page_text(&step), text(declined), "{script}");
+            assert!(step.effects.is_empty(), "{script}");
+            assert_eq!(npc.respond(ScriptInput::Next).unwrap().effects, []);
+        }
     }
 
     #[test]

@@ -1216,6 +1216,33 @@ pub mod keys {
         "lilin.fitness_test.go",
     ];
     pub const LILIN_FITNESS_TEST_DECLINED: &str = "lilin.fitness_test.declined";
+    /// The Aran's escape down the Black Road: Athena Pierce's Find the
+    /// Missing Kid 1 (`q21000s`), the Lost Kid's part 2 (`q21001s`) and
+    /// Athena's end of it by the ark (`q21001e`), her talk before the
+    /// search (`talkHelena`), and the way out barred until it is taken up.
+    pub const ATHENA_MISSING_KID: [&str; 4] = [
+        "athena.missing_kid.ask",
+        "athena.missing_kid.forest",
+        "athena.missing_kid.quest_window",
+        "athena.missing_kid.begging",
+    ];
+    pub const ATHENA_MISSING_KID_DECLINED: &str = "athena.missing_kid.declined";
+    pub const LOST_KID_ASK: &str = "lost_kid.ask";
+    pub const LOST_KID_DECLINED: &str = "lost_kid.declined";
+    pub const ATHENA_KID_SAFE: [&str; 8] = [
+        "athena.kid_safe.ask",
+        "athena.kid_safe.relief",
+        "athena.kid_safe.board",
+        "athena.kid_safe.no_time",
+        "athena.kid_safe.leave_now",
+        "athena.kid_safe.please",
+        "athena.kid_safe.cannot",
+        "athena.kid_safe.go_first",
+    ];
+    pub const ATHENA_KID_SAFE_DECLINED: &str = "athena.kid_safe.declined";
+    pub const ATHENA_ARK: [&str; 3] =
+        ["athena.ark.awake", "athena.ark.escape", "athena.ark.heroes"];
+    pub const BLACK_ROAD_OUT_LOCKED: &str = "black_road.out_locked";
     /// The Aran's first job: Lilin's The Five Heroes (`q21100s`) and the
     /// Polearm in the ice (1201001, `q21101s`/`e`).
     pub const LILIN_FIVE_HEROES: [&str; 8] = [
@@ -3105,6 +3132,14 @@ pub mod keys {
     pub const LINE_GRAVE_LIGHT: &str = "npc_line.grave_light";
     pub const LINE_ENIGMA_TOMBSTONE: &str = "npc_line.enigma_tombstone";
     pub const LINE_WORN_TOMBSTONE: &str = "npc_line.worn_tombstone";
+    /// The refugees by the ark on the Black Road, 1209001 to 1209005.
+    pub const LINE_REFUGEES: [&str; 5] = [
+        "npc_line.refugee_1",
+        "npc_line.refugee_2",
+        "npc_line.refugee_3",
+        "npc_line.refugee_4",
+        "npc_line.refugee_5",
+    ];
     pub const DOJO_UP_MONSTERS: &str = "dojo.up.monsters";
     pub const DOJO_NEXT_SHUT: &str = "dojo.next.shut";
     pub const DOJO_POINTS: &str = "dojo.points";
@@ -4534,6 +4569,26 @@ mod tests {
                 keys::LILIN_FITNESS_TEST[1],
                 keys::LILIN_FITNESS_TEST[2],
                 keys::LILIN_FITNESS_TEST_DECLINED,
+                keys::ATHENA_MISSING_KID[0],
+                keys::ATHENA_MISSING_KID[1],
+                keys::ATHENA_MISSING_KID[2],
+                keys::ATHENA_MISSING_KID[3],
+                keys::ATHENA_MISSING_KID_DECLINED,
+                keys::LOST_KID_ASK,
+                keys::LOST_KID_DECLINED,
+                keys::ATHENA_KID_SAFE[0],
+                keys::ATHENA_KID_SAFE[1],
+                keys::ATHENA_KID_SAFE[2],
+                keys::ATHENA_KID_SAFE[3],
+                keys::ATHENA_KID_SAFE[4],
+                keys::ATHENA_KID_SAFE[5],
+                keys::ATHENA_KID_SAFE[6],
+                keys::ATHENA_KID_SAFE[7],
+                keys::ATHENA_KID_SAFE_DECLINED,
+                keys::ATHENA_ARK[0],
+                keys::ATHENA_ARK[1],
+                keys::ATHENA_ARK[2],
+                keys::BLACK_ROAD_OUT_LOCKED,
                 keys::LILIN_FIVE_HEROES[0],
                 keys::LILIN_FIVE_HEROES[1],
                 keys::LILIN_FIVE_HEROES[2],
@@ -5113,6 +5168,11 @@ mod tests {
                 keys::LINE_GRAVE_LIGHT,
                 keys::LINE_ENIGMA_TOMBSTONE,
                 keys::LINE_WORN_TOMBSTONE,
+                keys::LINE_REFUGEES[0],
+                keys::LINE_REFUGEES[1],
+                keys::LINE_REFUGEES[2],
+                keys::LINE_REFUGEES[3],
+                keys::LINE_REFUGEES[4],
                 keys::DOJO_UP_MONSTERS,
                 keys::DOJO_NEXT_SHUT,
                 keys::DOJO_POINTS,

@@ -331,6 +331,29 @@ pub const HTPQ_LAMP_NAME: &str = "light";
 const RIEN: i32 = 140000000;
 const SECOND_DANGEROUS_FOREST: i32 = 140010100;
 const RIEN_TUTORIAL: i16 = 21014;
+/// The Black Road, where an Aran wakes before the escape: the forest by
+/// the ark, the road out through three stretches, where the Lost Kid
+/// waits, and the way back. Leaving the ark's side waits on Athena's Find
+/// the Missing Kid 1 (21000), and each stretch teaches one of the
+/// tutorial's skills (Cosmic `aranTutorOut1`-`3`); the Lost Kid's map
+/// leads back toward the ark once Find the Missing Kid 2 (21001) is taken
+/// up (`outChild`).
+const BLACK_ROAD_ARK: i32 = 914_000_100;
+const BLACK_ROAD_LAST_STRETCH: i32 = 914_000_220;
+const BLACK_ROAD_BACK: i32 = 914_000_400;
+const FIND_THE_MISSING_KID_1: i16 = 21000;
+const FIND_THE_MISSING_KID_2: i16 = 21001;
+/// The record 21000 waits for, set on reaching the ark (Cosmic
+/// `914000100.js`).
+const ARK_REACHED_RECORD: i16 = 21002;
+/// Each portal on to a stretch, and the skills it teaches at level 1: the
+/// tutorial's combo ability and critical, then double and triple swing,
+/// then the area attack, each a copy of the Legend's (Skill.nx `2000.img`).
+const BLACK_ROAD_STRETCHES: [(&str, i32, &[i32]); 3] = [
+    ("aranTutorOut1", 914_000_200, &[20000017, 20000018]),
+    ("aranTutorOut2", 914_000_210, &[20000014, 20000015]),
+    ("aranTutorOut3", BLACK_ROAD_LAST_STRETCH, &[20000016]),
+];
 /// Ereve's tutorial maps whose west door (`tutorquest`) opens on a quest:
 /// Kiku's "Welcome to Ereve" (20010) started, then each brother's done.
 /// The door leads to the next map.
@@ -746,6 +769,9 @@ pub enum Effect {
         town: &'static str,
         announced: bool,
     },
+    /// Take what is worn in equip slot `slot`, if anything (Cosmic's
+    /// `removeEquipFromSlot`); the others on the map see the new look.
+    TakeWorn(i16),
     /// Nothing is applied if the player no longer has them.
     TakeItem {
         item_id: i32,
@@ -1211,6 +1237,12 @@ pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
             vec![Effect::BringOutNpc {
                 npc_id: crate::events::NINE_SPIRIT_BABY,
                 at: crate::events::NINE_SPIRIT_NEST_EGG_AT,
+            }]
+        }
+        BLACK_ROAD_ARK if player.quests.info(ARK_REACHED_RECORD) != Some("1") => {
+            vec![Effect::SetRecord {
+                record: ARK_REACHED_RECORD,
+                value: "1",
             }]
         }
         // Shuang tells whoever reaches Sharenian's outskirts what to do there.
@@ -2378,6 +2410,36 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: None,
         },
+        "aranTutorAloneX" => through(Effect::WarpToPortal(BLACK_ROAD_ARK, 1)),
+        "aranTutorOut1" if quest(FIND_THE_MISSING_KID_1) != QuestState::Started => {
+            refused(keys::BLACK_ROAD_OUT_LOCKED)
+        }
+        script
+            if BLACK_ROAD_STRETCHES
+                .iter()
+                .any(|&(name, ..)| name == script) =>
+        {
+            let &(_, map, skills) = BLACK_ROAD_STRETCHES
+                .iter()
+                .find(|&&(name, ..)| name == script)?;
+            let mut effects: Vec<Effect> = (skills.iter())
+                .map(|&skill_id| Effect::TeachSkill {
+                    skill_id,
+                    level: 1,
+                    master_level: 0,
+                })
+                .collect();
+            effects.extend(through(Effect::WarpToPortal(map, 1)).effects);
+            ScriptOutcome {
+                effects,
+                block: false,
+                occupied: None,
+            }
+        }
+        "outChild" if quest(FIND_THE_MISSING_KID_2) == QuestState::Started => {
+            through(Effect::WarpToPortal(BLACK_ROAD_BACK, 2))
+        }
+        "outChild" => through(Effect::WarpToPortal(BLACK_ROAD_LAST_STRETCH, 2)),
         "enterRienFirst" => {
             let start = if aran_in_tutorial() { "st00" } else { "west00" };
             through(Effect::WarpToPortal(RIEN, named(RIEN, start)))
@@ -5442,6 +5504,66 @@ mod tests {
         assert_eq!(
             warp_of(&portal("rienTutor7", &done).unwrap()),
             Some((SECOND_DANGEROUS_FOREST, 2))
+        );
+    }
+
+    #[test]
+    fn the_black_road_teaches_a_skill_a_stretch_once_the_search_is_taken_up() {
+        let fresh = player_with(&[]);
+        assert_eq!(
+            warp_of(&portal("aranTutorAloneX", &fresh).unwrap()),
+            Some((BLACK_ROAD_ARK, 1))
+        );
+
+        // The ark's map marks the ark reached, once.
+        let mut at_ark = fresh.clone();
+        at_ark.stats.map_id = BLACK_ROAD_ARK;
+        let mark = unscripted_map_enter(&at_ark);
+        assert_eq!(
+            mark,
+            [Effect::SetRecord {
+                record: ARK_REACHED_RECORD,
+                value: "1",
+            }]
+        );
+        at_ark.quests.set_record(ARK_REACHED_RECORD, "1");
+        assert!(unscripted_map_enter(&at_ark).is_empty());
+
+        // Not before Athena's request is taken up.
+        let shut = portal("aranTutorOut1", &fresh).unwrap();
+        assert!(matches!(shut.effects.as_slice(), [Effect::Pink(_)]));
+
+        let searching = player_with(&[(FIND_THE_MISSING_KID_1, QuestState::Started)]);
+        for (script, map, skills) in BLACK_ROAD_STRETCHES {
+            let outcome = portal(script, &searching).unwrap();
+            assert_eq!(
+                outcome.effects.last(),
+                Some(&Effect::WarpToPortal(map, 1)),
+                "{script}"
+            );
+            let taught: Vec<i32> = (outcome.effects.iter())
+                .filter_map(|effect| match effect {
+                    Effect::TeachSkill {
+                        skill_id,
+                        level: 1,
+                        master_level: 0,
+                    } => Some(*skill_id),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(taught, skills, "{script}");
+        }
+
+        // From the Lost Kid's forest, back the way the Aran came until the
+        // kid comes along, then toward the ark.
+        let child = |state| warp_of(&portal("outChild", &player_with(&[state])).unwrap());
+        assert_eq!(
+            child((FIND_THE_MISSING_KID_1, QuestState::Completed)),
+            Some((BLACK_ROAD_LAST_STRETCH, 2))
+        );
+        assert_eq!(
+            child((FIND_THE_MISSING_KID_2, QuestState::Started)),
+            Some((BLACK_ROAD_BACK, 2))
         );
     }
 

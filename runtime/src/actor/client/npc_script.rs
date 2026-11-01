@@ -5,7 +5,7 @@ use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage, SquadAnswer};
 use game::pet::PetChange;
 use game::quest::{QuestRecord, QuestStatus};
-use game::QuestState;
+use game::{InventoryType, QuestState};
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::events::EventKind;
@@ -370,6 +370,14 @@ impl ClientActor {
                     changed = true;
                     packets.push(inventory::build_inventory_operation(false, &changes)?);
                     packets.push(inventory::build_item_gain_in_chat(*item_id, 1)?);
+                }
+                Effect::TakeWorn(slot) => {
+                    let Ok(changes) = next.inventory.take(InventoryType::Equipped, *slot, 1) else {
+                        continue;
+                    };
+                    changed = true;
+                    restyled = true;
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
                 }
                 Effect::TakeItem { item_id, quantity } => {
                     let Ok(changes) = next.inventory.remove(*item_id, *quantity) else {
