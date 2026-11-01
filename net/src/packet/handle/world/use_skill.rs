@@ -210,11 +210,10 @@ impl WorldHandler for UseSkillHandler {
         let field_limit = crate::game_data::get()?
             .field(ctx.player.stats.map_id)
             .map_or(0, |field| field.field_limit);
-        let transforms = [morph::TRANSFORMATION, morph::SUPER_TRANSFORMATION];
         // Invincibility and Power Explosion take a full energy bar (Cosmic's
         // SpecialMoveHandler).
         let secret = skills::pq_skill(skill_id) == Some(skills::PqSkill::DojoBuff);
-        let used = if transforms.contains(&skill_id)
+        let used = if morph::TRANSFORMS.contains(&skill_id)
             && field_limit & game_data::FIELD_LIMIT_MOVEMENT_SKILLS != 0
         {
             Err(Refusal::NoMovementSkillsHere)

@@ -1051,13 +1051,15 @@ Map seats aren't known to the server.
 
 Oak Barrel (5101007) and Transformation (5111005) and Super
 Transformation (5121003) give the skill level's `morph` (1002, 1000,
-1001) as the Morph buff, beside their leveled defence, speed and jump; a
+1001) as the Morph buff, and the Thunder Breaker's Transformation
+(15111002) and the Wind Archer's Eagle Eye (13111005) theirs (1000,
+1003), beside their leveled defence, speed and jump; a
 woman's superman is the template plus 100 (`net::morph::template`, as
 Cosmic sends). `net::morph::refused` keeps the client's skill rules on
 the server (reports 225b, 225c): nothing, not even a normal attack, from
 inside the barrel (the client's attack key cancels it instead); no
-Double Shot, Oak Barrel or Burst Fire as a superman; Shockwave only
-transformed and Demolition and Snatch only after Super Transformation.
+Double Shot, Oak Barrel or Burst Fire as a superman; either Shockwave
+(5111006, 15111003) only transformed, by any of the four, and Demolition and Snatch only after Super Transformation.
 Use Skill refuses the transformations on maps that forbid movement
 skills, like Dash.
 
