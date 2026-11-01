@@ -66,6 +66,9 @@ namespace ms
 		// Fade the screen to black, run fadeprocedure, then fade back in.
 		void fadeout(std::function<void()> fadeprocedure);
 
+		// Cut to black at once, run fadeprocedure, then fade back in.
+		void cutout(std::function<void()> fadeprocedure);
+
 		void check_events();
 
 		void setclipboard(const std::string &text) const;

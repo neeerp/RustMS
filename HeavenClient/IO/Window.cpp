@@ -347,6 +347,13 @@ namespace ms
 		fadeprocedure = fadeproc;
 	}
 
+	void Window::cutout(std::function<void()> fadeproc)
+	{
+		opacity = 0.0f;
+		opcstep = -1.0f;
+		fadeprocedure = fadeproc;
+	}
+
 	void Window::setclipboard(const std::string &text) const
 	{
 		glfwSetClipboardString(glwnd, text.c_str());

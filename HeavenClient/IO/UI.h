@@ -62,6 +62,9 @@ namespace ms
 
 		void change_state(State state);
 
+		// Whether the login stage is up.
+		bool in_login() const;
+
 		void quit();
 
 		bool not_quitted() const;

@@ -122,6 +122,11 @@ namespace ms
 		}
 	}
 
+	bool UI::in_login() const
+	{
+		return dynamic_cast<UIStateLogin *>(state.get()) != nullptr;
+	}
+
 	void UI::quit()
 	{
 		quitted = true;
