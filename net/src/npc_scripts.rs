@@ -381,6 +381,11 @@ const TARA: i32 = 2040021;
 const RYDOLE: i32 = 2040022;
 pub const CASEY: i32 = 1012008;
 pub const ARWEN: i32 = 1032100;
+pub const CHIEF_TATAMO: i32 = 2081000;
+/// The Magic Seed Chief Tatamo sells, its price, and the most at once.
+pub const MAGIC_SEED: i32 = 4031346;
+pub const MAGIC_SEED_PRICE: i32 = 30_000;
+const MAGIC_SEEDS_AT_ONCE: i32 = 99;
 /// Mos makes Cornian's Dagger while either of these quests is under way.
 const CORNIAN_QUESTS: [i16; 2] = [7301, 7303];
 /// The money sack drawn beside a price.
@@ -1185,6 +1190,8 @@ pub enum OnNumber {
     /// An Altaire camper trades that many hundred of `input` for Perfect
     /// Pitches.
     Pitches { input: i32 },
+    /// Chief Tatamo asks to sell that many Magic Seeds.
+    MagicSeeds,
 }
 
 impl OnNumber {
@@ -1209,6 +1216,7 @@ impl OnNumber {
                     },
                 ],
             }],
+            OnNumber::MagicSeeds => magic_seeds(number),
         }
     }
 }
@@ -2587,6 +2595,7 @@ impl NpcScript {
             MOS => return Some(mos(player, &mut rand::thread_rng())),
             CASEY => return Some(casey()),
             ARWEN => return Some(arwen(player)),
+            CHIEF_TATAMO => return Some(chief_tatamo()),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -17024,6 +17033,51 @@ fn refining(refine: &Refine, percent: i32, batches: i32) -> Vec<Effect> {
     effects
 }
 
+/// Chief Tatamo in Leafre, who sells Magic Seeds, any number up to
+/// `MAGIC_SEEDS_AT_ONCE` at once (`OnNumber::MagicSeeds`).
+fn chief_tatamo() -> NpcScript {
+    let price = MAGIC_SEED_PRICE.to_string();
+    let how_many = Page::AskNumber {
+        text: content::text().get(keys::TATAMO_HOW_MANY, &[("price", price.as_str())]),
+        default: 1,
+        min: 1,
+        max: MAGIC_SEEDS_AT_ONCE,
+        on_number: OnNumber::MagicSeeds,
+    };
+    let menu = Page::Menu {
+        text: text(keys::TATAMO_HELLO),
+        choices: vec![(text(keys::TATAMO_BUY), vec![how_many])],
+    };
+    let mut script = NpcScript::new(CHIEF_TATAMO, vec![menu]);
+    script.refused = Some(text(keys::TATAMO_SHORT));
+    script.inventory_full = Some(text(keys::TATAMO_SHORT));
+    script
+}
+
+/// Ask to sell `count` Magic Seeds at their price, then say goodbye.
+fn magic_seeds(count: i32) -> Vec<Page> {
+    let cost = MAGIC_SEED_PRICE * count;
+    let (count_text, cost_text) = (count.to_string(), cost.to_string());
+    let ask = content::text().get(
+        keys::TATAMO_ASK,
+        &[("count", count_text.as_str()), ("cost", cost_text.as_str())],
+    );
+    vec![
+        Page::Ask {
+            text: ask,
+            on_yes: vec![
+                Effect::SpendMeso(cost),
+                Effect::GiveItem {
+                    item_id: MAGIC_SEED,
+                    quantity: times(1, count),
+                },
+            ],
+            on_no: Some(text(keys::TATAMO_THINK)),
+        },
+        Page::Say(text(keys::TATAMO_BYE)),
+    ]
+}
+
 /// `quantity` `batches` times over, as an item count; the refiners' and
 /// traders' bounds keep it in range.
 fn times(quantity: i32, batches: i32) -> i16 {
@@ -26254,6 +26308,32 @@ mod tests {
             ]
         );
         assert!(arwen.refused().is_some() && arwen.inventory_full().is_some());
+    }
+
+    #[test]
+    fn chief_tatamo_sells_magic_seeds_at_their_price() {
+        let player = traveller(120, 0, false);
+        let mut tatamo = NpcScript::for_npc(CHIEF_TATAMO, &player).unwrap();
+        tatamo.begin();
+        match tatamo.respond(ScriptInput::Select(0)).unwrap().prompt {
+            Some(Prompt::AskNumber { min, max, .. }) => assert_eq!((min, max), (1, 99)),
+            other => panic!("number expected, got {other:?}"),
+        }
+        let asked = question(&tatamo.respond(ScriptInput::Number(3)).unwrap());
+        assert!(asked.contains("90000"), "{asked}");
+        let made = tatamo.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                Effect::SpendMeso(90_000),
+                Effect::GiveItem {
+                    item_id: MAGIC_SEED,
+                    quantity: 3
+                }
+            ]
+        );
+        assert_eq!(page_text(&made), text(keys::TATAMO_BYE));
+        assert!(tatamo.refused().is_some() && tatamo.inventory_full().is_some());
     }
 
     #[test]

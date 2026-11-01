@@ -3052,6 +3052,13 @@ pub mod keys {
     pub const CASEY_MATCH_CARDS_RULES: &str = "casey.match_cards_rules";
     pub const ARWEN_HELLO: &str = "arwen.hello";
     pub const ARWEN_STRANGER: &str = "arwen.stranger";
+    pub const TATAMO_HELLO: &str = "tatamo.hello";
+    pub const TATAMO_BUY: &str = "tatamo.buy";
+    pub const TATAMO_HOW_MANY: &str = "tatamo.how_many";
+    pub const TATAMO_ASK: &str = "tatamo.ask";
+    pub const TATAMO_SHORT: &str = "tatamo.short";
+    pub const TATAMO_THINK: &str = "tatamo.think";
+    pub const TATAMO_BYE: &str = "tatamo.bye";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5181,6 +5188,13 @@ mod tests {
                 keys::CASEY_MATCH_CARDS_RULES,
                 keys::ARWEN_HELLO,
                 keys::ARWEN_STRANGER,
+                keys::TATAMO_HELLO,
+                keys::TATAMO_BUY,
+                keys::TATAMO_HOW_MANY,
+                keys::TATAMO_ASK,
+                keys::TATAMO_SHORT,
+                keys::TATAMO_THINK,
+                keys::TATAMO_BYE,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
