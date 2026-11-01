@@ -162,11 +162,11 @@ pub struct StorageFees {
 /// (as Cosmic's do), and so say their own String.nx `d0`: Kiruru, Kiru and
 /// the two Puros on board the ships to and from Ereve and Rien, Andy by the
 /// Tera Forest Time Gate, Sejan in Ariant, Spindle in Ludibrium, the
-/// Glimmer Man in New Leaf City, Witch Malady and the Steward by the Haunted
-/// House, and Santa in Happyville.
-pub const DEFAULT_LINE_NPCS: [i32; 11] = [
-    1100005, 1100006, 1200005, 1200006, 2082004, 2101011, 9201082, 9201083, 9201142, 9201143,
-    9310058,
+/// Glimmer Man in New Leaf City, Witch Malady, the Steward and the Maid by
+/// and in the Haunted House, and Santa in Happyville.
+pub const DEFAULT_LINE_NPCS: [i32; 12] = [
+    1100005, 1100006, 1200005, 1200006, 2082004, 2101011, 2120003, 9201082, 9201083, 9201142,
+    9201143, 9310058,
 ];
 
 #[derive(Debug, Default)]
@@ -1780,6 +1780,8 @@ mod tests {
         }
         let spindle = &data.dialogue(9201082).unwrap().pages[0];
         assert!(spindle.contains("Spindle"));
+        let maid = &data.dialogue(2120003).unwrap().pages[0];
+        assert!(maid.contains("Master"));
     }
 
     #[test]
