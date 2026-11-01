@@ -32,6 +32,68 @@ impl WorldHandler for SpendApHandler {
     }
 }
 
+/// `AUTO_ASSIGN_AP`: tick, a count, then each stat's mask bit and the AP it
+/// gets. The Stat window's auto-assign sends two pairs that add up to the
+/// player's AP (0xa23b3d); it works the split out from totals with
+/// equipment, so the server only checks the request is AP the player has:
+/// STR, DEX, INT or LUK, each once, none below 0. A stat stops at its cap
+/// and the rest stays AP. Answered once either way, as SPEND_AP is.
+pub struct AutoAssignApHandler;
+
+impl WorldHandler for AutoAssignApHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        reader.read_int()?; // client tick
+        let count = reader.read_int()?;
+        let mut pairs = Vec::new();
+        if (1..=4).contains(&count) {
+            for _ in 0..count {
+                pairs.push((reader.read_int()?, reader.read_int()?));
+            }
+        }
+        let Some(spends) = auto_spends(&pairs, ctx.player.stats.ap) else {
+            debug!(?pairs, ap = ctx.player.stats.ap, "AP auto-assign refused");
+            return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
+        };
+        let bonus = skills::growth_bonus(ctx.player, false);
+        for (stat, amount) in spends {
+            for _ in 0..amount {
+                if !ctx.player.spend_ap(stat, bonus, skills::growth_roll) {
+                    break;
+                }
+            }
+        }
+        let stats = &ctx.player.stats;
+        Ok(HandlerResult::reply(stat::build_stat_update(
+            true,
+            &[
+                StatUpdate::Str(stats.str),
+                StatUpdate::Dex(stats.dex),
+                StatUpdate::Int(stats.int),
+                StatUpdate::Luk(stats.luk),
+                StatUpdate::Ap(stats.ap),
+            ],
+        )?))
+    }
+}
+
+/// The stats an auto-assign raises and by how much, if the request is one
+/// the player can pay for.
+fn auto_spends(pairs: &[(i32, i32)], ap: i16) -> Option<Vec<(ApStat, i32)>> {
+    let mut spends: Vec<(ApStat, i32)> = Vec::new();
+    let mut total = 0i64;
+    for &(mask, amount) in pairs {
+        let stat = ap_stat(mask).filter(|stat| !matches!(stat, ApStat::MaxHp | ApStat::MaxMp))?;
+        if amount < 0 || spends.iter().any(|&(spent, _)| spent == stat) {
+            return None;
+        }
+        total += i64::from(amount);
+        spends.push((stat, amount));
+    }
+    (total > 0 && total <= i64::from(ap)).then_some(spends)
+}
+
 /// `stat`'s value, as STAT_CHANGED sends it.
 pub(super) fn stat_value(stats: &CharacterStats, stat: ApStat) -> StatUpdate {
     match stat {
@@ -170,6 +232,65 @@ mod tests {
             [STAT]
         );
         assert_eq!(player.stats.dex, dex);
+    }
+
+    fn auto_assign(pairs: &[(i32, i32)]) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::AutoAssignAp as i16).unwrap();
+        p.write_int(0).unwrap();
+        p.write_int(pairs.len() as i32).unwrap();
+        for &(mask, amount) in pairs {
+            p.write_int(mask).unwrap();
+            p.write_int(amount).unwrap();
+        }
+        p
+    }
+
+    #[test]
+    fn auto_assign_spends_the_pairs_at_once() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.ap = 5;
+        let (str, dex) = (player.stats.str, player.stats.dex);
+        let replies = handle(
+            &AutoAssignApHandler,
+            &mut player,
+            auto_assign(&[(0x80, 3), (0x40, 2)]),
+        );
+        assert_eq!(replies, [STAT]);
+        assert_eq!(
+            (player.stats.str, player.stats.dex, player.stats.ap),
+            (str + 2, dex + 3, 0)
+        );
+        // A pair may be 0, and a stat at its cap keeps the rest as AP.
+        player.stats.ap = 5;
+        player.stats.luk = 998;
+        handle(
+            &AutoAssignApHandler,
+            &mut player,
+            auto_assign(&[(0x100, 0), (0x200, 5)]),
+        );
+        assert_eq!((player.stats.luk, player.stats.ap), (999, 4));
+    }
+
+    #[test]
+    fn a_refused_auto_assign_changes_nothing_but_still_unlocks() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.ap = 5;
+        let before = player.stats.clone();
+        for pairs in [
+            // More than the AP, below 0, HP, a stat twice, nothing at all.
+            vec![(0x80, 3), (0x40, 3)],
+            vec![(0x80, 6), (0x40, -1)],
+            vec![(0x800, 1), (0x40, 4)],
+            vec![(0x40, 2), (0x40, 3)],
+            vec![(0x40, 0), (0x80, 0)],
+            vec![],
+            vec![(0x40, 1); 5],
+        ] {
+            let replies = handle(&AutoAssignApHandler, &mut player, auto_assign(&pairs));
+            assert_eq!(replies, [STAT], "{pairs:?}");
+            assert_eq!(player.stats, before, "{pairs:?}");
+        }
     }
 
     #[test]

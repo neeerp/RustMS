@@ -92,7 +92,11 @@ namespace ms
 			BT_INT,
 			BT_LUK,
 			BT_DETAIL,
-			BT_HIDE
+			BT_HIDE,
+			BT_AUTO,
+			// The first-job Pirate's halves: Brawler and Gunslinger.
+			BT_AUTO1,
+			BT_AUTO2
 		};
 
 		void update_ap();
@@ -106,6 +110,10 @@ namespace ms
 		void send_apup(MapleStat::Id stat) const;
 		// Ask before spending AP on MaxHP or MaxMP, as v83 does.
 		void confirm_apup(MapleStat::Id stat) const;
+		// Spread the AP as the job builds, once the player says yes (0x8c8692).
+		void auto_assign(bool brawler) const;
+		// Whether the cursor is on a shown auto button, whose own help shows instead of the zone's.
+		bool on_auto_button(Point<int16_t> cursor) const;
 
 		void set_detail(bool enabled);
 

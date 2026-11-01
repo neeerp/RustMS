@@ -184,7 +184,7 @@ pub use self::scroll::UseUpgradeScrollHandler;
 pub use self::skill_macro::SkillMacroHandler;
 pub use self::snowball::{LeftKnockbackHandler, SnowballHandler};
 pub use self::solomon::{UseGachaExpHandler, UseSolomonItemHandler};
-pub use self::spend_points::{SpendApHandler, SpendSpHandler};
+pub use self::spend_points::{AutoAssignApHandler, SpendApHandler, SpendSpHandler};
 pub use self::spouse_chat::SpouseChatHandler;
 pub use self::storage::TrunkRequestHandler;
 pub use self::summon::{

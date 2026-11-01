@@ -23,6 +23,7 @@
 
 #include "../OutPacket.h"
 
+#include "../../Character/AutoAssign.h"
 #include "../../Character/MapleStat.h"
 #include "../../Character/SkillMacros.h"
 #include "../../IO/QuickSlots.h"
@@ -78,6 +79,24 @@ namespace ms
 		{
 			write_time();
 			write_int(MapleStat::codes[stat]);
+		}
+	};
+
+	// Spends AP over the stats the auto-assign picked: each stat's mask bit and what it gets, in order
+	// Opcode: AUTO_ASSIGN_AP(88)
+	class AutoAssignApPacket : public OutPacket
+	{
+	public:
+		AutoAssignApPacket(const std::vector<auto_assign::Pair> &pairs) : OutPacket(OutPacket::Opcode::AUTO_ASSIGN_AP)
+		{
+			write_time();
+			write_int(static_cast<int32_t>(pairs.size()));
+
+			for (const auto &pair : pairs)
+			{
+				write_int(pair.flag);
+				write_int(pair.amount);
+			}
 		}
 	};
 

@@ -2,7 +2,7 @@
 //! answer (the client locks its UI until they do), and what is spent
 //! survives logging out.
 
-use integration_harness::hunting::{attack, spend_ap, spend_sp};
+use integration_harness::hunting::{attack, auto_assign_ap, spend_ap, spend_sp};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{send, stat, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -60,11 +60,26 @@ async fn ap_and_sp_raise_stats_and_skills_and_persist() {
         assert!(t.skills.is_empty(), "{marker}");
     }
 
+    let t = step(c, "dex", spend_ap(stat::DEX)).await;
+    let dex = t.stat(stat::DEX).unwrap();
+    // The stat window's AUTO spends the rest at once, but not AP it lacks.
+    let t = step(
+        c,
+        "auto too much",
+        auto_assign_ap(&[(stat::DEX, 2), (stat::STR, 1)]),
+    )
+    .await;
+    assert_eq!(t.stat_updates, only_unlock);
+    let t = step(c, "auto", auto_assign_ap(&[(stat::DEX, 1), (stat::STR, 1)])).await;
+    assert_eq!(t.stat(stat::STR), Some(i64::from(session.str) + 2));
+    assert_eq!(t.stat(stat::DEX), Some(dex + 1));
+    assert_eq!(t.stat(stat::AP), Some(0));
+
     let str = session.str;
     drop(session);
     let session = relogin(&config).await;
     assert_eq!(session.level, 2);
-    assert_eq!((session.str, i64::from(session.max_hp)), (str + 1, raised));
-    assert_eq!((session.ap, session.sp), (3, 0));
+    assert_eq!((session.str, i64::from(session.max_hp)), (str + 2, raised));
+    assert_eq!((session.ap, session.sp), (0, 0));
     assert_eq!(session.skills, BTreeMap::from([(THREE_SNAILS, 1)]));
 }

@@ -214,9 +214,13 @@ from `UI.nx`. Moved so far:
   behind DETAIL, the attack and defence panel (closed with `Basic.img/BtHide`),
   laid out from period footage. The job shows as the `Job/main` and `Job/sub`
   bitmaps for explorers and Cygnus Knights. Beginners get the greyed INT and
-  LUK labels and no HP or MP buttons. The AP buttons are disabled without AP.
-  v83 had no AP auto-assign: the window creates only the six AP-up buttons and
-  DETAIL. EXP shows as "exp (pct%)" and updates as it is gained.
+  LUK labels, and up to level 10 no AP buttons at all. HP and MP are disabled
+  below level 20 for every job, and the AP buttons without AP. AUTO
+  (`BtAuto`; a first-job Pirate gets `BtAuto1` and `BtAuto2`, for knuckles
+  and guns; a GM none) spreads the AP over the job's two stats, as v83 works
+  it out from the totals with equipment (`Character/AutoAssign.h`), asks with
+  a Yes/No listing each stat's gain, and sends AUTO_ASSIGN_AP (0x58). EXP
+  shows as "exp (pct%)" and updates as it is gained.
 - **Skill window** (`UISkillBook`, `UIWindow.img/Skill`): one tab per job
   advancement (`Basic.img/Tab5`, drawn by `ClassicTabs`), the book and name of
   the selected one, four skill rows with a `VScr4` scroll bar, and the points

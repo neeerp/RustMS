@@ -243,6 +243,19 @@ pub fn spend_ap(stat: i32) -> Packet {
     p
 }
 
+/// AUTO_ASSIGN_AP: each stat's mask bit and the AP it gets.
+pub fn auto_assign_ap(pairs: &[(i32, i32)]) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::AutoAssignAp as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_int(pairs.len() as i32).unwrap();
+    for &(stat, amount) in pairs {
+        p.write_int(stat).unwrap();
+        p.write_int(amount).unwrap();
+    }
+    p
+}
+
 /// SPEND_SP on a skill.
 pub fn spend_sp(skill_id: i32) -> Packet {
     let mut p = Packet::new_empty();

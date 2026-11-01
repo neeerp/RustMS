@@ -1174,6 +1174,12 @@ so every request is answered, refusals with an empty STAT_CHANGED.
   above; a beginner gets +8-12 HP or +6-8 MP). As in v83, the client
   only asks for MaxHP or MaxMP from level 20, and then only after the player
   confirms a warning that it may leave the character weaker.
+- **Auto-assign** (`AutoAssignApHandler`): AUTO_ASSIGN_AP (0x58) carries a
+  count, then each stat's bit and its AP. The client works out the split, so
+  the server only checks the stats are STR, DEX, INT or LUK, each once, none
+  below 0, and the whole is more than 0 and no more than the AP. Each point is
+  spent as SPEND_AP spends it, so a stat at 999 leaves the rest as AP. The
+  reply carries STR, DEX, INT, LUK and AP.
 - **SP** (`Player::raise_skill`): the skill must belong to the character's
   job or one it advanced through (`game::skill::in_job_tree`). Its `Skill.nx`
   template (`game_data::skills`) gives the max level and the `req` skills it

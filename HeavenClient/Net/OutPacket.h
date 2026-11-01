@@ -138,6 +138,8 @@ namespace ms
 
 			/// Player
 			SPEND_AP = 87,
+			// The Stat window's auto-assign (0xa23b3d)
+			AUTO_ASSIGN_AP = 88,
 			SPEND_SP = 90,
 			CHANGE_KEYMAP = 135,
 

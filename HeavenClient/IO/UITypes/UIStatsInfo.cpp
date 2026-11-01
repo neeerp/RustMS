@@ -22,6 +22,7 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Character/AutoAssign.h"
 #include "../../Character/ExpTable.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/PlayerPackets.h"
@@ -42,6 +43,8 @@ namespace ms
 		const Point<int16_t> CLOSE = { 156, 6 };
 		const Point<int16_t> DETAIL_BUTTON = { 124, 324 };
 		const Point<int16_t> HIDE = { 155, 182 };
+		// BtAuto fills the AP box's left; the Pirate's two halves stack in its place (0x8c79f5).
+		const Point<int16_t> AUTO = { 97, 197 }, AUTO2 = { 97, 217 };
 
 		// Values start right of the labels; a row's text has its cap top 4
 		// below the row's top, and its AP button sits 3 below it.
@@ -104,6 +107,12 @@ namespace ms
 		buttons[Buttons::BT_DETAIL] = std::make_unique<MapleButton>(Stat["BtDetail"], DETAIL_BUTTON);
 		buttons[Buttons::BT_HIDE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtHide"],
 																  DETAIL + HIDE);
+		buttons[Buttons::BT_AUTO] = std::make_unique<MapleButton>(Stat["BtAuto"], AUTO);
+		buttons[Buttons::BT_AUTO1] = std::make_unique<MapleButton>(Stat["BtAuto1"], AUTO);
+		buttons[Buttons::BT_AUTO2] = std::make_unique<MapleButton>(Stat["BtAuto2"], AUTO2);
+		set_button_help(Buttons::BT_AUTO, "Game/Button/StatAuto");
+		set_button_help(Buttons::BT_AUTO1, "Game/Button/StatAuto1");
+		set_button_help(Buttons::BT_AUTO2, "Game/Button/StatAuto2");
 
 		for (auto &label : statlabels)
 			label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
@@ -296,6 +305,13 @@ namespace ms
 			case Buttons::BT_HIDE:
 				set_detail(false);
 				break;
+			case Buttons::BT_AUTO:
+			case Buttons::BT_AUTO1:
+				auto_assign(true);
+				break;
+			case Buttons::BT_AUTO2:
+				auto_assign(false);
+				break;
 			default:
 				break;
 		}
@@ -341,6 +357,56 @@ namespace ms
 			});
 	}
 
+	void UIStatsInfo::auto_assign(bool brawler) const
+	{
+		int32_t job = stats.get_job().get_id();
+		int32_t level = stats.get_stat(MapleStat::Id::LEVEL);
+		int32_t ap = stats.get_stat(MapleStat::Id::AP);
+		auto_assign::Totals have = { stats.get_total(EquipStat::Id::STR), stats.get_total(EquipStat::Id::DEX),
+									 stats.get_total(EquipStat::Id::INT), stats.get_total(EquipStat::Id::LUK) };
+		std::vector<auto_assign::Pair> pairs = auto_assign::distribute(job, level, have, brawler);
+
+		// A job it can't build, or no AP, does nothing and says nothing.
+		if (pairs.empty() || ap < 1)
+			return;
+
+		auto_assign::spread(pairs, ap);
+
+		UI::get().emplace<UIYesNo>(
+			auto_assign::message(pairs),
+			[pairs, &stats = stats](bool yes)
+			{
+				if (!yes || stats_pinned(stats))
+					return;
+
+				int32_t ap = stats.get_stat(MapleStat::Id::AP);
+				int32_t total = 0;
+
+				for (const auto &pair : pairs)
+					total += pair.amount;
+
+				// The AP may have gone while the dialog was up (0xa23b3d).
+				if (ap <= 0 || total == 0 || ap < total)
+					return;
+
+				Stage::get().get_player().request(AutoAssignApPacket(pairs), ExclRequest::WAIT);
+			},
+			Text::Alignment::LEFT);
+	}
+
+	bool UIStatsInfo::on_auto_button(Point<int16_t> cursor) const
+	{
+		for (int i = Buttons::BT_AUTO; i <= Buttons::BT_AUTO2; i++)
+		{
+			const auto &button = buttons.at(i);
+
+			if (button->is_active() && button->bounds(Point<int16_t>()).contains(cursor))
+				return true;
+		}
+
+		return false;
+	}
+
 	void UIStatsInfo::set_detail(bool enabled)
 	{
 		showdetail = enabled;
@@ -354,6 +420,13 @@ namespace ms
 	void UIStatsInfo::show_zone_help(Point<int16_t> cursor)
 	{
 		int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
+
+		if (on_auto_button(cursor))
+		{
+			clear_zone_help();
+
+			return;
+		}
 
 		if (map_tooltips::on_stat_exp(cursor.x(), cursor.y()))
 		{
@@ -409,23 +482,40 @@ namespace ms
 
 	void UIStatsInfo::update_ap()
 	{
+		int32_t job = stats.get_job().get_id();
+		int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
 		bool hasap = stats.get_stat(MapleStat::Id::AP) > 0;
+		// A beginner of level 10 or less has no AP buttons at all (0x8c79f5).
+		bool none = auto_assign::no_buttons(job, level);
 
 		// Keep an enabled button's hover, as v83 only toggles whether it is
 		// enabled (FUN_004c0e05).
-		for (int i = Buttons::BT_HP; i <= Buttons::BT_LUK; i++)
+		auto enable = [&](int i, bool enabled)
 		{
-			if (!hasap)
+			if (!enabled)
 				buttons[i]->set_state(Button::State::DISABLED);
 			else if (buttons[i]->get_state() == Button::State::DISABLED)
 				buttons[i]->set_state(Button::State::NORMAL);
+		};
+
+		for (int i = Buttons::BT_HP; i <= Buttons::BT_LUK; i++)
+		{
+			buttons[i]->set_active(!none);
+			enable(i, hasap);
 		}
 
-		// Beginners can't put AP into HP or MP.
-		if (is_beginner())
+		// Nobody puts AP into HP or MP below level 20 (0x8c5845).
+		if (level < 20)
 		{
-			buttons[Buttons::BT_HP]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_MP]->set_state(Button::State::DISABLED);
+			enable(Buttons::BT_HP, false);
+			enable(Buttons::BT_MP, false);
+		}
+
+		for (int which = 0; which < 3; which++)
+		{
+			int i = Buttons::BT_AUTO + which;
+			buttons[i]->set_active(!none && auto_assign::shown(job, which));
+			enable(i, hasap);
 		}
 	}
 

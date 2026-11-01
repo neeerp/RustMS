@@ -152,6 +152,9 @@ pub enum RecvOpcode {
     UseReturnScroll = 0x55,
     UseUpgradeScroll = 0x56,
     SpendAp = 0x57,
+    /// The Stat window's auto-assign: each stat and the AP it gets
+    /// (0xa23b3d).
+    AutoAssignAp = 0x58,
     HealOverTime = 0x59,
     SpendSp = 0x5A,
     UseSkill = 0x5B,
