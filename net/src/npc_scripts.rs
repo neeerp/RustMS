@@ -960,6 +960,13 @@ const HOLY_WATER_OF_LIFE: i32 = 4031455;
 /// Shadower defeats the disciples in `scripts::DISCIPLES_ROOM`.
 const DARK_LORD: i32 = 1052001;
 const THE_NIGHT_WARRIOR: i16 = 6141;
+/// Carta the sea witch, who takes a Miniature Pianus to send one on Strong
+/// Will (6301) to the deep-sea field (`923000000`), whose mobs drop its 40
+/// pieces (4031472). The field is shared, its mobs respawning.
+const CARTA: i32 = 2060100;
+const STRONG_WILL: i16 = 6301;
+const MINIATURE_PIANUS: i32 = 4000175;
+const STRONG_WILL_FIELD: i32 = 923_000_000;
 const PAST_PAPULATUS: i32 = 2043000;
 /// Shulynch in the Nautilus's Training Room, who sends a Corsair on
 /// "Mission Free the Monsters" (6410) to look for Delli; Shulynch on
@@ -2428,6 +2435,7 @@ impl NpcScript {
             ANCIENT_ICY_STONE => return ancient_icy_stone(player),
             MAPLE_LEAF_MARBLE => return maple_leaf_marble(player),
             FOUNTAIN_OF_LIFE => return fountain_of_life(player),
+            CARTA => return carta(player),
             PAST_PAPULATUS => return Some(past_papulatus(player)),
             SHULYNCH if player.quests.state(DELLI_QUEST) == QuestState::Started => {
                 return Some(ask_warp(
@@ -13688,6 +13696,27 @@ fn night_warrior() -> NpcScript {
     );
     script.refused = Some(text(keys::SOLO_MAP_OCCUPIED));
     script
+}
+
+/// Carta takes a Miniature Pianus to send one on Strong Will to its field
+/// without a word, or says to bring one (Cosmic `2060100.js`). Anyone else
+/// hears Carta's own line.
+fn carta(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(STRONG_WILL) != QuestState::Started {
+        return None;
+    }
+    let page = if player.inventory.count(MINIATURE_PIANUS) == 0 {
+        Page::Say(text(keys::CARTA_NEED_PIANUS))
+    } else {
+        Page::Done(vec![
+            Effect::TakeItem {
+                item_id: MINIATURE_PIANUS,
+                quantity: 1,
+            },
+            Effect::Warp(STRONG_WILL_FIELD),
+        ])
+    };
+    Some(NpcScript::new(CARTA, vec![page]))
 }
 
 /// Takes one `take` for one `give`, or `None` without a `take` or the room
@@ -26532,7 +26561,7 @@ mod tests {
         let mut thief = player(120);
         thief.stats.job = 412;
         // Without the quest, the instructor's talk.
-        let mut script = NpcScript::for_npc(DARK_LORD, &thief).unwrap();
+        let script = NpcScript::for_npc(DARK_LORD, &thief).unwrap();
         assert!(script.begin().prompt.is_some());
 
         thief.quests.upsert(game::QuestRecord {
@@ -26600,6 +26629,43 @@ mod tests {
             .begin();
         assert_eq!(page_text(&step), text(keys::FOUNTAIN_OF_LIFE_POUR));
         assert_eq!(step.effects, swap(HOLY_CUP, HOLY_WATER_OF_LIFE));
+    }
+
+    #[test]
+    fn carta_takes_a_miniature_pianus_to_open_the_way_on_strong_will() {
+        let mut hero = player(120);
+        hero.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(MINIATURE_PIANUS, 2),
+        );
+        assert!(NpcScript::for_npc(CARTA, &hero).is_none());
+
+        hero.quests.upsert(game::QuestRecord {
+            quest_id: STRONG_WILL,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let step = NpcScript::for_npc(CARTA, &hero).unwrap().begin();
+        assert!(step.prompt.is_none());
+        assert_eq!(
+            step.effects,
+            [
+                Effect::TakeItem {
+                    item_id: MINIATURE_PIANUS,
+                    quantity: 1,
+                },
+                Effect::Warp(STRONG_WILL_FIELD),
+            ]
+        );
+
+        // Without one, Carta says to bring it.
+        hero.inventory.remove(MINIATURE_PIANUS, 2).unwrap();
+        let step = NpcScript::for_npc(CARTA, &hero).unwrap().begin();
+        assert_eq!(page_text(&step), text(keys::CARTA_NEED_PIANUS));
+        assert!(step.effects.is_empty());
     }
 
     #[test]
