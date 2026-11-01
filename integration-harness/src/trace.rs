@@ -229,6 +229,10 @@ pub struct Trace {
     /// Every Coconut Season packet (FIELD_SPECIFIC_DATA, COCONUT_HIT and
     /// COCONUT_SCORE): (opcode, body), in order.
     pub coconut: Vec<(i16, Vec<u8>)>,
+    /// Every packet of the chandelier in Ergoth's room
+    /// (GUILD_BOSS_HEALER_MOVE and GUILD_BOSS_PULLEY_STATE): (opcode,
+    /// body), in order.
+    pub guild_boss: Vec<(i16, Vec<u8>)>,
     /// Every Snowball packet (SNOWBALL_STATE to LEFT_KNOCK_BACK): (opcode,
     /// body), in order.
     pub snowball: Vec<(i16, Vec<u8>)>,
@@ -777,6 +781,10 @@ impl Trace {
             || op == SendOpcode::CoconutScore as i16
         {
             self.coconut.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::GuildBossHealerMove as i16
+            || op == SendOpcode::GuildBossPulleyState as i16
+        {
+            self.guild_boss.push((op, p.bytes[2..].to_vec()));
         } else if (SendOpcode::SnowballState as i16..=SendOpcode::LeftKnockBack as i16)
             .contains(&op)
         {

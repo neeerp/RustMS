@@ -378,6 +378,11 @@ namespace ms
 		// hits and what it shows, while the game runs (A 575387).
 		void swing_at_snowballs();
 
+		// In Ergoth's room a basic attack that reaches no reactor may swing
+		// at the pulley instead, asking the server to drop the chandelier
+		// while the pulley is free (A 558b45). Returns whether it did.
+		bool swing_at_pulley();
+
 		// The melee stance a regular ranged attack whacks a mob right in
 		// front of the player with, or NONE to shoot. Either way, `reach` is
 		// how far in front of the player the whack reaches.

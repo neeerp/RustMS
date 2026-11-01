@@ -326,6 +326,7 @@ namespace ms
 		UI::get().clear_tooltip(Tooltip::Parent::FIELD);
 		ship = MapShip(src);
 		snowfield = MapSnowball(src);
+		guild_boss_field = MapGuildBoss(src);
 		wedding = mapid == -1 ? MapWedding() : MapWedding(mapid);
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
@@ -438,6 +439,7 @@ namespace ms
 		// A weather's bursts and fireworks share the mists' layer (z 0xc00614a4).
 		weather.draw_shows(alpha);
 		drops.draw_explosions(viewpos, alpha);
+		guild_boss_field.draw(viewx, viewy, alpha);
 		combat.draw(viewx, viewy, alpha);
 		snowfield.draw_front(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
@@ -541,6 +543,7 @@ namespace ms
 			touch_snowball();
 
 		snowfield.update();
+		guild_boss_field.update();
 		tilesobjs.update();
 
 		// Every 5 s, and whenever a quest record changes (FUN_00a20f4c).
@@ -1987,6 +1990,11 @@ namespace ms
 	void Stage::set_object_state(const std::string &name, int32_t state)
 	{
 		tilesobjs.set_state(name, state, player.get_position());
+	}
+
+	void Stage::swing_pulley()
+	{
+		guild_boss_field.swing();
 	}
 
 	std::vector<coconut::Box> Stage::coconut_boxes() const

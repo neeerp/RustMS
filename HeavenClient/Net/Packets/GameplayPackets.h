@@ -1518,6 +1518,14 @@ namespace ms
 		}
 	};
 
+	// A swing hit the pulley in Ergoth's room while it was free (A 558b45)
+	// Opcode: GUILD_BOSS_PULLEY(215)
+	class GuildBossPulleyPacket : public OutPacket
+	{
+	public:
+		GuildBossPulleyPacket() : OutPacket(OutPacket::Opcode::GUILD_BOSS_PULLEY) {}
+	};
+
 	// Spends CP on the Carnival window's row `index` (from 0) of tab `tab`:
 	// 0 a mob, 1 a skill, 2 a guardian (v83 FUN_008706d3)
 	// Opcode: MONSTER_CARNIVAL(218)

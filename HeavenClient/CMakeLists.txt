@@ -339,6 +339,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME ariant COMMAND ariant_tests)
     add_executable(wz_sound_tests tests/wz_sound.cpp Audio/WzSound.cpp)
     add_test(NAME wz_sound COMMAND wz_sound_tests)
+    add_executable(guild_boss_tests tests/guild_boss.cpp Character/GuildBoss.cpp Net/InPacket.cpp)
+    target_include_directories(guild_boss_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME guild_boss COMMAND guild_boss_tests)
     add_executable(snowball_tests tests/snowball.cpp Character/Snowball.cpp Character/Coconut.cpp Net/InPacket.cpp)
     target_include_directories(snowball_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME snowball COMMAND snowball_tests)
@@ -641,6 +644,8 @@ add_executable(HeavenClient
     Character/Coconut.h
     Character/Snowball.cpp
     Character/Snowball.h
+    Character/GuildBoss.cpp
+    Character/GuildBoss.h
     Character/Family.cpp
     Character/Marriage.cpp
     Character/Family.h
@@ -770,6 +775,8 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapShip.h
     Gameplay/MapleMap/MapSnowball.cpp
     Gameplay/MapleMap/MapSnowball.h
+    Gameplay/MapleMap/MapGuildBoss.cpp
+    Gameplay/MapleMap/MapGuildBoss.h
     Gameplay/MapleMap/ShipRules.h
     Gameplay/MapleMap/MapWedding.cpp
     Gameplay/MapleMap/MapWedding.h
@@ -1255,6 +1262,8 @@ add_executable(HeavenClient
     Net/Handlers/CoconutHandlers.h
     Net/Handlers/SnowballHandlers.cpp
     Net/Handlers/SnowballHandlers.h
+    Net/Handlers/GuildBossHandlers.cpp
+    Net/Handlers/GuildBossHandlers.h
     Net/Handlers/FamilyHandlers.cpp
     Net/Handlers/FamilyHandlers.h
     Net/Handlers/MarriageHandlers.cpp

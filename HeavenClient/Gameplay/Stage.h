@@ -55,6 +55,7 @@
 #include "MapleMap/MapDrops.h"
 #include "MapleMap/MapClock.h"
 #include "MapleMap/MapShip.h"
+#include "MapleMap/MapGuildBoss.h"
 #include "MapleMap/MapSnowball.h"
 #include "MapleMap/MapWedding.h"
 #include "Physics/Physics.h"
@@ -223,6 +224,9 @@ namespace ms
 
 		// The box of each of Coconut Season's nuts, by index; empty where the field has no such nut.
 		std::vector<coconut::Box> coconut_boxes() const;
+
+		// A swing hit Ergoth's room's pulley.
+		void swing_pulley();
 
 		// Put every named trap back in its first state.
 		void reset_obstacles();
@@ -495,6 +499,7 @@ namespace ms
 		Guide guide;
 		MapShip ship;
 		MapSnowball snowfield;
+		MapGuildBoss guild_boss_field;
 		// v83 asks to be thrown back once per update, every 30 ms.
 		int32_t snowball_knock_wait = 0;
 		MapWedding wedding;

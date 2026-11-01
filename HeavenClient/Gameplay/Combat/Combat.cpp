@@ -47,6 +47,7 @@
 #include "../TrembleRules.h"
 
 #include "../../Constants.h"
+#include "../../Character/GuildBoss.h"
 #include "../../Character/MountRules.h"
 #include "../../Character/SkillId.h"
 #include "../../Character/Look/AttackStances.h"
@@ -1251,6 +1252,9 @@ namespace ms
 			if (!move.is_skill() && swing_at_reactor())
 				return true;
 
+			if (!move.is_skill() && guild_boss::on_field() && swing_at_pulley())
+				return true;
+
 			// An attack with no skill waits out an Aran's last polearm swing
 			// (0x950d5d).
 			if (!move.is_skill() && !follow && now < reuse_times[0])
@@ -1973,6 +1977,29 @@ namespace ms
 		uint8_t what = static_cast<uint8_t>(target);
 		uint16_t damage = snowball::damage(what, game.damages, std::rand() % 100);
 		SnowballPacket(what, damage, player.get_attackdelay(0)).dispatch();
+	}
+
+	bool Combat::swing_at_pulley()
+	{
+		std::optional<Swing> swing = aim_swing();
+
+		if (!swing)
+			return false;
+
+		const Rectangle<int16_t> &range = swing->range;
+		guild_boss::Rect area{ range.left(), range.top(), range.right(), range.bottom() };
+
+		if (!guild_boss::rules().pulley_box().intersects(area) || !take_swing(*swing))
+			return false;
+
+		// The pulley plays whether or not it is free; the server locks it as
+		// it takes a pull.
+		Stage::get().swing_pulley();
+
+		if (guild_boss::state().pulley == 0)
+			GuildBossPulleyPacket().dispatch();
+
+		return true;
 	}
 
 	Stance::Id Combat::find_whack(const Attack &attack, int16_t &reach) const

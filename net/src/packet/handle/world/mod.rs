@@ -26,6 +26,7 @@ mod fame;
 mod family;
 mod guild;
 mod guild_bbs;
+mod guild_boss;
 mod hammer;
 mod hired_merchant;
 mod incubator;
@@ -129,6 +130,7 @@ pub use self::family::{
 };
 pub use self::guild::{DenyGuildRequestHandler, GuildOperationHandler};
 pub use self::guild_bbs::GuildBbsHandler;
+pub use self::guild_boss::GuildBossPulleyHandler;
 pub use self::hammer::UseHammerHandler;
 pub use self::hired_merchant::{
     EntrustedShopRequestHandler, RemoteShopRequestHandler, StoreBankRequestHandler,

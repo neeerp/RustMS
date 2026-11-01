@@ -341,6 +341,27 @@ impl Coconut {
     }
 }
 
+/// `healer` and `pulley`: the chandelier of a guild boss field (field type
+/// 8, Sharenian's 990000900; report b380). The client reads only the
+/// positions and pictures; the rest is the server's.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GuildBoss {
+    /// `healer/x`: where the chandelier hangs.
+    pub healer_x: i32,
+    /// `healer/yMin` and `yMax`: its top (where it starts) and its bottom.
+    pub y_min: i32,
+    pub y_max: i32,
+    /// `healer/rise` and `fall`: how far it goes up or down a step.
+    pub rise: i32,
+    pub fall: i32,
+    /// `healer/healMin` and `healMax`: what it deals on landing.
+    pub heal_min: i32,
+    pub heal_max: i32,
+    /// `pulley/x` and `y`.
+    pub pulley_x: i32,
+    pub pulley_y: i32,
+}
+
 /// `snowBall`: the rules of a Snowball field (field type 1, b168). The
 /// client reads the lanes and the clamps; the server reads the rest.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -404,6 +425,8 @@ pub struct FieldTemplate {
     pub coconut: Option<Coconut>,
     /// `snowBall`, on the Snowball fields.
     pub snowball: Option<Snowball>,
+    /// `healer` and `pulley`, on the guild boss field.
+    pub guild_boss: Option<GuildBoss>,
     /// `info/VRLeft`, `VRTop`, `VRRight` and `VRBottom` when `info/VRLimit`
     /// is set (only Orbis Tower<B2>, 200082300): the view range that narrows
     /// the map's bounds (`Footholds::bounds_within`).
@@ -795,6 +818,7 @@ fn build_field_template(
     let carnival = build_carnival(nx, body_idx)?;
     let coconut = build_coconut(nx, body_idx)?;
     let snowball = build_snowball(nx, body_idx)?;
+    let guild_boss = build_guild_boss(nx, body_idx)?;
     let recovery = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "recovery"))
@@ -941,6 +965,7 @@ fn build_field_template(
         carnival,
         coconut,
         snowball,
+        guild_boss,
         view_limit,
         level_limit,
         level_force_move,
@@ -1157,6 +1182,31 @@ fn build_coconut(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Coconut>, 
         effect_lose: string("effectLose")?,
         sound_win: string("soundWin")?,
         sound_lose: string("soundLose")?,
+    }))
+}
+
+fn build_guild_boss(
+    nx: &NxDataFile,
+    map_node_idx: u32,
+) -> Result<Option<GuildBoss>, GameDataError> {
+    let (Some(healer), Some(pulley)) = (
+        nx.child_by_name(map_node_idx, "healer")?,
+        nx.child_by_name(map_node_idx, "pulley")?,
+    ) else {
+        return Ok(None);
+    };
+    let int =
+        |node, key| -> Result<i32, GameDataError> { Ok(nx.int_child(node, key)?.unwrap_or(0)) };
+    Ok(Some(GuildBoss {
+        healer_x: int(healer, "x")?,
+        y_min: int(healer, "yMin")?,
+        y_max: int(healer, "yMax")?,
+        rise: int(healer, "rise")?,
+        fall: int(healer, "fall")?,
+        heal_min: int(healer, "healMin")?,
+        heal_max: int(healer, "healMax")?,
+        pulley_x: int(pulley, "x")?,
+        pulley_y: int(pulley, "y")?,
     }))
 }
 
@@ -1731,6 +1781,7 @@ mod tests {
             carnival: None,
             coconut: None,
             snowball: None,
+            guild_boss: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1816,6 +1867,7 @@ mod tests {
             carnival: None,
             coconut: None,
             snowball: None,
+            guild_boss: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1968,6 +2020,24 @@ mod tests {
                 "{spawn:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_guild_boss_field_has_its_chandelier() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data.field(990_000_900).expect("Sharenian's boss room");
+        assert_eq!(field.field_type, 8);
+        let boss = field.guild_boss.as_ref().expect("chandelier");
+        assert_eq!(
+            (boss.healer_x, boss.y_min, boss.y_max, boss.rise, boss.fall),
+            (295, -564, -350, 1, 10)
+        );
+        assert_eq!((boss.heal_min, boss.heal_max), (1000, 2000));
+        assert_eq!((boss.pulley_x, boss.pulley_y), (-59, -394));
+        assert!(game_data.field(990_000_800).unwrap().guild_boss.is_none());
     }
 
     #[test]
