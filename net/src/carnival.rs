@@ -266,6 +266,12 @@ pub const RESULT_DRAW: u8 = 10;
 /// The other side left before the end.
 pub const RESULT_LEFT: u8 = 11;
 
+/// MONSTER_CARNIVAL_LEAVE's kinds: a member quit (SP 0x1000), or their
+/// side's leader did and the member named leads it now (SP 0x1001). The
+/// client checks for 6 alone; the quit's 0 is ours (QUESTIONS b380).
+pub const LEAVE_QUIT: u8 = 0;
+pub const LEAVE_LEADER: u8 = 6;
+
 /// What 2042002 grades a member by: their side's CP in all, the most
 /// first (Cosmic's `FestivalPoints`).
 const GRADES: [i32; 3] = [300, 100, 50];
@@ -534,6 +540,18 @@ pub struct Score {
     sides: HashMap<ClientId, u8>,
     members: HashMap<ClientId, Points>,
     teams: [Points; 2],
+    /// Who leads each side, and the members' names, which LEAVE shows.
+    leads: [Option<ClientId>; 2],
+    names: HashMap<ClientId, String>,
+}
+
+/// What MONSTER_CARNIVAL_LEAVE tells those who play on: `name` of `side`
+/// quit (`LEAVE_QUIT`), or leads it now (`LEAVE_LEADER`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Quit {
+    pub kind: u8,
+    pub side: u8,
+    pub name: String,
 }
 
 impl Score {
@@ -545,6 +563,46 @@ impl Score {
 
     pub fn side(&self, member: ClientId) -> Option<u8> {
         self.sides.get(&member).copied()
+    }
+
+    /// `member` leads their side: its party's leader, or whoever the
+    /// party passed to.
+    pub fn lead(&mut self, member: ClientId) {
+        if let Some(side) = self.side(member) {
+            self.leads[usize::from(side)] = Some(member);
+        }
+    }
+
+    pub fn name(&mut self, member: ClientId, name: &str) {
+        self.names.insert(member, name.to_string());
+    }
+
+    /// `member` quit the battle, which goes on with `staying`: their side
+    /// hears who quit or, if they led it, the next of `staying` on it, who
+    /// leads it now. None for one whose name or side isn't known.
+    pub fn quit(&mut self, member: ClientId, staying: &[ClientId]) -> Option<Quit> {
+        let side = self.side(member)?;
+        let named = |who| self.names.get(&who).cloned();
+        let lead = &mut self.leads[usize::from(side)];
+        let next = staying
+            .iter()
+            .copied()
+            .find(|&m| self.sides.get(&m) == Some(&side) && self.names.contains_key(&m));
+        match next {
+            Some(next) if *lead == Some(member) => {
+                *lead = Some(next);
+                Some(Quit {
+                    kind: LEAVE_LEADER,
+                    side,
+                    name: named(next)?,
+                })
+            }
+            _ => Some(Quit {
+                kind: LEAVE_QUIT,
+                side,
+                name: named(member)?,
+            }),
+        }
     }
 
     /// Whether both sides still have one of `members` playing.
@@ -859,5 +917,34 @@ mod tests {
         assert!(score.both_sides(&[1, 3]));
         assert!(!score.both_sides(&[1, 2]));
         assert!(!score.both_sides(&[3, 9]));
+    }
+
+    #[test]
+    fn a_quit_names_who_left_or_who_leads_their_side_now() {
+        let mut score = Score::default();
+        for (member, side, name) in [
+            (1, 0, "Red"),
+            (2, 0, "Rose"),
+            (3, 1, "Blue"),
+            (4, 1, "Navy"),
+        ] {
+            score.join(member, side);
+            score.name(member, name);
+        }
+        score.lead(1);
+        score.lead(3);
+        let quit = |kind, side, name: &str| {
+            Some(Quit {
+                kind,
+                side,
+                name: name.to_string(),
+            })
+        };
+        assert_eq!(score.quit(4, &[1, 2, 3]), quit(LEAVE_QUIT, 1, "Navy"));
+        assert_eq!(score.quit(1, &[2, 3]), quit(LEAVE_LEADER, 0, "Rose"));
+        // Rose leads now.
+        assert_eq!(score.quit(2, &[3]), quit(LEAVE_QUIT, 0, "Rose"));
+        score.lead(9);
+        assert_eq!(score.quit(9, &[3]), None, "nobody's");
     }
 }

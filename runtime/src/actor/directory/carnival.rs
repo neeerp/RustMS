@@ -236,7 +236,7 @@ impl WorldDirectory {
             .filter_map(|member| self.clients.get(member))
             .map(|entry| entry.handle.clone())
             .collect();
-        if joiner.challengers(members) {
+        if joiner.challengers(members, challenger) {
             info!(
                 room = key.1,
                 channel_id = key.0,

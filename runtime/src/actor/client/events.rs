@@ -1644,6 +1644,7 @@ impl ClientActor {
             player.dojo.stage = 0;
             player.mark_dirty();
         }
+        ticket.named(player.name());
         self.event = Some(ticket);
         if dojo {
             self.send(&mut build_dojo_energy(0)?).await?;

@@ -129,6 +129,11 @@ namespace ms
 
 	void CarnivalLeaveHandler::handle(InPacket& recv) const
 	{
+		// Only the battle field's OnPacket reads it (FUN_00565962); the
+		// revive room's doesn't.
+		if (!carnival::battle_field(carnival::field_type()))
+			return;
+
 		uint8_t type = static_cast<uint8_t>(recv.read_byte());
 		int8_t team = recv.read_byte();
 		std::string name = recv.read_string();

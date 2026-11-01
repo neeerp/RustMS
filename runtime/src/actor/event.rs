@@ -41,8 +41,8 @@ use net::events::{
 };
 use net::loot::Loot;
 use net::packet::build::world::carnival::{
-    build_carnival_message, build_carnival_result, build_carnival_start, build_obtained_cp,
-    build_party_cp,
+    build_carnival_leave, build_carnival_message, build_carnival_result, build_carnival_start,
+    build_obtained_cp, build_party_cp,
 };
 use net::packet::build::world::effect::{build_field_effect, build_field_sound};
 use net::packet::build::world::field::{
@@ -150,8 +150,14 @@ pub enum EventMessage {
         lost: i32,
     },
     /// A Monster Carnival room's waiting party accepted the challenge of
-    /// `members`, who come in as Maple Blue.
-    Challengers { members: Vec<ClientHandle> },
+    /// `members`, led by `leader`, who come in as Maple Blue.
+    Challengers {
+        members: Vec<ClientHandle>,
+        leader: ClientId,
+    },
+    /// `client_id`, who took a Monster Carnival's ticket, is named `name`,
+    /// which the battle shows if they quit or come to lead their side.
+    Named { client_id: ClientId, name: String },
     /// The battle field answered `client_id`'s spend of `cost` CP on
     /// `index` of its mob (tab 0) or guardian (tab 2) list: whether it came
     /// out, or why not.
@@ -411,6 +417,17 @@ impl Drop for EventTicket {
 }
 
 impl EventTicket {
+    /// Tell a Monster Carnival the member's name, which the battle shows
+    /// if they quit or come to lead their side.
+    pub fn named(&self, name: &str) {
+        if matches!(self.kind, EventKind::Carnival(_)) {
+            let _ = self.event.tx.try_send(EventMessage::Named {
+                client_id: self.member,
+                name: name.to_string(),
+            });
+        }
+    }
+
     /// Whether `map_id` is one of the event's maps, played in its copy.
     pub fn holds(&self, map_id: i32) -> bool {
         self.kind.event().holds(map_id)
@@ -759,10 +776,11 @@ impl EventJoiner {
 }
 
 impl EventJoiner {
-    /// Bring the party of `members` into a Monster Carnival room's event
-    /// as the challengers. False if the event is over or busy.
-    pub fn challengers(&self, members: Vec<ClientHandle>) -> bool {
-        let message = EventMessage::Challengers { members };
+    /// Bring the party of `members`, led by `leader`, into a Monster
+    /// Carnival room's event as the challengers. False if the event is
+    /// over or busy.
+    pub fn challengers(&self, members: Vec<ClientHandle>, leader: ClientId) -> bool {
+        let message = EventMessage::Challengers { members, leader };
         self.0
             .upgrade()
             .is_some_and(|tx| tx.try_send(message).is_ok())
@@ -833,6 +851,7 @@ pub fn spawn(
             for member in &start.team {
                 score.join(member.client_id, 0);
             }
+            score.lead(start.leader);
             score
         },
         members: start
@@ -1092,7 +1111,12 @@ impl EventActor {
                             .or_else(|| self.guild_quest_left(client_id, left))
                             .unwrap_or(left);
                     }
-                    Some(EventMessage::Challengers { members }) => self.challengers(members),
+                    Some(EventMessage::Challengers { members, leader }) => {
+                        self.challengers(members, leader)
+                    }
+                    Some(EventMessage::Named { client_id, name }) => {
+                        self.carnival.name(client_id, &name)
+                    }
                     Some(EventMessage::Summoned { client_id, tab, index, cost, summoned }) => {
                         self.carnival_summoned(client_id, tab, index, cost, summoned);
                     }
@@ -1199,7 +1223,7 @@ impl EventActor {
     /// waiting room until the battle, the waiting side seeing the new
     /// clock (Cosmic `startCPQ`). Tickets that don't arrive hand
     /// themselves back.
-    fn challengers(&mut self, members: Vec<ClientHandle>) {
+    fn challengers(&mut self, members: Vec<ClientHandle>, leader: ClientId) {
         let Some(tx) = self.joiner.upgrade() else {
             return;
         };
@@ -1230,6 +1254,7 @@ impl EventActor {
             member.send(ServerMessage::EventStarted(ticket));
             self.members.insert(id, member);
         }
+        self.carnival.lead(leader);
     }
 
     /// A Monster Carnival room's time ran out. Waiting, the party goes back
@@ -1407,11 +1432,21 @@ impl EventActor {
             }
             Stage::Waiting | Stage::Over => None,
             Stage::Closing if self.carnival_outcome.is_some() => Some(members.is_empty()),
-            Stage::Ready => Some(!self.carnival.both_sides(members)),
+            Stage::Ready => {
+                // Nobody is told before the battle, but a leader's side
+                // passes on.
+                let over = !self.carnival.both_sides(members);
+                let members = members.to_vec();
+                let _ = self.carnival.quit(member, &members);
+                Some(over)
+            }
             Stage::Battle | Stage::Closing => {
                 let over = !self.carnival.both_sides(members);
                 if over {
                     self.carnival_deserted();
+                } else {
+                    let members = members.to_vec();
+                    self.carnival_quit(member, &members);
                 }
                 Some(over)
             }
@@ -1518,6 +1553,25 @@ impl EventActor {
             }
         }
         false
+    }
+
+    /// `member` quit a battle that goes on with `staying`: everyone in it
+    /// hears who, or, if they led their side, who leads it now.
+    fn carnival_quit(&mut self, member: ClientId, staying: &[ClientId]) {
+        let Some(quit) = self.carnival.quit(member, staying) else {
+            return;
+        };
+        let Ok(leave) = build_carnival_leave(quit.kind, quit.side, &quit.name) else {
+            return;
+        };
+        for member in staying {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventPackets {
+                    id: self.id,
+                    packets: vec![leave.clone()],
+                });
+            }
+        }
     }
 
     /// The other side left the battle field before the end: those still
@@ -1784,6 +1838,8 @@ impl EventActor {
                     && (leader || client_id == to) =>
             {
                 self.leader.store(to, Ordering::Relaxed);
+                // Whichever side's party it is.
+                self.carnival.lead(to);
                 if self.team.hand_over(to) {
                     info!(kind = ?self.kind, id = self.id, to, "Event's lead left it");
                     self.failed = true;

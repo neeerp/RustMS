@@ -79,6 +79,18 @@ pub fn build_carnival_died(side: u8, name: &str, lost: u8) -> Result<Packet, Net
     Ok(p)
 }
 
+/// MONSTER_CARNIVAL_LEAVE: `name` of side `side` quit the battle
+/// (`crate::carnival::LEAVE_QUIT`), or leads it now that its leader did
+/// (`LEAVE_LEADER`), which the battle field's chat log shows.
+pub fn build_carnival_leave(kind: u8, side: u8, name: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::CarnivalLeave as i16)?;
+    p.write_byte(kind)?;
+    p.write_byte(side)?;
+    p.write_str_with_length(name)?;
+    Ok(p)
+}
+
 /// MONSTER_CARNIVAL_RESULT: how the battle ended for the player's side
 /// (`crate::carnival::RESULT_WON` to `RESULT_LEFT`), which the battle field
 /// and the revive room print in the chat log.
@@ -156,6 +168,12 @@ mod tests {
             .byte(1)
             .string("Blue")
             .byte(10)
+            .end();
+        Expect::new(&build_carnival_leave(6, 0, "Red").unwrap().bytes)
+            .short(0x127)
+            .byte(6)
+            .byte(0)
+            .string("Red")
             .end();
         Expect::new(&build_carnival_result(8).unwrap().bytes)
             .short(0x128)

@@ -278,6 +278,9 @@ pub enum SendOpcode {
     CarnivalSummon = 0x124,
     CarnivalMessage = 0x125,
     CarnivalDied = 0x126,
+    /// Who quit a battle that goes on, and who leads their side now (295;
+    /// Cosmic never sends it).
+    CarnivalLeave = 0x127,
     /// How a battle ended, for the chat log (296; Cosmic never sends it).
     CarnivalResult = 0x128,
     /// The Ariant Coliseum's ranking of its players' Spirit Jewels (297;
