@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <vector>
@@ -188,6 +189,22 @@ namespace ms
 			for (const Area &area : areas)
 				if (area.type == ITEM && area.started
 					&& ((area.owner == owner && area.skillid == itemid) || area.contains(x, y)))
+					return true;
+
+			return false;
+		}
+
+		constexpr int32_t FLAME_GEAR = 12111005;
+
+		// A Flame Gear isn't cast where its area would overlap any other on
+		// the map, whoever's it is (FUN_00432b2a): IntersectRect, so areas
+		// that only touch don't.
+		template<class Areas>
+		bool overlaps(const Areas &areas, int32_t skillid, int32_t left, int32_t top, int32_t right, int32_t bottom)
+		{
+			for (const Area &area : areas)
+				if (area.skillid == skillid && std::max(left, area.left) < std::min(right, area.right)
+					&& std::max(top, area.top) < std::min(bottom, area.bottom))
 					return true;
 
 			return false;

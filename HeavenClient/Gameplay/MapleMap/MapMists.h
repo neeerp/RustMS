@@ -20,6 +20,7 @@
 #include "MistLayout.h"
 
 #include "../../Graphics/Animation.h"
+#include "../../Template/Rectangle.h"
 
 #include <functional>
 #include <map>
@@ -54,6 +55,9 @@ namespace ms
 
 		// Whether `owner` at `position` must wait to use the cash mist `itemid`.
 		bool item_busy(int32_t owner, int32_t itemid, Point<int16_t> position) const;
+
+		// Whether `area` overlaps a mist of `skillid`.
+		bool overlaps(int32_t skillid, Rectangle<int16_t> area) const;
 
 	private:
 		struct Cloud

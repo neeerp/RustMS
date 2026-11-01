@@ -355,6 +355,22 @@ namespace ms
 		if (move_id == recoil_shot::ID && now < reuse_times[move_id])
 			return false;
 
+		// Nor is a Flame Gear cast over another, its level's lt/rb about the player, before its cost is
+		// asked (0x955a50).
+		if (move_id == mist::FLAME_GEAR)
+		{
+			int32_t level = player.get_skills().get_level(move_id);
+			Rectangle<int16_t> area = SkillData::get(move_id).get_stats(level).range;
+			Point<int16_t> at = player.get_position();
+			area.shift(at);
+
+			if (level > 0 && Stage::get().get_mists().overlaps(move_id, area))
+			{
+				InChatMessage(Messages::SKILL_OVERLAP).drop();
+				return false;
+			}
+		}
+
 		if (!can_use_move(move))
 			return false;
 
