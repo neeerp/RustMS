@@ -536,6 +536,17 @@ pub struct PetCourse {
     pub closeness: i16,
 }
 
+/// The two Sages on the way up Crimsonwood Mountain to the Keep, each with
+/// a word for the map it stands on (Cosmic `9201104.js`, `9201105.js`).
+pub const SAGE: i32 = 9201104;
+pub const UPPER_SAGE: i32 = 9201105;
+const SAGE_WORDS: [(i32, i32, &str); 4] = [
+    (SAGE, 610_020_000, keys::SAGE_MENHIRS),
+    (SAGE, 610_020_003, keys::SAGE_STATUE),
+    (SAGE, 610_020_004, keys::SAGE_SIGILS),
+    (UPPER_SAGE, 610_020_005, keys::SAGE_KEEP),
+];
+
 /// The grassy lumps along Henesys's Pet-Walking Road, which hide Pet poop
 /// (Cosmic `9102101.js`).
 pub const GRASSY_LUMP: i32 = 9102101;
@@ -2800,6 +2811,7 @@ impl NpcScript {
             BARTOS => return Some(bartos(player)),
             FROD => return Some(pet_course_end(&HENESYS_PET_COURSE, player)),
             GRASSY_LUMP => return Some(grassy_lump(player)),
+            SAGE | UPPER_SAGE => return Some(sage(npc_id, player)),
             WEAVER => return Some(pet_course_start(&LUDIBRIUM_PET_COURSE, player)),
             NERU => return Some(pet_course_end(&LUDIBRIUM_PET_COURSE, player)),
             HIKARI => return Some(hikari(player)),
@@ -12966,6 +12978,15 @@ fn rupi(player: &Player) -> NpcScript {
             on_no: None,
         }],
     )
+}
+
+/// A Sage's word for the map it stands on, else a cheer on to the Keep.
+fn sage(npc: i32, player: &Player) -> NpcScript {
+    let map = player.stats.map_id;
+    let key = (SAGE_WORDS.iter())
+        .find(|&&(sage, at, _)| sage == npc && at == map)
+        .map_or(keys::SAGE_ORDEAL, |&(_, _, key)| key);
+    NpcScript::new(npc, vec![Page::Say(text(key))])
 }
 
 /// A grassy lump asks whether to pull out what it hides: on a yes, Pet
@@ -23601,6 +23622,21 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn the_sages_have_a_word_for_their_map_or_a_cheer() {
+        let says = |npc: i32, map: i32| {
+            let mut climber = player(50);
+            climber.stats.map_id = map;
+            page_text(&NpcScript::for_npc(npc, &climber).unwrap().begin())
+        };
+        assert_eq!(says(SAGE, 610_020_000), text(keys::SAGE_MENHIRS));
+        assert_eq!(says(SAGE, 610_020_003), text(keys::SAGE_STATUE));
+        assert_eq!(says(SAGE, 610_020_004), text(keys::SAGE_SIGILS));
+        assert_eq!(says(SAGE, 610_020_001), text(keys::SAGE_ORDEAL));
+        assert_eq!(says(UPPER_SAGE, 610_020_005), text(keys::SAGE_KEEP));
+        assert_eq!(says(UPPER_SAGE, 610_020_000), text(keys::SAGE_ORDEAL));
     }
 
     #[test]
