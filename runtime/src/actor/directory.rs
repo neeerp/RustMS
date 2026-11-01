@@ -702,6 +702,7 @@ impl WorldDirectory {
             map_id: entry.presence.map_id,
             married: entry.presence.married,
             gender: entry.presence.gender,
+            job: entry.presence.job,
         };
         let party = self.parties.of(from);
         let candidates: Vec<_> = if kind.event().solo() || kind.event().alone && party.is_none() {

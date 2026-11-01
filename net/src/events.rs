@@ -44,6 +44,9 @@ pub enum EventKind {
     /// Protecting Tylus (the warriors' 6192), started at Tylus (2020008)
     /// in El Nath's Chief's Residence.
     Tylus,
+    /// Elemental Thanatos (the Fire/Poison and Ice/Lightning Arch Mages'
+    /// 6225 and 6315), started at Flo (2041023) on the Path of Time.
+    Elemental,
     /// The Forest of Poison Haze, Ellin Forest's party quest, started at
     /// Ellin (2133000) in the Deep Fairy Forest.
     Ellin,
@@ -349,6 +352,9 @@ pub struct Event {
     /// Whether every member must be married, and the team both men and
     /// women (Cosmic AmoriaPQ's `onlyMarriedPlayers` and gender mask).
     pub married: bool,
+    /// The only job line that may come along, if any: the job's hundreds
+    /// digit, 2 for magicians (Cosmic `getJobNiche`, as `blessing`).
+    pub job_line: Option<i16>,
     /// Its time limit; 0 for none.
     pub minutes: u64,
     /// The EXP every member gets for clearing each stage, in order. Stage n
@@ -516,6 +522,7 @@ pub const KPQ: Event = Event {
     spread: None,
     team: 3..=4,
     married: false,
+    job_line: None,
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
     meso_per_stage: &[],
@@ -613,6 +620,7 @@ pub const HPQ: Event = Event {
     spread: None,
     team: 3..=6,
     married: false,
+    job_line: None,
     minutes: 10,
     exp_per_stage: &[1600],
     meso_per_stage: &[],
@@ -670,6 +678,7 @@ pub const LPQ: Event = Event {
     spread: None,
     team: 5..=6,
     married: false,
+    job_line: None,
     minutes: 45,
     exp_per_stage: &[210, 2520, 2940, 3360, 3770, 0, 4620, 5040, 5950],
     meso_per_stage: &[],
@@ -868,6 +877,7 @@ pub const OPQ: Event = Event {
     spread: None,
     team: 5..=6,
     married: false,
+    job_line: None,
     minutes: 60,
     exp_per_stage: &[3500, 3500, 3500, 3500, 3500, 3500, 3500, 0, 3500],
     meso_per_stage: &[],
@@ -1121,6 +1131,7 @@ pub const ZPQ: Event = Event {
     spread: None,
     team: 1..=6,
     married: false,
+    job_line: None,
     minutes: 30,
     exp_per_stage: &[12_000],
     meso_per_stage: &[],
@@ -1190,6 +1201,7 @@ pub const ZAKUM: Event = Event {
     spread: None,
     team: 6..=30,
     married: false,
+    job_line: None,
     minutes: 120,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -1236,6 +1248,7 @@ pub const GUILD_QUEST: Event = Event {
     spread: None,
     team: 6..=30,
     married: false,
+    job_line: None,
     minutes: 90,
     exp_per_stage: &[0; 10],
     meso_per_stage: &[],
@@ -1292,6 +1305,7 @@ pub const PAPULATUS: Event = Event {
     spread: None,
     team: 1..=6,
     married: false,
+    job_line: None,
     minutes: 45,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -1344,6 +1358,7 @@ pub const HORNTAIL: Event = Event {
     spread: None,
     team: 6..=30,
     married: false,
+    job_line: None,
     minutes: 120,
     exp_per_stage: &[0, 0, 0],
     meso_per_stage: &[],
@@ -1434,6 +1449,7 @@ pub const HTPQ: Event = Event {
     spread: None,
     team: 6..=6,
     married: false,
+    job_line: None,
     minutes: 25,
     exp_per_stage: &[0; 6],
     meso_per_stage: &[],
@@ -1529,6 +1545,7 @@ pub const DELLI: Event = Event {
     spread: None,
     team: 1..=2,
     married: false,
+    job_line: None,
     minutes: 6,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -1643,6 +1660,7 @@ pub const LUDIMAZE: Event = Event {
     spread: None,
     team: 3..=6,
     married: false,
+    job_line: None,
     minutes: 15,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -1704,7 +1722,64 @@ pub const TYLUS: Event = Event {
     spread: None,
     team: 1..=4,
     married: false,
+    job_line: None,
     minutes: 10,
+    exp_per_stage: &[0],
+    meso_per_stage: &[],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    stage_copies: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+    runs: 1,
+    alone: false,
+};
+
+/// Where Flo (2041023) takes two mages to Elemental Thanatos, and
+/// where they come back to; the room, where the two elementals wait,
+/// one of fire and one of ice (`mobTime` -1, nothing else there), whose
+/// deaths together win it, as the room's last mobs (`cleared_by_killing`).
+pub const ELEMENTAL_LOBBY: i32 = 220_050_300;
+pub const ELEMENTAL_ROOM: i32 = 922_020_100;
+pub const ELEMENTALS: [i32; 2] = [9_300_086, 9_300_100];
+/// The quests Elemental Thanatos is for, each with the one before it
+/// that Flo wants done: The Fire/Poison Arch Mage's 6225 with 6226, the
+/// Ice/Lightning's 6315 with 6316 (Cosmic `2041023` asks 6316 alone).
+pub const ELEMENTAL_QUESTS: [(i16, i16); 2] = [(6225, 6226), (6315, 6316)];
+
+/// Elemental Thanatos (Cosmic `ElementalBattle`): two of a party, both
+/// magicians of level 100 or more, on the Path of Time with their leader,
+/// go to their own copy of the room for twenty minutes. Killing both
+/// elementals wins it and stops the clock; its way out (`out00`) leads
+/// back to the Path of Time.
+pub const ELEMENTAL: Event = Event {
+    lobby: ELEMENTAL_LOBBY,
+    entrances: &[],
+    maps: ELEMENTAL_ROOM..=ELEMENTAL_ROOM,
+    entry: ELEMENTAL_ROOM,
+    entries: 1,
+    exit: ELEMENTAL_LOBBY,
+    levels: 100..=u8::MAX,
+    spread: None,
+    team: 2..=2,
+    married: false,
+    job_line: Some(2),
+    minutes: 20,
     exp_per_stage: &[0],
     meso_per_stage: &[],
     stride: 1,
@@ -1769,6 +1844,7 @@ pub const TREASURE: Event = Event {
     spread: None,
     team: 4..=6,
     married: false,
+    job_line: None,
     minutes: 45,
     exp_per_stage: &[60_000, 100_000],
     meso_per_stage: &[],
@@ -1870,6 +1946,7 @@ pub const ELLIN: Event = Event {
     spread: None,
     team: 4..=6,
     married: false,
+    job_line: None,
     minutes: 30,
     exp_per_stage: &[0; 6],
     meso_per_stage: &[],
@@ -1931,11 +2008,13 @@ pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
 /// The stage cleared once every mob on `map_id`, in an event's copy of
 /// it, is dead, and every reactor `seals` names there set: the first of
 /// the Forest of Poison Haze, the Pirate Ship's first, decks and doors,
-/// the hall below each Magatia library, and Yulete's office (Cosmic
-/// `EllinPQ`, `PiratePQ` and `MagatiaPQ_Z`'s `monsterKilled`).
+/// the hall below each Magatia library, Yulete's office, and Elemental
+/// Thanatos's room (Cosmic `EllinPQ`, `PiratePQ`, `MagatiaPQ_Z` and
+/// `ElementalBattle`'s `monsterKilled`).
 pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
     [
         (ELLIN_STAGES[0], 1),
+        (ELEMENTAL_ROOM, 1),
         (PIRATE_ENTRY, 1),
         (PIRATE_STAGES[2], 3),
         (PIRATE_STAGES[3], 4),
@@ -2140,6 +2219,7 @@ pub const PIRATE: Event = Event {
     spread: None,
     team: 3..=6,
     married: false,
+    job_line: None,
     minutes: 4,
     exp_per_stage: &[0; 6],
     meso_per_stage: &[],
@@ -2434,6 +2514,7 @@ pub const AMORIA: Event = Event {
     spread: None,
     team: 6..=6,
     married: true,
+    job_line: None,
     minutes: 75,
     exp_per_stage: &[2000, 4000, 6000, 8000, 9000, 11000],
     meso_per_stage: &[],
@@ -2494,6 +2575,7 @@ pub const CWK: Event = Event {
     spread: None,
     team: 6..=30,
     married: false,
+    job_line: None,
     minutes: 2,
     exp_per_stage: &[2500, 8000, 18000, 25000, 30000, 40000],
     meso_per_stage: &[500, 1000, 2000, 5000, 8000, 20000],
@@ -2541,6 +2623,7 @@ pub const SHOWA: Event = Event {
     spread: None,
     team: 3..=30,
     married: false,
+    job_line: None,
     minutes: 60,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -2647,6 +2730,7 @@ pub const BALROG: Event = Event {
     spread: None,
     team: 6..=30,
     married: false,
+    job_line: None,
     minutes: 60,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -2710,6 +2794,7 @@ pub const SCARGA: Event = Event {
     spread: None,
     team: 6..=30,
     married: false,
+    job_line: None,
     minutes: 60,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -2821,6 +2906,7 @@ pub const LATANICA: Event = Event {
     spread: None,
     team: 1..=6,
     married: false,
+    job_line: None,
     minutes: 10,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -2881,6 +2967,7 @@ pub const PINK_BEAN: Event = Event {
     spread: None,
     team: 6..=30,
     married: false,
+    job_line: None,
     minutes: 140,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -3404,6 +3491,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         spread: None,
         team: 4..=4,
         married: false,
+        job_line: None,
         minutes: 45,
         exp_per_stage: &[0, 10_000, 20_000, 0, 20_000, 20_000, 0],
         meso_per_stage: &[],
@@ -3721,6 +3809,7 @@ pub const DOJO: Event = Event {
     spread: None,
     team: 1..=1,
     married: false,
+    job_line: None,
     minutes: 5,
     exp_per_stage: &[0; DOJO_FLOORS as usize],
     meso_per_stage: &[],
@@ -3809,6 +3898,7 @@ pub const DOJO_TRIAL: Event = Event {
     spread: None,
     team: 1..=1,
     married: false,
+    job_line: None,
     minutes: 0,
     exp_per_stage: &[0],
     meso_per_stage: &[],
@@ -4451,6 +4541,7 @@ const fn holiday(level: u8) -> Event {
         spread: None,
         team: 3..=6,
         married: false,
+        job_line: None,
         minutes: 10 + level as u64 * 5,
         exp_per_stage: &HOLIDAY_EXP[level as usize - 1],
         meso_per_stage: &[],
@@ -4501,6 +4592,7 @@ const fn ariant(arena: u8) -> Event {
         spread: None,
         team: 2..=7,
         married: false,
+        job_line: None,
         minutes: 10,
         exp_per_stage: &[],
         meso_per_stage: &[],
@@ -4899,7 +4991,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 78] = [
+    pub const ALL: [EventKind; 79] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4912,6 +5004,7 @@ impl EventKind {
         EventKind::Delli,
         EventKind::LudiMaze,
         EventKind::Tylus,
+        EventKind::Elemental,
         EventKind::Ellin,
         EventKind::Pirate,
         EventKind::Dojo,
@@ -5032,6 +5125,7 @@ impl EventKind {
             EventKind::Delli => &DELLI,
             EventKind::LudiMaze => &LUDIMAZE,
             EventKind::Tylus => &TYLUS,
+            EventKind::Elemental => &ELEMENTAL,
             EventKind::Ellin => &ELLIN,
             EventKind::Pirate => &PIRATE,
             EventKind::Dojo => &DOJO,
@@ -5101,6 +5195,7 @@ pub struct Candidate {
     pub married: bool,
     /// 0 for a man, 1 for a woman.
     pub gender: u8,
+    pub job: i16,
 }
 
 /// Whether a player's party may start an event, as its NPC tells them.
@@ -5307,13 +5402,14 @@ impl Event {
     }
 
     /// Those of the leader's party online on the channel who come along:
-    /// the members in the lobby at the right levels (Cosmic
-    /// `getEligibleParty`). `None` unless the leader is one of them and
-    /// they are enough, and not too many.
+    /// the members in the lobby at the right levels, and of its job line if
+    /// it has one (Cosmic `getEligibleParty`). `None` unless the leader is
+    /// one of them and they are enough, and not too many.
     pub fn team(&self, leader: ClientId, candidates: &[Candidate]) -> Option<Vec<ClientId>> {
         let team: Vec<_> = candidates
             .iter()
             .filter(|c| self.starts_on(c.map_id) && self.levels.contains(&c.level))
+            .filter(|c| self.job_line.is_none_or(|line| c.job / 100 % 10 == line))
             .collect();
         let levels = team.iter().map(|c| c.level);
         let apart = levels.clone().max().unwrap_or(0) - levels.min().unwrap_or(0);
@@ -6126,7 +6222,36 @@ mod tests {
             map_id,
             married: false,
             gender: 0,
+            job: 0,
         }
+    }
+
+    #[test]
+    fn elemental_thanatos_takes_two_magicians_of_level_100() {
+        let mage = |id, job| Candidate {
+            job,
+            ..at(id, 120, ELEMENTAL_LOBBY)
+        };
+        let team = ELEMENTAL.team(1, &[mage(1, 212), mage(2, 1210)]);
+        assert_eq!(team, Some(vec![1, 2]), "a Blaze Wizard is a magician");
+        // A warrior stays behind, which leaves too few.
+        assert_eq!(ELEMENTAL.team(1, &[mage(1, 212), mage(2, 112)]), None);
+        let young = Candidate {
+            level: 99,
+            ..mage(2, 222)
+        };
+        assert_eq!(ELEMENTAL.team(1, &[mage(1, 212), young]), None);
+        let three = [mage(1, 212), mage(2, 222), mage(3, 232)];
+        assert_eq!(ELEMENTAL.team(1, &three), None);
+        assert_eq!(ELEMENTAL.minutes, 20);
+        assert_eq!(cleared_by_killing(ELEMENTAL_ROOM), Some(1));
+        assert_eq!(ELEMENTAL.last_stage(), 1);
+        // Other events take any job.
+        let warrior = Candidate {
+            job: 112,
+            ..at(1, 120, TYLUS_LOBBY)
+        };
+        assert_eq!(TYLUS.team(1, &[warrior]), Some(vec![1]));
     }
 
     #[test]

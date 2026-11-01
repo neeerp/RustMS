@@ -31,7 +31,10 @@ Delli's rescue, for the Corsairs' 6410, is a party's event won by holding
 out ([Delli's rescue](#dellis-rescue)). The Ludibrium Maze is played through
 ([the Ludibrium Maze](#the-ludibrium-maze)). Protecting Tylus, for the
 warriors' 6192, is a party's event with nothing to win
-([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
+([Protecting Tylus](#protecting-tylus)). Elemental Thanatos, for the
+Fire/Poison and Ice/Lightning mages' third-job trial, is a party's event of
+two magicians won by killing ([Elemental Thanatos](#elemental-thanatos)).
+Ellin Forest's Forest of Poison
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
 Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
@@ -1019,6 +1022,26 @@ El Nath (211000000, portal `in01`). The leader leaving the room, by either
 way, ends the event for everyone (`Team::leave`), as in Cosmic. Tylus in
 the Residence completes 6192 on the Trust; while 6192 is started he
 doesn't offer the chief's other choices. Its lines are placeholders (`tylus.*`).
+
+## Elemental Thanatos
+
+The magicians' trial on the way to the third job's Mystic Trial, for the
+Fire/Poison (6225) and Ice/Lightning (6315) mages (QUESTIONS b384). Flo
+(2041023) on El Nath's Tower 1st floor (220050300) answers a player on
+6225 past Flo's own 6226, or on 6315 past 6316, with a menu of going in and
+what to do (`dialogue.rs`, `flo_offers`); anyone else hears only that there
+is no reason to go (`elemental.no_reason`). The leader takes a party of
+exactly two, both magicians (`Event::job_line`, the job's hundreds digit,
+2) at level 100 and up and there, into the elementals' room (922020100) for
+twenty minutes (`events::ELEMENTAL`, `EventKind::Elemental`).
+
+The room holds the two elementals (9300086 and 9300100, neither
+respawning nor summoning), and killing both clears it
+(`cleared_by_killing`), which wins the event and stops the clock. Each
+drops the Fire/Poison and the Ice/Lightning proof (4031470, 4031469) a
+quarter of the time, from the content pack. The room's way out (`out00`)
+and the time running out lead back to Flo. Its lines are placeholders
+(`elemental.*`).
 
 ## The Forest of Poison Haze
 
@@ -2143,6 +2166,7 @@ On the floors (`net::scripts::depart_on`):
 | Gatekeeper 2083001 | 240050100, 240050300, 240050310 | Runtime (`htpq_keeper`): the leader's hand-in of the keys |
 | Tylus 2020008 | 211000001 | On 6192, runtime (`talk_about_event`): a menu of going in and what to do |
 | Tylus 2022004 | 921100301 | Thanks, and on to El Nath 211000000 |
+| Flo 2041023 | 220050300 | On 6225 past 6226 or 6315 past 6316, runtime (`talk_about_event`): a menu of going in and what to do |
 | Ellin 2133000 | 300030100 | Runtime (`talk_about_event`): a menu of going into the forest, what it holds, and the earrings for Altaire Fragments |
 | Ellin 2133001 | 930000000 | Welcome |
 | Ellin 2133001 | 930000300 | Clears the maze and moves the team on |

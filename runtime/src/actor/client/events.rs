@@ -80,6 +80,7 @@ impl ClientActor {
             EventKind::Delli => NpcScript::delli(entry),
             EventKind::LudiMaze => NpcScript::rolly(entry),
             EventKind::Tylus => NpcScript::tylus(entry),
+            EventKind::Elemental => NpcScript::flo(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             EventKind::Treasure => NpcScript::charles(entry),
             EventKind::Pirate => NpcScript::guon(entry),
