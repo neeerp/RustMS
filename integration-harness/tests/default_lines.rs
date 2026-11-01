@@ -9,6 +9,8 @@ use tokio::time::Duration;
 
 const LUDIBRIUM: i32 = 221000000;
 const SPINDLE: i32 = 9201082;
+const FOYER: i32 = 682000100;
+const MAID: i32 = 2120003;
 
 #[tokio::test]
 async fn spindle_says_the_default_line() {
@@ -22,4 +24,11 @@ async fn spindle_says_the_default_line() {
     let trace = told(&mut session, talk(LUDIBRIUM, SPINDLE)).await;
     assert_eq!(trace.prompts, [(SPINDLE, 0)], "{trace:?}");
     assert!(trace.prompt_texts[0].contains("Spindle"), "{trace:?}");
+
+    // The Haunted House's Maid, in its Foyer, says hers too.
+    let c = &mut session.connection;
+    assert_eq!(warp(c, FOYER, "", &mut seen).await, FOYER);
+    let trace = told(&mut session, talk(FOYER, MAID)).await;
+    assert_eq!(trace.prompts, [(MAID, 0)], "{trace:?}");
+    assert!(trace.prompt_texts[0].contains("Master"), "{trace:?}");
 }
