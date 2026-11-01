@@ -68,15 +68,7 @@ impl LoginHandler for CreateCharacterHandler {
             hair_color,
             skin,
             gender: i16::from(gender),
-            // Explorers start outside the Training Camp, with Heena and Sera.
-            // The island's exits lead one-way from there, so starting further
-            // along skips its first quests. A Noblesse starts on Ereve's
-            // tutorial path, bearing the mark its first quest asks for.
-            map_id: match job {
-                0 => 0,
-                NOBLESSE => EREVE_TUTORIAL,
-                _ => 1_010_000,
-            },
+            map_id: starting_map(job),
         };
 
         let records: &[(i16, &str)] = if job == NOBLESSE {
@@ -94,12 +86,29 @@ impl LoginHandler for CreateCharacterHandler {
 const NOBLESSE: i16 = 1000;
 /// The first of Ereve's tutorial maps, before the island proper.
 const EREVE_TUTORIAL: i32 = 130_030_000;
+const LEGEND: i16 = 2000;
+/// The first of the Aran's tutorial maps.
+const BLACK_ROAD: i32 = 914_000_000;
+
+/// Explorers start outside the Training Camp, with Heena and Sera. The
+/// island's exits lead one-way from there, so starting further along skips
+/// its first quests. A Noblesse starts on Ereve's tutorial path, bearing the
+/// mark its first quest asks for, and an Aran on the Black Road, where the
+/// Aran tutorial begins.
+fn starting_map(job: i16) -> i32 {
+    match job {
+        0 => 0,
+        NOBLESSE => EREVE_TUTORIAL,
+        LEGEND => BLACK_ROAD,
+        _ => 1_010_000,
+    }
+}
 
 fn starting_job(class_family: i32) -> Result<i16, NetworkError> {
     match class_family {
         0 => Ok(NOBLESSE), // Cygnus Noblesse
         1 => Ok(0),        // Explorer Beginner
-        2 => Ok(2000),     // Aran Legend
+        2 => Ok(LEGEND),   // Aran Legend
         _ => Err(NetworkError::PacketHandlerError(
             "Unsupported character class",
         )),
@@ -159,6 +168,13 @@ mod tests {
         assert_eq!(starting_job(2).unwrap(), 2000);
         assert!(starting_job(-1).is_err());
         assert!(starting_job(100).is_err());
+    }
+
+    #[test]
+    fn each_class_starts_at_the_head_of_its_tutorial() {
+        assert_eq!(starting_map(starting_job(1).unwrap()), 0);
+        assert_eq!(starting_map(starting_job(0).unwrap()), 130_030_000);
+        assert_eq!(starting_map(starting_job(2).unwrap()), 914_000_000);
     }
 
     #[test]

@@ -21,8 +21,8 @@ client loads the same files.
 
 New Explorer characters start in `0`, outside the Training Camp, with Heena
 and Sera. Existing characters keep their saved maps. A Noblesse starts on
-Ereve's tutorial path (`130030000`, below) and an Aran in Amherst
-(`1010000`). The active route is:
+Ereve's tutorial path (`130030000`, below) and an Aran on the Black Road
+(`914000000`, see `quests.md`). The active route is:
 
 `0 → 10000 → 20000 → 30000 → 40000 → 40001 → 40002 → 50000 → 1000000 → 1010000 → 1020000`
 
