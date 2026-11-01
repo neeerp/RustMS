@@ -182,6 +182,8 @@
 "florina.leave_decline" = "[placeholder] Take your time. #m{map}# will wait."
 "rooney.happyville_ask" = "[placeholder] I'm Rooney, here early for the holidays. I can take you to #bHappyville#k, where it's always winter. Shall we go?"
 "rupi.leave_ask" = "[placeholder] Had enough snow? I can take you back to #m{map}#. Leave Happyville now?"
+"roodolph.sprinkler" = "[placeholder] Shall I take you up to the #bSnow Sprinkler#k?"
+"roodolph.back" = "[placeholder] Ready to head back down to Happyville?"
 "amoria.to_amoria" = "[placeholder] I can take you to Amoria. Ready?"
 "amoria.to_henesys" = "[placeholder] I can take you back to Henesys. Ready?"
 "amoria.decline" = "[placeholder] Stay as long as you like."
