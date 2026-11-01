@@ -1680,6 +1680,8 @@ pub mod keys {
     pub const MAGIC_SQUARE_ASK: &str = "magic_square.ask";
     pub const MAGIC_SQUARE_DONE: &str = "magic_square.done";
     pub const NEINHEART_OPENING_ASK: &str = "neinheart_opening.ask";
+    pub const RIDLEY_EXPEDITIONS: &str = "ridley.expeditions";
+    pub const RIDLEY_TOO_LOW: &str = "ridley.too_low";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5269,6 +5271,8 @@ mod tests {
                 keys::MAGIC_SQUARE_ASK,
                 keys::MAGIC_SQUARE_DONE,
                 keys::NEINHEART_OPENING_ASK,
+                keys::RIDLEY_EXPEDITIONS,
+                keys::RIDLEY_TOO_LOW,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
