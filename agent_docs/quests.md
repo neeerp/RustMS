@@ -414,6 +414,10 @@ there, or from the unreached room 677000013, back out to the swamp
 (`astaroths_doorway.leave`) (Cosmic `9201128.js` to `9201133.js`). The
 demons themselves are placed only in Astaroth's Strolling Place, and the
 hiding places stay empty; neither the data nor Cosmic summons them there.
+Astaroth himself (9400633) comes out in his Hiding Place (677000012) on
+entry for one on 28283 who hasn't yet beaten him, unless he is out
+already; the data's `astaroth_summon` runs on first entry, which the
+server doesn't read, so `scripts::unscripted_map_enter` stands in.
 Wiz the Librarian (2040052, Helios Tower Library 222020000) ends the eight
 storybook quests (3615-3618, 3630, 3633, 3639, 3920). Talking to Wiz
 otherwise lists the books brought back, one per completed quest
