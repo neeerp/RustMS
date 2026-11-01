@@ -268,6 +268,11 @@ pub mod keys {
     pub const GRASSY_LUMP_LEAVE: &str = "grassy_lump.leave";
     pub const GRASSY_LUMP_POOP: &str = "grassy_lump.poop";
     pub const GRASSY_LUMP_FULL: &str = "grassy_lump.full";
+    pub const SAGE_MENHIRS: &str = "sage.menhirs";
+    pub const SAGE_STATUE: &str = "sage.statue";
+    pub const SAGE_SIGILS: &str = "sage.sigils";
+    pub const SAGE_KEEP: &str = "sage.keep";
+    pub const SAGE_ORDEAL: &str = "sage.ordeal";
     pub const AMORIA_TO_AMORIA: &str = "amoria.to_amoria";
     pub const AMORIA_TO_HENESYS: &str = "amoria.to_henesys";
     pub const AMORIA_DECLINE: &str = "amoria.decline";
@@ -4218,6 +4223,11 @@ mod tests {
             keys::GRASSY_LUMP_LEAVE,
             keys::GRASSY_LUMP_POOP,
             keys::GRASSY_LUMP_FULL,
+            keys::SAGE_MENHIRS,
+            keys::SAGE_STATUE,
+            keys::SAGE_SIGILS,
+            keys::SAGE_KEEP,
+            keys::SAGE_ORDEAL,
             keys::AMORIA_TO_AMORIA,
             keys::AMORIA_TO_HENESYS,
             keys::AMORIA_DECLINE,
