@@ -547,6 +547,18 @@ const SAGE_WORDS: [(i32, i32, &str); 4] = [
     (UPPER_SAGE, 610_020_005, keys::SAGE_KEEP),
 ];
 
+/// The job statues on Lith Harbor's dock (Npc.wz `goPerion` to
+/// `goNautilus`): the statue, its first job, its text, and the room of the
+/// job's instructor it sends a beginner to (Cosmic `9201123.js` to
+/// `9201127.js`).
+pub const JOB_STATUES: [(i32, i16, &str, i32); 5] = [
+    (9201123, 100, "warrior", 102_000_003),
+    (9201124, 300, "bowman", 100_000_201),
+    (9201125, 200, "magician", 101_000_003),
+    (9201126, 400, "thief", 103_000_003),
+    (9201127, 500, "pirate", 120_000_101),
+];
+
 /// The grassy lumps along Henesys's Pet-Walking Road, which hide Pet poop
 /// (Cosmic `9102101.js`).
 pub const GRASSY_LUMP: i32 = 9102101;
@@ -2812,6 +2824,10 @@ impl NpcScript {
             FROD => return Some(pet_course_end(&HENESYS_PET_COURSE, player)),
             GRASSY_LUMP => return Some(grassy_lump(player)),
             SAGE | UPPER_SAGE => return Some(sage(npc_id, player)),
+            id if JOB_STATUES.iter().any(|statue| statue.0 == id) => {
+                let statue = JOB_STATUES.iter().find(|statue| statue.0 == id);
+                return statue.map(|statue| job_statue(statue, player));
+            }
             WEAVER => return Some(pet_course_start(&LUDIBRIUM_PET_COURSE, player)),
             NERU => return Some(pet_course_end(&LUDIBRIUM_PET_COURSE, player)),
             HIKARI => return Some(hikari(player)),
@@ -12978,6 +12994,24 @@ fn rupi(player: &Player) -> NpcScript {
             on_no: None,
         }],
     )
+}
+
+/// A job statue sends a beginner who could take its first job to the job's
+/// instructor; one who can't yet is told to train, anyone else to keep at it.
+fn job_statue(&(npc, job, name, room): &(i32, i16, &str, i32), player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::job_statue(name, line));
+    let page = if player.stats.job != 0 {
+        Page::Say(text(keys::JOB_STATUE_OTHER))
+    } else if !player.can_take_first_job(job) {
+        Page::Say(line("weak"))
+    } else {
+        Page::Ask {
+            text: line("ask"),
+            on_yes: vec![Effect::WarpToPortal(room, 0)],
+            on_no: None,
+        }
+    };
+    NpcScript::new(npc, vec![page])
 }
 
 /// A Sage's word for the map it stands on, else a cheer on to the Keep.
@@ -23622,6 +23656,34 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn a_job_statue_sends_a_beginner_who_could_take_the_job_to_its_instructor() {
+        let mut beginner = player(50);
+        (beginner.stats.job, beginner.stats.level) = (0, 10);
+        (beginner.stats.str, beginner.stats.dex) = (35, 25);
+        let (warrior, _, _, sanctuary) = JOB_STATUES[0];
+        let mut trip = NpcScript::for_npc(warrior, &beginner).unwrap();
+        assert_eq!(
+            question(&trip.begin()),
+            text(&keys::job_statue("warrior", "ask"))
+        );
+        assert_eq!(
+            trip.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(sanctuary, 0)]
+        );
+
+        // Too weak for the job, or past beginner.
+        let (magician, ..) = JOB_STATUES[2];
+        let weak = NpcScript::for_npc(magician, &beginner).unwrap().begin();
+        assert_eq!(
+            page_text(&weak),
+            text(&keys::job_statue("magician", "weak"))
+        );
+        beginner.stats.job = 100;
+        let other = NpcScript::for_npc(warrior, &beginner).unwrap().begin();
+        assert_eq!(page_text(&other), text(keys::JOB_STATUE_OTHER));
     }
 
     #[test]
