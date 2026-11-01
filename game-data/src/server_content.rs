@@ -3081,6 +3081,9 @@ pub mod keys {
     pub const CLOY_SCROLL_ASK: &str = "cloy.scroll_ask";
     pub const CLOY_SCROLL_BOUGHT: &str = "cloy.scroll_bought";
     pub const CLOY_SHORT: &str = "cloy.short";
+    pub const WISP_HELLO: &str = "wisp.hello";
+    pub const WISP_DOLL: &str = "wisp.doll";
+    pub const WISP_DOLL_TOLD: &str = "wisp.doll_told";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5239,6 +5242,9 @@ mod tests {
                 keys::CLOY_SCROLL_ASK,
                 keys::CLOY_SCROLL_BOUGHT,
                 keys::CLOY_SHORT,
+                keys::WISP_HELLO,
+                keys::WISP_DOLL,
+                keys::WISP_DOLL_TOLD,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,

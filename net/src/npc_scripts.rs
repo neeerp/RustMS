@@ -388,6 +388,7 @@ pub const CLOY: i32 = 1012005;
 /// The Pet AP Reset Scroll Cloy sells, and its price.
 pub const PET_AP_RESET_SCROLL: i32 = 4160011;
 pub const PET_AP_RESET_PRICE: i32 = 250_000;
+pub const WISP: i32 = 2040030;
 /// The Magic Seed Chief Tatamo sells, its price, and the most at once.
 pub const MAGIC_SEED: i32 = 4031346;
 pub const MAGIC_SEED_PRICE: i32 = 30_000;
@@ -2605,6 +2606,7 @@ impl NpcScript {
             EUREK => return Some(eurek()),
             CHICO => return Some(chico()),
             CLOY => return Some(cloy()),
+            WISP => return Some(wisp()),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9801,7 +9803,6 @@ fn casey() -> NpcScript {
 /// raise them, what becomes of them, their commands, and the Pet AP Reset
 /// Scroll for sale.
 fn cloy() -> NpcScript {
-    let say = |key| vec![Page::Say(text(key))];
     let price = PET_AP_RESET_PRICE.to_string();
     let scroll = vec![
         Page::Say(text(keys::CLOY_SCROLL)),
@@ -9818,20 +9819,45 @@ fn cloy() -> NpcScript {
         },
         Page::Say(text(keys::CLOY_SCROLL_BOUGHT)),
     ];
+    let mut choices = pet_talk();
+    choices.push((text(keys::CLOY_SCROLL_CHOICE), scroll));
     let menu = Page::Menu {
         text: text(keys::CLOY_ASK),
-        choices: vec![
-            (text(keys::CLOY_PETS), say(keys::CLOY_PETS_TOLD)),
-            (text(keys::CLOY_RAISING), say(keys::CLOY_RAISING_TOLD)),
-            (text(keys::CLOY_DYING), say(keys::CLOY_DYING_TOLD)),
-            (text(keys::CLOY_COMMANDS), say(keys::CLOY_COMMANDS_TOLD)),
-            (text(keys::CLOY_SCROLL_CHOICE), scroll),
-        ],
+        choices,
     };
     let mut script = NpcScript::new(CLOY, vec![Page::Say(text(keys::CLOY_HELLO)), menu]);
     script.refused = Some(text(keys::CLOY_SHORT));
     script.inventory_full = Some(text(keys::CLOY_SHORT));
     script
+}
+
+/// The questions about pets that Cloy and Wisp both answer, each with its
+/// answer.
+fn pet_talk() -> Vec<(String, Vec<Page>)> {
+    [
+        (keys::CLOY_PETS, keys::CLOY_PETS_TOLD),
+        (keys::CLOY_RAISING, keys::CLOY_RAISING_TOLD),
+        (keys::CLOY_DYING, keys::CLOY_DYING_TOLD),
+        (keys::CLOY_COMMANDS, keys::CLOY_COMMANDS_TOLD),
+    ]
+    .into_iter()
+    .map(|(asked, told)| (text(asked), vec![Page::Say(text(told))]))
+    .collect()
+}
+
+/// Wisp at Eos Tower's entrance, Mar the Fairy's disciple: Cloy's talk of
+/// pets, after a word on a pet that has become a doll again.
+fn wisp() -> NpcScript {
+    let mut choices = vec![(
+        text(keys::WISP_DOLL),
+        vec![Page::Say(text(keys::WISP_DOLL_TOLD))],
+    )];
+    choices.extend(pet_talk());
+    let menu = Page::Menu {
+        text: text(keys::WISP_HELLO),
+        choices,
+    };
+    NpcScript::new(WISP, vec![menu])
 }
 
 /// Chico in Ludibrium: Match Cards or one of Ludibrium's Omok sets, for
@@ -26441,6 +26467,27 @@ mod tests {
             ]
         );
         assert!(cloy.refused().is_some() && cloy.inventory_full().is_some());
+    }
+
+    #[test]
+    fn wisp_tells_of_pets_as_cloy_does() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let player = traveller(30, 0, false);
+        let mut wisp = NpcScript::for_npc(WISP, &player).unwrap();
+        let asked = menu(wisp.begin());
+        assert!(asked.starts_with(&text(keys::WISP_HELLO)));
+        assert_eq!(asked.matches("#L").count(), 5);
+        let told = wisp.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(page_text(&told), text(keys::WISP_DOLL_TOLD));
+
+        let mut wisp = NpcScript::for_npc(WISP, &player).unwrap();
+        wisp.begin();
+        let told = wisp.respond(ScriptInput::Select(4)).unwrap();
+        assert_eq!(page_text(&told), text(keys::CLOY_COMMANDS_TOLD));
+        assert!(told.effects.is_empty());
     }
 
     #[test]
