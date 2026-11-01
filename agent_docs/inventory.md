@@ -1291,6 +1291,14 @@ which the Minar Forest shortcut spends, for 30,000 mesos each: an
 the total. Short mesos or a full Etc. tab get one line (`tatamo.short`).
 The lines are placeholders (`tatamo.*`, QUESTIONS b387).
 
+Eurek the Alchemist (2040050), in Leafre, Ludibrium, El Nath and
+Sleepywood's Ant Tunnel, makes five Magic Rocks (4006000) or five
+Summoning Rocks (4006001) at a time, each in one of five ways: two kinds
+of monster drop and a jewel (Magic Rocks) or a plate (Summoning Rocks),
+and 4,000 mesos (`refiners::EUREK_MAGIC_ROCKS`, `EUREK_SUMMONING_ROCKS`,
+asked through the refiners' `refine_batches`). The lines are placeholders
+(`eurek.*`, QUESTIONS b388).
+
 ### Refiners
 
 Refiners make plates, jewels, crystals, materials and arrows in batches.
