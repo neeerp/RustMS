@@ -2266,18 +2266,20 @@ namespace ms
 			user.update_skill(attack.skill, attack.level);
 			user.update_speed(attack.speed);
 
-			// Energy Charge's and Body Pressure's body attacks show only
-			// their hit on the mob (FUN_009830bb).
-			if (energy::charges(attack.skill) || attack.skill == aran_combo::BODY_PRESSURE)
-			{
-				extract_effects(user, get_move(attack.skill), attack, {}, 0, {}, {});
-				return;
-			}
-
 			// An attack ends the skill the user was preparing, unless it
 			// is one of its shots (0x98044f).
 			if (!prepare::outlasts_attacks(attack.skill))
 				end_remote_prepare(user);
+
+			// Energy Charge's and Body Pressure's body attacks cut the
+			// user's action short (0x980483), and show only their hit on
+			// the mob (FUN_009830bb).
+			if (energy::charges(attack.skill) || attack.skill == aran_combo::BODY_PRESSURE)
+			{
+				user.end_attack();
+				extract_effects(user, get_move(attack.skill), attack, {}, 0, {}, {});
+				return;
+			}
 
 			const SpecialMove &move = get_move(attack.skill);
 

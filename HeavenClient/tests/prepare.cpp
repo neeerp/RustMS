@@ -84,8 +84,9 @@ int main()
 		require(prepared_action(0x8016) == 0x16 && prepared_toleft(0x8016) && !prepared_toleft(0x002a),
 				"the top bit is the facing");
 		require(prepared_action(0xffff) == 0x7fff, "all ones is no action");
-		require(outlasts_attacks(3121004) && outlasts_attacks(14111006) && !outlasts_attacks(2121001),
-				"the shooters' attacks keep their prepare; others end it");
+		require(outlasts_attacks(3121004) && outlasts_attacks(15111006) && !outlasts_attacks(2121001),
+				"the shooters' attacks and Spark's keep their prepare; others end it");
+		require(!outlasts_attacks(14111006), "Poison Bomb's ends its own (0xe6935e is Spark)");
 
 		require(gauge_kind(1121001) == 1 && gauge_kind(15101003) == 1, "Monster Magnet and Corkscrew Blow have their own gauge");
 		require(gauge_kind(2121001) == 0 && gauge_kind(3221001) == 0, "the others share one");
