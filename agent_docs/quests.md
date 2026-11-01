@@ -1038,9 +1038,8 @@ are placeholders. Anyone else gets Lilin's menu (`NpcScript::lilin_guide`,
 as Cosmic's `ClickGuideHandler` opens 1202000): four answers, then a guide
 hint for each of the six Snow Island topics (hints 14 to 19).
 
-The Aran's story begins on the Black Road (914000000 to 914000500), though
-a new Aran still starts in Amherst until the whole tutorial is in. Its
-first portal (`aranTutorAloneX`) leads to the ark (914000100). Entering
+The Aran's story begins on the Black Road (914000000 to 914000500), where
+a new Aran starts, as in Cosmic. Its first portal (`aranTutorAloneX`) leads to the ark (914000100). Entering
 that map sets record 21002 to "1" (`scripts::unscripted_map_enter`, as
 Cosmic's `914000100.js`), which Find the Missing Kid 1 (21000) waits for.
 Athena Pierce (1209000) starts it (`q21000s`) and points the way with
