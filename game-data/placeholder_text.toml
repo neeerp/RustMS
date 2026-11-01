@@ -2110,6 +2110,8 @@
 "icebyrd.boroughs_told" = "[placeholder] Soon. The developers are hard at work, and the new parts will open when they're ready."
 "picture_frame.found" = "[placeholder] Behind the frame, a hook comes loose and opens a hidden space. Inside lies a silver pendant, which you take before closing the frame."
 "picture_frame.full" = "[placeholder] Make room in your Etc inventory to take the pendant."
+"study_pipe.password" = "[placeholder] Water runs through the pipes, and a small keypad slides out of the wall. Enter the password."
+"study_pipe.wrong" = "[placeholder] The keypad buzzes. That is not the password."
 "wiz.none" = "[placeholder] You haven't brought back a single storybook yet."
 "wiz.returned" = "[placeholder] You've brought back #b{count}#k storybooks so far. Here they are:{books}"
 "wiz.thanks" = "[placeholder] The library is calm again, thanks to you. If the stories get mixed up again, I'll be counting on you."
