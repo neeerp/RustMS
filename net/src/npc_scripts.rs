@@ -1068,6 +1068,9 @@ const SHULYNCH: i32 = 1092008;
 const SHULYNCH_ON_THE_WAY: i32 = 1095000;
 pub const DELLI: i32 = 2095000;
 const DELLI_QUEST: i16 = 6410;
+/// Simon, who walks between Happyville and its Shalom Temple.
+pub const SIMON: i32 = 9201033;
+pub const SHALOM_TEMPLE: i32 = 681_000_000;
 const TRAINING_ROOM: i32 = 120_000_104;
 const LOOKING_FOR_DELLI: i32 = 925_010_000;
 /// Rolly in Ludibrium, who takes a party into the Ludibrium Maze, and
@@ -2565,6 +2568,7 @@ impl NpcScript {
             DELLI if player.stats.map_id == events::NAUTILUS_HIDEOUT => {
                 return Some(ask_warp(DELLI, keys::DELLI_HOME_ASK, TRAINING_ROOM))
             }
+            SIMON => return simon(player.stats.map_id),
             TYLUS_GRATEFUL if player.stats.map_id == events::TYLUS_THANKS => {
                 return Some(NpcScript::new(
                     TYLUS_GRATEFUL,
@@ -14949,6 +14953,24 @@ fn ask_warp(npc: i32, key: &str, to: i32) -> NpcScript {
     )
 }
 
+/// Simon (Cosmic `9201033`): from Happyville to the Shalom Temple, and
+/// from the temple back.
+fn simon(map_id: i32) -> Option<NpcScript> {
+    let (key, to) = match map_id {
+        events::HAPPYVILLE => (keys::SIMON_TEMPLE_ASK, SHALOM_TEMPLE),
+        SHALOM_TEMPLE => (keys::SIMON_BACK_ASK, events::HAPPYVILLE),
+        _ => return None,
+    };
+    Some(NpcScript::new(
+        SIMON,
+        vec![Page::Ask {
+            text: text(key),
+            on_yes: vec![Effect::WarpToPortal(to, 0)],
+            on_no: Some(text(keys::SIMON_NO)),
+        }],
+    ))
+}
+
 /// Charles (Cosmic `9220018`) in MV's Lair's lobby: the leader takes the
 /// party in, and anyone may hear what it holds. Cosmic's Party Search line
 /// is left out, as at every party quest's NPC.
@@ -24954,6 +24976,27 @@ mod tests {
         });
         let mut claudia = NpcScript::for_npc(CLAUDIA, &cut).unwrap();
         assert_eq!(page_text(&claudia.begin()), text(keys::CLAUDIA_DONE));
+    }
+
+    #[test]
+    fn simon_walks_between_happyville_and_the_shalom_temple() {
+        for (from, key, to) in [
+            (events::HAPPYVILLE, keys::SIMON_TEMPLE_ASK, SHALOM_TEMPLE),
+            (SHALOM_TEMPLE, keys::SIMON_BACK_ASK, events::HAPPYVILLE),
+        ] {
+            let mut walker = player(50);
+            walker.stats.map_id = from;
+            let mut simon = NpcScript::for_npc(SIMON, &walker).unwrap();
+            assert_eq!(question(&simon.begin()), text(key));
+            let go = simon.respond(ScriptInput::Yes).unwrap();
+            assert!(matches!(go.effects[..], [Effect::WarpToPortal(map, 0)] if map == to));
+        }
+        let mut walker = player(50);
+        walker.stats.map_id = events::HAPPYVILLE;
+        let mut simon = NpcScript::for_npc(SIMON, &walker).unwrap();
+        simon.begin();
+        let no = simon.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&no), text(keys::SIMON_NO));
     }
 
     #[test]
