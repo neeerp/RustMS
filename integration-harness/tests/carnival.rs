@@ -15,7 +15,7 @@
 //! Carnival Field 2's three rooms, for levels 51 to 70, play the same way,
 //! its Spiegelmann going straight to them.
 
-use integration_harness::events::{armed_in, party_of_one, talk, told};
+use integration_harness::events::{armed_in, party, party_of_one, talk, told};
 use integration_harness::hunting::{attack, hit_reactor, walk_to};
 use integration_harness::protocol::WorldSession;
 use integration_harness::quests::answer;
@@ -491,6 +491,90 @@ async fn hunted(red: &mut WorldSession, blue: &mut WorldSession, room: u8) -> (T
     (seen, theirs, total)
 }
 
+/// LEAVE's body: `name` of side `side` quit, or leads it now (`kind` 6).
+fn left(kind: u8, side: u8, name: &str) -> Vec<u8> {
+    let length = (name.len() as u16).to_le_bytes();
+    [vec![kind, side], length.to_vec(), name.as_bytes().to_vec()].concat()
+}
+
+#[tokio::test]
+async fn those_playing_on_hear_who_quit_and_who_leads_now() {
+    // Carnival Field 2's room 8, which no other test takes.
+    let mut reds = vec![
+        armed_in(CARNIVAL2_LOBBY, 60).await,
+        armed_in(CARNIVAL2_LOBBY, 60).await,
+    ];
+    let mut blues = vec![
+        armed_in(CARNIVAL2_LOBBY, 60).await,
+        armed_in(CARNIVAL2_LOBBY, 60).await,
+    ];
+    party(&mut reds).await;
+    party(&mut blues).await;
+    let [red, rose] = &mut reds[..] else {
+        unreachable!()
+    };
+    let [blue, navy] = &mut blues[..] else {
+        unreachable!()
+    };
+    let mut seen = pick_on_field_2(red, 8).await;
+    until(&mut red.connection, &mut seen, |t| {
+        t.warps.contains(&room_map(8))
+    })
+    .await;
+    let put = pick_on_field_2(blue, 8).await;
+    assert!(
+        put.prompt_texts
+            .contains(&text("carnival.spiegelmann.sent")),
+        "{put:?}"
+    );
+    let mut asked = Trace::default();
+    until(&mut red.connection, &mut asked, |t| {
+        t.prompts.iter().any(|&(npc, _)| npc == CARNIVAL_ROOM_NPC)
+    })
+    .await;
+    send(&mut red.connection, answer(1, 1, None)).await;
+    let field = battle_map(8);
+    let started =
+        |t: &Trace| t.warps.contains(&field) && !carnival(t, SendOpcode::CarnivalStart).is_empty();
+    let (mut roses, mut blues_seen, mut navys) =
+        (Trace::default(), Trace::default(), Trace::default());
+    until(&mut rose.connection, &mut roses, |t| started(t)).await;
+    until(&mut blue.connection, &mut blues_seen, |t| started(t)).await;
+    until(&mut navy.connection, &mut navys, |t| started(t)).await;
+
+    // Red's leader quits: the battle goes on, and both sides hear Rose
+    // leads Maple Red now.
+    let red_name = red.character_name.clone();
+    drop(reds.remove(0));
+    let rose = &mut reds[0];
+    let leads = left(6, 0, &rose.character_name);
+    let [blue, navy] = &mut blues[..] else {
+        unreachable!()
+    };
+    for (player, seen) in [(&mut *rose, &mut roses), (&mut *blue, &mut blues_seen)] {
+        until(&mut player.connection, seen, |t| {
+            carnival(t, SendOpcode::CarnivalLeave) == [leads.clone()]
+        })
+        .await;
+    }
+    assert!(carnival(&roses, SendOpcode::CarnivalResult).is_empty());
+    assert!(!carnival(&blues_seen, SendOpcode::CarnivalLeave)
+        .iter()
+        .any(|body| body.ends_with(red_name.as_bytes())));
+
+    // Then one of Maple Blue who doesn't lead it: they are named.
+    let quits = left(0, 1, &navy.character_name);
+    blues.remove(1);
+    let blue = &mut blues[0];
+    for (player, seen) in [(&mut *rose, &mut roses), (&mut *blue, &mut blues_seen)] {
+        until(&mut player.connection, seen, |t| {
+            carnival(t, SendOpcode::CarnivalLeave) == [leads.clone(), quits.clone()]
+        })
+        .await;
+    }
+    assert!(carnival(&roses, SendOpcode::CarnivalResult).is_empty());
+}
+
 #[tokio::test]
 async fn a_carnival_skill_falls_on_the_other_side() {
     let red = &mut leader().await;
@@ -691,10 +775,17 @@ async fn leader2() -> WorldSession {
 /// Spiegelmann, who lists the field's rooms at once; the trace from the
 /// pick on.
 async fn pick_ninth(player: &mut WorldSession) -> Trace {
+    pick_on_field_2(player, 9).await
+}
+
+/// `player` picks Carnival Field 2's room `room` (7 to 9) from its
+/// Spiegelmann; the trace from the pick on.
+async fn pick_on_field_2(player: &mut WorldSession, room: u8) -> Trace {
     let rooms = told(player, talk(CARNIVAL2_LOBBY, CARNIVAL2_HOST)).await;
     assert_eq!(rooms.prompts, [(CARNIVAL2_HOST, 4)], "{rooms:?}");
     let mut seen = Trace::default();
-    send(&mut player.connection, answer(4, 1, Some(2))).await;
+    let index = i32::from(room) - 7;
+    send(&mut player.connection, answer(4, 1, Some(index))).await;
     until(&mut player.connection, &mut seen, |t| {
         !t.prompts.is_empty() || !t.warps.is_empty()
     })

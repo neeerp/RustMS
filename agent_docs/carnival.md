@@ -107,7 +107,12 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   `timeDefault` scaled by `RUSTMS_EVENT_SCALE` (`battle_length`). From
   then on the leader leaving doesn't end the event: if a side has nobody
   left before the result is known, the other is told (RESULT 11) and
-  everyone goes to the exit room. The end is under "Results".
+  everyone goes to the exit room. While both sides still play, those left
+  hear who quit (LEAVE, below), or, if they led their side, the next of
+  that side, who leads it now (`Score::quit`). A side's leader is its
+  party's at the challenge, or whoever the party passes to; each member's
+  client tells the event their name with the ticket
+  (`EventMessage::Named`). The end is under "Results".
 - The event keeps the score (`net::carnival::Score`): each member's side and
   CP, and each side's. A kill on the battle field
   (`FieldActor::handle_attack`) earns the mob's CP for the killer and their
@@ -210,4 +215,10 @@ CP is sent as two shorts, the CP left to spend and the total ever earned.
   client's chat log shows.
 - MONSTER_CARNIVAL_RESULT (0x128): a byte, 8 won, 9 lost, 10 a draw, 11
   the other side left, which the client prints only on a battle field or
-  revive room. MONSTER_CARNIVAL_LEAVE (0x127), who left, isn't sent.
+  revive room.
+- MONSTER_CARNIVAL_LEAVE (0x127): a byte, 6 if the side's leader quit and
+  the member named leads it now, else 0, a member quit (`LEAVE_QUIT`, ours:
+  the client checks for 6 alone); then the side and the name. Sent to the
+  whole battle while it goes on; the client prints it only on a battle
+  field, and v83 passes the side first to both lines, so a quit reads
+  "[Maple Red] of Team [name]" (b163).
