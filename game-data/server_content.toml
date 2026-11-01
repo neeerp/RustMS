@@ -63,6 +63,7 @@ unsourced = [
     "sage.sigils",
     "sage.keep",
     "sage.ordeal",
+    "wedding.exit.back",
     "job_statue.warrior.ask",
     "job_statue.warrior.weak",
     "job_statue.bowman.ask",

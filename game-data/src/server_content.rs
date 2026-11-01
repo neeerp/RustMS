@@ -269,6 +269,7 @@ pub mod keys {
     pub const GRASSY_LUMP_POOP: &str = "grassy_lump.poop";
     pub const GRASSY_LUMP_FULL: &str = "grassy_lump.full";
     pub const SAGE_MENHIRS: &str = "sage.menhirs";
+    pub const WEDDING_EXIT_BACK: &str = "wedding.exit.back";
     /// A Lith Harbor job statue, by job (`warrior`, `bowman`, `magician`,
     /// `thief`, `pirate`): `ask` (to go to the instructor) and `weak`.
     pub fn job_statue(job: &str, line: &str) -> String {
@@ -4230,6 +4231,7 @@ mod tests {
             keys::GRASSY_LUMP_POOP,
             keys::GRASSY_LUMP_FULL,
             keys::SAGE_MENHIRS,
+            keys::WEDDING_EXIT_BACK,
             keys::SAGE_STATUE,
             keys::SAGE_SIGILS,
             keys::SAGE_KEEP,
