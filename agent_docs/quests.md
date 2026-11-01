@@ -1037,6 +1037,15 @@ to 13), and who the knights are, as Cosmic's `1101008.js`. Mimo's lines
 are placeholders. Anyone else gets nothing: Cosmic opens Lilin's Aran
 tutorial, which isn't played.
 
+Before that, in Rien, Lilin (1201000) has a Legend train. Lilin's Account
+(21014, level 5) runs from the data. Basic Fitness Training 1 to 3 (21015
+to 21017) and the Basic Fitness Test (21018) each start on the yes of
+Lilin's start script (`q21015s` to `q21018s`). Their hunts and rewards come
+from the data. After each one the Aran is shown the tutorial's arrow
+(`Effect::AvatarEffect`,
+`OnUserEff.img/guideEffect/aranTutorial/tutorialArrow3`, or `tutorialArrow1`
+for the test), as Cosmic's `showInfo` does. Lilin's lines are placeholders.
+
 An Aran's jobs run on scripts too (`Act.img` is empty for all of them).
 At level 10 a Legend (2000) takes the first:
 

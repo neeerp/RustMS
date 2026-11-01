@@ -3189,6 +3189,10 @@ impl NpcScript {
             "q21400s" => Some(polearm_starts_a_fight()),
             "q21401s" => Some(taming_the_polearm()),
             "q21401e" => Some(polearm_tamed(player)),
+            "q21015s" => Some(basic_fitness_1()),
+            "q21016s" => Some(basic_fitness_2()),
+            "q21017s" => Some(basic_fitness_3()),
+            "q21018s" => Some(basic_fitness_test()),
             "q21700s" => Some(new_beginnings()),
             "q21703s" => Some(target_pigs()),
             "q21703e" => Some(combo_ability()),
@@ -7189,6 +7193,102 @@ fn polearm_tamed(player: &Player) -> NpcScript {
         ],
     );
     script.inventory_full = Some(text(keys::MAHA_TAMED_FULL));
+    script
+}
+
+const BASIC_FITNESS_1: i16 = 21015;
+const BASIC_FITNESS_2: i16 = 21016;
+const BASIC_FITNESS_3: i16 = 21017;
+const BASIC_FITNESS_TEST: i16 = 21018;
+
+/// The tutorial's arrow over the Aran, as Lilin sends them off to train.
+fn tutorial_arrow(n: u8) -> Effect {
+    Effect::AvatarEffect(format!(
+        "Effect/OnUserEff.img/guideEffect/aranTutorial/tutorialArrow{n}"
+    ))
+}
+
+/// `q21015s`: Lilin starts an Aran's Basic Fitness Training, 10 of the
+/// mobs in 140020000 (Cosmic `21015.js`); the data's end gives the
+/// rewards.
+fn basic_fitness_1() -> NpcScript {
+    let [enough, rusty, ask, go] = keys::LILIN_FITNESS_1;
+    let mut script = NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(enough)),
+            Page::Say(text(rusty)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(BASIC_FITNESS_1)],
+                on_no: Some(text(keys::LILIN_FITNESS_1_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    );
+    script.on_end = vec![tutorial_arrow(3)];
+    script
+}
+
+/// `q21016s`: the second round, 15 in 140020100 (Cosmic `21016.js`).
+fn basic_fitness_2() -> NpcScript {
+    let [ask, go] = keys::LILIN_FITNESS_2;
+    let mut script = NpcScript::new(
+        LILIN,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(BASIC_FITNESS_2)],
+                on_no: Some(text(keys::LILIN_FITNESS_2_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    );
+    script.on_end = vec![tutorial_arrow(3)];
+    script
+}
+
+/// `q21017s`: the third, 20 in 140020200, haggled over with the Aran
+/// (Cosmic `21017.js`).
+fn basic_fitness_3() -> NpcScript {
+    let [warmed_up, twenty, more, or_more, plenty, ask, accepted, go] = keys::LILIN_FITNESS_3;
+    let mut script = NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(warmed_up)),
+            Page::Say(text(twenty)),
+            Page::Reply(text(more)),
+            Page::Say(text(or_more)),
+            Page::Reply(text(plenty)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(BASIC_FITNESS_3)],
+                on_no: Some(text(keys::LILIN_FITNESS_3_DECLINED)),
+            },
+            Page::Reply(text(accepted)),
+            Page::Say(text(go)),
+        ],
+    );
+    script.on_end = vec![tutorial_arrow(3)];
+    script
+}
+
+/// `q21018s`: the Basic Fitness Test, 5 in 140010200 (Cosmic `21018.js`).
+fn basic_fitness_test() -> NpcScript {
+    let [strongest, ask, go] = keys::LILIN_FITNESS_TEST;
+    let mut script = NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(strongest)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(BASIC_FITNESS_TEST)],
+                on_no: Some(text(keys::LILIN_FITNESS_TEST_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    );
+    script.on_end = vec![tutorial_arrow(1)];
     script
 }
 
@@ -17308,6 +17408,56 @@ mod tests {
                 ]
             )
         );
+    }
+
+    #[test]
+    fn lilin_starts_each_round_of_basic_fitness_training_and_points_the_way() {
+        let aran = traveller(5, 0, false);
+        for (script, quest, arrow, declined) in [
+            (
+                "q21015s",
+                BASIC_FITNESS_1,
+                3,
+                keys::LILIN_FITNESS_1_DECLINED,
+            ),
+            (
+                "q21016s",
+                BASIC_FITNESS_2,
+                3,
+                keys::LILIN_FITNESS_2_DECLINED,
+            ),
+            (
+                "q21017s",
+                BASIC_FITNESS_3,
+                3,
+                keys::LILIN_FITNESS_3_DECLINED,
+            ),
+            (
+                "q21018s",
+                BASIC_FITNESS_TEST,
+                1,
+                keys::LILIN_FITNESS_TEST_DECLINED,
+            ),
+        ] {
+            assert_eq!(
+                yes_through(NpcScript::for_quest(script, &aran).unwrap()),
+                (
+                    LILIN,
+                    vec![Effect::StartQuest(quest), tutorial_arrow(arrow)]
+                ),
+                "{script}"
+            );
+            // Declined: told so, and nothing else.
+            let mut lilin = NpcScript::for_quest(script, &aran).unwrap();
+            let mut step = lilin.begin();
+            while kind(&step) != Some(1) {
+                step = lilin.respond(ScriptInput::Next).unwrap();
+            }
+            let step = lilin.respond(ScriptInput::No).unwrap();
+            assert_eq!(page_text(&step), text(declined), "{script}");
+            assert!(step.effects.is_empty());
+            assert_eq!(lilin.respond(ScriptInput::Next).unwrap().effects, []);
+        }
     }
 
     #[test]
