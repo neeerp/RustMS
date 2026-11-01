@@ -270,6 +270,13 @@ pub mod keys {
     pub const GRASSY_LUMP_FULL: &str = "grassy_lump.full";
     pub const SAGE_MENHIRS: &str = "sage.menhirs";
     pub const WEDDING_EXIT_BACK: &str = "wedding.exit.back";
+    pub const AMES_MENU: &str = "ames.menu";
+    pub const AMES_ENGAGE_LABEL: &str = "ames.engage.label";
+    pub const AMES_ENGAGE: &str = "ames.engage";
+    pub const AMES_MARRY_LABEL: &str = "ames.marry.label";
+    pub const AMES_MARRY: &str = "ames.marry";
+    pub const AMES_BREAK_OFF_LABEL: &str = "ames.break_off.label";
+    pub const AMES_BREAK_OFF: &str = "ames.break_off";
     /// A Lith Harbor job statue, by job (`warrior`, `bowman`, `magician`,
     /// `thief`, `pirate`): `ask` (to go to the instructor) and `weak`.
     pub fn job_statue(job: &str, line: &str) -> String {
@@ -4232,6 +4239,13 @@ mod tests {
             keys::GRASSY_LUMP_FULL,
             keys::SAGE_MENHIRS,
             keys::WEDDING_EXIT_BACK,
+            keys::AMES_MENU,
+            keys::AMES_ENGAGE_LABEL,
+            keys::AMES_ENGAGE,
+            keys::AMES_MARRY_LABEL,
+            keys::AMES_MARRY,
+            keys::AMES_BREAK_OFF_LABEL,
+            keys::AMES_BREAK_OFF,
             keys::SAGE_STATUE,
             keys::SAGE_SIGILS,
             keys::SAGE_KEEP,

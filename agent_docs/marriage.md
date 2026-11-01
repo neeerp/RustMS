@@ -329,6 +329,11 @@ same way. The venue's maps return to 680000500, so a player logging in
 there after a restart lands outside; a booking still inside its window
 can be started again (b071 Q10).
 
+Ames the Wise in Amoria (`AMES`, 9201004, Npc.wz `abouttheWedding`)
+answers a menu of how to get engaged, marry and break it off. Cosmic's
+`9201004.js` also divorces a married couple for 500,000 mesos; that
+is HeavenMS's own and left out (QUESTIONS b409).
+
 Ames's room has no portal out. Ames the Wise there
 (`AMES_AT_THE_EXIT`, 9201049) says a line and sends whoever asks back to
 Amoria (Cosmic `9201049.js`); the onyx chests Cosmic hands out there wait

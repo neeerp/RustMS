@@ -117,6 +117,9 @@ pub const DEBBIE: i32 = 9201006;
 /// Pila, in Amoria and the halls, who keeps the wedding gifts
 /// (`NpcScript::pila`).
 pub const PILA: i32 = 9201014;
+/// Ames the Wise in Amoria (Npc.wz `abouttheWedding`), who tells how to
+/// get engaged, marry and break it off.
+pub const AMES: i32 = 9201004;
 /// Ames the Wise in the room every wedding ends in, which has no portal
 /// out: the way back to Amoria (Cosmic `9201049.js`).
 pub const AMES_AT_THE_EXIT: i32 = 9201049;
@@ -2832,6 +2835,18 @@ impl NpcScript {
             FROD => return Some(pet_course_end(&HENESYS_PET_COURSE, player)),
             GRASSY_LUMP => return Some(grassy_lump(player)),
             SAGE | UPPER_SAGE => return Some(sage(npc_id, player)),
+            AMES => {
+                let answer = |label, line| (text(label), vec![Page::Say(text(line))]);
+                let page = Page::Menu {
+                    text: text(keys::AMES_MENU),
+                    choices: vec![
+                        answer(keys::AMES_ENGAGE_LABEL, keys::AMES_ENGAGE),
+                        answer(keys::AMES_MARRY_LABEL, keys::AMES_MARRY),
+                        answer(keys::AMES_BREAK_OFF_LABEL, keys::AMES_BREAK_OFF),
+                    ],
+                };
+                return Some(NpcScript::new(npc_id, vec![page]));
+            }
             AMES_AT_THE_EXIT => {
                 let back = Page::Done(vec![Effect::Warp(wedding::AMORIA)]);
                 let pages = vec![Page::Say(text(keys::WEDDING_EXIT_BACK)), back];
@@ -23668,6 +23683,19 @@ mod tests {
                     Effect::Warp(back)
                 ]
             );
+        }
+    }
+
+    #[test]
+    fn ames_tells_how_to_get_engaged_marry_and_break_it_off() {
+        for (choice, line) in [keys::AMES_ENGAGE, keys::AMES_MARRY, keys::AMES_BREAK_OFF]
+            .into_iter()
+            .enumerate()
+        {
+            let mut talk = NpcScript::for_npc(AMES, &player(50)).unwrap();
+            assert_eq!(kind(&talk.begin()), Some(4));
+            let said = talk.respond(ScriptInput::Select(choice as i32)).unwrap();
+            assert_eq!(page_text(&said), text(line));
         }
     }
 
