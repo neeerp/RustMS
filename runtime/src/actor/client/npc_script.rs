@@ -111,14 +111,20 @@ impl ClientActor {
     /// Whether anyone is on `map_id` in the player's channel; a lost reply
     /// counts as someone.
     async fn map_occupied(&self, map_id: i32) -> Result<bool, RuntimeError> {
-        let (reply, occupied) = oneshot::channel();
-        self.send_to_directory(DirectoryMessage::MapOccupied {
+        Ok(self.map_count(map_id).await? > 0)
+    }
+
+    /// How many are on `map_id` in the player's channel; a lost reply
+    /// counts as too many.
+    async fn map_count(&self, map_id: i32) -> Result<usize, RuntimeError> {
+        let (reply, count) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::MapCount {
             channel_id: self.channel_id,
             map_id,
             reply,
         })
         .await?;
-        Ok(occupied.await.unwrap_or(true))
+        Ok(count.await.unwrap_or(usize::MAX))
     }
 
     /// Apply script effects. Changes to the player (with any quest change)
@@ -643,6 +649,12 @@ impl ClientActor {
                 Effect::RequireEmptyMap(map_id) => {
                     if self.map_occupied(*map_id).await? {
                         debug!(map_id, "Map occupied; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                }
+                Effect::RequireRoom { map_id, most } => {
+                    if self.map_count(*map_id).await? >= *most {
+                        debug!(map_id, "Map full; nothing applied");
                         return Ok(Applied::Refused);
                     }
                 }

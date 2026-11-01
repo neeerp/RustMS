@@ -351,16 +351,19 @@ impl WorldDirectory {
                     (_, Err(_)) => {}
                 }
             }
-            DirectoryMessage::MapOccupied {
+            DirectoryMessage::MapCount {
                 channel_id,
                 map_id,
                 reply,
             } => {
-                let occupied = self
+                let count = self
                     .clients
                     .values()
-                    .any(|entry| entry.channel_id == channel_id && entry.presence.map_id == map_id);
-                let _ = reply.send(occupied);
+                    .filter(|entry| {
+                        entry.channel_id == channel_id && entry.presence.map_id == map_id
+                    })
+                    .count();
+                let _ = reply.send(count);
             }
             DirectoryMessage::EventEntry { from, kind, reply } => {
                 let _ = reply.send(self.event_entry(from, kind).0);

@@ -1037,6 +1037,12 @@ pub enum Effect {
     /// Nothing is applied while anyone is on this map in the player's
     /// channel; the script says its `refused` text instead.
     RequireEmptyMap(i32),
+    /// Nothing is applied while `most` or more are on this map in the
+    /// player's channel; the script says its `refused` text instead.
+    RequireRoom {
+        map_id: i32,
+        most: usize,
+    },
     /// To `portal` of the first of `maps` that nobody is on in the
     /// player's channel, nor on the map `beside` on from it, as the Mirror
     /// of Desire's rooms go in pairs. Nothing is applied if every one is

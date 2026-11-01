@@ -2523,6 +2523,9 @@ impl NpcScript {
         if npc_id == SMALL_TREE_STUMP {
             return Some(small_tree_stump(player));
         }
+        if let Some(&(npc, first)) = POWER_B_FORES.iter().find(|(npc, _)| *npc == npc_id) {
+            return Some(power_b_fore(npc, first, player));
+        }
         if npc_id == DRILL_HALL_GATEKEEPER {
             return Some(ask_warp(
                 npc_id,
@@ -5709,6 +5712,52 @@ fn small_tree_stump(player: &Player) -> NpcScript {
         }
     };
     NpcScript::new(SMALL_TREE_STUMP, vec![page])
+}
+
+/// Power B. Fore by each job's town (Npc.nx `enter_archer` and the like),
+/// with the first of the five Training Centers they lead to.
+pub const POWER_B_FORES: [(i32, i32); 5] = [
+    (1012119, 910060000),
+    (1022105, 910220000),
+    (1032114, 910120000),
+    (1052114, 910310000),
+    (1095002, 912030000),
+];
+/// The Training Centers' level: from it, a player is moved out
+/// (`map_rules::moved_out_to`), and Power B. Fore lets nobody in.
+const TRAINING_CENTER_LEVEL: u8 = 20;
+/// How many may train in a Training Center at once (as in Cosmic).
+pub const TRAINING_CENTER_ROOM: usize = 5;
+
+/// Power B. Fore: under level 20, the choice of five Training Centers,
+/// each taking up to five players.
+fn power_b_fore(npc_id: i32, first: i32, player: &Player) -> NpcScript {
+    if player.stats.level >= TRAINING_CENTER_LEVEL {
+        let page = Page::Say(text(keys::POWER_B_FORE_TOO_HIGH));
+        return NpcScript::new(npc_id, vec![page]);
+    }
+    let choices = (0..5)
+        .map(|i| {
+            let map_id = first + i;
+            let label =
+                content::text().get(keys::POWER_B_FORE_CENTER, &[("n", &(i + 1).to_string())]);
+            let enter = Page::Done(vec![
+                Effect::RequireRoom {
+                    map_id,
+                    most: TRAINING_CENTER_ROOM,
+                },
+                Effect::WarpToPortal(map_id, 0),
+            ]);
+            (label, vec![enter])
+        })
+        .collect();
+    let menu = Page::Menu {
+        text: text(keys::POWER_B_FORE_MENU),
+        choices,
+    };
+    let mut script = NpcScript::new(npc_id, vec![menu]);
+    script.refused = Some(text(keys::POWER_B_FORE_FULL));
+    script
 }
 
 /// Kerning City's trash can: the clue for a Knight on Hidden Inside the
@@ -22241,6 +22290,39 @@ mod tests {
             let step = NpcScript::for_npc(can, &knight).unwrap().begin();
             assert_eq!(page_text(&step), text(keys::KERNING_TRASH_CAN_EMPTY));
         }
+    }
+
+    #[test]
+    fn power_b_fore_sends_one_under_level_20_into_a_training_center_with_room() {
+        let mut novice = player(50);
+        novice.stats.level = 19;
+        for (npc, first) in POWER_B_FORES {
+            let mut script = NpcScript::for_npc(npc, &novice).unwrap();
+            let menu = script.begin();
+            assert_eq!(kind(&menu), Some(4));
+            let step = script.respond(ScriptInput::Select(4)).unwrap();
+            let enter = vec![
+                Effect::RequireRoom {
+                    map_id: first + 4,
+                    most: TRAINING_CENTER_ROOM,
+                },
+                Effect::WarpToPortal(first + 4, 0),
+            ];
+            assert_eq!(step.effects, enter);
+            assert_eq!(
+                page_text(&script.refused().unwrap()),
+                text(keys::POWER_B_FORE_FULL)
+            );
+            assert!(crate::game_data::get().unwrap().field(first + 4).is_some());
+        }
+
+        // From level 20, nobody goes in.
+        novice.stats.level = TRAINING_CENTER_LEVEL;
+        let step = NpcScript::for_npc(POWER_B_FORES[0].0, &novice)
+            .unwrap()
+            .begin();
+        assert_eq!(page_text(&step), text(keys::POWER_B_FORE_TOO_HIGH));
+        assert!(step.effects.is_empty());
     }
 
     #[test]
