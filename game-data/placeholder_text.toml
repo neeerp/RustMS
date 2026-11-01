@@ -1485,6 +1485,7 @@
 "control_device.off" = "[placeholder] The security system is off, and its alarm goes quiet."
 "magic_square.ask" = "[placeholder] The Magic Square is unfinished. Finish drawing it?"
 "magic_square.done" = "[placeholder] The Magic Square is whole, and its spell turns on Deet and Roi."
+"neinheart_opening.ask" = "[placeholder] You have what a Cygnus Knight needs. Shall I take you to Ereve now?"
 "perion_mission.ask" = "[placeholder] How's the training going? By now you could take part in the Party Quest in #m103000000#. Training matters, but we need you for a Cygnus Knights mission now. Some new information has just come in that may help us."
 "pucci.wolf_request.strong" = "[placeholder] Aran, you've come a long way since the ice let you go. Have you ever thought of riding a wolf?"
 "pucci.wolf_request.ask" = "[placeholder] A cub needs proper feeding. Fetch me some cub food from Aqua Road and I'll let you raise one. Will you go?"
