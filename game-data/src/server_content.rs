@@ -264,6 +264,10 @@ pub mod keys {
     pub const RUPI_LEAVE_ASK: &str = "rupi.leave_ask";
     pub const ROODOLPH_SPRINKLER: &str = "roodolph.sprinkler";
     pub const ROODOLPH_BACK: &str = "roodolph.back";
+    pub const GRASSY_LUMP_ASK: &str = "grassy_lump.ask";
+    pub const GRASSY_LUMP_LEAVE: &str = "grassy_lump.leave";
+    pub const GRASSY_LUMP_POOP: &str = "grassy_lump.poop";
+    pub const GRASSY_LUMP_FULL: &str = "grassy_lump.full";
     pub const AMORIA_TO_AMORIA: &str = "amoria.to_amoria";
     pub const AMORIA_TO_HENESYS: &str = "amoria.to_henesys";
     pub const AMORIA_DECLINE: &str = "amoria.decline";
@@ -4210,6 +4214,10 @@ mod tests {
             keys::RUPI_LEAVE_ASK,
             keys::ROODOLPH_SPRINKLER,
             keys::ROODOLPH_BACK,
+            keys::GRASSY_LUMP_ASK,
+            keys::GRASSY_LUMP_LEAVE,
+            keys::GRASSY_LUMP_POOP,
+            keys::GRASSY_LUMP_FULL,
             keys::AMORIA_TO_AMORIA,
             keys::AMORIA_TO_HENESYS,
             keys::AMORIA_DECLINE,
