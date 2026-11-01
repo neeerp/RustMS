@@ -1342,6 +1342,12 @@ mesos or materials (`maker.short`). Nothing is taken unless all of it applies.
   (1012002, Henesys) bows, crossbows and bowmen's gloves, and JM (1052002,
   Kerning City) thieves' gloves and claws, all one at a time; all three
   make materials in batches, and Vicious arrow bundles too.
+- Fiona (9201095, Crimsonwood Keep), once The Right Path (8225) is done,
+  forges four Crimsonwood weapons at 70,000 mesos and upgrades the Raven
+  weapons to their Dawn (75,000), Night and Dusk (50,000) kinds. An upgrade
+  spends the base Raven weapon too; Cosmic's table omits it, though its own
+  text says the upgrade does not carry over (`v83ref/lanes/QUESTIONS.md`).
+  Before the quest Fiona only says to come back (`refiner.fiona.*`).
 
 All of their text is placeholder (`refiner.*`, `altaire.*`).
 

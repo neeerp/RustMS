@@ -3172,6 +3172,11 @@ pub mod keys {
     pub fn boss_kitty_wrong(question: usize, answer: usize) -> String {
         format!("boss_kitty.q.{question}.wrong.{answer}")
     }
+
+    pub const REFINER_FIONA_HELLO: &str = "refiner.fiona.hello";
+    pub const REFINER_FIONA_FORGE: &str = "refiner.fiona.forge";
+    pub const REFINER_FIONA_UPGRADE: &str = "refiner.fiona.upgrade";
+    pub const REFINER_FIONA_NOT_YET: &str = "refiner.fiona.not_yet";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5396,6 +5401,10 @@ mod tests {
                 keys::BOSS_KITTY_START,
                 keys::BOSS_KITTY_PASS,
                 keys::BOSS_KITTY_FAIL,
+                keys::REFINER_FIONA_HELLO,
+                keys::REFINER_FIONA_FORGE,
+                keys::REFINER_FIONA_UPGRADE,
+                keys::REFINER_FIONA_NOT_YET,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
