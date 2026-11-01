@@ -2526,6 +2526,9 @@ impl NpcScript {
         if npc_id == HOTEL_RECEPTIONIST {
             return Some(hotel_receptionist(player));
         }
+        if npc_id == OPENING_NEINHEART {
+            return Some(opening_neinheart());
+        }
         if let Some(&(_, mob_id, ask, notice)) = BOSS_SWITCHES.iter().find(|s| s.0 == npc_id) {
             return Some(boss_switch(npc_id, mob_id, ask, notice));
         }
@@ -13054,6 +13057,22 @@ pub const BOSS_SWITCHES: [(i32, i32, &str, &str); 3] = [
     ),
 ];
 
+/// Neinheart at the end of the Cygnus Knights' opening (913040006, Npc.nx
+/// `erebWarp`): yes takes the player to Ereve, and no back to Henesys
+/// (Cosmic's `1103005.js`, whose saved `CYGNUSINTRO` spot nothing sets).
+pub const OPENING_NEINHEART: i32 = 1103005;
+pub const OPENING_EREVE: i32 = 130000000;
+pub const OPENING_HENESYS: i32 = 100000000;
+
+fn opening_neinheart() -> NpcScript {
+    let page = Page::Decide {
+        text: text(keys::NEINHEART_OPENING_ASK),
+        on_yes: vec![Page::Done(vec![Effect::WarpToPortal(OPENING_EREVE, 0)])],
+        on_no: vec![Page::Done(vec![Effect::WarpToPortal(OPENING_HENESYS, 0)])],
+    };
+    NpcScript::new(OPENING_NEINHEART, vec![page])
+}
+
 fn boss_switch(npc_id: i32, mob_id: i32, ask: &str, notice: &'static str) -> NpcScript {
     let page = Page::Ask {
         text: text(ask),
@@ -22494,6 +22513,19 @@ mod tests {
         let short = script.respond(ScriptInput::Yes).unwrap();
         assert!(short.effects.is_empty());
         assert_eq!(page_text(&short), text(keys::HOTEL_SHORT));
+    }
+
+    #[test]
+    fn the_openings_neinheart_sends_one_to_ereve_or_back_to_henesys() {
+        let ask = |input| {
+            let mut script = NpcScript::for_npc(OPENING_NEINHEART, &player(50)).unwrap();
+            let page = script.begin();
+            assert_eq!(question(&page), text(keys::NEINHEART_OPENING_ASK));
+            script.respond(input).unwrap().effects
+        };
+        let to = |map_id| vec![Effect::WarpToPortal(map_id, 0)];
+        assert_eq!(ask(ScriptInput::Yes), to(OPENING_EREVE));
+        assert_eq!(ask(ScriptInput::No), to(OPENING_HENESYS));
     }
 
     #[test]

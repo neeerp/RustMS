@@ -1679,6 +1679,7 @@ pub mod keys {
     pub const CONTROL_DEVICE_OFF: &str = "control_device.off";
     pub const MAGIC_SQUARE_ASK: &str = "magic_square.ask";
     pub const MAGIC_SQUARE_DONE: &str = "magic_square.done";
+    pub const NEINHEART_OPENING_ASK: &str = "neinheart_opening.ask";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5267,6 +5268,7 @@ mod tests {
                 keys::CONTROL_DEVICE_OFF,
                 keys::MAGIC_SQUARE_ASK,
                 keys::MAGIC_SQUARE_DONE,
+                keys::NEINHEART_OPENING_ASK,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],

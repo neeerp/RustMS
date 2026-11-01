@@ -36,6 +36,11 @@ revamp's Sen house (`30001`), and the Adventurer Training Centers
 (`1010100`-`1010400`) are in the assets but not linked from the route. Do not
 insert them or invent reverse connections.
 
+The Cygnus Knights' opening (`913040000`-`913040009`) isn't linked from
+anywhere either. Neinheart at its end (`913040006`, `OPENING_NEINHEART`)
+asks whether to go to Ereve: yes warps to `130000000` and no to Henesys
+(`100000000`), as Cosmic's `1103005.js`.
+
 ## Taxis
 
 Taxi NPCs are scripted in `net::npc_scripts` (fares from v83 server
