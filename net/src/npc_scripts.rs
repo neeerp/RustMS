@@ -3011,10 +3011,10 @@ impl NpcScript {
                 vec![Page::Done(vec![Effect::StartQuest(2238)])],
             )),
             "q2245s" => Some(tristan_tomb()),
-            "q2300s" | "q2301s" | "q2302s" | "q2303s" | "q2304s" => {
-                letter_for_the_kingdom(script, player)
-            }
-            "q2300e" | "q2301e" | "q2302e" | "q2303e" | "q2304e" => letter_read(script),
+            "q2300s" | "q2301s" | "q2302s" | "q2303s" | "q2304s" | "q2305s" | "q2306s"
+            | "q2307s" | "q2308s" | "q2309s" | "q2310s" => letter_for_the_kingdom(script, player),
+            "q2300e" | "q2301e" | "q2302e" | "q2303e" | "q2304e" | "q2305e" | "q2306e"
+            | "q2307e" | "q2308e" | "q2309e" | "q2310e" => letter_read(script),
             "q2325e" => Some(james_found()),
             "q2327s" => Some(james_escapes()),
             "q2338s" => Some(scarrs_spare_spore()),
@@ -5648,17 +5648,23 @@ fn ardins_sand_bandits() -> NpcScript {
     script
 }
 
-/// Endangered Mushking Empire (2300-2304): an Explorer's job instructor
-/// writes a recommendation letter (4032375) to the Head Security Officer
-/// (1300005) in the Mushroom Forest Field. (quest, instructor), one per
-/// branch; 2305-2310, the same for the Cygnus Knights, are left out with
-/// them.
-const KINGDOM_LETTERS: [(i16, i32); 5] = [
+/// Endangered Mushking Empire (2300-2310): a job instructor writes a
+/// recommendation letter (4032375) to the Head Security Officer (1300005)
+/// in the Mushroom Forest Field. (quest, instructor), one per branch: the
+/// Explorers' five, the Knight Commanders for the Cygnus Knights (2305 to
+/// 2309), and Lilin for an Aran (2310).
+const KINGDOM_LETTERS: [(i16, i32); 11] = [
     (2300, 1022000),
     (2301, 1032001),
     (2302, 1052001),
     (2303, 1012100),
     (2304, KYRIN),
+    (2305, 1101003),
+    (2306, 1101004),
+    (2307, 1101005),
+    (2308, 1101006),
+    (2309, 1101007),
+    (2310, 1201000),
 ];
 const KINGDOM_LETTER: i32 = 4032375;
 const HEAD_SECURITY_OFFICER: i32 = 1300005;
@@ -5672,7 +5678,7 @@ fn kingdom_letter(script: &str) -> Option<(i16, i32)> {
     KINGDOM_LETTERS.iter().copied().find(|&(q, _)| q == quest)
 }
 
-/// `q2300s`-`q2304s` (all Edelstein's `q2300s`): once the player accepts,
+/// `q2300s`-`q2310s` (all Edelstein's `q2300s`): once the player accepts,
 /// the instructor tells of the kingdom's trouble and hands over the
 /// letter, which starts the quest, then offers to send the player to the
 /// kingdom at once. Without a free ETC slot the instructor says so and
@@ -5719,7 +5725,7 @@ fn letter_for_the_kingdom(script: &str, player: &Player) -> Option<NpcScript> {
     Some(script)
 }
 
-/// `q2300e`-`q2304e` (Edelstein's `q2300e`): the Head Security Officer
+/// `q2300e`-`q2310e` (Edelstein's `q2300e`): the Head Security Officer
 /// reads the letter, the player answers, and he welcomes them, taking the
 /// letter for the quest and 1,200 EXP (the data has no rewards). Without
 /// the letter nothing is applied.
@@ -19058,7 +19064,7 @@ mod tests {
                 )
             );
         }
-        assert_eq!(NpcScript::for_quest("q2305e", &player(50)), None, "Cygnus");
+        assert_eq!(NpcScript::for_quest("q2311e", &player(50)), None);
     }
 
     #[test]
