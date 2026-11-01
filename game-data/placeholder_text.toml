@@ -2047,6 +2047,7 @@
 "eurek.summoning_rock" = "[placeholder] Make #t4006001#."
 "eurek.ways" = "[placeholder] Many skills call for #b#t{item}##k, and I know five ways to make it. Which will it be?"
 "eurek.way" = "[placeholder] Make it of #t{first}# and #t{second}#."
+"chico.hello" = "[placeholder] Hi! I'm #p2040014#, and minigames are my speciality. Which set shall I put together for you?"
 "ellin.menu" = "[placeholder] Poison is spreading through the forest. Will you and your party go in and stop it?"
 "ellin.enter" = "[placeholder] Go into the Forest of Poison Haze."
 "ellin.about" = "[placeholder] What is the Forest of Poison Haze?"

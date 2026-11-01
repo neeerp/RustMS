@@ -3065,6 +3065,7 @@ pub mod keys {
     pub const EUREK_SUMMONING_ROCK: &str = "eurek.summoning_rock";
     pub const EUREK_WAYS: &str = "eurek.ways";
     pub const EUREK_WAY: &str = "eurek.way";
+    pub const CHICO_HELLO: &str = "chico.hello";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5207,6 +5208,7 @@ mod tests {
                 keys::EUREK_SUMMONING_ROCK,
                 keys::EUREK_WAYS,
                 keys::EUREK_WAY,
+                keys::CHICO_HELLO,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
