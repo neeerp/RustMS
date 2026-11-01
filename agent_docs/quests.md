@@ -393,6 +393,23 @@ document (926120000; see `map-travel.md`, `magatia_dark0`), gives it
 silently to a player on 3309 who holds none,
 or says to free an Etc slot (`alcadno_cabinet.full`); otherwise clicking
 it does nothing (Cosmic `2111010.js`).
+The five Demon's Doorways in Victoria Island (`npc_scripts::DEMONS_DOORWAYS`,
+9201128-9201132) each serve one job's demon quest (Dances with Andras!,
+Marbas the Demon!, Catch Valefor!, The Final Battle with Amdusias, Treasure,
+and Crocell the Demon). A player on that quest holding the emblem it gives
+on its start is asked whether to go through (`demons_doorway.ask`), and on a
+yes the door takes any leftovers of the quest line's earlier steps and
+warps to the demon's strolling path (677000000-677000008, even ids).
+Without the emblem it says only an emblem lifts the force
+(`demons_doorway.emblem`); off the quest it is sealed
+(`demons_doorway.sealed`). Astaroth's Doorway (9201133) by the swamp
+105050400 lets one on 28283 wearing Wild Eye's Gas Mask (1003036) into the
+Fog Forest (677000010), or else says to wear it (`astaroths_doorway.mask`).
+In Astaroth's Strolling Place it leads on to the Hiding Place, and from
+there, or from the unreached room 677000013, back out to the swamp
+(`astaroths_doorway.leave`) (Cosmic `9201128.js` to `9201133.js`). The
+demons themselves are placed only in Astaroth's Strolling Place, and the
+hiding places stay empty; neither the data nor Cosmic summons them there.
 Wiz the Librarian (2040052, Helios Tower Library 222020000) ends the eight
 storybook quests (3615-3618, 3630, 3633, 3639, 3920). Talking to Wiz
 otherwise lists the books brought back, one per completed quest
