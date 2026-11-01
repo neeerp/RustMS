@@ -3148,6 +3148,9 @@ pub mod keys {
 
     /// Claudia, once her quest's coupon is spent.
     pub const CLAUDIA_DONE: &str = "claudia.done";
+    pub const SIMON_TEMPLE_ASK: &str = "simon.temple_ask";
+    pub const SIMON_BACK_ASK: &str = "simon.back_ask";
+    pub const SIMON_NO: &str = "simon.no";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5363,6 +5366,9 @@ mod tests {
                 keys::HOLLY_REFUSED,
                 keys::HOLLY_DONE,
                 keys::CLAUDIA_DONE,
+                keys::SIMON_TEMPLE_ASK,
+                keys::SIMON_BACK_ASK,
+                keys::SIMON_NO,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
