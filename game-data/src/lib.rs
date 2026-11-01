@@ -158,6 +158,17 @@ pub struct StorageFees {
     pub get: i32,
 }
 
+/// NPCs with a script but no `info/speak`, whose script only says a line
+/// (as Cosmic's do), and so say their own String.nx `d0`: Kiruru, Kiru and
+/// the two Puros on board the ships to and from Ereve and Rien, Andy by the
+/// Tera Forest Time Gate, Sejan in Ariant, Spindle in Ludibrium, the
+/// Glimmer Man in New Leaf City, Witch Malady and the Steward by the Haunted
+/// House, and Santa in Happyville.
+pub const DEFAULT_LINE_NPCS: [i32; 11] = [
+    1100005, 1100006, 1200005, 1200006, 2082004, 2101011, 9201082, 9201083, 9201142, 9201143,
+    9310058,
+];
+
 #[derive(Debug, Default)]
 pub struct NpcDialogueData {
     dialogues: BTreeMap<i32, NpcDialogueTemplate>,
@@ -192,10 +203,16 @@ impl NpcDialogueData {
                 let get = npcs.int_child(info, "trunkGet")?.unwrap_or(0);
                 storages.insert(npc_id, StorageFees { put, get });
             }
-            let Some(speak) = npcs.child_by_name(info, "speak")? else {
+            let Some(texts) = strings.child_by_name(names, &npc_id.to_string())? else {
                 continue;
             };
-            let Some(texts) = strings.child_by_name(names, &npc_id.to_string())? else {
+            let Some(speak) = npcs.child_by_name(info, "speak")? else {
+                if DEFAULT_LINE_NPCS.contains(&npc_id) {
+                    if let Some(text) = strings.string_child(texts, "d0")? {
+                        let pages = vec![text];
+                        dialogues.insert(npc_id, NpcDialogueTemplate { npc_id, pages });
+                    }
+                }
                 continue;
             };
             let mut keys = Vec::new();
@@ -1747,6 +1764,22 @@ mod tests {
         assert!(rain.pages[1].contains("Alt"));
         assert!(rain.pages[2].contains("arrow keys"));
         assert!(data.dialogue(-1).is_none());
+    }
+
+    #[test]
+    fn scripted_npcs_without_speech_say_their_default_line() {
+        let (Some(npc), Some(string)) =
+            (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
+        else {
+            return;
+        };
+        let data = NpcDialogueData::load_from_nx(npc, string).expect("load NPC dialogue assets");
+        for npc_id in DEFAULT_LINE_NPCS {
+            let line = data.dialogue(npc_id).expect("a default line");
+            assert_eq!(line.pages.len(), 1, "{npc_id}");
+        }
+        let spindle = &data.dialogue(9201082).unwrap().pages[0];
+        assert!(spindle.contains("Spindle"));
     }
 
     #[test]
