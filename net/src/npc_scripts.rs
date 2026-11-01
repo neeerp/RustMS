@@ -117,6 +117,9 @@ pub const DEBBIE: i32 = 9201006;
 /// Pila, in Amoria and the halls, who keeps the wedding gifts
 /// (`NpcScript::pila`).
 pub const PILA: i32 = 9201014;
+/// Ames the Wise in the room every wedding ends in, which has no portal
+/// out: the way back to Amoria (Cosmic `9201049.js`).
+pub const AMES_AT_THE_EXIT: i32 = 9201049;
 /// Lakelis, who sends parties into Kerning City's party quest; her script
 /// needs to know whether the party may go (`NpcScript::lakelis`).
 pub const LAKELIS: i32 = 9020000;
@@ -2824,6 +2827,11 @@ impl NpcScript {
             FROD => return Some(pet_course_end(&HENESYS_PET_COURSE, player)),
             GRASSY_LUMP => return Some(grassy_lump(player)),
             SAGE | UPPER_SAGE => return Some(sage(npc_id, player)),
+            AMES_AT_THE_EXIT => {
+                let back = Page::Done(vec![Effect::Warp(wedding::AMORIA)]);
+                let pages = vec![Page::Say(text(keys::WEDDING_EXIT_BACK)), back];
+                return Some(NpcScript::new(npc_id, pages));
+            }
             id if JOB_STATUES.iter().any(|statue| statue.0 == id) => {
                 let statue = JOB_STATUES.iter().find(|statue| statue.0 == id);
                 return statue.map(|statue| job_statue(statue, player));
@@ -23656,6 +23664,16 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn ames_sends_everyone_out_of_the_wedding_exit_back_to_amoria() {
+        let mut talk = NpcScript::for_npc(AMES_AT_THE_EXIT, &player(50)).unwrap();
+        assert_eq!(page_text(&talk.begin()), text(keys::WEDDING_EXIT_BACK));
+        assert_eq!(
+            talk.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Warp(wedding::AMORIA)]
+        );
     }
 
     #[test]

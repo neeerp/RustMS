@@ -193,6 +193,7 @@
 "sage.sigils" = "[placeholder] A hint for the road ahead: the Sigils wake to the skills of certain jobs used near them. Bring a full team."
 "sage.keep" = "[placeholder] The Keep is just ahead. Well done; go on through these woods to its gates."
 "sage.ordeal" = "[placeholder] You are doing well. This trial still stands between you and the Keep, so press on."
+"wedding.exit.back" = "[placeholder] I hope the wedding was a joy. I will send you back to #bAmoria#k now."
 "job_statue.warrior.ask" = "[placeholder] Want to become a Warrior? I can send you to the Warriors' Sanctuary in Perion right now. Go?"
 "job_statue.warrior.weak" = "[placeholder] To become a Warrior, train until you are level 10 with 35 STR, then come back to me."
 "job_statue.bowman.ask" = "[placeholder] Want to become a Bowman? I can send you to Athena Pierce's room in Henesys right now. Go?"
