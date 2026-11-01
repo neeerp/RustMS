@@ -125,7 +125,12 @@ namespace ms
 		UI::get().remove(UIElement::Type::PYRAMIDHUD);
 		UI::get().remove(UIElement::Type::PYRAMIDRESULT);
 
-		Window::get().fadeout(
+		// The login stage has no fade out: it cuts to black and only the
+		// field fades in (CLogin inits with 0x776b64 at 0x5f4bba but never
+		// closes with 0x776e65).
+		auto fade = UI::get().in_login() ? &Window::cutout : &Window::fadeout;
+
+		(Window::get().*fade)(
 			[mapid, portalid, chase]()
 			{
 				GraphicsGL::get().clear();
