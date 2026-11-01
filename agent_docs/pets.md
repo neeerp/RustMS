@@ -178,6 +178,9 @@ beside it.
   vary, each in one placeholder page (`cloy.*`). Cloy also sells the Pet AP
   Reset Scroll (4160011) for 250,000 mesos (`npc_scripts::cloy`, QUESTIONS
   b390). Mar the Fairy doesn't take the scroll yet.
+- **Wisp.** Wisp (2040030) at Eos Tower's entrance (220000400) gives the
+  same answers as Cloy, after a choice for a pet that has become a doll
+  again, which Wisp can't help with (`wisp.*`, QUESTIONS b391).
 
 ## Client
 
