@@ -1,6 +1,7 @@
 use crate::actor::field_coconut::{self, CoconutGame, Shot, Turn};
 use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_games::{GameRoomRequest, Games};
+use crate::actor::field_guild_boss::{Chandelier, Swing};
 use crate::actor::field_kites::KiteSet;
 use crate::actor::field_merchants::{MerchantRequest, Merchants};
 use crate::actor::field_mists::MistSet;
@@ -43,6 +44,9 @@ use net::packet::build::world::effect::{
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair,
     build_show_consume_effect, parse_movement, parse_movement_state,
+};
+use net::packet::build::world::guild_boss::{
+    build_guild_boss_healer_move, build_guild_boss_pulley_state,
 };
 use net::packet::build::world::kite::{build_remove_kite, build_spawn_kite, KiteView};
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
@@ -364,6 +368,8 @@ pub struct FieldActor {
     coconut: Option<CoconutGame>,
     /// On a Snowball field (field type 1), its game.
     snowball: Option<SnowballGame>,
+    /// In Ergoth's room (field type 8), the chandelier over the altar.
+    chandelier: Option<Chandelier>,
     /// On the OX Quiz's field (field type 5), its game.
     ox: Option<OxGame>,
     /// On one of a timed GM event's maps, the event while it is on.
@@ -486,6 +492,11 @@ impl FieldActor {
                 .and_then(|data| data.field(key.map_id))
                 .and_then(|field| field.coconut.clone())
                 .map(CoconutGame::new),
+            chandelier: net::get_game_data()
+                .ok()
+                .and_then(|data| data.field(key.map_id))
+                .and_then(|field| field.guild_boss.clone())
+                .map(Chandelier::new),
             snowball: net::get_game_data()
                 .ok()
                 .and_then(|data| data.field(key.map_id))
@@ -650,6 +661,7 @@ impl FieldActor {
             }
         }
         self.tick_coconut(now);
+        self.tick_chandelier(now);
         self.tick_snowball(now);
         self.tick_ox(now);
         self.tick_race(now);
@@ -1192,6 +1204,7 @@ impl FieldActor {
                 FieldRequest::Weather { item_id, message } => self.blow_weather(item_id, message),
                 FieldRequest::Kite { item_id, message } => self.fly_kite(from, item_id, message),
                 FieldRequest::CoconutHit { index } => self.hit_coconut(from, index),
+                FieldRequest::PullPulley => self.pull_pulley(from),
                 FieldRequest::SnowballHit { target, delay } => {
                     self.hit_snowball(from, target, delay)
                 }
@@ -2874,35 +2887,12 @@ impl FieldActor {
         {
             return;
         }
-        let Some(max_hp) = self.mobs.get(object_id).map(|mob| mob.info.max_hp) else {
-            return;
-        };
-        if self.mobs.shielded(object_id) {
+        if self.mobs.get(object_id).is_none() || self.mobs.shielded(object_id) {
             return;
         }
         self.trapped.insert(object_id, now);
-        // No client draws a trap's number itself, so all see it here, the
-        // last one too.
-        let show = |field: &Self, hp: i32| {
-            if let Ok(packet) = build_damage_mob(object_id, damage, hp, max_hp) {
-                field.broadcast(None, packet);
-            }
-        };
-        match self.mobs.damage(from, object_id, i64::from(damage), now) {
-            Some(Ok(_)) => {
-                let Some(mob) = self.mobs.get(object_id) else {
-                    return;
-                };
-                show(self, i32::try_from(mob.hp).unwrap_or(i32::MAX));
-                let bar = self.mobs.bar_for(object_id);
-                self.show_boss_bar(bar);
-            }
-            Some(Err(kill)) => {
-                show(self, 0);
-                self.trapped.remove(&object_id);
-                self.killed(&kill);
-            }
-            None => {}
+        if self.crush_mob(from, object_id, damage, now) {
+            self.trapped.remove(&object_id);
         }
     }
 
@@ -5249,6 +5239,19 @@ impl FieldActor {
                 handle.send_packet(packet);
             }
         }
+        if let Some(chandelier) = &self.chandelier {
+            let packets = [
+                chandelier
+                    .lowered()
+                    .then(|| build_guild_boss_healer_move(chandelier.y())),
+                chandelier
+                    .locked()
+                    .then(|| build_guild_boss_pulley_state(1)),
+            ];
+            for packet in packets.into_iter().flatten().flatten() {
+                handle.send_packet(packet);
+            }
+        }
         if let Some(game) = &self.snowball {
             for packet in snowball_entry(game, now) {
                 handle.send_packet(packet);
@@ -5482,6 +5485,91 @@ impl FieldActor {
         let line = net::content::text().get(key, &[("name", &name)]);
         if let Ok(packet) = build_broadcast(Broadcast::Pink, &line) {
             self.broadcast(None, packet);
+        }
+    }
+
+    /// `from` hit the pulley in Ergoth's room: the chandelier drops, and
+    /// the pulley locks for everyone until it is back up.
+    fn pull_pulley(&mut self, from: ClientId) {
+        let Some(chandelier) = &mut self.chandelier else {
+            return;
+        };
+        if !chandelier.pull(from, Instant::now()) {
+            return;
+        }
+        if let Ok(packet) = build_guild_boss_pulley_state(1) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// The chandelier moves; where it lands, each mob under it takes its
+    /// damage, credited to whoever pulled it (QUESTIONS b379).
+    fn tick_chandelier(&mut self, now: Instant) {
+        let Some(chandelier) = &mut self.chandelier else {
+            return;
+        };
+        let Some(swing) = chandelier.tick(now) else {
+            return;
+        };
+        let (span, damage) = (chandelier.span(), chandelier.damage());
+        let y = match swing {
+            Swing::Moved(y) | Swing::Landed { y, .. } | Swing::Freed(y) => y,
+        };
+        if let Ok(packet) = build_guild_boss_healer_move(y) {
+            self.broadcast(None, packet);
+        }
+        match swing {
+            Swing::Moved(_) => {}
+            Swing::Landed { by, .. } => {
+                let under: Vec<i32> = (self.mobs.live())
+                    .filter(|mob| span.contains(&i32::from(mob.x)))
+                    .map(|mob| mob.object_id)
+                    .collect();
+                let mut rng = rand::thread_rng();
+                for object_id in under {
+                    let hit = rng.gen_range(*damage.start(), *damage.end() + 1);
+                    self.crush_mob(by, object_id, hit, now);
+                }
+            }
+            Swing::Freed(_) => {
+                if let Ok(packet) = build_guild_boss_pulley_state(0) {
+                    self.broadcast(None, packet);
+                }
+            }
+        }
+    }
+
+    /// Mob `object_id` takes `damage` from something `from` set off, a
+    /// trap or the chandelier, unless it is shielded; whether it died. No
+    /// client draws such a number itself, so all see it here, the last one
+    /// too.
+    fn crush_mob(&mut self, from: ClientId, object_id: i32, damage: i32, now: Instant) -> bool {
+        let Some(max_hp) = self.mobs.get(object_id).map(|mob| mob.info.max_hp) else {
+            return false;
+        };
+        if self.mobs.shielded(object_id) {
+            return false;
+        }
+        let show = |field: &Self, hp: i32| {
+            if let Ok(packet) = build_damage_mob(object_id, damage, hp, max_hp) {
+                field.broadcast(None, packet);
+            }
+        };
+        match self.mobs.damage(from, object_id, i64::from(damage), now) {
+            Some(Ok(_)) => {
+                if let Some(mob) = self.mobs.get(object_id) {
+                    show(self, i32::try_from(mob.hp).unwrap_or(i32::MAX));
+                    let bar = self.mobs.bar_for(object_id);
+                    self.show_boss_bar(bar);
+                }
+                false
+            }
+            Some(Err(kill)) => {
+                show(self, 0);
+                self.killed(&kill);
+                true
+            }
+            None => false,
         }
     }
 
@@ -6964,6 +7052,110 @@ mod tests {
             [down]
         );
         assert_eq!(actor.kites.views().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn the_pulley_drops_the_chandelier_on_the_mobs_below() {
+        use crate::actor::field_guild_boss::STEP;
+        let (tank, mut info) = mob(300, false);
+        info.max_hp = 100_000;
+        let mut mobs = MobSet::new([(tank, info), mob(350, false), mob(100, false)]);
+        let spawned = mobs.spawn_all(Instant::now());
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 990000900),
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        actor.chandelier = Some(Chandelier::new(game_data::GuildBoss {
+            healer_x: 295,
+            y_min: -564,
+            y_max: -350,
+            rise: 1,
+            fall: 10,
+            heal_min: 1000,
+            heal_max: 2000,
+            pulley_x: -59,
+            pulley_y: -394,
+        }));
+        let of = |packets: &[Packet], op: SendOpcode| -> Vec<Vec<u8>> {
+            let op = op as i16;
+            packets
+                .iter()
+                .filter(|packet| packet.opcode() == op)
+                .map(|packet| packet.bytes[2..].to_vec())
+                .collect()
+        };
+        let (first, mut first_rx) = client(1);
+        actor.handle_message(FieldMessage::Join {
+            handle: first,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        });
+        let joined = sent(&mut first_rx);
+        assert!(of(&joined, SendOpcode::GuildBossHealerMove).is_empty());
+        assert!(of(&joined, SendOpcode::GuildBossPulleyState).is_empty());
+
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::PullPulley,
+        });
+        let pulled = Instant::now();
+        assert_eq!(
+            of(&sent(&mut first_rx), SendOpcode::GuildBossPulleyState),
+            [vec![1]]
+        );
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::PullPulley,
+        });
+        assert!(sent(&mut first_rx).is_empty(), "the pulley is locked");
+        actor.on_tick(pulled + STEP);
+        let fell = sent(&mut first_rx);
+        let y = (-554i16).to_le_bytes().to_vec();
+        assert_eq!(of(&fell, SendOpcode::GuildBossHealerMove), [y]);
+
+        // A newcomer sees it lowered and the pulley locked.
+        let (second, mut second_rx) = client(2);
+        actor.handle_message(FieldMessage::Join {
+            handle: second,
+            avatar: avatar(2, 0, 0),
+            party: None,
+        });
+        let joined = sent(&mut second_rx);
+        assert_eq!(of(&joined, SendOpcode::GuildBossHealerMove).len(), 1);
+        assert_eq!(of(&joined, SendOpcode::GuildBossPulleyState), [vec![1]]);
+
+        // It lands on the two mobs under it, killing the weak one, and
+        // misses the one beside it.
+        actor.on_tick(pulled + STEP * 22);
+        let landed = sent(&mut second_rx);
+        let y = (-350i16).to_le_bytes().to_vec();
+        assert_eq!(of(&landed, SendOpcode::GuildBossHealerMove), [y]);
+        assert_eq!(of(&landed, SendOpcode::DamageMonster).len(), 2);
+        assert_eq!(of(&landed, SendOpcode::KillMonster).len(), 1);
+        let tank = actor.mobs.get(spawned[0]).unwrap();
+        assert!((98_000..=99_000).contains(&tank.hp), "{}", tank.hp);
+        assert_eq!(tank.damage_by.get(&1), Some(&(100_000 - tank.hp)));
+        assert!(actor.mobs.get(spawned[1]).is_none());
+        assert_eq!(actor.mobs.get(spawned[2]).unwrap().hp, 8);
+
+        // Wound back up, the pulley frees.
+        actor.on_tick(pulled + STEP * (22 + 214));
+        let freed = sent(&mut second_rx);
+        assert_eq!(of(&freed, SendOpcode::GuildBossPulleyState), [vec![0]]);
+        actor.handle_message(FieldMessage::FromClient {
+            from: 2,
+            request: FieldRequest::PullPulley,
+        });
+        assert_eq!(
+            of(&sent(&mut first_rx), SendOpcode::GuildBossPulleyState).last(),
+            Some(&vec![1])
+        );
     }
 
     fn mob(x: i16, boss: bool) -> (game_data::MapMobTemplate, game_data::mobs::MobInfo) {

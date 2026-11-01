@@ -25,6 +25,7 @@
 #include "Handlers/AriantHandlers.h"
 #include "Handlers/PyramidHandlers.h"
 #include "Handlers/CoconutHandlers.h"
+#include "Handlers/GuildBossHandlers.h"
 #include "Handlers/SnowballHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
@@ -265,6 +266,8 @@ namespace ms
 		LEFT_KNOCK_BACK = 284,
 		COCONUT_HIT = 285,
 		COCONUT_SCORE = 286,
+		GUILD_BOSS_HEALER_MOVE = 287,
+		GUILD_BOSS_PULLEY_STATE = 288,
 		MONSTER_CARNIVAL_START = 289,
 		MONSTER_CARNIVAL_OBTAINED_CP = 290,
 		MONSTER_CARNIVAL_PARTY_CP = 291,
@@ -380,6 +383,8 @@ namespace ms
 		emplace<LEFT_KNOCK_BACK, LeftKnockBackHandler>();
 		emplace<COCONUT_HIT, CoconutHitHandler>();
 		emplace<COCONUT_SCORE, CoconutScoreHandler>();
+		emplace<GUILD_BOSS_HEALER_MOVE, GuildBossHealerMoveHandler>();
+		emplace<GUILD_BOSS_PULLEY_STATE, GuildBossPulleyStateHandler>();
 		emplace<ARIANT_ARENA_USER_SCORE, AriantScoreHandler>();
 		emplace<ARIANT_RESULT, AriantResultHandler>();
 		emplace<PYRAMID_GAUGE, PyramidGaugeHandler>();

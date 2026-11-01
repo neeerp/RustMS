@@ -17,6 +17,7 @@ pub mod family;
 pub mod field;
 pub mod guild;
 pub mod guild_bbs;
+pub mod guild_boss;
 pub mod hammer;
 pub mod hired_merchant;
 pub mod info;

@@ -18,6 +18,7 @@
 #include "SetFieldHandlers.h"
 
 #include "CoconutHandlers.h"
+#include "GuildBossHandlers.h"
 #include "SnowballHandlers.h"
 #include "Timer.h"
 
@@ -92,6 +93,7 @@ namespace ms
 		UI::get().remove(UIElement::Type::MONSTERCARNIVAL);
 		enter_coconut_field(mapid, fieldtype);
 		enter_snowball_field(mapid, fieldtype);
+		enter_guild_boss_field(mapid, fieldtype);
 		UI::get().remove(UIElement::Type::COCONUT);
 		ariant::enter_field(fieldtype);
 		UI::get().remove(UIElement::Type::ARIANT);

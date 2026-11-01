@@ -299,6 +299,24 @@ Ergoth's room (990000900, `KING_ROOM`) is stage 10, the last.
   haven't revived (`EventCommand::Revived`, told as a dead member answers
   the death dialog). With everyone in the room dead and a mob left, the
   quest ends (Cosmic `playerDead`), taking the whole guild out.
+- **The chandelier.** The room is field type 8 (CField_GuildBoss, report
+  b380). Its `healer` node is a chandelier over the altar, and its
+  `pulley` node the pulley that drops it (`game_data::GuildBoss`). A plain
+  attack whose swing reaches the pulley's box, and no reactor, attacks
+  nothing, plays the pulley, and while the pulley is free sends
+  GUILD_BOSS_PULLEY 0xD7, which has no body (`FieldRequest::PullPulley`).
+  The server locks the pulley for all (GUILD_BOSS_PULLEY_STATE 0x120, 1)
+  and drops the chandelier `fall` pixels every 100 ms from `yMin` to
+  `yMax` (GUILD_BOSS_HEALER_MOVE 0x11F, its y). At the bottom it lands on
+  every mob whose x is under its picture (`x` - 124 to `x` + 125), Ergoth
+  below the altar but not its guards, for `healMin` to `healMax` each,
+  credited to whoever pulled. Then it rises `rise` pixels a step, and at
+  the top the pulley frees (0x120, 0). One coming in sees where it hangs
+  and whether the pulley is locked (`runtime/src/actor/field_guild_boss.rs`).
+  The client reads nothing but the two pictures' places and draws both in
+  front of the field (`MapGuildBoss`). The landing, the pace, the damage
+  and who it hits are QUESTIONS b379's picks; the client only shows the
+  chandelier moving.
 
 ## The quest's items
 
@@ -407,4 +425,9 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
   (`the_guild_quest_s_gates_and_spears_stay_set`) the altar and the boxes.
 - `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)
   and `net/src/scripts.rs` (`shuang_briefs_whoever_reaches_sharenians_outskirts`).
+- `integration-harness/tests/guild_boss_chandelier.rs`: a pull locking
+  the pulley and dropping the chandelier to the bottom, and one coming
+  back in seeing both. `runtime/src/actor/field.rs`
+  (`the_pulley_drops_the_chandelier_on_the_mobs_below`) has the landing on
+  the mobs, and `HeavenClient/tests/guild_boss.cpp` the pulley's box.
 - `HeavenClient/tests/guild.cpp`: the waitlist lines.

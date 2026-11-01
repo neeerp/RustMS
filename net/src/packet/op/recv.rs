@@ -220,6 +220,8 @@ pub enum RecvOpcode {
     LeftKnockback = 0xD4,
     /// An attack hit a Coconut Season nut (b167).
     Coconut = 0xD5,
+    /// A swing hit the pulley in Ergoth's room (report b380).
+    GuildBossPulley = 0xD7,
     /// The Monster Carnival window spends CP (v83ref b163).
     MonsterCarnival = 0xDA,
     ContiStateRequest = 0xDC,
