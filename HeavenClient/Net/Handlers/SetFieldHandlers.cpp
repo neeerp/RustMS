@@ -59,6 +59,7 @@
 #include "../../IO/UITypes/UIMemoNotice.h"
 #include "../../IO/UITypes/UIMiniMap.h"
 #include "../../IO/UITypes/UIMobGage.h"
+#include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UIPyramidHud.h"
 #include "../../IO/UITypes/UIPyramidResult.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
@@ -83,6 +84,29 @@ namespace ms
 		{
 			if (recv.length() >= 8)
 				item_expiry::server_offset() = recv.read_long() - item_expiry::now();
+		}
+	}
+
+	namespace
+	{
+		// Every field entered at level 1 with no EXP opens the Maple
+		// Administrator's key guide, an OK dialog that answers nothing
+		// (0x77642f, StringPool 0x399).
+		void show_key_guide()
+		{
+			const CharStats &stats = Stage::get().get_player().get_stats();
+
+			if (stats.get_stat(MapleStat::Id::LEVEL) != 1 || stats.get_exp() != 0)
+				return;
+
+			UI::get().emplace<UINpcTalk>();
+
+			if (auto talk = UI::get().get_element<UINpcTalk>())
+			{
+				talk->change_text(9010000, UINpcTalk::SENDOK, 0, 0,
+					"#eBasic Configuration for MapleStory#n\r\n\r\n#fUI/UIWindow.img/UtilDlgEx/notice#");
+				talk->set_local_responder([](int8_t, int32_t) {});
+			}
 		}
 	}
 
@@ -130,6 +154,8 @@ namespace ms
 				// So do notes left unread (0x5293eb).
 				if (!Memos::Inbox::get().empty() && !UIMemoNotice::showing())
 					UI::get().emplace<UIMemoNotice>();
+
+				show_key_guide();
 			});
 
 		// Bamboo Rain is once a stage, and the Dojo's HUD and its clock go with their field.
