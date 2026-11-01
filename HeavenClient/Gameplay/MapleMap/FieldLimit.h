@@ -180,11 +180,12 @@ namespace ms
 		}
 
 		// v83 FUN_0094c383 and FUN_0094c4f8: bit 0x1 stops jumping, and bit
-		// 0x20000 the down-jump (Down + Jump), for all but GMs. Down + Jump
-		// never falls back to a plain jump.
-		inline bool may_jump(int32_t fieldlimit, bool down)
+		// 0x20000 the down-jump (Down + Jump), for all but GMs (FUN_004f38d3
+		// at 0x94c3d6 and 0x94c510). Down + Jump never falls back to a plain
+		// jump.
+		inline bool may_jump(int32_t fieldlimit, bool down, bool gm)
 		{
-			return !(fieldlimit & (down ? DOWN_JUMP : JUMP));
+			return gm || !(fieldlimit & (down ? DOWN_JUMP : JUMP));
 		}
 
 		// v83 FUN_00678c77: Dark Sight keeps a mob's touch off the player,

@@ -786,8 +786,11 @@ force-and-friction model (`move_normal`).
   (`FUN_0094c4f8`), a platform with `forbidFallDown` refuses the down-jump
   from it, though not onto it, and Down + Jump then does nothing at all.
   A map whose `fieldLimit` has bit 0x20000 refuses the down-jump, and bit
-  0x1 the plain jump (`field_limit::may_jump`). v83 lets GMs past both
-  bits; HeavenClient doesn't know who is a GM.
+  0x1 the plain jump (`field_limit::may_jump`). As in v83 (`FUN_004f38d3`
+  at 0x94c3d6 and 0x94c510), a GM account (the login grade's bit 0x1)
+  passes both bits. A GM is also let past bit 0x2 for Teleport, Flash Jump,
+  Wings and Combat Step, but not for Monster Magnet, Dash or the
+  transformations.
 - **Knockback.** A hit that does damage, and that the stance roll doesn't
   block, knocks the player away from the mob and up at 270 px/s, or 200 px/s
   under Power Guard. It also knocks the player off ladders and ropes.
