@@ -6356,6 +6356,22 @@ mod tests {
     }
 
     #[test]
+    fn the_haunted_houses_mobs_drop_cosmics_tables_without_the_pack() {
+        let table = RewardTable::load(None).unwrap();
+        let lens: Vec<_> = (9400638..=9400640).map(|m| table.drops(m).len()).collect();
+        assert_eq!(lens, [11, 17, 16]);
+        let jack = table.drops(9400557);
+        assert_eq!(
+            (jack.len(), jack[0].item, jack[0].prob),
+            (1, Some(2022245), 0.003)
+        );
+        let skeleton = table.drops(9400638);
+        assert_eq!((skeleton[0].money, skeleton[0].prob), (Some(150), 0.4));
+        let arrows = skeleton.iter().find(|d| d.item == Some(2060000)).unwrap();
+        assert_eq!((arrows.min, arrows.max), (Some(26), Some(33)));
+    }
+
+    #[test]
     fn mvs_lairs_chests_and_mv_in_its_treasure_room_drop_without_the_pack() {
         let table = RewardTable::load(None).unwrap();
         let chest = table.reactor_drops(6742014);
