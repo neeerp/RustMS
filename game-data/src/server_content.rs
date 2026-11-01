@@ -1665,6 +1665,14 @@ pub mod keys {
     pub const MUIRHAT_SCROLL: &str = "muirhat.scroll";
     pub const MUIRHAT_FULL: &str = "muirhat.full";
     pub const MUIRHAT_CHASE: &str = "muirhat.chase";
+    pub const HOTEL_WELCOME: &str = "hotel.welcome";
+    pub const HOTEL_MENU: &str = "hotel.menu";
+    pub const HOTEL_REGULAR: &str = "hotel.regular";
+    pub const HOTEL_VIP: &str = "hotel.vip";
+    pub const HOTEL_REGULAR_ASK: &str = "hotel.regular_ask";
+    pub const HOTEL_VIP_ASK: &str = "hotel.vip_ask";
+    pub const HOTEL_DECLINED: &str = "hotel.declined";
+    pub const HOTEL_SHORT: &str = "hotel.short";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5239,6 +5247,14 @@ mod tests {
                 keys::MUIRHAT_SCROLL,
                 keys::MUIRHAT_FULL,
                 keys::MUIRHAT_CHASE,
+                keys::HOTEL_WELCOME,
+                keys::HOTEL_MENU,
+                keys::HOTEL_REGULAR,
+                keys::HOTEL_VIP,
+                keys::HOTEL_REGULAR_ASK,
+                keys::HOTEL_VIP_ASK,
+                keys::HOTEL_DECLINED,
+                keys::HOTEL_SHORT,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],

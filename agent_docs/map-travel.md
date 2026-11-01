@@ -274,6 +274,15 @@ Their keys (`statue.*`, `crumbling.ask`, `time_gate.*`) are `unsourced`;
 menu labels are map names (`#m<map id>#`). `statues_and_time_gate.rs` checks
 them through the network harness.
 
+The Sleepywood Hotel's receptionist (`1061100`, `hotel1`, in `105040400`)
+greets the guest, then offers the regular sauna (`105040401`, 499 mesos) or
+the VIP sauna (`105040402`, 999 mesos) and asks before each; yes pays and
+goes in at portal 0, no says so, and a guest short of the price hears that
+after the yes. The prices are Cosmic's (`1061100.js`); the maps' own
+`recovery` (2.0 and 3.0) speeds HP and MP inside. The `hotel.*` keys are
+`unsourced`. `sleepywood_hotel.rs` checks a short guest and the VIP sauna
+through the network harness.
+
 ## Tower rocks
 
 Magic rocks in two towers move the player between floors, and each move

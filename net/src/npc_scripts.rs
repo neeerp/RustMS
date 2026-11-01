@@ -2523,6 +2523,9 @@ impl NpcScript {
         if npc_id == SMALL_TREE_STUMP {
             return Some(small_tree_stump(player));
         }
+        if npc_id == HOTEL_RECEPTIONIST {
+            return Some(hotel_receptionist(player));
+        }
         if npc_id == NAUTILUS_TRASH_CAN {
             return Some(nautilus_trash_can(player));
         }
@@ -12995,6 +12998,38 @@ fn gated(
     pages
 }
 
+/// The Sleepywood Hotel's receptionist (105040400, Npc.nx `hotel1`) and
+/// the two saunas, each with its price (as in Cosmic's `1061100.js`); the
+/// maps' own `recovery` speeds HP and MP there.
+pub const HOTEL_RECEPTIONIST: i32 = 1061100;
+pub const SAUNAS: [(i32, i32); 2] = [(105040401, 499), (105040402, 999)];
+
+fn hotel_receptionist(player: &Player) -> NpcScript {
+    let room = |(label, ask): (&str, &str), (map_id, price): (i32, i32)| {
+        let label = content::text().get(label, &[("price", &price.to_string())]);
+        let pages = ride(
+            text(ask),
+            Some(keys::HOTEL_DECLINED),
+            keys::HOTEL_SHORT,
+            price,
+            Effect::WarpToPortal(map_id, 0),
+            player,
+        );
+        (label, pages)
+    };
+    let pages = vec![
+        Page::Say(text(keys::HOTEL_WELCOME)),
+        Page::Menu {
+            text: text(keys::HOTEL_MENU),
+            choices: vec![
+                room((keys::HOTEL_REGULAR, keys::HOTEL_REGULAR_ASK), SAUNAS[0]),
+                room((keys::HOTEL_VIP, keys::HOTEL_VIP_ASK), SAUNAS[1]),
+            ],
+        },
+    ];
+    NpcScript::new(HOTEL_RECEPTIONIST, pages)
+}
+
 /// `world_trip`: Spinel's tour from where the player stands, or at the
 /// Mushroom Shrine the way back.
 fn spinel(player: &Player) -> NpcScript {
@@ -22399,6 +22434,33 @@ mod tests {
             Effect::WarpToPortal(scripts::DISCIPLES_HIDEOUT, 0),
         ];
         assert_eq!(says(&pirate), (text(keys::MUIRHAT_SCROLL), sent));
+    }
+
+    #[test]
+    fn the_hotel_receptionist_lets_a_guest_into_a_sauna_for_its_price() {
+        let mut guest = player(50);
+        guest.meso = 999;
+        for (choice, (map_id, price)) in SAUNAS.into_iter().enumerate() {
+            let mut script = NpcScript::for_npc(HOTEL_RECEPTIONIST, &guest).unwrap();
+            assert_eq!(page_text(&script.begin()), text(keys::HOTEL_WELCOME));
+            let menu = script.respond(ScriptInput::Next).unwrap();
+            assert_eq!(kind(&menu), Some(4));
+            let ask = script.respond(ScriptInput::Select(choice as i32)).unwrap();
+            assert_eq!(kind(&ask), Some(1));
+            let paid = script.respond(ScriptInput::Yes).unwrap();
+            let into = vec![Effect::SpendMeso(price), Effect::WarpToPortal(map_id, 0)];
+            assert_eq!(paid.effects, into);
+        }
+
+        // Short of the VIP price, the guest hears so after the yes.
+        guest.meso = 998;
+        let mut script = NpcScript::for_npc(HOTEL_RECEPTIONIST, &guest).unwrap();
+        script.begin();
+        script.respond(ScriptInput::Next).unwrap();
+        script.respond(ScriptInput::Select(1)).unwrap();
+        let short = script.respond(ScriptInput::Yes).unwrap();
+        assert!(short.effects.is_empty());
+        assert_eq!(page_text(&short), text(keys::HOTEL_SHORT));
     }
 
     #[test]
