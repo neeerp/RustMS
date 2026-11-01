@@ -44,8 +44,11 @@ namespace ms
 			opacities = {src["a0"], src["a1"]};
 		} else if (hasa0)
 		{
+			// a0 alone holds the frame at that alpha: the login logo's 255 after its fade-in, the rings' 225-255
+			// steps, Molten Rock's blank 0 pauses. The client hands -1 for the missing a1 to the layer
+			// (0x63e63d).
 			uint8_t a0 = src["a0"];
-			opacities = {a0, 255 - a0};
+			opacities = {a0, a0};
 		} else if (hasa1)
 		{
 			uint8_t a1 = src["a1"];
