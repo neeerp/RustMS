@@ -200,6 +200,12 @@ namespace ms
 
 		bool quickslot_active;
 		Menu menu;
+		// The menu entry Enter picks, 0 for none, and whether the cursor is on one: the cursor coming onto an entry
+		// moves the focus there and going off it drops the focus (FUN_0084a453).
+		uint16_t menu_focus;
+		bool menu_hovered;
+
+		void show_menu_focus();
 
 		Animation key_hints[Key::NUM_KEYS];
 		// Steps left for each key's glow; 0 when it is off.

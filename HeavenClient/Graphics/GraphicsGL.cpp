@@ -354,10 +354,12 @@ namespace ms
 				height = h;
 		}
 
+		// A face that doesn't fit starts a row below the current one, whose
+		// top is fontborder's y and whose tallest glyph is fontymax.
 		if (fontborder.x() + width > ATLASW)
 		{
 			fontborder.set_x(0);
-			fontborder.set_y(fontymax);
+			fontborder.set_y(fontborder.y() + fontymax);
 			fontymax = 0;
 		}
 
