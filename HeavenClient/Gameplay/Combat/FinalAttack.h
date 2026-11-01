@@ -45,6 +45,12 @@ namespace ms
 			return skill == 11101002 || skill == 13101002;
 		}
 
+		// The temp-stat bit of that buff: the Dawn Warrior's 63, the Wind Archer's 64 (0x957891).
+		inline uint8_t buff_bit(int32_t skill)
+		{
+			return skill == 11101002 ? 63 : 64;
+		}
+
 		// Slash Blast, an explorer's or a Dawn Warrior's.
 		inline bool slash_blast(int32_t skill)
 		{

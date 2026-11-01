@@ -45,7 +45,9 @@ namespace ms
 			BERSERK_FURY,
 			DIVINE_BODY,
 			SPARK,
+			// The Dawn Warrior's and the Wind Archer's Final Attacks, rolled only under these.
 			FINALATTACK,
+			WIND_FINALATTACK,
 			BATTLESHIP,
 			WATK,
 			WDEF,

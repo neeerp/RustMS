@@ -224,7 +224,10 @@ on its own after a skill attack whose skill lists it under `finalAttack`
 attack packet with the Final Attack's id and level, costs no MP (the
 Cygnus ones have an `mpCon` for their buff), and hits one mob, except that
 after Slash Blast (bit 0 of the attack's flags) it reaches as many as the
-player's Slash Blast does (`skills::slash_blast`).
+player's Slash Blast does (`skills::slash_blast`). The Dawn Warrior's and
+the Wind Archer's (11101002, 13101002) are cast first as buffs, temp-stat
+bits 63 and 64 (`BuffStat::DawnFinalAttack`, `WindFinalAttack`), and the
+client rolls their swing or shot only while that buff is on.
 Assassinate (4221001) goes only from Dark Sight, and in Dark Sight nothing
 else goes. The client sends CANCEL_BUFF for Dark Sight, then a 3-line
 strike; an attack delay later, if that found a mob, it strikes that mob

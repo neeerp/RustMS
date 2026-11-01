@@ -1728,9 +1728,11 @@ namespace ms
 		{
 			int32_t level = player.get_skills().get_level(skill);
 
-			// The Cygnus Knights' come up only under their buff, which the
-			// server doesn't give yet.
-			if (level <= 0 || final_attack::needs_buff(skill))
+			// The Cygnus Knights' come up only under their buff.
+			if (level <= 0)
+				continue;
+
+			if (final_attack::needs_buff(skill) && !player.has_buff(Buffstat::by_bit(final_attack::buff_bit(skill))))
 				continue;
 
 			if (std::find(types.begin(), types.end(), weapon) == types.end())

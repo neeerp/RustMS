@@ -1304,6 +1304,10 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         21120007 => vec![(BuffStat::ComboBarrier, effect.x)],
         crate::aran_combo::BODY_PRESSURE => vec![(BuffStat::BodyPressure, effect.x)],
         21111001 => vec![(BuffStat::SmartKnockback, effect.x)],
+        // The knights' Final Attacks, which the client rolls only under
+        // these (report 194-final-attack).
+        11101002 => vec![(BuffStat::DawnFinalAttack, effect.x)],
+        13101002 => vec![(BuffStat::WindFinalAttack, effect.x)],
         2001002 | 12001001 => vec![(BuffStat::MagicGuard, effect.x)],
         2301003 => vec![(BuffStat::Invincible, effect.x)],
         2311003 => vec![(BuffStat::HolySymbol, effect.x)],
@@ -1523,6 +1527,10 @@ mod tests {
         assert_eq!(stats(21120007, 30), [(BuffStat::ComboBarrier, 800)]);
         assert_eq!(stats(21101003, 20), [(BuffStat::BodyPressure, 5)]);
         assert_eq!(stats(21111001, 20), [(BuffStat::SmartKnockback, 10)]);
+        assert_eq!(stats(11101002, 30), [(BuffStat::DawnFinalAttack, 1)]);
+        assert_eq!(stats(13101002, 30), [(BuffStat::WindFinalAttack, 1)]);
+        assert_eq!(BuffStat::DawnFinalAttack.bit(), 63);
+        assert_eq!(BuffStat::WindFinalAttack.bit(), 64);
     }
 
     #[test]
