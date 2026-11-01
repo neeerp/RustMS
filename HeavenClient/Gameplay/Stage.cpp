@@ -1062,10 +1062,12 @@ namespace ms
 	}
 
 	// v83 checks a Teleport skill against the map and any pending move
-	// before it looks for where to go (FUN_00957b74).
+	// before it looks for where to go (FUN_00957b74). A GM may teleport
+	// where the map forbids it.
 	void Stage::use_teleport(int32_t skill)
 	{
-		bool allowed = mapinfo.can_use_movement_skills() && !pending_teleport && teleport_cooldown <= 0;
+		bool gm = Configuration::get().get_grade().gm();
+		bool allowed = (mapinfo.can_use_movement_skills() || gm) && !pending_teleport && teleport_cooldown <= 0;
 
 		if (std::optional<teleport::Spot> spot = combat.use_teleport(skill, allowed))
 		{
@@ -1079,10 +1081,12 @@ namespace ms
 	}
 
 	// v83 lets Flash Jump go only in the air, and leaves its effect where
-	// the player was (FUN_0096be38).
+	// the player was (FUN_0096be38). The map's ban spares a GM.
 	void Stage::use_flash_jump(int32_t skill)
 	{
-		if (!combat.use_flash_jump(skill, mapinfo.can_use_movement_skills(), player.may_flash_jump()))
+		bool allowed = mapinfo.can_use_movement_skills() || Configuration::get().get_grade().gm();
+
+		if (!combat.use_flash_jump(skill, allowed, player.may_flash_jump()))
 			return;
 
 		player.flash_jump(player.get_skills().get_level(skill));
@@ -1091,13 +1095,16 @@ namespace ms
 
 	// v83 casts Wings from a foothold or the water, jumps, and glides the
 	// player down once falling (FUN_00957a1f). The jump can still fail
-	// after the cast, as where the map forbids jumping (FUN_009b21da).
+	// after the cast, as where the map forbids jumping (FUN_009b21da). The
+	// map's ban on the skill spares a GM.
 	void Stage::use_wings(int32_t skill)
 	{
-		if (!combat.use_wings(skill, mapinfo.can_use_movement_skills(), player.may_wings()))
+		bool gm = Configuration::get().get_grade().gm();
+
+		if (!combat.use_wings(skill, mapinfo.can_use_movement_skills() || gm, player.may_wings()))
 			return;
 
-		if (!field_limit::may_jump(mapinfo.get_fieldlimit(), false))
+		if (!field_limit::may_jump(mapinfo.get_fieldlimit(), false, gm))
 			return;
 
 		const SkillData::Stats &stats = SkillData::get(skill).get_stats(player.get_skills().get_level(skill));

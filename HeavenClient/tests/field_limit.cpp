@@ -37,9 +37,11 @@ int main()
 
 		require(may_buff(0, 5001005) && may_buff(0x2, 1001003), "bit 0x2 leaves other buffs alone");
 		require(!may_buff(0x2, 5001005) && !may_buff(0x2, 13111005), "but stops Dash and Albatross");
-		require(may_jump(0, false) && may_jump(0, true), "an open map allows both jumps");
-		require(!may_jump(0x1, false) && may_jump(0x1, true), "bit 0x1 stops only the plain jump");
-		require(may_jump(0x20000, false) && !may_jump(0x20000, true), "bit 0x20000 stops only the down-jump");
+		require(may_jump(0, false, false) && may_jump(0, true, false), "an open map allows both jumps");
+		require(!may_jump(0x1, false, false) && may_jump(0x1, true, false), "bit 0x1 stops only the plain jump");
+		require(may_jump(0x20000, false, false) && !may_jump(0x20000, true, false),
+				"bit 0x20000 stops only the down-jump");
+		require(may_jump(0x20001, false, true) && may_jump(0x20001, true, true), "neither stops a GM");
 
 		require(is_use_item(2000000) && is_use_item(2450000), "potions and the like go as USE_ITEM");
 		require(!is_use_item(2030000) && !is_use_item(2280000) && !is_use_item(2100000),

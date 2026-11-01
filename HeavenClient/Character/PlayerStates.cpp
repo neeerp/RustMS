@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PlayerStates.h"
 
+#include "../Configuration.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
 
@@ -67,7 +68,9 @@ namespace ms
 	{
 		bool down = player.is_key_down(KeyAction::Id::DOWN);
 
-		if (!field_limit::may_jump(Stage::get().get_mapinfo().get_fieldlimit(), down))
+		bool gm = Configuration::get().get_grade().gm();
+
+		if (!field_limit::may_jump(Stage::get().get_mapinfo().get_fieldlimit(), down, gm))
 			return;
 
 		if (!player.may_jump_afloat())
