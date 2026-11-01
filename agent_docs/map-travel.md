@@ -235,6 +235,17 @@ they next enter. The other `lvForceMove` maps (Kerning Square's 51,
 the Mushroom Castle's 39) are left alone. GMs pass both checks.
 `map_level_rules.rs` checks them through the network harness.
 
+Power B. Fore stands by each job's town (`1012119` by Henesys, `1022105`
+by Perion, `1032114` by Ellinia, `1052114` by Kerning City, `1095002` by
+Nautilus; Npc.nx `enter_archer` and the like) and offers its job's five
+Training Centers to a player under level 20, each to portal 0 while fewer
+than five are in it on the channel (`Effect::RequireRoom`, as Cosmic's
+`maxp`); a full one is refused with a line, and a player of level 20 or
+more hears only that the Centers are for those under it. Cosmic's special
+Training Center for Evan quests 22515-22518 (`910060100`) is not in the
+v83 data. `power_b_fore.rs` checks the entry, a full room and the level
+through the network harness.
+
 ## Menu warps
 
 These NPCs warp straight off a menu choice, with no question after it

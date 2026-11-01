@@ -1314,11 +1314,11 @@ pub enum DirectoryMessage {
         portal: u8,
         reply: tokio::sync::oneshot::Sender<Result<i32, net::dungeons::Refusal>>,
     },
-    /// Whether anyone is on `map_id` in `channel_id`.
-    MapOccupied {
+    /// How many are on `map_id` in `channel_id`.
+    MapCount {
         channel_id: u8,
         map_id: i32,
-        reply: tokio::sync::oneshot::Sender<bool>,
+        reply: tokio::sync::oneshot::Sender<usize>,
     },
     /// Send a packet to whichever of these characters are online.
     Deliver {
