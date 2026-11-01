@@ -167,6 +167,11 @@ namespace ms
 		return mist::item_busy(areas(), owner, itemid, position.x(), position.y());
 	}
 
+	bool MapMists::overlaps(int32_t skillid, Rectangle<int16_t> area) const
+	{
+		return mist::overlaps(areas(), skillid, area.left(), area.top(), area.right(), area.bottom());
+	}
+
 	// A fading mist is gone to the client, which removes its area at once.
 	std::vector<mist::Area> MapMists::areas() const
 	{

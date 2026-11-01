@@ -81,6 +81,8 @@ namespace ms
 			MORPH_FIXED,
 			// Shockwave and the like without a transformation (0xdd2)
 			UNTRANSFORMED,
+			// A Flame Gear over another (0x1117)
+			SKILL_OVERLAP,
 			LENGTH
 		};
 

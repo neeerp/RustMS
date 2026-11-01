@@ -93,6 +93,14 @@ int main()
 		want = { { 0, 0, 30, 0, false } };
 		require(clouds == want, "one cloud at the middle of the bottom");
 		require(layout_single(-200, 200, 30, {}).empty(), "none without a tile");
+
+		// A Flame Gear isn't cast over anyone's, started or not; touching
+		// edges are no overlap.
+		std::vector<mist::Area> gears{ { 1, 8, mist::FLAME_GEAR, 20, -200, -100, 200, 0, 0, 0, false } };
+		require(mist::overlaps(gears, mist::FLAME_GEAR, 100, -50, 500, 50), "over a stranger's");
+		require(!mist::overlaps(gears, mist::FLAME_GEAR, 200, -100, 600, 0), "beside it");
+		require(!mist::overlaps(gears, mist::FLAME_GEAR, -200, 0, 200, 100), "below it");
+		require(!mist::overlaps(smokes, mist::FLAME_GEAR, -50, -50, 50, 50), "over another mist");
 	}
 	catch (const std::exception& e)
 	{

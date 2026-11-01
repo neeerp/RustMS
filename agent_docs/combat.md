@@ -1394,6 +1394,10 @@ caster like Poison Mist's. Poison Bomb's falls where the grenade went off:
 its attack ends with that spot after where the player stands (v83
 0x952b89, `Attack::grenade`), and `skills::mist_origin` centres the box
 there unless it is more than 1000 px from the thrower.
+The client won't cast a Flame Gear whose area, its level's `lt`/`rb`
+about the caster, would overlap any Flame Gear on the map, whoever's it
+is: it says "It cannot be used here." and sends nothing (v83
+FUN_00432b2a at 0x955aa5, `mist::overlaps`). The server doesn't check.
 
 A Shadower's Smokescreen (4221006) is a USE_SKILL that asks the field for
 a type 2 (smoke) mist around the caster that puts nothing on mobs. The
