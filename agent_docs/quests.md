@@ -1060,6 +1060,15 @@ there. At the gangway (914000500), Athena (1209007) takes the child
 Ice Cave (140090000). Cosmic plays a cinematic first (914090010), which we
 skip. All these lines are placeholders.
 
+The road's touch spots (`aranTutorMono0` to `3`, `aranTutorArrow0` to `3`,
+`aranTutorGuide0` to `2`, `BLACK_ROAD_TOUCHES`) each show a balloon, arrow
+or guide (`OnUserEff.img/guideEffect/aranTutorial/...`) once, and never
+move the Aran. Each marks itself and the hints before it seen in record
+21002's key=value info (`o`, as Cosmic's area info); a spot whose own key is
+already seen shows nothing. `aranTutorMono1` also plays `Aran/balloon`, and
+the three guides send a placeholder tip in pink (`black_road.tip.*`).
+`aranTutorLost` marks them all seen and plays `aranTutorial/ClickChild`.
+
 Entering the Ice Cave (`iceCave`) takes away the five tutorial skills
 (`Effect::ForgetSkill`, sent as level 0) and points at Lilin
 (`aranTutorial/ClickLilin`). Lilin (1202000) wakes the hero the first time

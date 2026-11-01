@@ -368,6 +368,82 @@ const COLD_FOREST_WAYS: [(&str, i16, i32); 4] = [
     ("rienTutor3", 21012, 140_090_400),
     ("rienTutor4", 21013, 140_090_500),
 ];
+/// The Black Road's touch spots (Cosmic's `aranTutorMono0` to `3`,
+/// `aranTutorArrow0` to `3` and `aranTutorGuide0` to `2`): each shows its
+/// balloon, arrow or tip from `OnUserEff.img/guideEffect/aranTutorial` once,
+/// marking it, and those it stands for, seen in record 21002's area info.
+const BLACK_ROAD_TOUCHES: [(&str, &str, &[&str], &str); 11] = [
+    ("aranTutorMono0", "mo1", &["mo1"], "legendBalloon1"),
+    ("aranTutorMono1", "mo2", &["mo1", "mo2"], "legendBalloon2"),
+    (
+        "aranTutorMono2",
+        "mo3",
+        &["mo1", "mo2", "mo3"],
+        "legendBalloon3",
+    ),
+    (
+        "aranTutorMono3",
+        "mo4",
+        &["normal", "arr0", "mo1", "mo2", "mo3", "mo4"],
+        "legendBalloon6",
+    ),
+    (
+        "aranTutorArrow0",
+        "arr0",
+        &["arr0", "mo1", "mo2", "mo3"],
+        "tutorialArrow3",
+    ),
+    (
+        "aranTutorArrow1",
+        "arr1",
+        &["normal", "arr0", "arr1", "mo1", "mo2", "mo3", "mo4"],
+        "tutorialArrow1",
+    ),
+    (
+        "aranTutorArrow2",
+        "arr2",
+        &[
+            "normal", "arr0", "arr1", "arr2", "mo1", "chain", "mo2", "mo3", "mo4",
+        ],
+        "tutorialArrow1",
+    ),
+    (
+        "aranTutorArrow3",
+        "arr3",
+        &[
+            "cmd", "normal", "arr0", "arr1", "arr2", "arr3", "mo1", "chain", "mo2", "mo3", "mo4",
+        ],
+        "tutorialArrow1",
+    ),
+    (
+        "aranTutorGuide0",
+        "normal",
+        &["normal", "arr0", "mo1", "mo2", "mo3"],
+        "tutorialGuide1",
+    ),
+    (
+        "aranTutorGuide1",
+        "chain",
+        &[
+            "normal", "arr0", "arr1", "mo1", "chain", "mo2", "mo3", "mo4",
+        ],
+        "tutorialGuide2",
+    ),
+    (
+        "aranTutorGuide2",
+        "cmd",
+        &[
+            "cmd", "normal", "arr0", "arr1", "arr2", "mo1", "chain", "mo2", "mo3", "mo4",
+        ],
+        "tutorialGuide3",
+    ),
+];
+/// The touch spots' area-info record, and every spot `aranTutorLost` marks
+/// seen as it shows the lost child.
+const BLACK_ROAD_SEEN: i16 = 21002;
+const BLACK_ROAD_ALL_SEEN: [&str; 12] = [
+    "cmd", "normal", "arr0", "arr1", "arr2", "arr3", "fin", "mo1", "chain", "mo2", "mo3", "mo4",
+];
 /// Ereve's tutorial maps whose west door (`tutorquest`) opens on a quest:
 /// Kiku's "Welcome to Ereve" (20010) started, then each brother's done.
 /// The door leads to the next map.
@@ -2491,6 +2567,46 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: true,
             occupied: None,
         },
+        script if BLACK_ROAD_TOUCHES.iter().any(|t| t.0 == script) => {
+            let &(_, key, marks, effect) =
+                BLACK_ROAD_TOUCHES.iter().find(|t| t.0 == script).unwrap();
+            let mut effects = Vec::new();
+            if player.quest_ex.get(BLACK_ROAD_SEEN, key) != Some("o") {
+                if script == "aranTutorMono1" {
+                    effects.push(Effect::Sound("Aran/balloon".to_string()));
+                }
+                effects.extend(black_road_seen(marks));
+                effects.push(Effect::AvatarEffect(format!(
+                    "Effect/OnUserEff.img/guideEffect/aranTutorial/{effect}"
+                )));
+                let tip = ["aranTutorGuide0", "aranTutorGuide1", "aranTutorGuide2"]
+                    .iter()
+                    .position(|&guide| guide == script);
+                if let Some(tip) = tip {
+                    let line = content::text().get(keys::BLACK_ROAD_TIPS[tip], &[]);
+                    effects.push(Effect::Pink(line));
+                }
+            }
+            ScriptOutcome {
+                effects,
+                block: true,
+                occupied: None,
+            }
+        }
+        "aranTutorLost" => {
+            let mut effects = Vec::new();
+            if player.quest_ex.get(BLACK_ROAD_SEEN, "fin") != Some("o") {
+                effects.extend(black_road_seen(&BLACK_ROAD_ALL_SEEN));
+                effects.push(Effect::ScenePart(
+                    "Effect/Direction1.img/aranTutorial/ClickChild".to_string(),
+                ));
+            }
+            ScriptOutcome {
+                effects,
+                block: true,
+                occupied: None,
+            }
+        }
         "enterRienFirst" => {
             let start = if aran_in_tutorial() { "st00" } else { "west00" };
             through(Effect::WarpToPortal(RIEN, named(RIEN, start)))
@@ -3322,6 +3438,15 @@ fn opens(npc: i32) -> ScriptOutcome {
 }
 
 /// A portal that keeps the player back, saying why in pink chat.
+/// Mark each of the Black Road's touch spots `marks` seen.
+fn black_road_seen<'a>(marks: &'a [&'static str]) -> impl Iterator<Item = Effect> + 'a {
+    marks.iter().map(|&key| Effect::SetQuestEx {
+        quest: BLACK_ROAD_SEEN,
+        key,
+        value: "o".to_string(),
+    })
+}
+
 fn refused(key: &str) -> ScriptOutcome {
     ScriptOutcome {
         effects: vec![Effect::Pink(content::text().get(key, &[]))],
@@ -5616,6 +5741,60 @@ mod tests {
             child((FIND_THE_MISSING_KID_2, QuestState::Started)),
             Some((BLACK_ROAD_BACK, 2))
         );
+    }
+
+    #[test]
+    fn the_black_road_s_touch_spots_show_each_hint_once() {
+        let mut aran = player_with(&[]);
+        let effects = |name: &str, player: &Player| {
+            let outcome = portal(name, player).unwrap();
+            assert!(outcome.block, "{name}");
+            outcome.effects
+        };
+        let seen = |key| Effect::SetQuestEx {
+            quest: BLACK_ROAD_SEEN,
+            key,
+            value: "o".to_string(),
+        };
+        let on_user = |name: &str| {
+            Effect::AvatarEffect(format!(
+                "Effect/OnUserEff.img/guideEffect/aranTutorial/{name}"
+            ))
+        };
+        assert_eq!(
+            effects("aranTutorMono1", &aran),
+            [
+                Effect::Sound("Aran/balloon".to_string()),
+                seen("mo1"),
+                seen("mo2"),
+                on_user("legendBalloon2"),
+            ]
+        );
+        let tip = content::text().get(keys::BLACK_ROAD_TIPS[1], &[]);
+        assert_eq!(
+            effects("aranTutorGuide1", &aran).last(),
+            Some(&Effect::Pink(tip))
+        );
+
+        // Once a spot, or one after it, is seen, it shows nothing.
+        aran.quest_ex.set(BLACK_ROAD_SEEN, "mo2", "o");
+        assert!(effects("aranTutorMono1", &aran).is_empty());
+        assert_eq!(effects("aranTutorMono2", &aran).len(), 4);
+        let lost = effects("aranTutorLost", &aran);
+        assert_eq!(lost.len(), BLACK_ROAD_ALL_SEEN.len() + 1);
+        assert_eq!(
+            lost.last(),
+            Some(&Effect::ScenePart(
+                "Effect/Direction1.img/aranTutorial/ClickChild".to_string()
+            ))
+        );
+        for key in BLACK_ROAD_ALL_SEEN {
+            aran.quest_ex.set(BLACK_ROAD_SEEN, key, "o");
+        }
+        for (name, ..) in BLACK_ROAD_TOUCHES {
+            assert!(effects(name, &aran).is_empty(), "{name}");
+        }
+        assert!(effects("aranTutorLost", &aran).is_empty());
     }
 
     #[test]
