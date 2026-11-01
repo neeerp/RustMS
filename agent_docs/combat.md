@@ -525,6 +525,28 @@ Reaching level 200 sends a notice to the whole world (`level.200`, Cosmic),
 but not for a GM. It is sent from `commit_player`, so EXP from kills, quests
 and `!exp` all trigger it; `!level` sets the level directly and doesn't.
 
+### The same spot
+
+The client limits how often a player may act without moving
+(`HeavenClient Gameplay/Combat/SameSpot.h`, v83's FUN_009536d0, report
+b377). A step of 6 px across or 150 px up or down makes a new spot.
+
+- From one spot, the player gets 100 attacks after the first. This counts
+  swings, shots, spells, the body attacks, Meso Explosion and a basic
+  attack in a special field or at a reactor. Hurricane's and Rapid Fire's
+  shots don't count, and neither does a grenade's blast (none of v83's
+  senders).
+- A skill that sends the player's position (`skill_use::sends_position`)
+  gets 20 uses after the first.
+
+Past either limit nothing is sent and no message appears:
+
+- a swing doesn't happen at all;
+- a shot, a spell or Meso Explosion plays its action but hits nothing;
+- a skill plays its action without its effect.
+
+A new map starts both counts over. The server has no such limit.
+
 ### Rates and rate cards
 
 `net::rates` scales kills for each player. Kill EXP is multiplied by the
