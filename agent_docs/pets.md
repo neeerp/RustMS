@@ -173,6 +173,11 @@ beside it.
   is what makes a v83 client check its HP potion.
 - **Not allowed.** Dropping a pet that is out. Trading or storing one isn't
   checked yet.
+- **Cloy.** Cloy (1012005) in Henesys Park (100000200) tells what pets
+  are, how to raise them, what becomes of them and that their commands
+  vary, each in one placeholder page (`cloy.*`). Cloy also sells the Pet AP
+  Reset Scroll (4160011) for 250,000 mesos (`npc_scripts::cloy`, QUESTIONS
+  b390). Mar the Fairy doesn't take the scroll yet.
 
 ## Client
 

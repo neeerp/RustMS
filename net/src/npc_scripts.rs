@@ -384,6 +384,10 @@ pub const ARWEN: i32 = 1032100;
 pub const CHIEF_TATAMO: i32 = 2081000;
 pub const EUREK: i32 = 2040050;
 pub const CHICO: i32 = 2040014;
+pub const CLOY: i32 = 1012005;
+/// The Pet AP Reset Scroll Cloy sells, and its price.
+pub const PET_AP_RESET_SCROLL: i32 = 4160011;
+pub const PET_AP_RESET_PRICE: i32 = 250_000;
 /// The Magic Seed Chief Tatamo sells, its price, and the most at once.
 pub const MAGIC_SEED: i32 = 4031346;
 pub const MAGIC_SEED_PRICE: i32 = 30_000;
@@ -2600,6 +2604,7 @@ impl NpcScript {
             CHIEF_TATAMO => return Some(chief_tatamo()),
             EUREK => return Some(eurek()),
             CHICO => return Some(chico()),
+            CLOY => return Some(cloy()),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9790,6 +9795,43 @@ fn casey() -> NpcScript {
         ],
     };
     with_maker_words(NpcScript::new(CASEY, vec![menu]))
+}
+
+/// Cloy in Henesys Park, who made the first pets: what pets are, how to
+/// raise them, what becomes of them, their commands, and the Pet AP Reset
+/// Scroll for sale.
+fn cloy() -> NpcScript {
+    let say = |key| vec![Page::Say(text(key))];
+    let price = PET_AP_RESET_PRICE.to_string();
+    let scroll = vec![
+        Page::Say(text(keys::CLOY_SCROLL)),
+        Page::Ask {
+            text: content::text().get(keys::CLOY_SCROLL_ASK, &[("price", price.as_str())]),
+            on_yes: vec![
+                Effect::SpendMeso(PET_AP_RESET_PRICE),
+                Effect::GiveItem {
+                    item_id: PET_AP_RESET_SCROLL,
+                    quantity: 1,
+                },
+            ],
+            on_no: None,
+        },
+        Page::Say(text(keys::CLOY_SCROLL_BOUGHT)),
+    ];
+    let menu = Page::Menu {
+        text: text(keys::CLOY_ASK),
+        choices: vec![
+            (text(keys::CLOY_PETS), say(keys::CLOY_PETS_TOLD)),
+            (text(keys::CLOY_RAISING), say(keys::CLOY_RAISING_TOLD)),
+            (text(keys::CLOY_DYING), say(keys::CLOY_DYING_TOLD)),
+            (text(keys::CLOY_COMMANDS), say(keys::CLOY_COMMANDS_TOLD)),
+            (text(keys::CLOY_SCROLL_CHOICE), scroll),
+        ],
+    };
+    let mut script = NpcScript::new(CLOY, vec![Page::Say(text(keys::CLOY_HELLO)), menu]);
+    script.refused = Some(text(keys::CLOY_SHORT));
+    script.inventory_full = Some(text(keys::CLOY_SHORT));
+    script
 }
 
 /// Chico in Ludibrium: Match Cards or one of Ludibrium's Omok sets, for
@@ -26365,6 +26407,40 @@ mod tests {
             ]
         );
         assert!(arwen.refused().is_some() && arwen.inventory_full().is_some());
+    }
+
+    #[test]
+    fn cloy_tells_of_pets_and_sells_the_pet_ap_reset_scroll() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let player = traveller(30, 0, false);
+        let mut cloy = NpcScript::for_npc(CLOY, &player).unwrap();
+        assert_eq!(page_text(&cloy.begin()), text(keys::CLOY_HELLO));
+        let asked = menu(cloy.respond(ScriptInput::Next).unwrap());
+        assert_eq!(asked.matches("#L").count(), 5);
+        let told = cloy.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&told), text(keys::CLOY_RAISING_TOLD));
+
+        let mut cloy = NpcScript::for_npc(CLOY, &player).unwrap();
+        cloy.begin();
+        cloy.respond(ScriptInput::Next);
+        let about = cloy.respond(ScriptInput::Select(4)).unwrap();
+        assert_eq!(page_text(&about), text(keys::CLOY_SCROLL));
+        assert!(question(&cloy.respond(ScriptInput::Next).unwrap()).contains("250000"));
+        let bought = cloy.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            bought.effects,
+            [
+                Effect::SpendMeso(PET_AP_RESET_PRICE),
+                Effect::GiveItem {
+                    item_id: PET_AP_RESET_SCROLL,
+                    quantity: 1
+                }
+            ]
+        );
+        assert!(cloy.refused().is_some() && cloy.inventory_full().is_some());
     }
 
     #[test]
