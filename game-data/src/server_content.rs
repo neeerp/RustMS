@@ -1642,6 +1642,9 @@ pub mod keys {
     pub const KERNING_TRASH_CAN_FOUND: &str = "kerning_trash_can.found";
     pub const KERNING_TRASH_CAN_FULL: &str = "kerning_trash_can.full";
     pub const KERNING_TRASH_CAN_EMPTY: &str = "kerning_trash_can.empty";
+    pub const TREE_STUMP_BOTTLED: &str = "tree_stump.bottled";
+    pub const TREE_STUMP_FULL: &str = "tree_stump.full";
+    pub const TREE_STUMP_SAP: &str = "tree_stump.sap";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5191,6 +5194,9 @@ mod tests {
                 keys::KERNING_TRASH_CAN_FOUND,
                 keys::KERNING_TRASH_CAN_FULL,
                 keys::KERNING_TRASH_CAN_EMPTY,
+                keys::TREE_STUMP_BOTTLED,
+                keys::TREE_STUMP_FULL,
+                keys::TREE_STUMP_SAP,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],

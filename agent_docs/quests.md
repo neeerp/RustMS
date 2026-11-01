@@ -1068,7 +1068,12 @@ On the way out of Ereve:
   `q20710s`, level 16, after 20709) starts on the yes. The trash can in the
   back alley (1052111 on 103000101, Npc.nx script `givebubbleDoll3`) gives
   the clue (4032136) to a Knight on 20710 who hasn't one, and Matthias
-  takes it back for the data's 800 EXP.
+  takes it back for the data's 800 EXP. The alley's other three trash cans
+  (1052109, 1052110, 1052112) are only trash cans.
+- For Maybe it's Arwen! (20716), the Small Tree Stump atop the Tree That
+  Grew (1032111 on 101010103, `giveSap`) bottles a Clear Tree Sap
+  (4032142) for a Knight on the quest who hasn't one, if it fits; anyone
+  else only sees the sap.
 - Neinheart's Before the Mission in Perion (20720, `q20720s`, level 25,
   after 20719) starts on the yes.
 
