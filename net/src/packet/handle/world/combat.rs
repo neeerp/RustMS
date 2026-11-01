@@ -217,6 +217,24 @@ fn assassinate(attack: &combat::Attack, player: &mut Player, now: Instant) -> bo
     hidden
 }
 
+/// The client sends a body attack at most once a second (its cooldown at
+/// 0x95f2e6); this allows for the two arriving closer than they were sent.
+const BODY_ATTACK_EVERY: Duration = Duration::from_millis(800);
+
+/// Whether a body attack comes long enough after the last one, which it
+/// then replaces. Other attacks always may.
+fn body_attack_due(attack: &combat::Attack, player: &mut Player, now: Instant) -> bool {
+    if attack.kind != AttackKind::Body {
+        return true;
+    }
+    let last = &mut player.buffs.body_attacked;
+    if last.is_some_and(|at| now.saturating_duration_since(at) < BODY_ATTACK_EVERY) {
+        return false;
+    }
+    *last = Some(now);
+    true
+}
+
 /// `CLOSE_RANGE_ATTACK`, `RANGED_ATTACK`, and `MAGIC_ATTACK`: a swing, a
 /// shot, or a spell.
 pub struct AttackHandler(pub AttackKind);
@@ -253,6 +271,10 @@ impl WorldHandler for AttackHandler {
                 return Ok(HandlerResult::empty());
             }
         };
+        if !body_attack_due(&attack, ctx.player, now) {
+            debug!(skill = attack.skill, "Body attack refused within a second");
+            return Ok(HandlerResult::empty());
+        }
         let fills = attack.mob_count > 0 && dojo::in_dojo(ctx.player.stats.map_id);
         let mut result = HandlerResult::empty();
         let mut skill_level = 0;
@@ -1117,6 +1139,38 @@ mod tests {
         assert_eq!(shed, [(4031868, 1)]);
         let (changes, shed) = knocked_out(&mut player, &[jewels], |_| true);
         assert!(changes.is_empty() && shed.is_empty());
+    }
+
+    #[test]
+    fn a_body_attack_comes_at_most_about_once_a_second() {
+        let mut player = crate::codec::stats::sample_player();
+        let now = Instant::now();
+        let attack = |kind| combat::Attack {
+            kind,
+            skill: 5110001,
+            mob_count: 1,
+            hit_count: 1,
+            display: 0,
+            action: 0,
+            speed: 4,
+            charge: 0,
+            ammo_slot: 0,
+            hits: vec![combat::AttackHit {
+                object_id: 7,
+                damage: vec![1],
+            }],
+            explosion: None,
+            grenade: None,
+        };
+        let (body, swing) = (attack(AttackKind::Body), attack(AttackKind::Close));
+        let after = |ms| now + Duration::from_millis(ms);
+        assert!(body_attack_due(&body, &mut player, now));
+        assert!(!body_attack_due(&body, &mut player, after(500)));
+        assert!(body_attack_due(&swing, &mut player, after(500)));
+        // A refusal doesn't push the next one back.
+        assert!(body_attack_due(&body, &mut player, after(800)));
+        assert!(!body_attack_due(&body, &mut player, after(1500)));
+        assert!(body_attack_due(&body, &mut player, after(1600)));
     }
 
     #[test]

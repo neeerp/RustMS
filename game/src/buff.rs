@@ -333,6 +333,9 @@ pub struct Buffs {
     pub dark_sight_cancelled: Option<Instant>,
     /// The mob Assassinate's second strike must hit, and by when.
     pub assassinate: Option<(i32, Instant)>,
+    /// When the last body attack (Energy Charge, Body Pressure) was let
+    /// through.
+    pub body_attacked: Option<Instant>,
     /// The mob Homing Beacon marked, until the player leaves the map.
     pub beacon: Option<Beacon>,
     /// What is left of the Battleship's HP. It stays damaged between rides
