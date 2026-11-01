@@ -720,7 +720,9 @@ A few skills do more than buff:
   on a tamed monster (FUN_0095f135). Neither side plays an action or an
   effect of the attacker's, only the skill's `hit` on the mob. The server
   takes it through the attack handler (`AttackKind::Body`) and sends the
-  map ENERGY_ATTACK (0xBD); Energy Charge comes no other way. Harness
+  map ENERGY_ATTACK (0xBD); Energy Charge comes no other way. It drops a
+  body attack, Energy Charge's or Body Pressure's, that comes within 800 ms
+  of the last one it let through (`body_attack_due`). Harness
   `energy_charge` fills a Marauder's gauge 192 a swing to 10000 and checks
   that Energy Blast waits for it.
 - **Weapon charges** (`net::charge`, 1211003 to 1211008 and the Paladin's
@@ -787,8 +789,8 @@ A few skills do more than buff:
   freezes the combo (FUN_00a265c2, which b360 took for the mini room's; see
   `lie-detector.md`).
   Still open: the GIVE_BUFF layout of stats 68 to 72 is inferred. The
-  server takes 0xA3 on trust and doesn't hold Body Pressure to once a
-  second, Body Pressure's `prop` status isn't modelled, and Combo Drain
+  server takes 0xA3 on trust, Body Pressure's `prop` status isn't
+  modelled, and Combo Drain
   shares Drain's cap of half max HP.
 - **The Aran's key sequences** (HeavenClient `aran_combo::Commands`,
   reports b364 to b366) turn arrows and the attack key, pressed in order
