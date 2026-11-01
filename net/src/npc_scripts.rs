@@ -2523,6 +2523,12 @@ impl NpcScript {
         if npc_id == SMALL_TREE_STUMP {
             return Some(small_tree_stump(player));
         }
+        if npc_id == NAUTILUS_TRASH_CAN {
+            return Some(nautilus_trash_can(player));
+        }
+        if npc_id == MUIRHAT {
+            return Some(muirhat(player));
+        }
         if let Some(&(npc, first)) = POWER_B_FORES.iter().find(|(npc, _)| *npc == npc_id) {
             return Some(power_b_fore(npc, first, player));
         }
@@ -5778,6 +5784,57 @@ fn kerning_trash_can(player: &Player) -> NpcScript {
         }];
         script.inventory_full = Some(text(keys::KERNING_TRASH_CAN_FULL));
     }
+    script
+}
+
+/// The Nautilus's trash can (Npc.nx `nautil_letter`), holding the letter
+/// that starts The Half-written Letter (2162) for one who hasn't done it.
+pub const NAUTILUS_TRASH_CAN: i32 = 1092018;
+const HALF_WRITTEN_LETTER: i16 = 2162;
+const CRUMPLED_PAPER: i32 = 4031839;
+
+fn nautilus_trash_can(player: &Player) -> NpcScript {
+    let searching = player.quests.state(HALF_WRITTEN_LETTER) != QuestState::Completed
+        && player.inventory.count(CRUMPLED_PAPER) == 0;
+    if !searching {
+        let empty = Page::Say(text(keys::KERNING_TRASH_CAN_EMPTY));
+        return NpcScript::new(NAUTILUS_TRASH_CAN, vec![empty]);
+    }
+    let mut script = NpcScript::new(
+        NAUTILUS_TRASH_CAN,
+        vec![Page::Say(text(keys::NAUTILUS_TRASH_CAN_FOUND))],
+    );
+    script.player_speaks = true;
+    script.on_end = vec![Effect::GiveItem {
+        item_id: CRUMPLED_PAPER,
+        quantity: 1,
+    }];
+    script.inventory_full = Some(text(keys::NAUTILUS_TRASH_CAN_FULL));
+    script
+}
+
+/// Muirhat on the Nautilus's port (Npc.nx `nautil_black`): one on
+/// Disciples of the Black Magician (2175) gets a Nautilus Return Scroll and
+/// is sent to the Disciples' hideout.
+pub const MUIRHAT: i32 = 1092007;
+const NAUTILUS_RETURN_SCROLL: i32 = 2030019;
+
+fn muirhat(player: &Player) -> NpcScript {
+    if player.quests.state(scripts::DISCIPLES_QUEST) != QuestState::Started {
+        return NpcScript::new(MUIRHAT, vec![Page::Say(text(keys::MUIRHAT_CHASE))]);
+    }
+    if crate::items::give(&mut player.inventory.clone(), NAUTILUS_RETURN_SCROLL, 1).is_err() {
+        return NpcScript::new(MUIRHAT, vec![Page::Say(text(keys::MUIRHAT_FULL))]);
+    }
+    let mut script = NpcScript::new(MUIRHAT, vec![Page::Say(text(keys::MUIRHAT_SCROLL))]);
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: NAUTILUS_RETURN_SCROLL,
+            quantity: 1,
+        },
+        Effect::WarpToPortal(scripts::DISCIPLES_HIDEOUT, 0),
+    ];
+    script.inventory_full = Some(text(keys::MUIRHAT_FULL));
     script
 }
 
@@ -22290,6 +22347,58 @@ mod tests {
             let step = NpcScript::for_npc(can, &knight).unwrap().begin();
             assert_eq!(page_text(&step), text(keys::KERNING_TRASH_CAN_EMPTY));
         }
+    }
+
+    #[test]
+    fn the_nautilus_trash_can_holds_the_half_written_letter_until_it_is_delivered() {
+        let says = |pirate: &Player| {
+            let script = NpcScript::for_npc(NAUTILUS_TRASH_CAN, pirate).unwrap();
+            (page_text(&script.begin()), script.on_end.clone())
+        };
+        let mut pirate = player(50);
+        let paper = vec![Effect::GiveItem {
+            item_id: CRUMPLED_PAPER,
+            quantity: 1,
+        }];
+        assert_eq!(says(&pirate), (text(keys::NAUTILUS_TRASH_CAN_FOUND), paper));
+        pirate
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(CRUMPLED_PAPER, 1));
+        let empty = (text(keys::KERNING_TRASH_CAN_EMPTY), vec![]);
+        assert_eq!(says(&pirate), empty);
+        pirate.inventory = player(50).inventory;
+        pirate.quests.upsert(game::QuestRecord {
+            quest_id: HALF_WRITTEN_LETTER,
+            status: QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        assert_eq!(says(&pirate), empty);
+    }
+
+    #[test]
+    fn muirhat_sends_one_after_the_disciples_with_a_return_scroll() {
+        let says = |pirate: &Player| {
+            let script = NpcScript::for_npc(MUIRHAT, pirate).unwrap();
+            (page_text(&script.begin()), script.on_end.clone())
+        };
+        let mut pirate = player(50);
+        assert_eq!(says(&pirate), (text(keys::MUIRHAT_CHASE), vec![]));
+        pirate.quests.upsert(game::QuestRecord {
+            quest_id: scripts::DISCIPLES_QUEST,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let sent = vec![
+            Effect::GiveItem {
+                item_id: NAUTILUS_RETURN_SCROLL,
+                quantity: 1,
+            },
+            Effect::WarpToPortal(scripts::DISCIPLES_HIDEOUT, 0),
+        ];
+        assert_eq!(says(&pirate), (text(keys::MUIRHAT_SCROLL), sent));
     }
 
     #[test]

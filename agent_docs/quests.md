@@ -485,6 +485,17 @@ for 1,700 EXP and ten Nautilus Return Scrolls (2030019). If the player
 clicks Abel holding another pair instead, Abel takes it for 1,000 EXP and
 five scrolls and completes the quest anyway (Cosmic `2186.js` and the
 bushes' scripts). The text is unsourced.
+For "The Half-written Letter" (2162), whose start at Muirhat (1092007)
+needs the Crumpled Paper (4031839), the trash can on the Nautilus's port
+(1092018 on 120000100, `nautil_letter`) gives the paper, in the player's
+own words, to anyone who hasn't completed the quest and isn't holding one;
+otherwise it is an empty trash can. On "Disciples of the Black Magician"
+(2175), talking to Muirhat (`nautil_black`) gives a Nautilus Return Scroll
+(2030019) and sends the player to the Disciples' hideout (100000006,
+portal 0), where the Disciple comes out on entry (see `map-travel.md`);
+with a full Use bag, Muirhat asks for room first. Off that quest Muirhat
+has one line. This follows Cosmic's `1092018.js` and `1092007.js`; the text
+is unsourced. `nautilus_letter.rs` checks both through the network harness.
 In "Truth of the Rumor" (2144), Winston (1022006) wants to hear what five
 people know about the old tree: Blackbull (1020000), Manji (1022002),
 Ayan (1022007) and Dances with Balrog (1022000) in Perion, and Betty
