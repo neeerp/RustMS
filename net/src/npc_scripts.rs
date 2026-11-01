@@ -415,6 +415,12 @@ const SILVER_PENDANT: i32 = 4031697;
 /// Wiz the Librarian in the Helios Tower Library, and the storybook quests
 /// that end there with the book each brings back.
 pub const WIZ: i32 = 2040052;
+/// Robert Holly in Ludibrium adds `BUDDY_SLOTS` to a buddy list for
+/// `BUDDY_SLOTS_PRICE` mesos, up to `MOST_BUDDY_SLOTS` in all.
+pub const ROBERT_HOLLY: i32 = 2040046;
+pub const BUDDY_SLOTS_PRICE: i32 = 240_000;
+pub const BUDDY_SLOTS: u8 = 5;
+pub const MOST_BUDDY_SLOTS: u8 = 50;
 const STORYBOOKS: [(i16, i32); 8] = [
     (3615, 4031235),
     (3616, 4031236),
@@ -2676,6 +2682,7 @@ impl NpcScript {
             ICEBYRD_SLIMM => return Some(icebyrd_slimm(player)),
             PICTURE_FRAME => return picture_frame(player),
             WIZ => return Some(wiz(player)),
+            ROBERT_HOLLY => return Some(robert_holly()),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -10040,6 +10047,44 @@ fn picture_frame(player: &Player) -> Option<NpcScript> {
     let mut script = NpcScript::new(PICTURE_FRAME, pages);
     script.inventory_full = Some(text(keys::PICTURE_FRAME_FULL));
     Some(script)
+}
+
+/// Robert Holly offers more buddy slots, then names the price; a yes to
+/// both pays and adds them, unless the mesos are short or the list is as
+/// long as it gets.
+fn robert_holly() -> NpcScript {
+    let terms = |key| {
+        content::text().get(
+            key,
+            &[
+                ("price", &BUDDY_SLOTS_PRICE.to_string()),
+                ("slots", &BUDDY_SLOTS.to_string()),
+                ("max", &MOST_BUDDY_SLOTS.to_string()),
+            ],
+        )
+    };
+    let pages = vec![
+        Page::Ask {
+            text: text(keys::HOLLY_OFFER),
+            on_yes: vec![],
+            on_no: Some(text(keys::HOLLY_NO_OFFER)),
+        },
+        Page::Ask {
+            text: terms(keys::HOLLY_PRICE),
+            on_yes: vec![
+                Effect::SpendMeso(BUDDY_SLOTS_PRICE),
+                Effect::RaiseBuddyCapacity {
+                    by: BUDDY_SLOTS,
+                    max: MOST_BUDDY_SLOTS,
+                },
+            ],
+            on_no: Some(text(keys::HOLLY_LATER)),
+        },
+        Page::Say(text(keys::HOLLY_DONE)),
+    ];
+    let mut script = NpcScript::new(ROBERT_HOLLY, pages);
+    script.refused = Some(terms(keys::HOLLY_REFUSED));
+    script
 }
 
 /// Wiz lists the storybooks the player has brought back, by the quests
@@ -26806,6 +26851,29 @@ mod tests {
             );
             assert!(hikari.refused().is_some());
         }
+    }
+
+    #[test]
+    fn robert_holly_sells_five_buddy_slots_after_two_yeses() {
+        let mut holly = NpcScript::for_npc(ROBERT_HOLLY, &traveller(30, 0, false)).unwrap();
+        assert_eq!(question(&holly.begin()), text(keys::HOLLY_OFFER));
+        let no = holly.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&no), text(keys::HOLLY_NO_OFFER));
+
+        let mut holly = NpcScript::for_npc(ROBERT_HOLLY, &traveller(30, 0, false)).unwrap();
+        holly.begin();
+        let price = holly.respond(ScriptInput::Yes).unwrap();
+        assert!(price.effects.is_empty());
+        let paid = holly.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            paid.effects,
+            [
+                Effect::SpendMeso(BUDDY_SLOTS_PRICE),
+                Effect::RaiseBuddyCapacity { by: 5, max: 50 },
+            ]
+        );
+        assert_eq!(page_text(&paid), text(keys::HOLLY_DONE));
+        assert!(holly.refused.as_deref().unwrap().contains("240000"));
     }
 
     #[test]

@@ -1072,6 +1072,12 @@ pub enum Effect {
     /// Areda gave the player their last Ariant battle's points: none are
     /// left to give (`Player::ariant_tier`).
     AriantPrizeTaken,
+    /// Add `by` slots to the player's buddy list (`Player::buddy_capacity`);
+    /// nothing is applied if that would pass `max`.
+    RaiseBuddyCapacity {
+        by: u8,
+        max: u8,
+    },
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,

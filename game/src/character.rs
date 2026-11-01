@@ -221,6 +221,9 @@ pub struct MiniRoomBox {
     pub in_progress: bool,
 }
 
+/// The buddy list capacity every character starts with.
+pub const DEFAULT_BUDDY_CAPACITY: u8 = 20;
+
 /// A character that is logged in. The owning client actor holds the only
 /// copy; everything else (fields, the world directory) receives projections.
 #[derive(Clone, Debug)]
@@ -229,6 +232,8 @@ pub struct Player {
     pub world_id: u8,
     pub stats: CharacterStats,
     pub meso: i32,
+    /// How many buddies the list holds: `DEFAULT_BUDDY_CAPACITY`, or more
+    /// once Robert Holly has added slots.
     pub buddy_capacity: u8,
     /// The account's highest other character in this world, whose name
     /// Blessing of the Fairy's tooltip shows; looked up at each entry, not
@@ -374,7 +379,7 @@ impl Player {
             world_id,
             stats,
             meso,
-            buddy_capacity: 20,
+            buddy_capacity: DEFAULT_BUDDY_CAPACITY,
             linked_name: None,
             inventory,
             skills,
