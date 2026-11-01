@@ -2516,6 +2516,13 @@ impl NpcScript {
         if npc_id == KERNING_TRASH_CAN {
             return Some(kerning_trash_can(player));
         }
+        if OTHER_TRASH_CANS.contains(&npc_id) {
+            let empty = Page::Say(text(keys::KERNING_TRASH_CAN_EMPTY));
+            return Some(NpcScript::new(npc_id, vec![empty]));
+        }
+        if npc_id == SMALL_TREE_STUMP {
+            return Some(small_tree_stump(player));
+        }
         if npc_id == DRILL_HALL_GATEKEEPER {
             return Some(ask_warp(
                 npc_id,
@@ -5543,6 +5550,14 @@ const MATTHIAS: i32 = 1103002;
 /// script is `givebubbleDoll3`, and the clue in it.
 const KERNING_TRASH_CAN: i32 = 1052111;
 const TRASH_CAN_CLUE: i32 = 4032136;
+/// The back alley's other trash cans (`givebubbleDoll1`, `2`, `4`), with
+/// nothing in them.
+const OTHER_TRASH_CANS: [i32; 3] = [1052109, 1052110, 1052112];
+const MAYBE_ITS_ARWEN: i16 = 20716;
+/// The stump atop the Tree That Grew (101010103), whose Npc.nx script is
+/// `giveSap`, and the sap it gives.
+pub const SMALL_TREE_STUMP: i32 = 1032111;
+const CLEAR_TREE_SAP: i32 = 4032142;
 
 /// `q20311s` to `q20315s`: the third job and the quest done on the yes,
 /// unless the Knight keeps more SP than 3 for each level past 70
@@ -5650,6 +5665,28 @@ fn sure_you_can_leave() -> NpcScript {
         Page::Say(text(keys::SURE_YOU_CAN_LEAVE_BLESSING)),
     ];
     NpcScript::new(NEINHEART, pages)
+}
+
+/// The Small Tree Stump: a bottle of Clear Tree Sap for a Knight on Maybe
+/// it's Arwen! (20716) who hasn't one, if it fits; for anyone else, only the
+/// flowing sap (Cosmic `1032111.js`).
+fn small_tree_stump(player: &Player) -> NpcScript {
+    let page = if player.quests.state(MAYBE_ITS_ARWEN) != QuestState::Started
+        || player.inventory.count(CLEAR_TREE_SAP) > 0
+    {
+        Page::Say(text(keys::TREE_STUMP_SAP))
+    } else if crate::items::give(&mut player.inventory.clone(), CLEAR_TREE_SAP, 1).is_err() {
+        Page::Say(text(keys::TREE_STUMP_FULL))
+    } else {
+        Page::Act {
+            text: text(keys::TREE_STUMP_BOTTLED),
+            effects: vec![Effect::GiveItem {
+                item_id: CLEAR_TREE_SAP,
+                quantity: 1,
+            }],
+        }
+    };
+    NpcScript::new(SMALL_TREE_STUMP, vec![page])
 }
 
 /// Kerning City's trash can: the clue for a Knight on Hidden Inside the
@@ -22116,6 +22153,40 @@ mod tests {
         let leave = NpcScript::for_quest("q20700s", &knight).unwrap();
         let done = vec![Effect::FinishQuest(ARE_YOU_SURE_YOU_CAN_LEAVE)];
         assert_eq!(yes_through(leave), (NEINHEART, done));
+    }
+
+    #[test]
+    fn the_small_tree_stump_bottles_sap_for_a_knight_on_maybe_its_arwen() {
+        let says = |knight: &Player| {
+            let step = NpcScript::for_npc(SMALL_TREE_STUMP, knight)
+                .unwrap()
+                .begin();
+            (page_text(&step), step.effects)
+        };
+        let mut knight = player(50);
+        assert_eq!(says(&knight), (text(keys::TREE_STUMP_SAP), vec![]));
+        knight.quests.upsert(game::QuestRecord {
+            quest_id: MAYBE_ITS_ARWEN,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let sap = vec![Effect::GiveItem {
+            item_id: CLEAR_TREE_SAP,
+            quantity: 1,
+        }];
+        assert_eq!(says(&knight), (text(keys::TREE_STUMP_BOTTLED), sap));
+        knight
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(CLEAR_TREE_SAP, 1));
+        assert_eq!(says(&knight), (text(keys::TREE_STUMP_SAP), vec![]));
+
+        // The back alley's other trash cans hold nothing.
+        for can in OTHER_TRASH_CANS {
+            let step = NpcScript::for_npc(can, &knight).unwrap().begin();
+            assert_eq!(page_text(&step), text(keys::KERNING_TRASH_CAN_EMPTY));
+        }
     }
 
     #[test]
