@@ -1975,6 +1975,7 @@
 "shield_field.wear" = "[placeholder] Wear the Skill-Earning Shield before you go into the practice field."
 "shield_field.ask" = "[placeholder] Keep the Skill-Earning Shield on while you train. Shall I send you to the practice field now?"
 "shield_field.leave" = "[placeholder] Do you want to leave the practice field?"
+"fountain_of_life.pour" = "[placeholder] (The Holy Cup fills with water from the fountain.)"
 "delli.shulynch.ask" = "[placeholder] Delli has gone missing in the hideout. Will you go and look for Delli?"
 "delli.shulynch.leave" = "[placeholder] Do you want to give up the search and go back?"
 "delli.menu" = "[placeholder] Monsters are coming for me. Will you protect me?"

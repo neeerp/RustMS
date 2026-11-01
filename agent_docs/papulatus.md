@@ -84,6 +84,14 @@ which wins it. There is no stage EXP and no world notice. The win stops the
 clock and frees the lobby (`free_lobby`), so the gates open and the next
 party may go in while the winners loot.
 
+Papulatus (8500002) also drops the Papulatus' Key (4031869), every time,
+for a Buccaneer on The Study of Space-Time Transformation (6360), which the
+pack lacks (`game-data/reward_overrides.toml`, Cosmic's quest drop). The
+same file gives the Pirates' other fourth-job hunts their items: Heart of
+Stone (4031872, Red Dragon Turtle 8140701, 6340) and Sturdy Leather
+(4031871, Blue Dragon Turtle 8140700, 6350) 1 time in 10, Spirit Viking
+Flags (4031873, 8141000, 6380) and Token (4031874, 8141100, 6390) 6 in 100.
+
 ## NPCs
 
 | NPC | Where | Script |

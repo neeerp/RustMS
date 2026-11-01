@@ -111,11 +111,23 @@ Moose (`2081009`, `s4blocking_enter`) in Leafre's Forest: Crossroad
 (`240010400`) sends a Hero or Paladin on A Shield's True Power (6180) who
 has fewer than its 200 kills, and wears the Skill-Earning Shield
 (`1092041`), into the practice field (`924000001`) after a Yes; without the
-shield on he says to wear it, and anyone else is refused. The field is
-shared, as in Cosmic, and the shield is checked only on the way in. His twin
+shield on Moose says to wear it, and anyone else is refused. The field is
+shared, as in Cosmic, and the shield is checked only on the way in. Moose's twin
 (`2081010`, `s4blocking`) on the way to, in and out of the field asks, and a
 Yes leads back to the crossroad's `st00`; the kills stay. Keys
 `shield_field.*`; `shield_field.rs` checks it through the network harness.
+
+Two more fourth-job quest items come from talking to an object, both
+dispatched in `net::npc_scripts` because the client sends the talk of an
+NPC with an `info/script`. The Maple Leaf Marble (`2012023`, `s4tornado`)
+in Orbis Tower (`200000300`) silently makes the Glass Marble (`4031476`)
+that Maple Marble (6230) starts with into the Maple Marble (`4031456`) it
+ends on (Cosmic `2012023.js`). The Fountain of Life (`2083005`,
+`s4holycharge`) in `240050400` fills a Paladin's Holy Cup (`4031454`) with
+the Holy Water of Life (`4031455`) while The Holy Knight's Sword (6280) is
+under way, with one line (`fountain_of_life.pour`; Cosmic `2083005.js`).
+Both do nothing without the item or the room for the new one.
+`skill_quest_items.rs` checks both through the network harness.
 
 Shane (`1032003`, `herb_in`) in Ellinia lets players from level 25 into the
 Forest of Patience for 5000 mesos (Yes/No, then a refusal if short). They

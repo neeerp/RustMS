@@ -1295,3 +1295,26 @@ replace = [{ item = 4000477, prob = 0.3 }]
 
 [mobs.9420540]
 replace = [{ item = 4000478, prob = 0.3 }]
+
+[mobs.8500002]
+# Papulatus drops the Papulatus' Key 4031869 that The Study of Space-Time
+# Transformation (6360) checks for (Quest.nx Check.img/6360/1/item); the pack
+# lacks it. It drops every time, as on the community servers.
+add = [{ item = 4031869, prob = 1.0, quest = 6360 }]
+
+[mobs.8140701]
+# The Buccaneer's and Corsair's fourth-job hunts check for 50 of an item from
+# 150 kills (Quest.nx Check.img/6340, 6350, 6380, 6390): the Red Dragon
+# Turtle's Heart of Stone (6340), the Blue Dragon Turtle's Sturdy Leather
+# (6350), the Spirit Viking's Flags (6380) and the Gigantic Spirit Viking's
+# Token (6390). The pack lacks them; the rates are the community servers'.
+add = [{ item = 4031872, prob = 0.1, quest = 6340 }]
+
+[mobs.8140700]
+add = [{ item = 4031871, prob = 0.1, quest = 6350 }]
+
+[mobs.8141000]
+add = [{ item = 4031873, prob = 0.06, quest = 6380 }]
+
+[mobs.8141100]
+add = [{ item = 4031874, prob = 0.06, quest = 6390 }]
