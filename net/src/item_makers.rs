@@ -2,8 +2,8 @@
 //! the Nautilus (1091003), Neve in Orbis (2010003), Mos in Leafre
 //! (2080000), Francois in Ellinia (1032002), Chrishrama in Sleepywood
 //! (1061000), Gordon in El Nath (2020002), and Sarah, Tara and Rydole in
-//! Ludibrium (2040020-2040022). Items, materials and prices follow
-//! Cosmic's scripts.
+//! Ludibrium (2040020-2040022), and Casey in Henesys (1012008), who makes
+//! minigame sets. Items, materials and prices follow Cosmic's scripts.
 
 /// One thing a maker makes: an `item` for its `materials` (item and
 /// quantity) and `cost` mesos.
@@ -3055,6 +3055,20 @@ pub const RYDOLE_THIEF_STIMULATED: &[Recipe] = &[
 
 pub const CORNIANS_DAGGER: Recipe =
     recipe(4001078, &[(4011001, 1), (4011002, 1), (4001079, 1)], 25000);
+
+/// Casey's Omok sets, each of 99 of two kinds of piece and an Omok Table,
+/// for nothing.
+pub const CASEY_OMOK: &[Recipe] = &[
+    recipe(4080000, &[(4030000, 99), (4030001, 99), (4030009, 1)], 0),
+    recipe(4080001, &[(4030000, 99), (4030010, 99), (4030009, 1)], 0),
+    recipe(4080002, &[(4030000, 99), (4030011, 99), (4030009, 1)], 0),
+    recipe(4080003, &[(4030010, 99), (4030001, 99), (4030009, 1)], 0),
+    recipe(4080004, &[(4030011, 99), (4030010, 99), (4030009, 1)], 0),
+    recipe(4080005, &[(4030011, 99), (4030001, 99), (4030009, 1)], 0),
+];
+
+/// Casey's set of Match Cards, of 15 Monster Cards.
+pub const CASEY_MATCH_CARDS: Recipe = recipe(4080100, &[(4030012, 15)], 0);
 
 #[cfg(test)]
 mod tests {

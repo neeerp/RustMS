@@ -379,6 +379,7 @@ const GORDON: i32 = 2020002;
 const SARAH: i32 = 2040020;
 const TARA: i32 = 2040021;
 const RYDOLE: i32 = 2040022;
+pub const CASEY: i32 = 1012008;
 /// Mos makes Cornian's Dagger while either of these quests is under way.
 const CORNIAN_QUESTS: [i16; 2] = [7301, 7303];
 /// The money sack drawn beside a price.
@@ -2583,6 +2584,7 @@ impl NpcScript {
                 ))
             }
             MOS => return Some(mos(player, &mut rand::thread_rng())),
+            CASEY => return Some(casey()),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9749,6 +9751,32 @@ fn mos(player: &Player, rng: &mut impl Rng) -> NpcScript {
     with_maker_words(NpcScript::new(MOS, vec![menu]))
 }
 
+/// Casey: an Omok set or a set of Match Cards, made as the other makers
+/// make things, or how either game is played.
+fn casey() -> NpcScript {
+    let omok = item_makers::CASEY_OMOK;
+    let sets = omok.iter().map(|recipe| make(recipe, None)).collect();
+    let menu = Page::Menu {
+        text: text(keys::CASEY_HELLO),
+        choices: vec![
+            (text(keys::CASEY_OMOK), vec![recipe_menu(omok, sets)]),
+            (
+                text(keys::CASEY_MATCH_CARDS),
+                make(&item_makers::CASEY_MATCH_CARDS, None),
+            ),
+            (
+                text(keys::CASEY_ABOUT_OMOK),
+                vec![Page::Say(text(keys::CASEY_OMOK_RULES))],
+            ),
+            (
+                text(keys::CASEY_ABOUT_MATCH_CARDS),
+                vec![Page::Say(text(keys::CASEY_MATCH_CARDS_RULES))],
+            ),
+        ],
+    };
+    with_maker_words(NpcScript::new(CASEY, vec![menu]))
+}
+
 /// The menu of one kind's items, each leading to its `pages`.
 fn recipe_menu(recipes: &[Recipe], pages: Vec<Vec<Page>>) -> Page {
     Page::Menu {
@@ -9776,10 +9804,13 @@ fn make(recipe: &Recipe, stimulator: Option<(i32, Option<&'static str>)>) -> Vec
     for (item, quantity) in &materials {
         ask.push_str(&format!("\r\n#i{item}# {quantity} #t{item}#"));
     }
-    let meso = recipe.cost.to_string();
-    let meso = content::text().get(keys::MAKER_MESO, &[("meso", meso.as_str())]);
-    ask.push_str(&format!("\r\n#i{MESO_ICON}# {meso}"));
-    let mut on_yes = vec![Effect::SpendMeso(recipe.cost)];
+    let mut on_yes = Vec::new();
+    if recipe.cost > 0 {
+        let meso = recipe.cost.to_string();
+        let meso = content::text().get(keys::MAKER_MESO, &[("meso", meso.as_str())]);
+        ask.push_str(&format!("\r\n#i{MESO_ICON}# {meso}"));
+        on_yes.push(Effect::SpendMeso(recipe.cost));
+    }
     on_yes.extend(
         materials
             .iter()
@@ -26119,6 +26150,53 @@ mod tests {
         // Once marked, or off the quest, it says nothing of its own.
         assert!(NpcScript::for_npc(SHINY_STONE, &on("5")).is_none());
         assert!(NpcScript::for_npc(SHINY_STONE, &traveller(30, 0, false)).is_none());
+    }
+
+    #[test]
+    fn casey_makes_omok_sets_and_match_cards_for_their_makings_alone() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let ask = |step: Step| match step.prompt {
+            Some(Prompt::YesNo { text, .. }) => text,
+            other => panic!("question expected, got {other:?}"),
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let player = traveller(30, 0, false);
+        let mut casey = NpcScript::for_npc(CASEY, &player).unwrap();
+        assert_eq!(menu(casey.begin()).matches("#L").count(), 4);
+        // Match Cards: 15 Monster Cards, and no mesos.
+        let asked = ask(casey.respond(ScriptInput::Select(1)).unwrap());
+        assert!(asked.contains("#i4030012# 15 #t4030012#"), "{asked}");
+        assert!(!asked.contains(&format!("#i{MESO_ICON}#")), "{asked}");
+        let made = casey.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                take(4030012, 15),
+                Effect::GiveItem {
+                    item_id: 4080100,
+                    quantity: 1
+                }
+            ]
+        );
+        assert!(casey.refused().is_some() && casey.inventory_full().is_some());
+        // The Slime and Octopus Omok set.
+        let mut casey = NpcScript::for_npc(CASEY, &player).unwrap();
+        casey.begin();
+        assert!(menu(casey.respond(ScriptInput::Select(0)).unwrap()).contains("#t4080005#"));
+        casey.respond(ScriptInput::Select(1));
+        let made = casey.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects[..3],
+            [take(4030000, 99), take(4030010, 99), take(4030009, 1)]
+        );
+        // The rules.
+        let mut casey = NpcScript::for_npc(CASEY, &player).unwrap();
+        casey.begin();
+        let rules = casey.respond(ScriptInput::Select(2)).unwrap();
+        assert_eq!(page_text(&rules), text(keys::CASEY_OMOK_RULES));
     }
 
     #[test]

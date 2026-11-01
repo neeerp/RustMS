@@ -1267,6 +1267,16 @@ Tara's prices are a tenth below the other makers'. While quest 7301 or
 7303 is started, Mos also makes Cornian's Dagger (4001078). No sourced
 text exists for these NPCs, so all of it is placeholder (`maker.*`).
 
+Casey (1012008, Henesys's Game Park, 100000203) makes minigame sets the
+same way, for materials alone (a recipe of 0 mesos asks for no mesos and
+spends none): the six Omok sets (4080000-4080005), each of 99 of two of
+the Omok pieces (4030000, 4030001, 4030010, 4030011) and an Omok Table
+(4030009), and a set of Match Cards (4080100) of 15 Monster Cards
+(4030012). The menu also says how each game is played. The pack drops
+none of these makings, so `reward_overrides.toml` adds them at the
+community servers' mobs and rates (QUESTIONS b385). Casey's lines are
+placeholders (`casey.*`).
+
 ### Refiners
 
 Refiners make plates, jewels, crystals, materials and arrows in batches.

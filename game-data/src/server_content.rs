@@ -3043,6 +3043,13 @@ pub mod keys {
     pub const ELEMENTAL_NOT_LEADER: &str = "elemental.not_leader";
     pub const ELEMENTAL_NOT_ELIGIBLE: &str = "elemental.not_eligible";
     pub const ELEMENTAL_BUSY: &str = "elemental.busy";
+    pub const CASEY_HELLO: &str = "casey.hello";
+    pub const CASEY_OMOK: &str = "casey.omok";
+    pub const CASEY_MATCH_CARDS: &str = "casey.match_cards";
+    pub const CASEY_ABOUT_OMOK: &str = "casey.about_omok";
+    pub const CASEY_ABOUT_MATCH_CARDS: &str = "casey.about_match_cards";
+    pub const CASEY_OMOK_RULES: &str = "casey.omok_rules";
+    pub const CASEY_MATCH_CARDS_RULES: &str = "casey.match_cards_rules";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5163,6 +5170,13 @@ mod tests {
                 keys::ELEMENTAL_NOT_LEADER,
                 keys::ELEMENTAL_NOT_ELIGIBLE,
                 keys::ELEMENTAL_BUSY,
+                keys::CASEY_HELLO,
+                keys::CASEY_OMOK,
+                keys::CASEY_MATCH_CARDS,
+                keys::CASEY_ABOUT_OMOK,
+                keys::CASEY_ABOUT_MATCH_CARDS,
+                keys::CASEY_OMOK_RULES,
+                keys::CASEY_MATCH_CARDS_RULES,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
