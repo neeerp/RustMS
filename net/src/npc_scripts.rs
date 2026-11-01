@@ -421,6 +421,13 @@ pub const ROBERT_HOLLY: i32 = 2040046;
 pub const BUDDY_SLOTS_PRICE: i32 = 240_000;
 pub const BUDDY_SLOTS: u8 = 5;
 pub const MOST_BUDDY_SLOTS: u8 = 50;
+/// Item traders, who take a pile of one etc item for a prize drawn at
+/// random from its list (`TRADERS`).
+pub const STAFF_SERGEANT_CHARLIE: i32 = 2010000;
+pub const JOKO: i32 = 9201097;
+pub const FAITO: i32 = 9120010;
+/// Joko trades only with one who has completed this quest.
+const JOKO_QUEST: i16 = 8225;
 const STORYBOOKS: [(i16, i32); 8] = [
     (3615, 4031235),
     (3616, 4031236),
@@ -2683,6 +2690,10 @@ impl NpcScript {
             PICTURE_FRAME => return picture_frame(player),
             WIZ => return Some(wiz(player)),
             ROBERT_HOLLY => return Some(robert_holly()),
+            STAFF_SERGEANT_CHARLIE | JOKO | FAITO => {
+                let trader = TRADERS.iter().find(|trader| trader.npc == npc_id)?;
+                return Some(item_trader(trader, player, &mut rand::thread_rng()));
+            }
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -10084,6 +10095,690 @@ fn robert_holly() -> NpcScript {
     ];
     let mut script = NpcScript::new(ROBERT_HOLLY, pages);
     script.refused = Some(terms(keys::HOLLY_REFUSED));
+    script
+}
+
+/// An item trader: what the player may bring (an item, how many, and the
+/// prizes, an item and quantity each, item 0 being mesos), and how the
+/// trader talks. Its text keys are `trader.{name}.*`.
+struct Trader {
+    npc: i32,
+    name: &'static str,
+    /// Trades only with one who has completed it; `not_yet` otherwise.
+    quest: Option<i16>,
+    /// An `intro` before the offer.
+    intro: bool,
+    /// A `confirm` before each trade.
+    confirm: bool,
+    /// The EXP each trade also gives.
+    exp: i32,
+    wants: &'static [(i32, i16, &'static [(i32, i32)])],
+}
+
+/// The traders, from Cosmic's `2010000.js`, `9201097.js` and `9120010.js`.
+/// Cosmic's Black Crystal Ore 4010008 (no item in v83) is 4020008, and its
+/// malformed `[4020008.2]` is two of them.
+const TRADERS: [Trader; 3] = [
+    // Staff Sergeant Charlie in Orbis.
+    Trader {
+        npc: STAFF_SERGEANT_CHARLIE,
+        name: "charlie",
+        quest: None,
+        intro: true,
+        confirm: true,
+        exp: 500,
+        wants: &[
+            (
+                4000073,
+                100,
+                &[
+                    (2000001, 20),
+                    (2010004, 10),
+                    (2000003, 15),
+                    (4003001, 15),
+                    (2020001, 15),
+                    (2030000, 15),
+                ],
+            ),
+            (
+                4000059,
+                100,
+                &[
+                    (2000003, 20),
+                    (2000001, 30),
+                    (2010001, 40),
+                    (4003001, 20),
+                    (2040002, 1),
+                ],
+            ),
+            (
+                4000060,
+                100,
+                &[
+                    (2000002, 25),
+                    (2000006, 10),
+                    (2022000, 5),
+                    (4000030, 15),
+                    (2040902, 1),
+                ],
+            ),
+            (
+                4000061,
+                100,
+                &[
+                    (2000002, 30),
+                    (2000006, 15),
+                    (2020000, 20),
+                    (4003000, 5),
+                    (2041016, 1),
+                ],
+            ),
+            (
+                4000058,
+                100,
+                &[
+                    (2000002, 15),
+                    (2010004, 15),
+                    (2000003, 25),
+                    (4003001, 30),
+                    (2040302, 1),
+                ],
+            ),
+            (
+                4000062,
+                100,
+                &[
+                    (2000002, 30),
+                    (2000006, 15),
+                    (2020000, 20),
+                    (4003000, 5),
+                    (2040402, 1),
+                ],
+            ),
+            (
+                4000048,
+                100,
+                &[
+                    (2000002, 30),
+                    (2020000, 20),
+                    (2000006, 15),
+                    (4003000, 5),
+                    (2040402, 1),
+                ],
+            ),
+            (
+                4000049,
+                100,
+                &[
+                    (2000006, 25),
+                    (2020000, 20),
+                    (4020000, 7),
+                    (4020001, 7),
+                    (4020002, 3),
+                    (4020007, 2),
+                    (2040708, 1),
+                ],
+            ),
+            (
+                4000055,
+                100,
+                &[
+                    (2020005, 30),
+                    (2020006, 15),
+                    (2022001, 30),
+                    (4003003, 1),
+                    (2040505, 1),
+                ],
+            ),
+            (
+                4000056,
+                100,
+                &[
+                    (2000006, 25),
+                    (4020005, 7),
+                    (4020003, 7),
+                    (4020004, 7),
+                    (4020008, 2),
+                    (2040802, 1),
+                ],
+            ),
+            (
+                4000051,
+                100,
+                &[
+                    (2002004, 15),
+                    (2002005, 15),
+                    (2002003, 15),
+                    (4001005, 1),
+                    (2040502, 1),
+                ],
+            ),
+            (
+                4000052,
+                100,
+                &[
+                    (2000006, 20),
+                    (4010004, 7),
+                    (4010003, 7),
+                    (4010005, 7),
+                    (4003002, 1),
+                    (2040602, 1),
+                ],
+            ),
+            (
+                4000050,
+                100,
+                &[
+                    (2000006, 20),
+                    (4010002, 7),
+                    (4010001, 7),
+                    (4010000, 7),
+                    (4010006, 2),
+                    (4003000, 5),
+                    (2040702, 1),
+                ],
+            ),
+            (
+                4000057,
+                100,
+                &[
+                    (2000006, 20),
+                    (4010004, 7),
+                    (4010005, 7),
+                    (4010006, 3),
+                    (4020007, 2),
+                    (4020008, 2),
+                    (2040705, 1),
+                ],
+            ),
+            (
+                4000053,
+                100,
+                &[
+                    (2000006, 30),
+                    (4020006, 7),
+                    (4020008, 2),
+                    (4020007, 2),
+                    (2070010, 1),
+                    (2040805, 1),
+                ],
+            ),
+            (
+                4000054,
+                100,
+                &[
+                    (2000006, 30),
+                    (4020006, 7),
+                    (4020008, 2),
+                    (4020007, 2),
+                    (2041020, 1),
+                ],
+            ),
+            (
+                4000076,
+                100,
+                &[
+                    (2000001, 30),
+                    (2000003, 20),
+                    (4003001, 20),
+                    (2010001, 40),
+                    (2040002, 1),
+                ],
+            ),
+            (
+                4000078,
+                100,
+                &[
+                    (2000002, 15),
+                    (2000003, 25),
+                    (2010004, 15),
+                    (2050004, 15),
+                    (4003001, 30),
+                    (2040302, 1),
+                ],
+            ),
+            (
+                4000081,
+                100,
+                &[
+                    (2000006, 25),
+                    (2020006, 25),
+                    (4010004, 8),
+                    (4010005, 8),
+                    (4010006, 3),
+                    (4020007, 2),
+                    (4020008, 2),
+                    (2040705, 1),
+                ],
+            ),
+            (
+                4000070,
+                100,
+                &[
+                    (2000002, 30),
+                    (2020000, 20),
+                    (2000006, 15),
+                    (4003000, 5),
+                    (2041005, 1),
+                ],
+            ),
+            (
+                4000071,
+                100,
+                &[
+                    (2000002, 30),
+                    (2020000, 20),
+                    (2000006, 15),
+                    (4003000, 5),
+                    (2041005, 1),
+                ],
+            ),
+            (
+                4000072,
+                100,
+                &[
+                    (2000002, 30),
+                    (2020000, 20),
+                    (2000006, 15),
+                    (4003000, 5),
+                    (2041005, 1),
+                ],
+            ),
+            (
+                4000069,
+                100,
+                &[
+                    (2000006, 20),
+                    (2020005, 30),
+                    (2020006, 15),
+                    (2050004, 20),
+                    (4003003, 1),
+                    (2041002, 1),
+                ],
+            ),
+            (
+                4000079,
+                100,
+                &[
+                    (2000006, 25),
+                    (2050004, 50),
+                    (2022001, 35),
+                    (4020000, 8),
+                    (4020001, 8),
+                    (4020002, 8),
+                    (4020007, 2),
+                    (2041023, 1),
+                ],
+            ),
+            (
+                4000080,
+                100,
+                &[
+                    (2000006, 35),
+                    (4020006, 9),
+                    (4020008, 4),
+                    (4020007, 4),
+                    (2041008, 1),
+                ],
+            ),
+        ],
+    },
+    // Joko in Crimsonwood's Phantom Forest, once its quest is done: the
+    // first four for 50, the rest for 25.
+    Trader {
+        npc: JOKO,
+        name: "joko",
+        quest: Some(JOKO_QUEST),
+        intro: true,
+        confirm: true,
+        exp: 0,
+        wants: &[
+            (
+                4032007,
+                50,
+                &[
+                    (1002801, 1),
+                    (1462052, 1),
+                    (1462006, 1),
+                    (1462009, 1),
+                    (1452012, 1),
+                    (1472031, 1),
+                    (2044701, 1),
+                    (2044501, 1),
+                    (3010041, 1),
+                    (0, 750000),
+                ],
+            ),
+            (
+                4032006,
+                50,
+                &[
+                    (1332077, 1),
+                    (1322062, 1),
+                    (1302068, 1),
+                    (4032016, 1),
+                    (2043001, 1),
+                    (2043201, 1),
+                    (2044401, 1),
+                    (2044301, 1),
+                    (3010041, 1),
+                    (0, 1250000),
+                ],
+            ),
+            (
+                4032009,
+                50,
+                &[
+                    (1472072, 1),
+                    (1332077, 1),
+                    (1402048, 1),
+                    (1302068, 1),
+                    (4032017, 1),
+                    (4032015, 1),
+                    (2043023, 1),
+                    (2043101, 1),
+                    (2043301, 1),
+                    (3010040, 1),
+                    (0, 2500000),
+                ],
+            ),
+            (
+                4032008,
+                50,
+                &[
+                    (1002801, 1),
+                    (1382008, 1),
+                    (1382006, 1),
+                    (4032016, 1),
+                    (4032015, 1),
+                    (2043701, 1),
+                    (2043801, 1),
+                    (3010040, 1),
+                    (0, 1750000),
+                ],
+            ),
+            (4032007, 25, &[(0, 3500000)]),
+            (4032006, 25, &[(0, 3500000)]),
+            (4032009, 25, &[(0, 3500000)]),
+            (4032008, 25, &[(0, 3500000)]),
+        ],
+    },
+    // Faito in Showa.
+    Trader {
+        npc: FAITO,
+        name: "faito",
+        quest: None,
+        intro: false,
+        confirm: false,
+        exp: 0,
+        wants: &[
+            (
+                4000064,
+                100,
+                &[
+                    (2000000, 1),
+                    (2000006, 1),
+                    (2000003, 5),
+                    (2000002, 5),
+                    (4020006, 2),
+                    (4020000, 2),
+                    (4020004, 2),
+                    (2000003, 10),
+                    (2000003, 20),
+                    (2000002, 10),
+                    (2000002, 20),
+                    (2022026, 15),
+                    (2022024, 15),
+                    (1002393, 1),
+                ],
+            ),
+            (
+                4000065,
+                100,
+                &[
+                    (2000006, 1),
+                    (2000002, 5),
+                    (4020006, 2),
+                    (2000002, 10),
+                    (2000003, 10),
+                    (2000002, 20),
+                    (2000003, 20),
+                    (2022024, 15),
+                    (2022026, 15),
+                ],
+            ),
+            (
+                4000066,
+                100,
+                &[
+                    (2000006, 1),
+                    (2000002, 5),
+                    (2000003, 5),
+                    (4020000, 2),
+                    (2000003, 10),
+                    (2000002, 10),
+                    (2000003, 20),
+                    (2000002, 20),
+                    (2022024, 15),
+                    (1002393, 1),
+                ],
+            ),
+            (
+                4000075,
+                100,
+                &[
+                    (2060003, 1000),
+                    (4010004, 2),
+                    (4010006, 2),
+                    (2022022, 5),
+                    (2022022, 10),
+                    (2022022, 15),
+                    (2022019, 5),
+                    (2022019, 10),
+                    (2022019, 15),
+                    (2001002, 15),
+                    (2001001, 15),
+                    (1102040, 1),
+                    (1102043, 1),
+                ],
+            ),
+            (
+                4000077,
+                100,
+                &[
+                    (2000003, 1),
+                    (2022019, 5),
+                    (2000006, 5),
+                    (4010002, 2),
+                    (4010003, 2),
+                    (2000006, 10),
+                    (2000006, 15),
+                    (2022019, 10),
+                    (2022019, 15),
+                    (2060003, 1000),
+                    (2061003, 1000),
+                    (1082150, 1),
+                    (1082149, 1),
+                ],
+            ),
+            (
+                4000089,
+                100,
+                &[
+                    (2000006, 1),
+                    (2000003, 5),
+                    (2000002, 5),
+                    (2000003, 10),
+                    (2000003, 20),
+                    (2000002, 10),
+                    (2000002, 15),
+                    (2060003, 1000),
+                    (2061003, 1000),
+                    (2022026, 15),
+                    (1002395, 1),
+                ],
+            ),
+            (
+                4000090,
+                100,
+                &[
+                    (2022019, 5),
+                    (2000006, 5),
+                    (4010003, 2),
+                    (2022019, 10),
+                    (2022019, 15),
+                    (2000006, 10),
+                    (2000006, 15),
+                    (2060003, 1000),
+                    (2061003, 1000),
+                ],
+            ),
+            (
+                4000091,
+                100,
+                &[
+                    (2000003, 1),
+                    (2000006, 1),
+                    (2022019, 1),
+                    (2000006, 5),
+                    (4010002, 2),
+                    (4020001, 2),
+                    (2022019, 10),
+                    (2022019, 15),
+                    (2000006, 10),
+                    (2000006, 15),
+                    (2060003, 1000),
+                    (2061003, 1000),
+                ],
+            ),
+            (
+                4000092,
+                100,
+                &[
+                    (2022019, 5),
+                    (2022022, 5),
+                    (4010006, 2),
+                    (2022019, 10),
+                    (2022019, 15),
+                    (2022022, 10),
+                    (2022022, 15),
+                    (2001002, 15),
+                    (2001001, 15),
+                    (1102043, 1),
+                ],
+            ),
+            (
+                4000093,
+                100,
+                &[
+                    (4010004, 5),
+                    (2022019, 5),
+                    (2022022, 15),
+                    (2022019, 15),
+                    (2001002, 15),
+                    (2001001, 15),
+                    (1102043, 1),
+                ],
+            ),
+            (
+                4000094,
+                100,
+                &[
+                    (1102207, 1),
+                    (1442026, 1),
+                    (1302037, 1),
+                    (2070007, 1),
+                    (2340000, 1),
+                    (2330005, 1),
+                    (2022060, 25),
+                    (2022061, 20),
+                    (2022062, 15),
+                ],
+            ),
+        ],
+    },
+];
+
+/// The trader offers to trade; a yes shows what it takes, and picking one
+/// (and a yes, if it asks) trades the pile for a prize drawn now, or says
+/// the player hasn't enough.
+fn item_trader(trader: &Trader, player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let key = |part: &str| keys::trader(trader.name, part);
+    let mut script = NpcScript::new(trader.npc, Vec::new());
+    if trader
+        .quest
+        .is_some_and(|quest| player.quests.state(quest) != QuestState::Completed)
+    {
+        script.pages = vec![Page::Say(text(&key("not_yet")))];
+        return script;
+    }
+    let choices = trader
+        .wants
+        .iter()
+        .map(|&(item_id, count, prizes)| {
+            let (item, count_text) = (item_id.to_string(), count.to_string());
+            let said = |part: &str, more: &[(&str, &str)]| {
+                let mut values = vec![("item", item.as_str()), ("count", count_text.as_str())];
+                values.extend_from_slice(more);
+                content::text().get(&key(part), &values)
+            };
+            let label = format!("#v{item_id}# #t{item_id}# x {count}");
+            let trade = if player.inventory.count(item_id) < i32::from(count) {
+                Page::Say(said("lack", &[]))
+            } else {
+                let &(prize, quantity) = prizes.choose(rng).expect("every pile has prizes");
+                let mut effects = vec![Effect::TakeItem {
+                    item_id,
+                    quantity: count,
+                }];
+                if trader.exp > 0 {
+                    effects.push(Effect::GainExp(trader.exp));
+                }
+                let quantity_text = quantity.to_string();
+                let text = if prize == 0 {
+                    effects.push(Effect::GainMeso(quantity));
+                    said("done_mesos", &[("mesos", &quantity_text)])
+                } else {
+                    effects.push(Effect::GiveItem {
+                        item_id: prize,
+                        quantity: i16::try_from(quantity).unwrap_or(i16::MAX),
+                    });
+                    let prize = prize.to_string();
+                    said("done", &[("prize", &prize), ("quantity", &quantity_text)])
+                };
+                Page::Act { text, effects }
+            };
+            let pages = if trader.confirm {
+                vec![
+                    Page::Ask {
+                        text: said("confirm", &[]),
+                        on_yes: vec![],
+                        on_no: Some(text(&key("no_deal"))),
+                    },
+                    trade,
+                ]
+            } else {
+                vec![trade]
+            };
+            (label, pages)
+        })
+        .collect();
+    if trader.intro {
+        script.pages.push(Page::Say(text(&key("intro"))));
+    }
+    script.pages.extend([
+        Page::Ask {
+            text: text(&key("deal")),
+            on_yes: vec![],
+            on_no: Some(text(&key("no_deal"))),
+        },
+        Page::Menu {
+            text: text(&key("menu")),
+            choices,
+        },
+    ]);
+    script.inventory_full = Some(text(&key("full")));
+    script.refused = Some(text(&key("refused")));
     script
 }
 
@@ -26874,6 +27569,121 @@ mod tests {
         );
         assert_eq!(page_text(&paid), text(keys::HOLLY_DONE));
         assert!(holly.refused.as_deref().unwrap().contains("240000"));
+    }
+
+    fn holding(item_id: i32, count: i16) -> Player {
+        let mut player = traveller(30, 0, false);
+        player.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(item_id, count),
+        );
+        player
+    }
+
+    #[test]
+    fn faito_trades_a_hundred_crow_feathers_for_a_prize_from_its_list() {
+        const CROW_FEATHER: i32 = 4000064;
+        let mut faito = NpcScript::for_npc(FAITO, &holding(CROW_FEATHER, 100)).unwrap();
+        let say = |part| text(&keys::trader("faito", part));
+        assert_eq!(question(&faito.begin()), say("deal"));
+        assert_eq!(kind(&faito.respond(ScriptInput::Yes).unwrap()), Some(4));
+        let traded = faito.respond(ScriptInput::Select(0)).unwrap();
+        let [Effect::TakeItem {
+            item_id: CROW_FEATHER,
+            quantity: 100,
+        }, Effect::GiveItem { item_id, quantity }] = traded.effects[..]
+        else {
+            panic!("{traded:?}");
+        };
+        let prizes = TRADERS[2].wants[0].2;
+        assert!(
+            prizes.contains(&(item_id, i32::from(quantity))),
+            "{traded:?}"
+        );
+        assert!(page_text(&traded).contains(&item_id.to_string()));
+        assert_eq!(faito.inventory_full, Some(say("full")));
+
+        // Short of a hundred, Faito won't be fooled.
+        let mut faito = NpcScript::for_npc(FAITO, &holding(CROW_FEATHER, 99)).unwrap();
+        faito.begin();
+        faito.respond(ScriptInput::Yes).unwrap();
+        let short = faito.respond(ScriptInput::Select(0)).unwrap();
+        assert!(short.effects.is_empty());
+        assert!(page_text(&short).contains("4000064"));
+    }
+
+    #[test]
+    fn joko_trades_only_after_the_quest_and_pays_mesos_for_twenty_five() {
+        const SOILED_DOCUMENT: i32 = 4032007;
+        let mut player = holding(SOILED_DOCUMENT, 25);
+        let say = |part| text(&keys::trader("joko", part));
+        let mut joko = NpcScript::for_npc(JOKO, &player).unwrap();
+        assert_eq!(page_text(&joko.begin()), say("not_yet"));
+        assert_eq!(joko.respond(ScriptInput::Next).unwrap().prompt, None);
+
+        player.quests.upsert(game::QuestRecord {
+            quest_id: JOKO_QUEST,
+            status: game::QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        let mut joko = NpcScript::for_npc(JOKO, &player).unwrap();
+        assert_eq!(page_text(&joko.begin()), say("intro"));
+        assert_eq!(
+            question(&joko.respond(ScriptInput::Next).unwrap()),
+            say("deal")
+        );
+        joko.respond(ScriptInput::Yes).unwrap();
+        // The fifth choice takes 25 for mesos; the first wants 50.
+        let confirm = joko.respond(ScriptInput::Select(4)).unwrap();
+        assert!(question(&confirm).contains("25"));
+        let traded = joko.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            traded.effects,
+            [
+                Effect::TakeItem {
+                    item_id: SOILED_DOCUMENT,
+                    quantity: 25,
+                },
+                Effect::GainMeso(3_500_000),
+            ]
+        );
+        assert!(page_text(&traded).contains("3500000"));
+    }
+
+    #[test]
+    fn charlie_adds_five_hundred_exp_to_a_trade_and_every_trader_has_its_text() {
+        const ORANGE_POTION: i32 = 2000001;
+        let mut charlie =
+            NpcScript::for_npc(STAFF_SERGEANT_CHARLIE, &holding(4000073, 100)).unwrap();
+        charlie.begin();
+        charlie.respond(ScriptInput::Next).unwrap();
+        charlie.respond(ScriptInput::Yes).unwrap();
+        charlie.respond(ScriptInput::Select(0)).unwrap();
+        let traded = charlie.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(traded.effects[1], Effect::GainExp(500));
+        assert!(TRADERS[0].wants[0].2.contains(&(ORANGE_POTION, 20)));
+
+        let known = keys::all();
+        for trader in &TRADERS {
+            let mut parts = vec!["deal", "no_deal", "menu", "lack", "full", "refused", "done"];
+            parts.extend(trader.intro.then_some("intro"));
+            parts.extend(trader.confirm.then_some("confirm"));
+            parts.extend(trader.quest.map(|_| "not_yet"));
+            if trader
+                .wants
+                .iter()
+                .any(|want| want.2.iter().any(|prize| prize.0 == 0))
+            {
+                parts.push("done_mesos");
+            }
+            for part in parts {
+                let key = keys::trader(trader.name, part);
+                assert!(known.contains(&key), "{key}");
+            }
+            assert!(trader.wants.iter().all(|want| !want.2.is_empty()));
+        }
     }
 
     #[test]

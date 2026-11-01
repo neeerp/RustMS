@@ -1345,6 +1345,27 @@ mesos or materials (`maker.short`). Nothing is taken unless all of it applies.
 
 All of their text is placeholder (`refiner.*`, `altaire.*`).
 
+### Item traders
+
+Item traders take a pile of one etc item for a prize drawn at random from
+that item's list (`TRADERS` in `net::npc_scripts`, from Cosmic's
+`2010000.js`, `9201097.js` and `9120010.js`). The prize is drawn when the
+conversation starts; a player short of the pile is told so and nothing is
+taken. The take, any EXP and the prize are one step, so a full inventory
+(`full`) takes nothing.
+
+- Staff Sergeant Charlie (2010000, Orbis): an intro, a yes to deal, a menu
+  of 25 items, a yes to the trade; 100 of the item for a prize and 500 EXP.
+- Joko (9201097, Crimsonwood's Phantom Forest), once quest 8225 is
+  complete: the same steps, 50 of each of four items for a prize or mesos,
+  or 25 of any of them for 3,500,000 mesos.
+- Faito (9120010, Showa): a yes to hear more, then a menu of 11 items;
+  100 of one for a prize.
+
+Cosmic's Black Crystal Ore 4010008 (no such item in v83) is 4020008, and
+its malformed `[4020008.2]` prize is two of them. Their text is placeholder
+(`trader.{charlie,joko,faito}.*`).
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
