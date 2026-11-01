@@ -2032,6 +2032,8 @@
 "casey.about_match_cards" = "[placeholder] How are Match Cards played?"
 "casey.omok_rules" = "[placeholder] Two players take turns placing pieces, and the first to get five in a row wins. Opening a room takes an Omok set."
 "casey.match_cards_rules" = "[placeholder] Two players take turns turning over pairs of cards, and whoever matches the most pairs wins. Opening a room takes a set of Match Cards."
+"arwen.hello" = "[placeholder] Fairies keep away from humans, but one as strong as you can stay a while. Bring me the makings, and I will refine something rare for you."
+"arwen.stranger" = "[placeholder] I refine rare things, but not for a stranger like you."
 "ellin.menu" = "[placeholder] Poison is spreading through the forest. Will you and your party go in and stop it?"
 "ellin.enter" = "[placeholder] Go into the Forest of Poison Haze."
 "ellin.about" = "[placeholder] What is the Forest of Poison Haze?"

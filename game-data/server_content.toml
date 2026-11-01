@@ -1303,6 +1303,8 @@ unsourced = [
     "casey.about_match_cards",
     "casey.omok_rules",
     "casey.match_cards_rules",
+    "arwen.hello",
+    "arwen.stranger",
     "ellin.menu",
     "ellin.enter",
     "ellin.about",
