@@ -79,6 +79,11 @@ const OBSTACLE_OPENED: i16 = 32500;
 /// (`out00`), where the pipe leads.
 const YULETE_LAB: i32 = 926130000;
 const YULETE_LAB_WAY_OUT: u8 = 2;
+/// The cabinet room's way out (`out00`), and the dark lab's way back
+/// (`down00`): the dark pipe's other two ends.
+const ALCADNO_CABINET_WAY_OUT: u8 = 1;
+const DARK_LAB: i32 = 261_020_700;
+const DARK_LAB_WAY_BACK: u8 = 4;
 /// How near a scripted item's portal the player must stand.
 const ITEM_REACH: f64 = 210.0;
 /// Kerning City's subway: Line 1's first area.
@@ -2445,12 +2450,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             let side = crate::events::MagatiaSide::of(player.stats.map_id)?;
             through(Effect::WarpToPortal(side.stages()[6], 0))
         }
-        // The dark pipe off Magatia's Alcadno side, into Yulete's lab once
-        // his traces have shown the way (Cosmic `magatia_dark0`, quest 7770).
+        // The dark pipe off Magatia's Alcadno side (Cosmic `magatia_alc0`):
+        // into the room of Alcadno's Cabinet for one on An Incident still
+        // without the Secret Document, else into Yulete's lab once his
+        // traces have shown the way (Cosmic `magatia_dark0`, quest 7770),
+        // else into the dark lab.
+        "magatia_dark0"
+            if quest(npc_scripts::AN_INCIDENT) == QuestState::Started
+                && player.inventory.count(npc_scripts::SECRET_DOCUMENT) == 0 =>
+        {
+            through(Effect::WarpToPortal(
+                npc_scripts::ALCADNO_CABINET_ROOM,
+                ALCADNO_CABINET_WAY_OUT,
+            ))
+        }
         "magatia_dark0" if quest(npc_scripts::YULETE_LAB_OPENED) == QuestState::Started => {
             through(Effect::WarpToPortal(YULETE_LAB, YULETE_LAB_WAY_OUT))
         }
-        "magatia_dark0" => refused(keys::MAGATIA_PIPE_DARK),
+        "magatia_dark0" => through(Effect::WarpToPortal(DARK_LAB, DARK_LAB_WAY_BACK)),
         // Yulete's Lab Entrance's three rooms, each for those on its quest
         // (Making the Reagent, Organizing the Lab Report, Eliminating
         // Obstacles), and their exits' ways back (Cosmic `q3366in` to
@@ -5508,13 +5525,17 @@ mod tests {
     }
 
     #[test]
-    fn the_dark_pipe_leads_into_yuletes_lab_once_his_traces_showed_the_way() {
+    fn the_dark_pipe_leads_to_the_cabinet_on_an_incident_or_yuletes_lab_or_the_dark_lab() {
+        let data = crate::game_data::get().unwrap();
+        let way = |map: i32, name: &str| data.field(map).unwrap().portal_by_name(name).unwrap().id;
         let mut player = player_with(&[]);
         player.stats.map_id = 261020600;
         let dark = portal("magatia_dark0", &player).unwrap();
-        let line = content::text().get(keys::MAGATIA_PIPE_DARK, &[]);
-        assert_eq!(dark.effects, [Effect::Pink(line)]);
-        assert!(!dark.block);
+        assert_eq!(
+            dark.effects,
+            [Effect::PortalSound, Effect::WarpToPortal(261020700, 4)]
+        );
+        assert_eq!(way(261020700, "down00"), 4);
 
         player.quests.mark(npc_scripts::YULETE_LAB_OPENED);
         let open = portal("magatia_dark0", &player).unwrap();
@@ -5523,8 +5544,26 @@ mod tests {
             [Effect::PortalSound, Effect::WarpToPortal(926130000, 2)]
         );
         // `out00`, its way out to Magatia.
-        let lab = crate::game_data::get().unwrap().field(926130000).unwrap();
-        assert_eq!(lab.portal_by_name("out00").unwrap().id, 2);
+        assert_eq!(way(926130000, "out00"), 2);
+
+        // On An Incident, the cabinet's room comes first, until the Secret
+        // Document is in hand.
+        player.quests.upsert(QuestRecord {
+            quest_id: npc_scripts::AN_INCIDENT,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let cabinet = portal("magatia_dark0", &player).unwrap();
+        assert_eq!(
+            cabinet.effects,
+            [Effect::PortalSound, Effect::WarpToPortal(926120000, 1)]
+        );
+        assert_eq!(way(926120000, "out00"), 1);
+        crate::items::give(&mut player.inventory, npc_scripts::SECRET_DOCUMENT, 1).unwrap();
+        let held = portal("magatia_dark0", &player).unwrap();
+        assert_eq!(held.effects, open.effects);
     }
 
     #[test]
