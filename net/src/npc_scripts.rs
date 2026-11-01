@@ -412,6 +412,19 @@ const NLC_QUIZ_LEVEL: u8 = 10;
 pub const PICTURE_FRAME: i32 = 2111013;
 const PHYLLIAS_PENDANT: i16 = 3322;
 const SILVER_PENDANT: i32 = 4031697;
+/// Wiz the Librarian in the Helios Tower Library, and the storybook quests
+/// that end there with the book each brings back.
+pub const WIZ: i32 = 2040052;
+const STORYBOOKS: [(i16, i32); 8] = [
+    (3615, 4031235),
+    (3616, 4031236),
+    (3617, 4031237),
+    (3618, 4031238),
+    (3630, 4031270),
+    (3633, 4031280),
+    (3639, 4031298),
+    (3920, 4031591),
+];
 
 /// A pet-walking road's two trainers: the one at its foot gives a letter,
 /// and the brother at its top takes it and brings every pet out closer.
@@ -2662,6 +2675,7 @@ impl NpcScript {
             HIKARI => return Some(hikari(player)),
             ICEBYRD_SLIMM => return Some(icebyrd_slimm(player)),
             PICTURE_FRAME => return picture_frame(player),
+            WIZ => return Some(wiz(player)),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -10026,6 +10040,29 @@ fn picture_frame(player: &Player) -> Option<NpcScript> {
     let mut script = NpcScript::new(PICTURE_FRAME, pages);
     script.inventory_full = Some(text(keys::PICTURE_FRAME_FULL));
     Some(script)
+}
+
+/// Wiz lists the storybooks the player has brought back, by the quests
+/// completed, then thanks them.
+fn wiz(player: &Player) -> NpcScript {
+    let books: Vec<i32> = STORYBOOKS
+        .iter()
+        .filter(|(quest, _)| player.quests.state(*quest) == QuestState::Completed)
+        .map(|&(_, book)| book)
+        .collect();
+    if books.is_empty() {
+        return NpcScript::new(WIZ, vec![Page::Say(text(keys::WIZ_NONE))]);
+    }
+    let list: String = books
+        .iter()
+        .map(|book| format!("\r\n#v{book}# #b#t{book}##k"))
+        .collect();
+    let returned = content::text().get(
+        keys::WIZ_RETURNED,
+        &[("count", &books.len().to_string()), ("books", &list)],
+    );
+    let pages = vec![Page::Say(returned), Page::Say(text(keys::WIZ_THANKS))];
+    NpcScript::new(WIZ, pages)
 }
 
 /// Icebyrd Slimm, New Leaf City's mayor: a word on the city, or the start
@@ -26769,6 +26806,28 @@ mod tests {
             );
             assert!(hikari.refused().is_some());
         }
+    }
+
+    #[test]
+    fn wiz_lists_the_storybooks_brought_back() {
+        let mut player = traveller(50, 0, false);
+        let mut wiz = NpcScript::for_npc(WIZ, &player).unwrap();
+        assert_eq!(page_text(&wiz.begin()), text(keys::WIZ_NONE));
+
+        for (quest, _) in [STORYBOOKS[1], STORYBOOKS[7]] {
+            player.quests.upsert(game::QuestRecord {
+                quest_id: quest,
+                status: game::QuestStatus::Completed {
+                    at: std::time::SystemTime::UNIX_EPOCH,
+                },
+            });
+        }
+        let mut wiz = NpcScript::for_npc(WIZ, &player).unwrap();
+        let list = "\r\n#v4031236# #b#t4031236##k\r\n#v4031591# #b#t4031591##k";
+        let returned = content::text().get(keys::WIZ_RETURNED, &[("count", "2"), ("books", list)]);
+        assert_eq!(page_text(&wiz.begin()), returned);
+        let thanks = wiz.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&thanks), text(keys::WIZ_THANKS));
     }
 
     #[test]

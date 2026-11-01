@@ -3128,6 +3128,9 @@ pub mod keys {
     pub const ICEBYRD_BOROUGHS_TOLD: &str = "icebyrd.boroughs_told";
     pub const PICTURE_FRAME_FOUND: &str = "picture_frame.found";
     pub const PICTURE_FRAME_FULL: &str = "picture_frame.full";
+    pub const WIZ_NONE: &str = "wiz.none";
+    pub const WIZ_RETURNED: &str = "wiz.returned";
+    pub const WIZ_THANKS: &str = "wiz.thanks";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5333,6 +5336,9 @@ mod tests {
                 keys::ICEBYRD_BOROUGHS_TOLD,
                 keys::PICTURE_FRAME_FOUND,
                 keys::PICTURE_FRAME_FULL,
+                keys::WIZ_NONE,
+                keys::WIZ_RETURNED,
+                keys::WIZ_THANKS,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
