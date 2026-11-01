@@ -444,6 +444,7 @@ namespace ms
 		} else
 		{
 			desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, DESC_WIDTH, true, tooltip::LINE_ADJ);
+			desc.set_tooltip();
 			height += desc.height();
 		}
 

@@ -120,6 +120,8 @@ namespace ms
 		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, data.get_name(), WIDTH - 2 * tooltip::NAME_POS.x());
 		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, DESC_WIDTH, true, tooltip::LINE_ADJ);
 		leveldesc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, levelstr, LEVEL_WIDTH, true, tooltip::LINE_ADJ);
+		desc.set_tooltip();
+		leveldesc.set_tooltip();
 
 		line_y = std::max<int16_t>(LINE_MIN_Y, DESC_POS.y() + desc.height() + LINE_DESC_GAP);
 

@@ -148,6 +148,10 @@ namespace ms
 
 		void change_text(const std::string &text);
 
+		// Read '#' as an item or skill tooltip's description does (v83
+		// 0x8e40e4): it only turns the highlight on and off.
+		void set_tooltip();
+
 		void change_color(Color::Name color);
 
 		void set_background(Background background);
@@ -191,6 +195,7 @@ namespace ms
 		Layout layout;
 		uint16_t maxwidth;
 		bool formatted;
+		bool tooltip = false;
 		std::string text;
 		int16_t line_adj;
 		std::vector<Point<int16_t>> boxes;

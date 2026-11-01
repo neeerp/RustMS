@@ -26,9 +26,10 @@ namespace ms
 	// Lay out a text in a font whose lines are `linespace` apart and whose
 	// characters move the pen by `advance`, given whether they are bold. The n-th Text::BOX character takes
 	// the n-th of `boxes` (width, height). Positions in the layout are byte
-	// offsets into `text` (UTF-8).
+	// offsets into `text` (UTF-8). A `tooltip` text reads '#' as v83's
+	// tooltips do (0x8e40e4) rather than as NPC dialogue does.
 	Text::Layout layout_text(const std::string &text, int16_t linespace,
 							 const std::function<int16_t(char32_t, bool)> &advance, Text::Alignment alignment,
 							 int16_t maxwidth, bool formatted, int16_t line_adj,
-							 const std::vector<Point<int16_t>> &boxes);
+							 const std::vector<Point<int16_t>> &boxes, bool tooltip = false);
 }
