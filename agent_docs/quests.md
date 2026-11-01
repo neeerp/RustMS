@@ -297,7 +297,11 @@ data asks for a token (4001193) instead. Cosmic has no way back into the
 test room once its clock runs out; here the pack's wolf (1202008) offers
 the test again while 21613 is started and unpassed. Maha's end script
 (`q21618e`) swaps the wolf (1902017) for its grown form (1902018) only when
-it is in the Equip inventory, not ridden.
+it is in the Equip inventory, not ridden. The Field of Wolves' den
+(140010210), where the pack's wolf ends A Visit from the Wolf Herd (21612),
+has no portal in; the Wolf Guard (1202009, `enterWolf`) in Rien's
+140010200 lets in one with the Werewolf (1902016) in the bag or ridden, as
+Cosmic's `1202009.js` does.
 "The Test" (2312) has a start check of the same kind: its `Check.img/0`
 `infoNumber` names record 2311, which must be "1" (cond 0 is string equality,
 1 at least, 2 at most, as in the end check; v83 FUN_00721163). Such pairs are

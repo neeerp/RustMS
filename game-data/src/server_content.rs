@@ -1645,6 +1645,7 @@ pub mod keys {
     pub const TREE_STUMP_BOTTLED: &str = "tree_stump.bottled";
     pub const TREE_STUMP_FULL: &str = "tree_stump.full";
     pub const TREE_STUMP_SAP: &str = "tree_stump.sap";
+    pub const WOLF_GUARD_AWAY: &str = "wolf_guard.away";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5197,6 +5198,7 @@ mod tests {
                 keys::TREE_STUMP_BOTTLED,
                 keys::TREE_STUMP_FULL,
                 keys::TREE_STUMP_SAP,
+                keys::WOLF_GUARD_AWAY,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],
