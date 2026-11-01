@@ -107,7 +107,10 @@ pub fn build_successful_login_packet(
     }
     packet.write_long(0)?; // creation time
 
-    packet.write_int(1)?; // skip the "select a world" tutorial prompt
+    // 0 has the client show its login hints: "Please select the World you
+    // would like to play in." and "Double-click on a character to login."
+    // (CWvsContext +0x2088; nothing else reads it).
+    packet.write_int(0)?;
 
     // PIN: 0 = enabled, 1 = disabled. PIC: 2 = disabled (matches the char list).
     packet.write_byte(if pin_required { 0 } else { 1 })?;
@@ -215,7 +218,7 @@ mod tests {
         expect.byte(grade).byte(0).byte(0); // grade, admin byte, country code
         expect.string("admin").byte(0);
         expect.byte(0).long(0).long(0); // not quiet-banned, ban time, creation time
-        expect.int(1); // skip the "select the world" prompt
+        expect.int(0); // the login hints
         expect.byte(pin_flag); // 0 = PIN system enabled, 1 = disabled
         expect.byte(2); // 2 = PIC disabled
         expect.end();
