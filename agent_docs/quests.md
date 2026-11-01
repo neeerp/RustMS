@@ -1034,8 +1034,9 @@ tests characters first, so the player standing over it is picked instead).
 For a Noblesse the server opens Mimo's menu (`NpcScript::mimo`): who Mimo
 is, a guide hint for each of the next thirteen topics (TALK_GUIDE hints 1
 to 13), and who the knights are, as Cosmic's `1101008.js`. Mimo's lines
-are placeholders. Anyone else gets nothing: Cosmic opens Lilin's Aran
-tutorial, which isn't played.
+are placeholders. Anyone else gets Lilin's menu (`NpcScript::lilin_guide`,
+as Cosmic's `ClickGuideHandler` opens 1202000): four answers, then a guide
+hint for each of the six Snow Island topics (hints 14 to 19).
 
 The Aran's story begins on the Black Road (914000000 to 914000500), though
 a new Aran still starts in Amherst until the whole tutorial is in. Its
@@ -1059,6 +1060,37 @@ there. At the gangway (914000500), Athena (1209007) takes the child
 `removeEquipFromSlot(-11)`), and the Aran goes straight to Snow Island's
 Ice Cave (140090000). Cosmic plays a cinematic first (914090010), which we
 skip. All these lines are placeholders.
+
+Entering the Ice Cave (`iceCave`) takes away the five tutorial skills
+(`Effect::ForgetSkill`, sent as level 0) and points at Lilin
+(`aranTutorial/ClickLilin`). Lilin (1202000) wakes the hero the first time
+(record 21019 "helper" set to "clear"), then leads the way: the guide comes
+out (`Effect::SpawnGuide` with no line; the client picks Lilin's look for
+an Aran) and the Aran goes to Cold Forest 1 (140090100). Elsewhere, talking
+to Lilin opens the guide's menu. Each map's way on (`rienTutor1` to `4`,
+`COLD_FOREST_WAYS`) stays shut with a pink line until that map's quest is
+done:
+
+- Puka (1202001) starts The Return of the Hero (21010, `q21010s`): HP goes
+  down to 25 and a Special Rien Red Potion (2000022) is handed over. The
+  data's end needs it gone; Puka's end (`q21010e`) also wants HP back at
+  50, as Cosmic's does, and gives 5 red and 5 blue potions and 16 EXP.
+- Puen (1202002) starts The Missing Weapon (21011) from the data; Puir
+  (1202003) ends it (`q21011e`) with a sword (1302000) and 35 EXP.
+- Purun (1202004) starts Abilities Lost (21012, `q21012s`): three of the
+  four Tutorial Murus (9300383) in 140090300. The end (`q21012e`) gives 10
+  of each potion and 57 EXP.
+- Putzki (1202005) starts A Gift for the Hero (21013, `q21013s`). The five
+  boxes (reactor 1402000) in 140090400 drop both chair parts (4032309,
+  4032310) while it is taken (`[reactors.1402000]` in
+  `reward_overrides.toml`; Cosmic's drop only mesos, which leaves the quest
+  stuck). The end (`q21013e`) takes them for the Bamboo Chair (3010062)
+  and 95 EXP.
+
+Each start and end points the guide at the next thing (hints 14 to 19). In
+Cold Forest 5, touching `tutor00` (`rienTutor5`) has the guide say it goes
+ahead (`Effect::GuideSays`), and `tutor01` (`rienTutor6`) takes the guide
+away (`Effect::RemoveGuide`). These lines are placeholders too.
 
 Later, in Rien, Lilin (1201000) has a Legend train. Lilin's Account
 (21014, level 5) runs from the data. Basic Fitness Training 1 to 3 (21015

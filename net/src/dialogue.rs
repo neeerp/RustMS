@@ -27,6 +27,9 @@ pub enum NpcInteraction {
     },
     /// A Noblesse double-clicked their guide: Mimo's menu opens.
     Mimo,
+    /// Anyone else double-clicked theirs, an Aran on the way to Rien:
+    /// Lilin's menu opens.
+    Lilin,
 }
 
 /// One server-driven NPC prompt.

@@ -5,7 +5,7 @@ use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage, SquadAnswer};
 use game::pet::PetChange;
 use game::quest::{QuestRecord, QuestStatus};
-use game::{InventoryType, QuestState};
+use game::{InventoryType, QuestState, SkillRecord};
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::events::EventKind;
@@ -229,8 +229,18 @@ impl ClientActor {
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
                 Effect::SpawnGuide(text) => {
                     afterwards.push(effect::build_spawn_guide(true)?);
-                    afterwards.push(effect::build_guide_says(text, GUIDE_WIDTH, GUIDE_SAYS_FOR)?);
+                    if !text.is_empty() {
+                        afterwards.push(effect::build_guide_says(
+                            text,
+                            GUIDE_WIDTH,
+                            GUIDE_SAYS_FOR,
+                        )?);
+                    }
                 }
+                Effect::GuideSays(text) => {
+                    afterwards.push(effect::build_guide_says(text, GUIDE_WIDTH, GUIDE_SAYS_FOR)?)
+                }
+                Effect::RemoveGuide => afterwards.push(effect::build_spawn_guide(false)?),
                 Effect::GuideHint(hint) => {
                     afterwards.push(effect::build_guide_hint(*hint, GUIDE_HINT_FOR)?)
                 }
@@ -567,6 +577,21 @@ impl ClientActor {
                         changed = true;
                         packets.push(skill::build_update_skills(&taught)?);
                     }
+                }
+                Effect::ForgetSkill(skill_id) => {
+                    if next.skills.get(*skill_id).is_none() {
+                        continue;
+                    }
+                    next.skills.remove(*skill_id);
+                    changed = true;
+                    // Level 0 takes it out of the skill window, as a GM's
+                    // `!skill <id> 0` does.
+                    packets.push(skill::build_update_skills(&[SkillRecord {
+                        skill_id: *skill_id,
+                        level: 0,
+                        master_level: 0,
+                        expiration: None,
+                    }])?);
                 }
                 Effect::Mark(marker) => {
                     next.quests.mark(*marker);

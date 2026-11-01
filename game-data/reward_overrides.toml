@@ -238,6 +238,14 @@ replace = [
     { item = 4032268, prob = 1.0, quest = 20013 },
 ]
 
+[reactors.1402000]
+# The Cold Forest's boxes on Snow Island (Map.nx 140090400; Reactor.nx
+# 1402000, rienItem0, "Rien box reactor") hold the parts Putzki takes for A
+# Gift for the Hero (21013, Check.img/21013/1/item): the Piece of Bamboo and
+# the Wood. The pack has neither, nor does Cosmic, whose boxes only drop
+# mesos.
+quest_items = { 4032309 = 21013, 4032310 = 21013 }
+
 [reactors.2000]
 # Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
 # 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).
