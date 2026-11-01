@@ -140,6 +140,15 @@ player. A busy room refuses with `portal.solo_map.occupied` (QUESTIONS b383).
 The room's `out00` leads back to Kerning City. `skill_quest_items.rs`
 checks the trip and a kill through the network harness.
 
+Carta (`2060100`, `s4common2`) in `230040001` starts and ends Strong Will
+(6301). While it is under way, talking to Carta silently takes a Miniature
+Pianus (`4000175`, which Pianus drops) and sends the player to the
+deep-sea field (`923000000`), whose mobs (`9300097`-`9300099`) drop the 40
+pieces (`4031472`) the quest asks for. Without a Miniature Pianus, Carta
+says to bring one (`carta.need_pianus`). The field is shared and its mobs
+respawn, as in Cosmic (`2060100.js`). Its `out00` leads back to Carta.
+`skill_quest_items.rs` checks both cases through the network harness.
+
 Shane (`1032003`, `herb_in`) in Ellinia lets players from level 25 into the
 Forest of Patience for 5000 mesos (Yes/No, then a refusal if short). They
 start at Step 1 (`101000100`) while on Sabitrama's first herb quest (2050),

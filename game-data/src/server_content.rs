@@ -2979,6 +2979,9 @@ pub mod keys {
     pub const SHIELD_FIELD_LEAVE: &str = "shield_field.leave";
     /// The Fountain of Life (2083005) filling the Holy Cup.
     pub const FOUNTAIN_OF_LIFE_POUR: &str = "fountain_of_life.pour";
+    /// Carta (2060100) on Strong Will (6301), to one without a Miniature
+    /// Pianus to open the way.
+    pub const CARTA_NEED_PIANUS: &str = "carta.need_pianus";
     /// Papulatus in the past (2043000), sending a visitor back to their time.
     pub const PAST_PAPULATUS_SEND_BACK: &str = "papulatus.past.send_back";
     /// Delli's rescue (6410): Shulynch (1092008) in the Nautilus's Training
@@ -5099,6 +5102,7 @@ mod tests {
                 keys::SHIELD_FIELD_ASK,
                 keys::SHIELD_FIELD_LEAVE,
                 keys::FOUNTAIN_OF_LIFE_POUR,
+                keys::CARTA_NEED_PIANUS,
                 keys::PAST_PAPULATUS_SEND_BACK,
                 keys::DELLI_SHULYNCH_ASK,
                 keys::DELLI_SHULYNCH_LEAVE,
