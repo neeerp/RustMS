@@ -19,7 +19,7 @@ use net::packet::build::world::messaging::{
 use net::packet::build::world::pet::PetGone;
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{
-    drop, effect, guild, inventory, marriage, npc, pet, quest, skill, stat,
+    buddy, drop, effect, guild, inventory, marriage, npc, pet, quest, skill, stat,
 };
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
@@ -129,6 +129,8 @@ impl ClientActor {
     ) -> Result<Applied, RuntimeError> {
         let mut next = self.in_game()?.player.clone();
         let mut changed = false;
+        // Others' buddy requests read the capacity from the database.
+        let mut save_now = false;
         let mut change = None;
         let mut packets = Vec::new();
         let mut afterwards = Vec::new();
@@ -205,6 +207,17 @@ impl ClientActor {
                     };
                     next.ariant_points = total;
                     changed = true;
+                }
+                Effect::RaiseBuddyCapacity { by, max } => {
+                    let Some(capacity) =
+                        (next.buddy_capacity.checked_add(*by)).filter(|capacity| capacity <= max)
+                    else {
+                        return Ok(Applied::Refused);
+                    };
+                    next.buddy_capacity = capacity;
+                    packets.push(buddy::build_buddy_capacity(capacity)?);
+                    changed = true;
+                    save_now = true;
                 }
                 Effect::AriantPrizeTaken => {
                     next.ariant_tier = next.ariant_tier.map(|_| 0);
@@ -922,6 +935,9 @@ impl ClientActor {
         }
         if (changed || change.is_some()) && !self.commit_player(next, change, &mut packets).await? {
             return Ok(Applied::Refused);
+        }
+        if save_now {
+            self.flush().await?;
         }
         packets.append(&mut afterwards);
         if let Some(command) = command {

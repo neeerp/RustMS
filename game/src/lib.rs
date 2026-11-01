@@ -40,6 +40,7 @@ pub mod wedding;
 pub use buff::{Beacon, Buff, BuffStat, Buffs, Disease, ShownBuff};
 pub use character::{
     ApStat, AutoPotions, AvatarLook, CharacterStats, FieldAvatar, MiniRoomBox, Player, Ride,
+    DEFAULT_BUDDY_CAPACITY,
 };
 pub use dojo::DojoRecord;
 pub use guild::{Guild, GuildMember, GuildTag};

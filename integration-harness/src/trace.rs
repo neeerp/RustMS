@@ -180,6 +180,8 @@ pub struct Trace {
     pub buddy_requests: Vec<(i32, String)>,
     /// Buddy channel changes: (buddy, channel or -1).
     pub buddy_channels: Vec<(i32, i32)>,
+    /// Buddy list capacities sent (BUDDYLIST 0x15).
+    pub buddy_capacities: Vec<u8>,
     /// Failed buddy adds, by BUDDYLIST mode.
     pub buddy_errors: Vec<u8>,
     /// Buddy chat lines: (sender, text).
@@ -739,6 +741,7 @@ impl Trace {
                     self.buddy_channels.push((id, r.read_int().unwrap()));
                 }
                 mode @ 0x0B..=0x0F => self.buddy_errors.push(mode),
+                0x15 => self.buddy_capacities.push(r.read_byte().unwrap()),
                 _ => {}
             }
         } else if op == SendOpcode::OpenNpcShop as i16 {

@@ -28,9 +28,16 @@ characters list each other without `pending`.
   registered.
 - `db::buddy::add` locks both characters' rows, so two requests that cross
   can't both insert a pending row.
-- The capacity is the character's `buddy_capacity` (20; not persisted). It
-  limits your accepted rows, and all of the target's rows, pending
-  included.
+- The capacity is the character's `buddy_capacity`: 20
+  (`DEFAULT_BUDDY_CAPACITY`), or more once Robert Holly has added slots,
+  kept in `buddy_capacities` (a row only when raised). Your own capacity
+  limits your accepted rows; the target's own capacity limits all of the
+  target's rows, pending included.
+- Robert Holly (2040046, Ludibrium 220000000) offers more slots, then
+  names the price; a yes to both spends 240,000 mesos and adds 5 slots
+  (`Effect::RaiseBuddyCapacity`, up to 50 in all, as Cosmic `2040046.js`),
+  and sends the new capacity (BUDDYLIST 0x15). Short of mesos or at 50, it
+  says so and nothing is taken.
 - The world directory fills in channels (`DirectoryMessage::BuddyList`)
   because it knows who is online. It shows a channel only for buddies who
   are both mutual and online; everyone else gets -1.
@@ -136,9 +143,8 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
 
 ## Not implemented
 
-- Raising the capacity: the client shows any capacity 0x15 brings, but
-  the server never sends it, and v83's client has no way to ask for one.
-  The Cash Shop flags.
+- Raising the capacity from the Cash Shop; the client shows any capacity
+  0x15 brings, and has no way to ask for one.
 - v83's Friend tab has no MAP button, and neither does this one; the
   Guild tab's is in `guilds.md`. The Blacklist tab is in `inventory.md`
   ("Personal shops").

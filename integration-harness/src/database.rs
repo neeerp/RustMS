@@ -233,6 +233,20 @@ pub async fn set_dojo_points(character_id: i32, points: i32) -> Result<(), Harne
     .await
 }
 
+/// Set the logged-out character `character_id`'s buddy list capacity.
+pub async fn set_buddy_capacity(character_id: i32, capacity: i16) -> Result<(), HarnessError> {
+    change_one_row("set buddy capacity", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO buddy_capacities (character_id, capacity) VALUES ($1, $2) \
+             ON CONFLICT (character_id) DO UPDATE SET capacity = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(capacity)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Give the logged-out character `character_id` `points` Battle Arena
 /// points.
 pub async fn set_ariant_points(character_id: i32, points: i32) -> Result<(), HarnessError> {

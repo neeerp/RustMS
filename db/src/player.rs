@@ -8,10 +8,10 @@ use crate::character::Character;
 use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
-    accounts, ariant_records, auto_potions, character_mounts, character_quests, characters,
-    dojo_records, equipment_stats, explored_maps, extra_pendant_slots, gacha_exp, inventory_items,
-    keybindings, monster_book_cards, quest_ex_records, quick_slots, saved_locations, skill_macros,
-    skills, teleport_rocks,
+    accounts, ariant_records, auto_potions, buddy_capacities, character_mounts, character_quests,
+    characters, dojo_records, equipment_stats, explored_maps, extra_pendant_slots, gacha_exp,
+    inventory_items, keybindings, monster_book_cards, quest_ex_records, quick_slots,
+    saved_locations, skill_macros, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -316,6 +316,14 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
     {
         player.ariant_points = points;
     }
+    if let Some(capacity) = buddy_capacities::table
+        .find(character_id)
+        .select(buddy_capacities::capacity)
+        .first::<i16>(&mut conn)
+        .optional()?
+    {
+        player.buddy_capacity = u8::try_from(capacity).unwrap_or(game::DEFAULT_BUDDY_CAPACITY);
+    }
     Ok(player)
 }
 
@@ -406,6 +414,23 @@ fn save_ariant(conn: &mut PgConnection, id: i32, points: i32) -> QueryResult<()>
         .on_conflict(ariant_records::character_id)
         .do_update()
         .set(ariant_records::points.eq(points))
+        .execute(conn)?;
+    Ok(())
+}
+
+fn save_buddy_capacity(conn: &mut PgConnection, id: i32, capacity: u8) -> QueryResult<()> {
+    if capacity == game::DEFAULT_BUDDY_CAPACITY {
+        diesel::delete(buddy_capacities::table.find(id)).execute(conn)?;
+        return Ok(());
+    }
+    diesel::insert_into(buddy_capacities::table)
+        .values((
+            buddy_capacities::character_id.eq(id),
+            buddy_capacities::capacity.eq(i16::from(capacity)),
+        ))
+        .on_conflict(buddy_capacities::character_id)
+        .do_update()
+        .set(buddy_capacities::capacity.eq(i16::from(capacity)))
         .execute(conn)?;
     Ok(())
 }
@@ -554,6 +579,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         save_mount(conn, id, &player.mount)?;
         save_dojo(conn, id, &player.dojo)?;
         save_ariant(conn, id, player.ariant_points)?;
+        save_buddy_capacity(conn, id, player.buddy_capacity)?;
         save_inventory(conn, id, &player.inventory)?;
         crate::pet::save(conn, &player.inventory, &player.pets)?;
         // Script markers are whatever the player holds now.

@@ -3,7 +3,7 @@
 //! buddy is mutual when each has the other on their list, and only mutual
 //! buddies see each other's channel.
 
-use crate::schema::{buddies, characters};
+use crate::schema::{buddies, buddy_capacities, characters};
 use diesel::prelude::*;
 use diesel::sql_types::Text;
 use std::collections::HashSet;
@@ -94,7 +94,8 @@ fn listed_by(conn: &mut PgConnection, cid: i32) -> QueryResult<HashSet<i32>> {
 /// Add the character called `name` to `cid`'s list, asking them to add
 /// `cid` back unless they already have. Accepting their request has the same
 /// effect. Adding a buddy already listed under another group moves them to
-/// `group`, which is how v83 changes groups. `capacity` bounds both lists.
+/// `group`, which is how v83 changes groups. `capacity` bounds `cid`'s list;
+/// the target's own capacity bounds theirs.
 pub fn add(
     cid: i32,
     name: &str,
@@ -157,7 +158,13 @@ pub fn add(
             .select(buddies::pending)
             .first::<bool>(conn)
             .optional()?;
-        if theirs.is_none() && count(conn, target, None)? >= i64::from(capacity) {
+        let their_capacity = buddy_capacities::table
+            .find(target)
+            .select(buddy_capacities::capacity)
+            .first::<i16>(conn)
+            .optional()?
+            .unwrap_or(i16::from(game::DEFAULT_BUDDY_CAPACITY));
+        if theirs.is_none() && count(conn, target, None)? >= i64::from(their_capacity) {
             return Ok(Err(AddError::TheirListFull));
         }
 

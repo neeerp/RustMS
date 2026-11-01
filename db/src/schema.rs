@@ -822,6 +822,13 @@ diesel::table! {
 }
 diesel::joinable!(ariant_records -> characters (character_id));
 diesel::table! {
+    buddy_capacities (character_id) {
+        character_id -> Int4,
+        capacity -> Int2,
+    }
+}
+diesel::joinable!(buddy_capacities -> characters (character_id));
+diesel::table! {
     parcel_mesos_sent (character_id) {
         character_id -> Int4,
         day -> Date,
@@ -888,6 +895,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     reports,
     dojo_records,
     ariant_records,
+    buddy_capacities,
     parcel_mesos_sent,
     votes,
 );
