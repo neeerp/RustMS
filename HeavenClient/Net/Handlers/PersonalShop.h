@@ -245,7 +245,12 @@ namespace ms
 			Sale sale;
 		};
 
-		inline SellCheck check_sale(const SellForm &form, int32_t itemid, int16_t quantity)
+		// The sell dialog's boxes checked in v83's order (FUN_006fe2c3), and
+		// what goes up (FUN_006feacd, 0x6fdc0c): a whole item one of itself;
+		// a whole cash item, its count and bundle both the stack, one
+		// bundle of all of it; anything else `count` in bundles of the box's
+		// size, or of one unbundled.
+		inline SellCheck check_sale(const SellForm &form, int16_t quantity, bool whole, bool cash)
 		{
 			int32_t per_bundle = 1;
 
@@ -273,8 +278,11 @@ namespace ms
 			if (price.problem != enter_number::Problem::NONE)
 				return { Box::PRICE, enter_number::problem_text(price.problem, max_price, 1), {} };
 
-			if (sells_whole(itemid))
+			if (whole && !cash)
 				return { Box::NONE, "", { 1, 1, price.number } };
+
+			if (whole)
+				per_bundle = quantity;
 
 			auto bundles = static_cast<int16_t>(count.number / per_bundle);
 

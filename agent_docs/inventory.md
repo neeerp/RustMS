@@ -1693,7 +1693,9 @@ The flow:
 2. **Put item** (`0x16`: bag, slot, bundles, per bundle, price) and **take
    back** (`0x1b`: index) work only before the shop opens. Stars, bullets
    and equipment go whole, as one bundle. The storage rules decide what may
-   be sold. Each change sends the inventory operation, then the listings
+   be sold. The client's sell dialog sends `{1, 1}` for an equip, a set of
+   stars or a stack with a time limit, and one bundle of the whole stack,
+   `{1, quantity}`, for a cash item (v83 0x6fdc0c). Each change sends the inventory operation, then the listings
    (`0x19`) to everyone in the shop. Taking back an item with no room for it
    gets the inventory-full notice.
 3. **Open**: the client sends its blacklist (`0x1e`), then `{0xb, 1}`.

@@ -701,10 +701,16 @@ namespace ms
 			}
 		}
 
-		// A set of stars or bullets counts as one.
+		// A set of stars or bullets counts as one. An item with a time limit
+		// sells whole, and a cash one, by its data or its serial, in one
+		// bundle (FUN_004f3144, 0x6fda90).
 		int16_t quantity = shop_list::is_rechargeable(itemid) ? 1 : count;
+		const Inventory &inventory = Stage::get().get_player().get_inventory();
+		Optional<const Item> item = inventory.get_item(tab, slot);
+		bool whole = personal_shop::sells_whole(itemid, item ? item->get_expiration() : item_expiry::BEFORE);
+		bool cash = ItemData::get(itemid).is_cashitem() || inventory.get_cash_id(tab, slot) != 0;
 
-		UI::get().emplace<UIShopSell>(tab, slot, itemid, quantity, merchant);
+		UI::get().emplace<UIShopSell>(tab, slot, itemid, quantity, whole, cash, merchant);
 	}
 
 	void UIPersonalShop::take_back(int16_t index) const
@@ -1311,8 +1317,9 @@ namespace ms
 		constexpr Point<int16_t> BT_CANCEL = Point<int16_t>(180, 120);
 	}
 
-	UIShopSell::UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity, bool merchant) : UIElement(),
-			tab(tab), slot(slot), itemid(itemid), quantity(quantity), merchant(merchant), whole(personal_shop::sells_whole(itemid)), bundled(false)
+	UIShopSell::UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity, bool whole, bool cash,
+						   bool merchant) : UIElement(),
+			tab(tab), slot(slot), itemid(itemid), quantity(quantity), merchant(merchant), whole(whole), cash(cash), bundled(cash)
 	{
 		nl::node PersonalShop = NxFiles::ui_classic["UIWindow.img"]["PersonalShop"];
 		nl::node Basic = NxFiles::ui_classic["Basic.img"];
@@ -1329,8 +1336,9 @@ namespace ms
 		price = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, PRICE_BOX, 10);
 		per_bundle = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, PER_BUNDLE_BOX, 4);
 
-		// A whole item sells one at a time; a stack offers all of it.
-		count.change_text(std::to_string(whole ? 1 : quantity));
+		// A whole item sells one at a time; a stack offers all of it, and a
+		// cash item is checked as one bundle of it all, fixed (0x6fe414).
+		count.change_text(std::to_string(whole && !cash ? 1 : quantity));
 		price.change_text("0");
 		per_bundle.change_text(std::to_string(whole ? quantity : 1));
 
@@ -1340,11 +1348,11 @@ namespace ms
 			field->set_key_callback(KeyAction::Id::ESCAPE, [&]() { cancel(); });
 		}
 
-		if (whole)
+		if (whole || cash)
 			count.set_state(Textfield::State::DISABLED);
 
 		per_bundle.set_state(Textfield::State::DISABLED);
-		(whole ? price : count).set_state(Textfield::State::FOCUSED);
+		(whole || cash ? price : count).set_state(Textfield::State::FOCUSED);
 
 		dimension = backgrnd.get_dimensions();
 		position = centred(dimension);
@@ -1358,7 +1366,7 @@ namespace ms
 		if (bundled)
 			bar.draw(position + BAR);
 
-		checkboxes[bundled].draw(DrawArgument(position + CHECKBOX + Point<int16_t>(0, 1), whole ? 0.5f : 1.0f));
+		checkboxes[bundled].draw(DrawArgument(position + CHECKBOX + Point<int16_t>(0, 1), whole || cash ? 0.5f : 1.0f));
 
 		count.draw(position + TEXT_Y);
 		price.draw(position + TEXT_Y);
@@ -1388,7 +1396,7 @@ namespace ms
 
 		Rectangle<int16_t> checkbox = Rectangle<int16_t>(position + CHECKBOX, position + CHECKBOX + CHECKBOX_SIZE);
 
-		if (!whole && checkbox.contains(cursorpos))
+		if (!whole && !cash && checkbox.contains(cursorpos))
 		{
 			if (clicked)
 			{
@@ -1428,7 +1436,7 @@ namespace ms
 	void UIShopSell::confirm()
 	{
 		personal_shop::SellForm form = { count.get_text(), price.get_text(), per_bundle.get_text(), bundled };
-		personal_shop::SellCheck check = personal_shop::check_sale(form, itemid, quantity);
+		personal_shop::SellCheck check = personal_shop::check_sale(form, quantity, whole, cash);
 
 		// A problem keeps the dialog open at the box to fix (FUN_006fe2c3).
 		if (check.box != personal_shop::Box::NONE)
