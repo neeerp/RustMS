@@ -269,6 +269,12 @@ pub mod keys {
     pub const GRASSY_LUMP_POOP: &str = "grassy_lump.poop";
     pub const GRASSY_LUMP_FULL: &str = "grassy_lump.full";
     pub const SAGE_MENHIRS: &str = "sage.menhirs";
+    /// A Lith Harbor job statue, by job (`warrior`, `bowman`, `magician`,
+    /// `thief`, `pirate`): `ask` (to go to the instructor) and `weak`.
+    pub fn job_statue(job: &str, line: &str) -> String {
+        format!("job_statue.{job}.{line}")
+    }
+    pub const JOB_STATUE_OTHER: &str = "job_statue.other";
     pub const SAGE_STATUE: &str = "sage.statue";
     pub const SAGE_SIGILS: &str = "sage.sigils";
     pub const SAGE_KEEP: &str = "sage.keep";
@@ -5977,6 +5983,11 @@ mod tests {
         }
         assert!(text.contains(&keys::robin_answer(0, 0)));
         assert!(text.contains(&keys::first_job("thief", "after.4")));
+        for job in ["warrior", "bowman", "magician", "thief", "pirate"] {
+            assert!(text.contains(&keys::job_statue(job, "ask")));
+            assert!(text.contains(&keys::job_statue(job, "weak")));
+        }
+        assert!(text.contains(keys::JOB_STATUE_OTHER));
         assert!(text.contains(&keys::second_job("thief", "proctor.ask")));
         assert!(text.contains(&keys::second_job("420", "accept")));
         assert!(text.contains(&keys::first_job("pirate", "after.4")));
