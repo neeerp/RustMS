@@ -1285,6 +1285,12 @@ Flaming Feather, a Moon Rock and a Black Crystal and 30,000 mesos
 (`item_makers::ARWEN`). Below level 40 Arwen says only that strangers
 get nothing (QUESTIONS b386). The lines are placeholders (`arwen.*`).
 
+Chief Tatamo (2081000, Leafre, 240000000) sells Magic Seeds (4031346),
+which the Minar Forest shortcut spends, for 30,000 mesos each: an
+`AskNumber` from 1 to 99 (`OnNumber::MagicSeeds`), then a yes/no with
+the total. Short mesos or a full Etc. tab get one line (`tatamo.short`).
+The lines are placeholders (`tatamo.*`, QUESTIONS b387).
+
 ### Refiners
 
 Refiners make plates, jewels, crystals, materials and arrows in batches.
