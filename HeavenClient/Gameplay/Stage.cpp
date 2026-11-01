@@ -356,6 +356,7 @@ namespace ms
 		combat.clear_prepare();
 		combat.clear_grenades();
 		combat.clear_final_attack();
+		combat.clear_spots();
 		player.set_flymap(mapinfo.is_flying());
 		player.respawn(startpos, mapinfo.is_swimming(startpos));
 		// v83 makes the user anew in each field: a revival or a portal just

@@ -34,6 +34,8 @@
 #include "../MapleMap/MapPortals.h"
 #include "../MapleMap/MapReactors.h"
 #include "../MapleMap/MapSummons.h"
+#include "SameSpot.h"
+
 #include "../Physics/Physics.h"
 
 #include "../../Character/Player.h"
@@ -148,6 +150,7 @@ namespace ms
 		// Drop a Final Attack still to come, as on leaving the map: v83
 		// makes the user anew in each field.
 		void clear_final_attack();
+		void clear_spots();
 
 		// Show another user's summon attacking: its animation, then each
 		// mob's hit as it gets there (FUN_007a6882). `hits` are the mobs
@@ -355,7 +358,8 @@ namespace ms
 		std::optional<Swing> aim_swing();
 
 		// Takes it, telling the server of an attack on no mob.
-		void take_swing(const Swing &swing);
+		bool take_swing(const Swing &swing);
+		bool may_attack_here();
 
 		// Swing a basic attack at a reactor in reach instead, if there is
 		// one. Returns whether it did.
@@ -612,6 +616,10 @@ namespace ms
 		// When Energy Charge and Body Pressure may hit a touching mob again (0x95f2e6).
 		int64_t next_body_attack = 0;
 		int64_t next_body_pressure = 0;
+		// The attacks, and the skills that send where the player stands,
+		// counted from one spot (FUN_009536d0).
+		same_spot::Limiter attack_spot{ same_spot::ATTACKS };
+		same_spot::Limiter skill_spot{ same_spot::SKILLS };
 
 		static Texture gauge_bar[2];
 		static Texture gauge_fill[2];

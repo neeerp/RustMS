@@ -667,13 +667,20 @@ namespace ms
 		if (!reach)
 			return false;
 
-		move.apply_useeffects(player);
+		// Past its spot's limit a skill sent from where the player stands
+		// acts with no effect, and isn't sent (0x96d5a4).
+		Point<int16_t> at = player.get_position();
+		bool here = !skill_use::sends_position(moveid) || skill_spot.allows(at.x(), at.y());
+
+		if (here)
+			move.apply_useeffects(player);
+
 		std::string action = move.apply_actions(player, Attack::Type::MAGIC);
 		player.fix_action_speed(6);
 
 		// Resurrection with no one to raise plays out but isn't sent
 		// (0x96d567).
-		if (!skill_use::sends(moveid, reach->party))
+		if (!here || !skill_use::sends(moveid, reach->party))
 			return true;
 
 		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
@@ -1266,6 +1273,13 @@ namespace ms
 				!player.soul_arrow() && player.shadow_star_lost())
 				return false;
 
+			// Past the spot's limit a swing does nothing at all (0x951382).
+			// A shot or a spell still plays out, but isn't sent, below.
+			bool close = attack.type == Attack::Type::CLOSE || whack != Stance::Id::NONE;
+
+			if (close && !may_attack_here())
+				return false;
+
 			// Assassinate's first strike shows Dark Sight going, and ends
 			// it before the attack goes out; its second shows `special`
 			// instead of its effect (0x951a20).
@@ -1555,6 +1569,12 @@ namespace ms
 				result.last_oid = result.first_oid;
 			}
 
+			// A shot (0x95420a) or a spell (0x955bf5) counts once it has
+			// played out; Hurricane's and Rapid Fire's shots don't.
+			if (!close && (attack.type != Attack::Type::RANGED || same_spot::counts_shot(attack.skill))
+				&& !may_attack_here())
+				return true;
+
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
 			show_counters(result);
@@ -1621,6 +1641,10 @@ namespace ms
 		move.apply_useeffects(player);
 		move.apply_actions(player, attack.type);
 		player.set_afterimage(ID);
+
+		// Past the spot's limit it acts but isn't sent (0x96b62a).
+		if (!may_attack_here())
+			return true;
 
 		AttackResult result = attack;
 		result.attacker = player.get_oid();
@@ -1792,8 +1816,12 @@ namespace ms
 		return Swing{ degenerate, stance, attack, range };
 	}
 
-	void Combat::take_swing(const Swing &swing)
+	bool Combat::take_swing(const Swing &swing)
 	{
+		// Past the spot's limit the swing does nothing at all (0x95763a).
+		if (!may_attack_here())
+			return false;
+
 		player.attack(swing.degenerate, swing.stance);
 		player.set_afterimage(0);
 
@@ -1803,6 +1831,15 @@ namespace ms
 		AttackResult result = attack;
 		result.attacker = player.get_oid();
 		AttackPacket(result, player.get_position()).dispatch();
+
+		return true;
+	}
+
+	bool Combat::may_attack_here()
+	{
+		Point<int16_t> at = player.get_position();
+
+		return attack_spot.allows(at.x(), at.y());
 	}
 
 	void Combat::use_skill_at_reactors(int32_t skill)
@@ -1883,7 +1920,8 @@ namespace ms
 		int16_t index = coconut::first_hit(Stage::get().coconut_boxes(),
 										   { range.left(), range.top(), range.right(), range.bottom() });
 
-		take_swing(*swing);
+		if (!take_swing(*swing))
+			return;
 
 		if (index >= 0)
 			CoconutPacket(index, player.get_attackdelay(0)).dispatch();
@@ -1901,7 +1939,8 @@ namespace ms
 		int16_t target = snowball::first_hit(snowball::rules(), { game.balls[0].step, game.balls[1].step },
 											 { range.left(), range.top(), range.right(), range.bottom() });
 
-		take_swing(*swing);
+		if (!take_swing(*swing))
+			return;
 
 		// Only while the game runs.
 		if (target < 0 || game.state != 1)
@@ -2189,7 +2228,7 @@ namespace ms
 		AttackResult result = attack;
 		mobs.send_attack(result, attack, { oid }, 1);
 
-		if (result.damagelines.empty())
+		if (result.damagelines.empty() || !may_attack_here())
 			return;
 
 		next = now + 1000;
@@ -3674,6 +3713,12 @@ namespace ms
 	void Combat::clear_final_attack()
 	{
 		pending_final.reset();
+	}
+
+	void Combat::clear_spots()
+	{
+		attack_spot = same_spot::Limiter(same_spot::ATTACKS);
+		skill_spot = same_spot::Limiter(same_spot::SKILLS);
 	}
 
 	const Skill &Combat::get_skill(int32_t skill_id)
