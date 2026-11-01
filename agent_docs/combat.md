@@ -740,7 +740,10 @@ A few skills do more than buff:
   a close attack of Energy Charge on that one mob with one line of the
   skill's damage, at most once a second, off ropes and ladders and not
   on a tamed monster (FUN_0095f135). Neither side plays an action or an
-  effect of the attacker's, only the skill's `hit` on the mob. The server
+  effect of the attacker's, only the skill's `hit` on the mob. Others see
+  the attacker's action cut short and any skill they were preparing ended
+  (0x98044f), as for any attack but the shots of Hurricane and Rapid Fire
+  and Spark's bolts (`prepare::outlasts_attacks`). The server
   takes it through the attack handler (`AttackKind::Body`) and sends the
   map ENERGY_ATTACK (0xBD); Energy Charge comes no other way. It drops a
   body attack, Energy Charge's or Body Pressure's, that comes within 800 ms

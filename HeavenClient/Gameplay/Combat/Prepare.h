@@ -206,11 +206,12 @@ namespace ms
 			return (action_and_facing & 0x8000) != 0;
 		}
 
-		// Whether another user's attack leaves the skill they hold as it is:
-		// the shooters keep firing with it (0x98044f).
+		// Whether another user's attack leaves what they do as it is: the
+		// shooters keep firing, and Spark's bolts strike as they act
+		// (0x98044f).
 		inline bool outlasts_attacks(int32_t skill)
 		{
-			return repeats(skill) || skill == 14111006;
+			return repeats(skill) || skill == 15111006;
 		}
 
 		// A skill that keeps firing shoots once more than 100 ms have passed
