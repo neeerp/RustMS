@@ -30,6 +30,9 @@ int main()
 		require(key(true, true, "walk1") == "walk1", "the action's node");
 		require(key(true, false, "walk1") == "default", "else default");
 		require(key(false, true, "walk1") == "default", "an item without action");
+		require(acts(true, false, 0) && acts(true, true, 1902000) && acts(true, false, 1912000), "acting afoot or kept on a mount");
+		require(!acts(true, false, 1902000) && !acts(true, false, 1932000), "not on a tamed monster or vehicle without tamingMob");
+		require(!acts(false, true, 0), "nor an item without action");
 
 		// 201-item-effects section 6: loose 10, 50 px away, 16 ms later, it closes 3.7 px.
 		Trail x;

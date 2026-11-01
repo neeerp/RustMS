@@ -12,6 +12,7 @@ namespace ms
 		item_id = id;
 		effect = {};
 		keyed = false;
+		acting = false;
 		action.clear();
 		layer.reset();
 		followers.clear();
@@ -27,6 +28,8 @@ namespace ms
 			return;
 
 		keyed = effect["action"].get_integer() != 0;
+		taming_mob = effect["tamingMob"].get_integer(1) != 0;
+		acting = keyed;
 		spectrum = effect["spectrum"].get_integer() != 0;
 		interval = static_cast<int32_t>(effect["interval"].get_integer(100));
 		delay = static_cast<int32_t>(effect["delay"].get_integer(1000));
@@ -82,7 +85,18 @@ namespace ms
 
 		// An action item starts its node over at every change of action, even from one that plays `default` to
 		// another.
-		if (keyed && now_action != action)
+		bool acts = item_effect::acts(keyed, taming_mob, look.get_vehicle());
+
+		if (acts != acting)
+		{
+			acting = acts;
+			action.clear();
+
+			if (!acts)
+				load("default");
+		}
+
+		if (acts && now_action != action)
 		{
 			action = now_action;
 			load(item_effect::key(true, static_cast<bool>(effect[action]), action));
