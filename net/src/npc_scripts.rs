@@ -399,6 +399,13 @@ pub const BATHHOUSE_PRICE: i32 = 300;
 /// `out00` (portal 2).
 pub const LOCKER_ROOMS: [i32; 2] = [801000100, 801000200];
 const LOCKER_ROOM_DOOR: u8 = 2;
+pub const ICEBYRD_SLIMM: i32 = 9201050;
+/// The first and last of Icebyrd Slimm's quiz quests, Welcome to New Leaf
+/// City Quiz 1 and 12. The first's `lvmin` (100200) keeps the client from
+/// starting it; Icebyrd Slimm starts it from level 10.
+pub const NLC_QUIZ_FIRST: i16 = 4900;
+const NLC_QUIZ_LAST: i16 = 4911;
+const NLC_QUIZ_LEVEL: u8 = 10;
 
 /// A pet-walking road's two trainers: the one at its foot gives a letter,
 /// and the brother at its top takes it and brings every pet out closer.
@@ -2647,6 +2654,7 @@ impl NpcScript {
             WEAVER => return Some(pet_course_start(&LUDIBRIUM_PET_COURSE, player)),
             NERU => return Some(pet_course_end(&LUDIBRIUM_PET_COURSE, player)),
             HIKARI => return Some(hikari(player)),
+            ICEBYRD_SLIMM => return Some(icebyrd_slimm(player)),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9990,6 +9998,47 @@ fn hikari(player: &Player) -> NpcScript {
     );
     script.refused = Some(priced(keys::HIKARI_SHORT));
     script
+}
+
+/// Icebyrd Slimm, New Leaf City's mayor: a word on the city, or the start
+/// of the quiz about it.
+fn icebyrd_slimm(player: &Player) -> NpcScript {
+    let say = |key| vec![Page::Say(text(key))];
+    if player.quests.state(NLC_QUIZ_LAST) == QuestState::Completed {
+        return NpcScript::new(ICEBYRD_SLIMM, say(keys::ICEBYRD_DONE));
+    }
+    if player.quests.state(NLC_QUIZ_FIRST) != QuestState::NotStarted {
+        return NpcScript::new(ICEBYRD_SLIMM, say(keys::ICEBYRD_QUIZZING));
+    }
+    let quiz = if player.stats.level >= NLC_QUIZ_LEVEL {
+        vec![Page::Act {
+            text: text(keys::ICEBYRD_QUIZ_STARTED),
+            effects: vec![Effect::StartQuest(NLC_QUIZ_FIRST)],
+        }]
+    } else {
+        say(keys::ICEBYRD_EXPLORE)
+    };
+    let mut choices: Vec<_> = [
+        (keys::ICEBYRD_CITY, keys::ICEBYRD_CITY_TOLD),
+        (keys::ICEBYRD_FOXWIT, keys::ICEBYRD_FOXWIT_TOLD),
+        (keys::ICEBYRD_DOORS, keys::ICEBYRD_DOORS_TOLD),
+        (keys::ICEBYRD_MESOGEARS, keys::ICEBYRD_MESOGEARS_TOLD),
+        (keys::ICEBYRD_JUNGLE, keys::ICEBYRD_JUNGLE_TOLD),
+        (keys::ICEBYRD_GEAR_PORTALS, keys::ICEBYRD_GEAR_PORTALS_TOLD),
+        (keys::ICEBYRD_SIGNS, keys::ICEBYRD_SIGNS_TOLD),
+        (keys::ICEBYRD_JACK, keys::ICEBYRD_JACK_TOLD),
+        (keys::ICEBYRD_LITA, keys::ICEBYRD_LITA_TOLD),
+        (keys::ICEBYRD_BOROUGHS, keys::ICEBYRD_BOROUGHS_TOLD),
+    ]
+    .into_iter()
+    .map(|(asked, told)| (text(asked), say(told)))
+    .collect();
+    choices.push((text(keys::ICEBYRD_QUIZ), quiz));
+    let menu = Page::Menu {
+        text: text(keys::ICEBYRD_HELLO),
+        choices,
+    };
+    NpcScript::new(ICEBYRD_SLIMM, vec![menu])
 }
 
 /// Chico in Ludibrium: Match Cards or one of Ludibrium's Omok sets, for
@@ -26692,6 +26741,39 @@ mod tests {
             );
             assert!(hikari.refused().is_some());
         }
+    }
+
+    #[test]
+    fn icebyrd_slimm_tells_of_the_city_and_starts_the_quiz_from_level_10() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let mut young = NpcScript::for_npc(ICEBYRD_SLIMM, &traveller(9, 0, false)).unwrap();
+        assert_eq!(menu(young.begin()).matches("#L").count(), 11);
+        let told = young.respond(ScriptInput::Select(10)).unwrap();
+        assert_eq!(page_text(&told), text(keys::ICEBYRD_EXPLORE));
+        assert!(told.effects.is_empty());
+
+        let mut player = traveller(10, 0, false);
+        let mut icebyrd = NpcScript::for_npc(ICEBYRD_SLIMM, &player).unwrap();
+        icebyrd.begin();
+        let told = icebyrd.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&told), text(keys::ICEBYRD_FOXWIT_TOLD));
+        let mut icebyrd = NpcScript::for_npc(ICEBYRD_SLIMM, &player).unwrap();
+        icebyrd.begin();
+        let started = icebyrd.respond(ScriptInput::Select(10)).unwrap();
+        assert_eq!(started.effects, [Effect::StartQuest(NLC_QUIZ_FIRST)]);
+
+        player.quests.upsert(game::QuestRecord {
+            quest_id: NLC_QUIZ_FIRST,
+            status: game::QuestStatus::Started {
+                kills: vec![],
+                info: None,
+            },
+        });
+        let mut icebyrd = NpcScript::for_npc(ICEBYRD_SLIMM, &player).unwrap();
+        assert_eq!(page_text(&icebyrd.begin()), text(keys::ICEBYRD_QUIZZING));
     }
 
     #[test]

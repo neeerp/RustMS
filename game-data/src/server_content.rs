@@ -3100,6 +3100,32 @@ pub mod keys {
     pub const HIKARI_ASK: &str = "hikari.ask";
     pub const HIKARI_LATER: &str = "hikari.later";
     pub const HIKARI_SHORT: &str = "hikari.short";
+    pub const ICEBYRD_HELLO: &str = "icebyrd.hello";
+    pub const ICEBYRD_DONE: &str = "icebyrd.done";
+    pub const ICEBYRD_QUIZZING: &str = "icebyrd.quizzing";
+    pub const ICEBYRD_QUIZ: &str = "icebyrd.quiz";
+    pub const ICEBYRD_QUIZ_STARTED: &str = "icebyrd.quiz_started";
+    pub const ICEBYRD_EXPLORE: &str = "icebyrd.explore";
+    pub const ICEBYRD_CITY: &str = "icebyrd.city";
+    pub const ICEBYRD_CITY_TOLD: &str = "icebyrd.city_told";
+    pub const ICEBYRD_FOXWIT: &str = "icebyrd.foxwit";
+    pub const ICEBYRD_FOXWIT_TOLD: &str = "icebyrd.foxwit_told";
+    pub const ICEBYRD_DOORS: &str = "icebyrd.doors";
+    pub const ICEBYRD_DOORS_TOLD: &str = "icebyrd.doors_told";
+    pub const ICEBYRD_MESOGEARS: &str = "icebyrd.mesogears";
+    pub const ICEBYRD_MESOGEARS_TOLD: &str = "icebyrd.mesogears_told";
+    pub const ICEBYRD_JUNGLE: &str = "icebyrd.jungle";
+    pub const ICEBYRD_JUNGLE_TOLD: &str = "icebyrd.jungle_told";
+    pub const ICEBYRD_GEAR_PORTALS: &str = "icebyrd.gear_portals";
+    pub const ICEBYRD_GEAR_PORTALS_TOLD: &str = "icebyrd.gear_portals_told";
+    pub const ICEBYRD_SIGNS: &str = "icebyrd.signs";
+    pub const ICEBYRD_SIGNS_TOLD: &str = "icebyrd.signs_told";
+    pub const ICEBYRD_JACK: &str = "icebyrd.jack";
+    pub const ICEBYRD_JACK_TOLD: &str = "icebyrd.jack_told";
+    pub const ICEBYRD_LITA: &str = "icebyrd.lita";
+    pub const ICEBYRD_LITA_TOLD: &str = "icebyrd.lita_told";
+    pub const ICEBYRD_BOROUGHS: &str = "icebyrd.boroughs";
+    pub const ICEBYRD_BOROUGHS_TOLD: &str = "icebyrd.boroughs_told";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5277,6 +5303,32 @@ mod tests {
                 keys::HIKARI_ASK,
                 keys::HIKARI_LATER,
                 keys::HIKARI_SHORT,
+                keys::ICEBYRD_HELLO,
+                keys::ICEBYRD_DONE,
+                keys::ICEBYRD_QUIZZING,
+                keys::ICEBYRD_QUIZ,
+                keys::ICEBYRD_QUIZ_STARTED,
+                keys::ICEBYRD_EXPLORE,
+                keys::ICEBYRD_CITY,
+                keys::ICEBYRD_CITY_TOLD,
+                keys::ICEBYRD_FOXWIT,
+                keys::ICEBYRD_FOXWIT_TOLD,
+                keys::ICEBYRD_DOORS,
+                keys::ICEBYRD_DOORS_TOLD,
+                keys::ICEBYRD_MESOGEARS,
+                keys::ICEBYRD_MESOGEARS_TOLD,
+                keys::ICEBYRD_JUNGLE,
+                keys::ICEBYRD_JUNGLE_TOLD,
+                keys::ICEBYRD_GEAR_PORTALS,
+                keys::ICEBYRD_GEAR_PORTALS_TOLD,
+                keys::ICEBYRD_SIGNS,
+                keys::ICEBYRD_SIGNS_TOLD,
+                keys::ICEBYRD_JACK,
+                keys::ICEBYRD_JACK_TOLD,
+                keys::ICEBYRD_LITA,
+                keys::ICEBYRD_LITA_TOLD,
+                keys::ICEBYRD_BOROUGHS,
+                keys::ICEBYRD_BOROUGHS_TOLD,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
