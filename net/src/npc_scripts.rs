@@ -421,6 +421,12 @@ const UNDERGROUND_STUDY: i16 = 3339;
 /// Phyllia gives it in the quest's start (Quest.nx `Say.img/3339/0/yes/2`).
 pub const STUDY_PASSWORD: &str = "my love Phyllia";
 const ALCHEMISTS_HOME: i32 = 261_000_001;
+/// The Queen's cabinet in Ariant's palace (260000303): while the third of
+/// the Sand Bandits' requests (3923) is under way, it holds the ring the
+/// quest ends on.
+pub const QUEENS_CABINET: i32 = 2103002;
+const SAND_BANDITS_REQUEST: i16 = 3923;
+const QUEENS_RING: i32 = 4031578;
 /// Wiz the Librarian in the Helios Tower Library, and the storybook quests
 /// that end there with the book each brings back.
 pub const WIZ: i32 = 2040052;
@@ -2717,6 +2723,7 @@ impl NpcScript {
             HIKARI => return Some(hikari(player)),
             ICEBYRD_SLIMM => return Some(icebyrd_slimm(player)),
             PICTURE_FRAME => return picture_frame(player),
+            QUEENS_CABINET => return queens_cabinet(player),
             pipe if STUDY_PIPES.contains(&pipe) => return study_pipe(pipe, player),
             WIZ => return Some(wiz(player)),
             ROBERT_HOLLY => return Some(robert_holly()),
@@ -10105,6 +10112,32 @@ fn picture_frame(player: &Player) -> Option<NpcScript> {
     ];
     let mut script = NpcScript::new(PICTURE_FRAME, pages);
     script.inventory_full = Some(text(keys::PICTURE_FRAME_FULL));
+    Some(script)
+}
+
+/// The player swipes the ring from the Queen's cabinet once, while the
+/// quest is under way and none is held, in their own words (Cosmic
+/// `2103002.js`), or says no Etc slot is free; otherwise clicking it does
+/// nothing.
+fn queens_cabinet(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(SAND_BANDITS_REQUEST) != QuestState::Started
+        || player.inventory.count(QUEENS_RING) > 0
+    {
+        return None;
+    }
+    let page = if crate::items::give(&mut player.inventory.clone(), QUEENS_RING, 1).is_err() {
+        Page::Say(text(keys::QUEENS_CABINET_FULL))
+    } else {
+        Page::Act {
+            text: text(keys::QUEENS_CABINET_SWIPED),
+            effects: vec![Effect::GiveItem {
+                item_id: QUEENS_RING,
+                quantity: 1,
+            }],
+        }
+    };
+    let mut script = NpcScript::new(QUEENS_CABINET, vec![page]);
+    script.player_speaks = true;
     Some(script)
 }
 
@@ -27580,6 +27613,36 @@ mod tests {
         // Done, or off the quest, they say nothing of their own.
         assert!(NpcScript::for_npc(2111020, &on_info_quest(MAGIC_PENTAGRAM, "4")).is_none());
         assert!(NpcScript::for_npc(2111020, &traveller(85, 0, false)).is_none());
+    }
+
+    #[test]
+    fn the_queens_cabinet_gives_up_the_ring_once_on_the_sand_bandits_request() {
+        let mut player = traveller(30, 0, false);
+        assert!(NpcScript::for_npc(QUEENS_CABINET, &player).is_none());
+        player.quests.upsert(game::QuestRecord {
+            quest_id: SAND_BANDITS_REQUEST,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let mut script = NpcScript::for_npc(QUEENS_CABINET, &player).unwrap();
+        assert!(script.player_speaks);
+        let step = script.begin();
+        assert_eq!(page_text(&step), text(keys::QUEENS_CABINET_SWIPED));
+        assert_eq!(
+            step.effects,
+            [Effect::GiveItem {
+                item_id: QUEENS_RING,
+                quantity: 1,
+            }]
+        );
+        player.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(QUEENS_RING, 1),
+        );
+        assert!(NpcScript::for_npc(QUEENS_CABINET, &player).is_none());
     }
 
     #[test]

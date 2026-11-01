@@ -1383,6 +1383,8 @@ unsourced = [
     "picture_frame.full",
     "study_pipe.password",
     "study_pipe.wrong",
+    "queens_cabinet.swiped",
+    "queens_cabinet.full",
     "wiz.none",
     "wiz.returned",
     "wiz.thanks",
