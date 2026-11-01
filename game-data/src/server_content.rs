@@ -1673,6 +1673,12 @@ pub mod keys {
     pub const HOTEL_VIP_ASK: &str = "hotel.vip_ask";
     pub const HOTEL_DECLINED: &str = "hotel.declined";
     pub const HOTEL_SHORT: &str = "hotel.short";
+    pub const SHADE_LAMP_ASK: &str = "shade_lamp.ask";
+    pub const SHADE_LAMP_ON: &str = "shade_lamp.on";
+    pub const CONTROL_DEVICE_ASK: &str = "control_device.ask";
+    pub const CONTROL_DEVICE_OFF: &str = "control_device.off";
+    pub const MAGIC_SQUARE_ASK: &str = "magic_square.ask";
+    pub const MAGIC_SQUARE_DONE: &str = "magic_square.done";
     pub const PERION_MISSION_ASK: &str = "perion_mission.ask";
 
     /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
@@ -5255,6 +5261,12 @@ mod tests {
                 keys::HOTEL_VIP_ASK,
                 keys::HOTEL_DECLINED,
                 keys::HOTEL_SHORT,
+                keys::SHADE_LAMP_ASK,
+                keys::SHADE_LAMP_ON,
+                keys::CONTROL_DEVICE_ASK,
+                keys::CONTROL_DEVICE_OFF,
+                keys::MAGIC_SQUARE_ASK,
+                keys::MAGIC_SQUARE_DONE,
                 keys::PERION_MISSION_ASK,
                 keys::PUCCI_WOLF_REQUEST[0],
                 keys::PUCCI_WOLF_REQUEST[1],

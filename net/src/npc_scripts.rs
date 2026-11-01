@@ -2526,6 +2526,9 @@ impl NpcScript {
         if npc_id == HOTEL_RECEPTIONIST {
             return Some(hotel_receptionist(player));
         }
+        if let Some(&(_, mob_id, ask, notice)) = BOSS_SWITCHES.iter().find(|s| s.0 == npc_id) {
+            return Some(boss_switch(npc_id, mob_id, ask, notice));
+        }
         if npc_id == NAUTILUS_TRASH_CAN {
             return Some(nautilus_trash_can(player));
         }
@@ -13030,6 +13033,36 @@ fn hotel_receptionist(player: &Player) -> NpcScript {
     NpcScript::new(HOTEL_RECEPTIONIST, pages)
 }
 
+/// Switches by three bosses that weaken the boss when turned (Cosmic's
+/// `weakenAreaBoss`): the Small Street Light by Shade in Kerning City's
+/// subway (Npc.nx `sca_Shade`), and in Magatia the Control Device by the
+/// Security Camera (`sca_auto`) and the Incomplete Magic Square by Deet and
+/// Roi (`sca_DitRoi`). Each is (npc, boss, the ask, the map's notice).
+pub const BOSS_SWITCHES: [(i32, i32, &str, &str); 3] = [
+    (1052107, 5090000, keys::SHADE_LAMP_ASK, keys::SHADE_LAMP_ON),
+    (
+        2111025,
+        7090000,
+        keys::CONTROL_DEVICE_ASK,
+        keys::CONTROL_DEVICE_OFF,
+    ),
+    (
+        2111026,
+        8090000,
+        keys::MAGIC_SQUARE_ASK,
+        keys::MAGIC_SQUARE_DONE,
+    ),
+];
+
+fn boss_switch(npc_id: i32, mob_id: i32, ask: &str, notice: &'static str) -> NpcScript {
+    let page = Page::Ask {
+        text: text(ask),
+        on_yes: vec![Effect::WeakenMob { mob_id, notice }],
+        on_no: None,
+    };
+    NpcScript::new(npc_id, vec![page])
+}
+
 /// `world_trip`: Spinel's tour from where the player stands, or at the
 /// Mushroom Shrine the way back.
 fn spinel(player: &Player) -> NpcScript {
@@ -22461,6 +22494,17 @@ mod tests {
         let short = script.respond(ScriptInput::Yes).unwrap();
         assert!(short.effects.is_empty());
         assert_eq!(page_text(&short), text(keys::HOTEL_SHORT));
+    }
+
+    #[test]
+    fn a_boss_switch_asks_and_weakens_its_boss() {
+        for (npc, mob_id, ask, notice) in BOSS_SWITCHES {
+            let mut script = NpcScript::for_npc(npc, &player(50)).unwrap();
+            let page = script.begin();
+            assert_eq!((question(&page), kind(&page)), (text(ask), Some(1)));
+            let turned = script.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(turned.effects, [Effect::WeakenMob { mob_id, notice }]);
+        }
     }
 
     #[test]

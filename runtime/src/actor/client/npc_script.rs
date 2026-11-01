@@ -297,6 +297,9 @@ impl ClientActor {
                     })
                 }
                 Effect::ClearMobs => to_field.push(FieldRequest::ClearMobs),
+                &Effect::WeakenMob { mob_id, notice } => {
+                    to_field.push(FieldRequest::WeakenMob { mob_id, notice })
+                }
                 Effect::BringOutSnowman => to_field.push(FieldRequest::BringOutSnowman),
                 Effect::BringOutScrooge => to_field.push(FieldRequest::BringOutScrooge),
                 Effect::OpenGuildNamePrompt => {
