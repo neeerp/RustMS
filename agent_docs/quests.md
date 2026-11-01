@@ -380,6 +380,11 @@ door, and the right one sets the info to `1`, which the data's end checks (see
 261000001, `hide` 1 in the map data but spawned like any NPC) gives it,
 after one line, to a player on 3322 who holds none; otherwise clicking it
 does nothing (Cosmic `2111013.js`).
+Wiz the Librarian (2040052, Helios Tower Library 222020000) ends the eight
+storybook quests (3615-3618, 3630, 3633, 3639, 3920). Talking to Wiz
+otherwise lists the books brought back, one per completed quest
+(`STORYBOOKS`), with their icons and names, then thanks the player; with
+none it says so (Cosmic `2040052.js`).
 "Life Alchemy, and the Missing Alchemist" (3314) starts from the data, with
 Alcadno's cape (1102136) worn. The desk in Alcadno's upper lab (2111015,
 261020200) gives one of Russellon's Pills (2022198) to a player on 3314 who
