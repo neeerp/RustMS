@@ -706,6 +706,11 @@ const DIAMOND: i32 = 4021007;
 /// free back where the tour began, else Boat Quay Town. The destinations
 /// are `(map, portal)`.
 const AUDREY: i32 = 9201135;
+/// Claudia in Amoria's salon, a stylist for the coupon (`CLAUDIAS_COUPON`)
+/// that her quest (`BEAUTY_OR_BEAST`) gives.
+pub const CLAUDIA: i32 = 9201039;
+pub const BEAUTY_OR_BEAST: i16 = 8860;
+pub const CLAUDIAS_COUPON: i32 = 4031528;
 const MALAYSIA_CBD: i32 = 540000000;
 const KAMPUNG_VILLAGE: i32 = 551000000;
 const CBD_FARE: i32 = 42000;
@@ -2979,6 +2984,16 @@ impl NpcScript {
             id if NANAS.contains(&id) => nana(id, player),
             AUDREY => audrey(player),
             CRANE => crane(player),
+            // Once the quest's coupon is spent, she has cut for it.
+            CLAUDIA
+                if player.quests.state(BEAUTY_OR_BEAST) == QuestState::Completed
+                    && !holds(player, CLAUDIAS_COUPON) =>
+            {
+                Some(NpcScript::new(
+                    CLAUDIA,
+                    vec![Page::Say(text(keys::CLAUDIA_DONE))],
+                ))
+            }
             id if stylists::services(id).next().is_some() => {
                 stylist(id, player, &mut rand::thread_rng())
             }
@@ -24904,6 +24919,41 @@ mod tests {
             other => panic!("a coupon for a face expected, got {other:?}"),
         }
         assert_eq!(kind(&done), Some(0));
+    }
+
+    #[test]
+    fn claudia_cuts_once_for_the_coupon_of_her_quest() {
+        let mut man = player(50);
+        man.stats.gender = 0;
+        man.stats.hair = 30033;
+        man.inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(CLAUDIAS_COUPON, 1));
+        let mut claudia = NpcScript::for_npc(CLAUDIA, &man).unwrap();
+        assert_eq!(kind(&claudia.begin()), Some(4));
+        let ask = claudia.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(kind(&ask), Some(1));
+        let done = claudia.respond(ScriptInput::Yes).unwrap();
+        match &done.effects[..] {
+            [Effect::TakeItem {
+                item_id: CLAUDIAS_COUPON,
+                quantity: 1,
+            }, Effect::SetStyle(hair)] => {
+                assert_eq!(hair % 10, 3, "the cut keeps the colour");
+                assert_ne!(*hair, 30033, "not the cut worn");
+            }
+            other => panic!("the coupon for a cut expected, got {other:?}"),
+        }
+
+        // With the quest done and the coupon spent, she says she has cut.
+        let mut cut = player(50);
+        cut.quests.upsert(game::QuestRecord {
+            quest_id: BEAUTY_OR_BEAST,
+            status: game::QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        let mut claudia = NpcScript::for_npc(CLAUDIA, &cut).unwrap();
+        assert_eq!(page_text(&claudia.begin()), text(keys::CLAUDIA_DONE));
     }
 
     #[test]

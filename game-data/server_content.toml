@@ -1417,6 +1417,7 @@ unsourced = [
     "trader.faito.full",
     "trader.faito.refused",
     "trader.faito.done",
+    "claudia.done",
     "ellin.menu",
     "ellin.enter",
     "ellin.about",

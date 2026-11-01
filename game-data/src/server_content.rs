@@ -3145,6 +3145,9 @@ pub mod keys {
     pub fn trader(name: &str, part: &str) -> String {
         format!("trader.{name}.{part}")
     }
+
+    /// Claudia, once her quest's coupon is spent.
+    pub const CLAUDIA_DONE: &str = "claudia.done";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5359,6 +5362,7 @@ mod tests {
                 keys::HOLLY_LATER,
                 keys::HOLLY_REFUSED,
                 keys::HOLLY_DONE,
+                keys::CLAUDIA_DONE,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
