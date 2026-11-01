@@ -419,9 +419,9 @@ pub const MYSTIC_DOOR: i32 = 2311002;
 /// moves the player and asks only for the MP.
 pub const TELEPORTS: [i32; 6] = [2101002, 2201002, 2301001, 12101003, 22101001, 9001002];
 
-/// The Flash Jump skills (v83 FUN_0096be38): the client throws the player on
-/// through the air and asks only for the MP.
-pub const FLASH_JUMPS: [i32; 2] = [4111006, 14101004];
+/// The Flash Jump skills and the Dawn Warrior's Soul Rush (v83
+/// FUN_0096be38): the client throws the player on and asks only for the MP.
+pub const FLASH_JUMPS: [i32; 3] = [4111006, 14101004, 11101005];
 
 /// The Dash skills (v83 FUN_009433a2): a double tap on an arrow casts them,
 /// and the handler gives their speed and jump as two-state stats. Space

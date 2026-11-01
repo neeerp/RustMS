@@ -1392,6 +1392,22 @@ mod tests {
     }
 
     #[test]
+    fn soul_rush_spends_its_mp() {
+        if skills::data().is_err() {
+            return;
+        }
+        // 60 MP at level 1 and 15 at level 10, and no buff.
+        for (level, mp) in [(1, 40), (10, 85)] {
+            let mut player = beginner_with(11101005, level);
+            player.stats.max_mp = 100;
+            player.stats.mp = 100;
+            let used = use_skill(&mut player, 11101005, level, Instant::now()).unwrap();
+            assert!(!used.buffs);
+            assert_eq!(player.stats.mp, mp);
+        }
+    }
+
+    #[test]
     fn wings_spends_its_mp() {
         if skills::data().is_err() {
             return;

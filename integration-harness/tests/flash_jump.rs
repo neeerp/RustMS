@@ -1,7 +1,8 @@
 //! Flash Jump (4111006): the movement is the client's, so the server only
 //! spends the level's MP (60 at level 1, 13 at level 20), with no buff and
 //! no cooldown. A level not learned, a skill not learned or too little MP
-//! is refused and spends nothing.
+//! is refused and spends nothing. The Dawn Warrior's Soul Rush (11101005)
+//! is the same to the server.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_skill, set_job};
@@ -19,6 +20,8 @@ const HERMIT: i16 = 411;
 const FLASH_JUMP: i32 = 4_111_006;
 const NIGHT_WALKERS_FLASH_JUMP: i32 = 14_101_004;
 const COST_AT_20: i64 = 13;
+const DAWN_WARRIOR: i16 = 1110;
+const SOUL_RUSH: i32 = 11_101_005;
 
 /// USE_SKILL as the client sends Flash Jump: tick, skill, level and a
 /// trailing zero short (report 194-flash-jump).
@@ -30,6 +33,11 @@ fn flash_jump(skill: i32, level: u8) -> Packet {
 
 /// A Hermit with Flash Jump at level 20 and `mp` MP, on the test map.
 async fn hermit(mp: i16) -> WorldSession {
+    jumper(HERMIT, FLASH_JUMP, 20, mp).await
+}
+
+/// One of `job` with `skill` at `level` and `mp` MP, on the test map.
+async fn jumper(job: i16, skill: i32, level: u8, mp: i16) -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config)
         .await
@@ -37,8 +45,8 @@ async fn hermit(mp: i16) -> WorldSession {
         .character_id;
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
-    set_job(id, HERMIT, 70, mp).await.expect("hermit");
-    grant_skill(id, FLASH_JUMP, 20).await.expect("Flash Jump");
+    set_job(id, job, 70, mp).await.expect("job");
+    grant_skill(id, skill, level.into()).await.expect("skill");
 
     let mut session = relogin(&config).await;
     let mut t = Trace::default();
@@ -82,4 +90,14 @@ async fn a_flash_jump_without_its_mp_is_refused() {
     const MARK: &str = "flash jump without mp";
 
     assert!(jump(c, MARK, FLASH_JUMP, 20).await.is_empty());
+}
+
+#[tokio::test]
+async fn soul_rush_spends_its_levels_mp() {
+    let mut session = jumper(DAWN_WARRIOR, SOUL_RUSH, 10, 1000).await;
+    let c = &mut session.connection;
+    const MARK: &str = "soul rush";
+
+    // 15 MP at level 10.
+    assert_eq!(jump(c, MARK, SOUL_RUSH, 10).await, [985]);
 }
