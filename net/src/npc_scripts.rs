@@ -406,6 +406,12 @@ pub const ICEBYRD_SLIMM: i32 = 9201050;
 pub const NLC_QUIZ_FIRST: i16 = 4900;
 const NLC_QUIZ_LAST: i16 = 4911;
 const NLC_QUIZ_LEVEL: u8 = 10;
+/// The picture frame in the Home of the Missing Alchemist (261000001):
+/// while Phyllia's Pendant (3322) is under way, it hides the Silver
+/// Pendant the quest ends on.
+pub const PICTURE_FRAME: i32 = 2111013;
+const PHYLLIAS_PENDANT: i16 = 3322;
+const SILVER_PENDANT: i32 = 4031697;
 
 /// A pet-walking road's two trainers: the one at its foot gives a letter,
 /// and the brother at its top takes it and brings every pet out closer.
@@ -2655,6 +2661,7 @@ impl NpcScript {
             NERU => return Some(pet_course_end(&LUDIBRIUM_PET_COURSE, player)),
             HIKARI => return Some(hikari(player)),
             ICEBYRD_SLIMM => return Some(icebyrd_slimm(player)),
+            PICTURE_FRAME => return picture_frame(player),
             FRANCOIS => {
                 return Some(item_maker(
                     FRANCOIS,
@@ -9998,6 +10005,27 @@ fn hikari(player: &Player) -> NpcScript {
     );
     script.refused = Some(priced(keys::HIKARI_SHORT));
     script
+}
+
+/// The picture frame gives up the Silver Pendant once, while the quest is
+/// under way and none is held; otherwise clicking it does nothing.
+fn picture_frame(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(PHYLLIAS_PENDANT) != QuestState::Started
+        || player.inventory.count(SILVER_PENDANT) > 0
+    {
+        return None;
+    }
+    let give = Effect::GiveItem {
+        item_id: SILVER_PENDANT,
+        quantity: 1,
+    };
+    let pages = vec![
+        Page::Say(text(keys::PICTURE_FRAME_FOUND)),
+        Page::Done(vec![give]),
+    ];
+    let mut script = NpcScript::new(PICTURE_FRAME, pages);
+    script.inventory_full = Some(text(keys::PICTURE_FRAME_FULL));
+    Some(script)
 }
 
 /// Icebyrd Slimm, New Leaf City's mayor: a word on the city, or the start
@@ -26741,6 +26769,34 @@ mod tests {
             );
             assert!(hikari.refused().is_some());
         }
+    }
+
+    #[test]
+    fn the_picture_frame_gives_the_silver_pendant_once_on_phyllias_pendant() {
+        let mut player = traveller(70, 0, false);
+        assert!(NpcScript::for_npc(PICTURE_FRAME, &player).is_none());
+        player.quests.upsert(game::QuestRecord {
+            quest_id: PHYLLIAS_PENDANT,
+            status: game::QuestStatus::Started {
+                kills: vec![],
+                info: None,
+            },
+        });
+        let mut frame = NpcScript::for_npc(PICTURE_FRAME, &player).unwrap();
+        assert_eq!(page_text(&frame.begin()), text(keys::PICTURE_FRAME_FOUND));
+        let given = frame.respond(ScriptInput::Next).unwrap();
+        let give = Effect::GiveItem {
+            item_id: SILVER_PENDANT,
+            quantity: 1,
+        };
+        assert_eq!(given.effects, [give]);
+        assert_eq!(frame.inventory_full, Some(text(keys::PICTURE_FRAME_FULL)));
+
+        let pendant = game::Item::stack(SILVER_PENDANT, 1);
+        player
+            .inventory
+            .insert(game::InventoryType::Etc, 1, pendant);
+        assert!(NpcScript::for_npc(PICTURE_FRAME, &player).is_none());
     }
 
     #[test]

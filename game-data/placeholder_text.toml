@@ -2108,6 +2108,8 @@
 "icebyrd.lita_told" = "[placeholder] An old friend who trained hard for years and now keeps the city's peace."
 "icebyrd.boroughs" = "[placeholder] When will new boroughs open?"
 "icebyrd.boroughs_told" = "[placeholder] Soon. The developers are hard at work, and the new parts will open when they're ready."
+"picture_frame.found" = "[placeholder] Behind the frame, a hook comes loose and opens a hidden space. Inside lies a silver pendant, which you take before closing the frame."
+"picture_frame.full" = "[placeholder] Make room in your Etc inventory to take the pendant."
 "ellin.menu" = "[placeholder] Poison is spreading through the forest. Will you and your party go in and stop it?"
 "ellin.enter" = "[placeholder] Go into the Forest of Poison Haze."
 "ellin.about" = "[placeholder] What is the Forest of Poison Haze?"
