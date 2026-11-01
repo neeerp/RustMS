@@ -87,7 +87,11 @@ that is not an action. They may also copy requirements from `Check`
 (`npc`, `lvmin`, `lvmax`, `job`, `quest`, `interval`, `start`, `end`;
 `INERT_ACTIONS`). v83's client reads none of these under `Act`, nor does
 Cosmic, so only the `Check` copy counts: 3081 and 3082 have an `Act/0/lvmin`
-but no level requirement, and 3075's `Act/0/npc` names its completion NPC. `item` requirements are counts the player must hold; a count of 0
+but no level requirement, and 3075's `Act/0/npc` names its completion NPC.
+A level bound past any level reads as 32767: Welcome to New Leaf City Quiz 1
+(4900) has an `lvmin` of 100200, so the client never offers it, and Icebyrd
+Slimm (9201050) starts it from level 10 instead; 4901 to 4911 follow by
+`nextQuest`. `item` requirements are counts the player must hold; a count of 0
 means none may be left (Roger's apples must all be eaten). `mob` requirements
 are kill counts (below). `quest` requirements, on either side, name other
 quests that must be in a given state: Chief's Introduction (1040) completes

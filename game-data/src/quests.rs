@@ -808,14 +808,8 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         npc: nx
             .int_child(start, "npc")?
             .ok_or_else(|| invalid("missing start NPC"))?,
-        min_level: nx
-            .int_child(start, "lvmin")?
-            .map(|v| small(v, "level"))
-            .transpose()?,
-        max_level: nx
-            .int_child(start, "lvmax")?
-            .map(|v| small(v, "level"))
-            .transpose()?,
+        min_level: nx.int_child(start, "lvmin")?.map(level_bound).transpose()?,
+        max_level: nx.int_child(start, "lvmax")?.map(level_bound).transpose()?,
         min_fame: small(nx.int_child(start, "pop")?.unwrap_or(0), "fame")?,
         // v83 treats a negative interval, like none, as not repeatable.
         repeat_interval: nx
@@ -1361,6 +1355,13 @@ fn item_counts(nx: &NxDataFile, stage: u32) -> Result<Vec<(i32, i32)>, GameDataE
     Ok(counts)
 }
 
+/// A start level bound. Past any level, as Welcome to New Leaf City Quiz
+/// 1's (4900) `lvmin` of 100200 is, it means the same as `i16::MAX`: the
+/// client never offers such a quest itself, though a script may start it.
+fn level_bound(value: i32) -> Result<i16, GameDataError> {
+    small(value.min(i32::from(i16::MAX)), "level")
+}
+
 fn small(value: i32, what: &str) -> Result<i16, GameDataError> {
     i16::try_from(value).map_err(|_| invalid(&format!("{what} out of range")))
 }
@@ -1764,6 +1765,7 @@ mod tests {
         assert_eq!(catalog.quest(7301).unwrap().end_npc_act, None);
         // Its first step's offer asks questions (`Act/0/ask`, `stop`).
         assert_eq!(catalog.quest(7300).unwrap().start.min_level, Some(80));
+        assert_eq!(catalog.quest(4900).unwrap().start.min_level, Some(i16::MAX));
         // The token taken, then scrolls to pick from, listed "1" to "16" in
         // numeric order.
         let rewards = &catalog.quest(3379).unwrap().end_rewards;
