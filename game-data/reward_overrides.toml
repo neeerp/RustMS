@@ -1743,3 +1743,66 @@ add = [{ item = 4030013, prob = 0.077 }]
 
 [mobs.9500113]
 add = [{ item = 4030015, prob = 0.077 }]
+
+# The Haunted House's mobs the pack has no drops for (Psycho Jack Box, and
+# the mansion's Rotting Skeleton, Dead Scarecrow and Twisted Jester):
+# Cosmic's (152-drop-data, 9400557 and 9400638-9400640). Every item is in our
+# String.nx. Cosmic's mesos ranges are one pile each that ours vary around.
+[mobs.9400557]
+replace = [{ item = 2022245, prob = 0.003 }]
+
+[mobs.9400638]
+replace = [
+    { money = 150, prob = 0.4 },
+    { item = 4011007, prob = 0.001 },
+    { item = 4007001, prob = 0.01 },
+    { item = 4007000, prob = 0.01 },
+    { item = 2000001, prob = 0.04 },
+    { item = 2022244, prob = 0.04 },
+    { item = 2010003, prob = 0.04 },
+    { item = 2060000, prob = 0.04, min = 26, max = 33 },
+    { item = 2061000, prob = 0.04, min = 26, max = 33 },
+    { item = 1332008, prob = 0.002 },
+    { item = 1041008, prob = 0.002 },
+]
+
+[mobs.9400639]
+replace = [
+    { money = 225, prob = 0.4 },
+    { item = 4000018, prob = 0.4 },
+    { item = 4130018, prob = 0.005 },
+    { item = 4130009, prob = 0.005 },
+    { item = 4007003, prob = 0.01 },
+    { item = 2000002, prob = 0.04 },
+    { item = 2000006, prob = 0.04 },
+    { item = 2040602, prob = 0.005 },
+    { item = 4006001, prob = 0.04 },
+    { item = 2022244, prob = 0.04 },
+    { item = 1050021, prob = 0.002 },
+    { item = 1072127, prob = 0.002 },
+    { item = 1002021, prob = 0.002 },
+    { item = 1092029, prob = 0.002 },
+    { item = 1002143, prob = 0.002 },
+    { item = 1472021, prob = 0.002 },
+    { item = 1082074, prob = 0.002 },
+]
+
+[mobs.9400640]
+replace = [
+    { money = 325, prob = 0.4 },
+    { item = 2000006, prob = 0.04 },
+    { item = 2043700, prob = 0.005 },
+    { item = 4006001, prob = 0.02 },
+    { item = 1072154, prob = 0.002 },
+    { item = 1061086, prob = 0.002 },
+    { item = 1082061, prob = 0.002 },
+    { item = 1051054, prob = 0.002 },
+    { item = 1082091, prob = 0.002 },
+    { item = 1002286, prob = 0.002 },
+    { item = 1040096, prob = 0.002 },
+    { item = 1060085, prob = 0.002 },
+    { item = 1002281, prob = 0.001287 },
+    { item = 1082074, prob = 0.002 },
+    { item = 1002285, prob = 0.001287 },
+    { item = 1002210, prob = 0.002 },
+]
