@@ -3066,6 +3066,21 @@ pub mod keys {
     pub const EUREK_WAYS: &str = "eurek.ways";
     pub const EUREK_WAY: &str = "eurek.way";
     pub const CHICO_HELLO: &str = "chico.hello";
+    pub const CLOY_HELLO: &str = "cloy.hello";
+    pub const CLOY_ASK: &str = "cloy.ask";
+    pub const CLOY_PETS: &str = "cloy.pets";
+    pub const CLOY_PETS_TOLD: &str = "cloy.pets_told";
+    pub const CLOY_RAISING: &str = "cloy.raising";
+    pub const CLOY_RAISING_TOLD: &str = "cloy.raising_told";
+    pub const CLOY_DYING: &str = "cloy.dying";
+    pub const CLOY_DYING_TOLD: &str = "cloy.dying_told";
+    pub const CLOY_COMMANDS: &str = "cloy.commands";
+    pub const CLOY_COMMANDS_TOLD: &str = "cloy.commands_told";
+    pub const CLOY_SCROLL_CHOICE: &str = "cloy.scroll_choice";
+    pub const CLOY_SCROLL: &str = "cloy.scroll";
+    pub const CLOY_SCROLL_ASK: &str = "cloy.scroll_ask";
+    pub const CLOY_SCROLL_BOUGHT: &str = "cloy.scroll_bought";
+    pub const CLOY_SHORT: &str = "cloy.short";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5209,6 +5224,21 @@ mod tests {
                 keys::EUREK_WAYS,
                 keys::EUREK_WAY,
                 keys::CHICO_HELLO,
+                keys::CLOY_HELLO,
+                keys::CLOY_ASK,
+                keys::CLOY_PETS,
+                keys::CLOY_PETS_TOLD,
+                keys::CLOY_RAISING,
+                keys::CLOY_RAISING_TOLD,
+                keys::CLOY_DYING,
+                keys::CLOY_DYING_TOLD,
+                keys::CLOY_COMMANDS,
+                keys::CLOY_COMMANDS_TOLD,
+                keys::CLOY_SCROLL_CHOICE,
+                keys::CLOY_SCROLL,
+                keys::CLOY_SCROLL_ASK,
+                keys::CLOY_SCROLL_BOUGHT,
+                keys::CLOY_SHORT,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,
