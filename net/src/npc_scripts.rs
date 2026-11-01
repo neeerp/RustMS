@@ -1305,8 +1305,10 @@ pub const CARNIVAL_GUIDE: i32 = 2042002;
 /// Spiegelmann in a Monster Carnival waiting room, who puts challenges to
 /// the party waiting there.
 pub const CARNIVAL_ROOM_NPC: i32 = 2042001;
-/// The waiting room's way back to the Carnival Field.
+/// The waiting rooms' way back to the Carnival Field: Assistant Red in rooms
+/// 1, 3 and 5, Assistant Blue in 2, 4 and 6 (Cosmic `2042003`, `2042004`).
 pub const CARNIVAL_ROOM_EXIT: i32 = 2042003;
+pub const CARNIVAL_ROOM_EXIT_BLUE: i32 = 2042004;
 /// Spiegelmann on Carnival Field 2, who gives out its rooms (Cosmic
 /// `2042005`).
 pub const CARNIVAL2_HOST: i32 = 2042005;
@@ -2584,17 +2586,20 @@ impl NpcScript {
         if let Some(room) = carnival::waiting_room(player.stats.map_id) {
             // The leader's leaving gives the room up (`EventActor`).
             let back = carnival::lobby(room);
-            let (host, exit) = if carnival::second(room) {
-                (CARNIVAL2_GUIDE, CARNIVAL2_ROOM_EXIT)
+            let (host, exits): (_, &[i32]) = if carnival::second(room) {
+                (CARNIVAL2_GUIDE, &[CARNIVAL2_ROOM_EXIT])
             } else {
-                (CARNIVAL_ROOM_NPC, CARNIVAL_ROOM_EXIT)
+                (
+                    CARNIVAL_ROOM_NPC,
+                    &[CARNIVAL_ROOM_EXIT, CARNIVAL_ROOM_EXIT_BLUE],
+                )
             };
             if npc_id == host {
                 let page = Page::Say(text(keys::CARNIVAL_ROOM_WAIT));
                 return Some(NpcScript::new(host, vec![page]));
             }
-            if npc_id == exit {
-                return Some(ask_warp(exit, keys::CARNIVAL_ROOM_LEAVE, back));
+            if exits.contains(&npc_id) {
+                return Some(ask_warp(npc_id, keys::CARNIVAL_ROOM_LEAVE, back));
             }
         }
         if let Some(script) = gm_event_exit(npc_id, player) {
@@ -29904,12 +29909,16 @@ mod tests {
         leader.stats.map_id = carnival::room_map(4);
         let mut wait = NpcScript::for_npc(CARNIVAL_ROOM_NPC, &leader).unwrap();
         assert_eq!(page_text(&wait.begin()), text(keys::CARNIVAL_ROOM_WAIT));
-        let mut leave = NpcScript::for_npc(CARNIVAL_ROOM_EXIT, &leader).unwrap();
-        assert_eq!(question(&leave.begin()), text(keys::CARNIVAL_ROOM_LEAVE));
-        assert_eq!(
-            leave.respond(ScriptInput::Yes).unwrap().effects,
-            [Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0)]
-        );
+        // Assistant Blue stands in the even rooms, Assistant Red in the odd.
+        for (room, exit) in [(4, CARNIVAL_ROOM_EXIT_BLUE), (3, CARNIVAL_ROOM_EXIT)] {
+            leader.stats.map_id = carnival::room_map(room);
+            let mut leave = NpcScript::for_npc(exit, &leader).unwrap();
+            assert_eq!(question(&leave.begin()), text(keys::CARNIVAL_ROOM_LEAVE));
+            assert_eq!(
+                leave.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0)]
+            );
+        }
     }
 
     #[test]
