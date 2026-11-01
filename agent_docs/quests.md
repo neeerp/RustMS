@@ -380,6 +380,12 @@ door, and the right one sets the info to `1`, which the data's end checks (see
 261000001, `hide` 1 in the map data but spawned like any NPC) gives it,
 after one line, to a player on 3322 who holds none; otherwise clicking it
 does nothing (Cosmic `2111013.js`).
+The third of the Sand Bandits' requests (3923) ends on the Queen's ring
+(4031578) at the bandit in Ariant (2101012). The Queen's cabinet in the
+palace (2103002, 260000303) gives it, in the player's own words, to a
+player on 3923 who holds none and has an Etc slot free, or says no slot is
+free; otherwise clicking it does nothing (Cosmic `2103002.js`,
+`queens_cabinet.*`).
 Wiz the Librarian (2040052, Helios Tower Library 222020000) ends the eight
 storybook quests (3615-3618, 3630, 3633, 3639, 3920). Talking to Wiz
 otherwise lists the books brought back, one per completed quest

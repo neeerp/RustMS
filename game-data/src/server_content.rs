@@ -3130,6 +3130,8 @@ pub mod keys {
     pub const PICTURE_FRAME_FULL: &str = "picture_frame.full";
     pub const STUDY_PIPE_PASSWORD: &str = "study_pipe.password";
     pub const STUDY_PIPE_WRONG: &str = "study_pipe.wrong";
+    pub const QUEENS_CABINET_SWIPED: &str = "queens_cabinet.swiped";
+    pub const QUEENS_CABINET_FULL: &str = "queens_cabinet.full";
     pub const WIZ_NONE: &str = "wiz.none";
     pub const WIZ_RETURNED: &str = "wiz.returned";
     pub const WIZ_THANKS: &str = "wiz.thanks";
@@ -5386,6 +5388,8 @@ mod tests {
                 keys::PICTURE_FRAME_FULL,
                 keys::STUDY_PIPE_PASSWORD,
                 keys::STUDY_PIPE_WRONG,
+                keys::QUEENS_CABINET_SWIPED,
+                keys::QUEENS_CABINET_FULL,
                 keys::WIZ_NONE,
                 keys::WIZ_RETURNED,
                 keys::WIZ_THANKS,

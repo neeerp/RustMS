@@ -2112,6 +2112,8 @@
 "picture_frame.full" = "[placeholder] Make room in your Etc inventory to take the pendant."
 "study_pipe.password" = "[placeholder] Water runs through the pipes, and a small keypad slides out of the wall. Enter the password."
 "study_pipe.wrong" = "[placeholder] The keypad buzzes. That is not the password."
+"queens_cabinet.swiped" = "[placeholder] (I slip the ring out of the cabinet. Better leave before anyone notices.)"
+"queens_cabinet.full" = "[placeholder] (My Etc inventory is full. I need a free slot to take the ring.)"
 "wiz.none" = "[placeholder] You haven't brought back a single storybook yet."
 "wiz.returned" = "[placeholder] You've brought back #b{count}#k storybooks so far. Here they are:{books}"
 "wiz.thanks" = "[placeholder] The library is calm again, thanks to you. If the stories get mixed up again, I'll be counting on you."
