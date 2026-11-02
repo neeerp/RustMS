@@ -90,11 +90,11 @@ namespace ms
 		{
 			case Type::HMOVEA:
 			case Type::HMOVEB:
-				moveobj.hspeed = rx / 16;
+				moveobj.hspeed = field_effect::back_step(rx, Constants::TIMESTEP);
 				break;
 			case Type::VMOVEA:
 			case Type::VMOVEB:
-				moveobj.vspeed = ry / 16;
+				moveobj.vspeed = field_effect::back_step(ry, Constants::TIMESTEP);
 				break;
 		}
 	}

@@ -62,6 +62,9 @@ int main()
 		require(back_alpha(100, 255, 1000, 1000) == 255 && back_alpha(100, 255, 1200, 1000) == 255, "then held");
 		require(back_alpha(0, 255, 0, 0) == 255, "at once without a duration");
 
+		require(back_step(-30, 8) == -1.2 && back_step(-30, 1000) == -150, "150 px a second to the left at rx -30");
+		require(back_step(100, 20000) == 10000 && back_step(0, 8) == 0, "100 px in 20000/r ms; still at 0");
+
 		std::cout << "Field effect rules passed\n";
 		return 0;
 	}
