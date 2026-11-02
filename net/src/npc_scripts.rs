@@ -783,6 +783,15 @@ const RUPI: i32 = 2002000;
 /// Roodolph, between Happyville and the Snow Sprinkler (Cosmic `9220005.js`).
 pub const ROODOLPH: i32 = 9220005;
 pub const SNOW_SPRINKLER: i32 = 209_080_000;
+/// Happyville's Branch, Metal Bucket and Straw Hat Snowmen, each to its
+/// Maplemas tree room, and the Scarf Snowman in the rooms, back to Happyville's
+/// portal 3 (Cosmic `2001001.js`-`2001004.js`).
+const TREE_SNOWMEN: [(i32, i32); 3] = [
+    (2001001, 209_000_001),
+    (2001002, 209_000_002),
+    (2001003, 209_000_003),
+];
+const SCARF_SNOWMAN: i32 = 2001004;
 /// Thomas Swift, free between Henesys and Amoria: to Amoria's portal 0, and
 /// back to Henesys's portal 5, at the town's east end.
 const THOMAS_SWIFT: i32 = 9201022;
@@ -3212,6 +3221,8 @@ impl NpcScript {
             npc_data::ROONEY => Some(rooney(player)),
             RUPI => Some(rupi(player)),
             ROODOLPH => roodolph(player),
+            2001001..=2001003 => tree_snowman(npc_id, player),
+            SCARF_SNOWMAN => scarf_snowman(player),
             THOMAS_SWIFT => thomas_swift(player),
             MOONY => Some(moony(player)),
             MOM_AND_DAD => mom_and_dad(player),
@@ -13417,6 +13428,38 @@ fn roodolph(player: &Player) -> Option<NpcScript> {
             on_no: None,
         }],
     ))
+}
+
+/// A Happyville snowman offers a look at its Maplemas tree. `None` elsewhere.
+fn tree_snowman(npc_id: i32, player: &Player) -> Option<NpcScript> {
+    let &(_, room) = TREE_SNOWMEN.iter().find(|(id, _)| *id == npc_id)?;
+    (player.stats.map_id == events::HAPPYVILLE).then(|| {
+        NpcScript::new(
+            npc_id,
+            vec![Page::Ask {
+                text: text(keys::SNOWMAN_TREE),
+                on_yes: vec![Effect::WarpToPortal(room, 0)],
+                on_no: None,
+            }],
+        )
+    })
+}
+
+/// The Scarf Snowman sees a player out of a tree room. `None` elsewhere.
+fn scarf_snowman(player: &Player) -> Option<NpcScript> {
+    TREE_SNOWMEN
+        .iter()
+        .any(|&(_, room)| room == player.stats.map_id)
+        .then(|| {
+            NpcScript::new(
+                SCARF_SNOWMAN,
+                vec![Page::Ask {
+                    text: text(keys::SNOWMAN_OUT),
+                    on_yes: vec![Effect::WarpToPortal(events::HAPPYVILLE, 3)],
+                    on_no: None,
+                }],
+            )
+        })
 }
 
 /// Thomas Swift, free from Henesys to Amoria and back. `None` elsewhere.
@@ -24356,6 +24399,27 @@ mod tests {
             );
         }
         assert!(NpcScript::for_npc(ROODOLPH, &rider(100, 0, ELLINIA)).is_none());
+    }
+
+    #[test]
+    fn snowmen_go_to_their_tree_rooms_and_the_scarf_snowman_back() {
+        for (snowman, room) in TREE_SNOWMEN {
+            let mut trip = NpcScript::for_npc(snowman, &rider(100, 0, events::HAPPYVILLE)).unwrap();
+            assert_eq!(question(&trip.begin()), text(keys::SNOWMAN_TREE));
+            assert_eq!(
+                trip.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::WarpToPortal(room, 0)]
+            );
+            assert!(NpcScript::for_npc(snowman, &rider(100, 0, room)).is_none());
+
+            let mut out = NpcScript::for_npc(SCARF_SNOWMAN, &rider(100, 0, room)).unwrap();
+            assert_eq!(question(&out.begin()), text(keys::SNOWMAN_OUT));
+            assert_eq!(
+                out.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::WarpToPortal(events::HAPPYVILLE, 3)]
+            );
+        }
+        assert!(NpcScript::for_npc(SCARF_SNOWMAN, &rider(100, 0, events::HAPPYVILLE)).is_none());
     }
 
     #[test]

@@ -54,6 +54,8 @@ unsourced = [
     "rupi.leave_ask",
     "roodolph.sprinkler",
     "roodolph.back",
+    "snowman.tree",
+    "snowman.out",
     "grassy_lump.ask",
     "grassy_lump.leave",
     "grassy_lump.poop",
