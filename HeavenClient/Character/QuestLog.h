@@ -24,10 +24,13 @@
 #include <functional>
 #include <map>
 #include <vector>
+#include "QuestAlarm.h"
 #include "QuestMarker.h"
 
 namespace ms
 {
+	class Inventory;
+
 	// Class that stores information on the quest log of an individual character
 	class QuestLog
 	{
@@ -41,17 +44,33 @@ namespace ms
 		// Forget a quest, e.g. after it was forfeited.
 		void remove(int16_t);
 
-		// Quests shown in the Quest Helper, oldest first. Newly started quests
-		// with something to hunt or collect are tracked automatically.
-		static constexpr size_t MAX_TRACKED = 5;
+		// Quests shown in the Quest Helper. Those added by hand come before
+		// those added automatically.
+		static constexpr size_t MAX_TRACKED = QuestAlarm::MAX;
 		const std::vector<int16_t>& tracked() const;
 		bool is_tracked(int16_t id) const;
-		// `false` if the helper is full or the quest is not started.
+		// Add a quest by hand; `false` if the helper is full or the quest is
+		// not started.
 		bool track(int16_t id);
 		void untrack(int16_t id);
-		// Whether newly started quests are tracked (the helper's AUTO).
+		// Whether quests that make progress are added automatically (AUTO).
 		bool auto_tracks() const;
 		void set_auto_track(bool on);
+		// Take this character's saved list and AUTO, after the quests are
+		// loaded, and save changes under `key` from then on.
+		void restore_tracking(const std::string& key);
+		// A started quest's record changed (0xa20f4c, state 1): keep a tracked
+		// one listed, or add it if it shows progress but isn't done (0xa212af).
+		void record_updated(int16_t id, const Inventory& inventory);
+		// The counts of the items started quests ask for, before an inventory
+		// change, for items_changed.
+		std::map<int32_t, int16_t> wanted_items(const Inventory& inventory) const;
+		// Gaining a wanted item keeps a tracked quest listed or adds it
+		// (0xa1f387).
+		void items_changed(const std::map<int32_t, int16_t>& before, const Inventory& inventory);
+		// Drop the quests added automatically that went ten minutes without
+		// progress and aren't done (0x887b5c).
+		void expire_tracking(const Inventory& inventory);
 
 		bool is_started(int16_t);
 
@@ -87,10 +106,20 @@ namespace ms
 		std::map<int16_t, std::pair<int16_t, std::string>> in_progress;
 		std::map<int16_t, int64_t> completed;
 		std::map<int16_t, std::string> records_ex;
+		// v83's automatic add (0x88599c with bAuto).
+		bool offer(int16_t id, const Inventory& inventory, bool unless_done);
+		void touch(int16_t id);
+		bool objectives_met(int16_t id, const Inventory& inventory) const;
+		void save_tracking() const;
+
 		std::vector<int16_t> tracking;
 		bool auto_track = true;
+		// When each quest added automatically last made progress (+0x640).
+		std::map<int16_t, int64_t> auto_since;
 		// Quests the player took out of the helper; not re-added automatically.
 		std::vector<int16_t> dismissed;
+		// The character's key for the saved list; empty while loading.
+		std::string tracking_key;
 		uint64_t marker_revision = 0;
 	};
 }

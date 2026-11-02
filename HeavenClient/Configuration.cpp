@@ -100,6 +100,7 @@ namespace ms
 		settings.emplace<FriendFolded>();
 		settings.emplace<FriendBlocked>();
 		settings.emplace<BlackList>();
+		settings.emplace<QuestAlarms>();
 
 		load();
 	}

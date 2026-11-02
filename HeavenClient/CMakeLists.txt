@@ -12,6 +12,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_alert_rules COMMAND quest_alert_rules_tests)
     add_executable(quest_completion_tests tests/quest_completion.cpp)
     add_test(NAME quest_completion COMMAND quest_completion_tests)
+    add_executable(quest_alarm_tests tests/quest_alarm.cpp)
+    add_test(NAME quest_alarm COMMAND quest_alarm_tests)
     add_executable(fade_notice_tests tests/fade_notice.cpp)
     add_test(NAME fade_notice COMMAND fade_notice_tests)
     add_executable(input_focus_tests tests/input_focus.cpp)
@@ -672,6 +674,7 @@ add_executable(HeavenClient
     Character/QuestCompletion.h
     Character/QuestDialogue.h
     Character/QuestInfo.h
+    Character/QuestAlarm.h
     Character/QuestLog.cpp
     Character/QuestLog.h
     Character/QuestResult.h

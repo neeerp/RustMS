@@ -18,24 +18,35 @@
 #include "QuestLog.h"
 #include "QuestCatalog.h"
 #include "QuestMarker.h"
+#include "QuestObjectives.h"
 #include "QuestRecordEx.h"
+#include "Inventory/Inventory.h"
+#include "../Configuration.h"
 #include <algorithm>
+#include <chrono>
 
 namespace ms
 {
+	namespace
+	{
+		int64_t now_ms()
+		{
+			return std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now().time_since_epoch()).count();
+		}
+
+		std::vector<QuestObjective> objectives_of(const QuestInfo& quest, const std::string& record,
+			const Inventory& inventory)
+		{
+			return quest_objectives(quest.end_mobs, quest.end_items, record,
+				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); });
+		}
+	}
+
 	void QuestLog::add_started(int16_t qid, const std::string &qdata)
 	{
-		bool fresh = started.count(qid) == 0;
 		started[qid] = qdata;
 		++marker_revision;
-
-		if (fresh && auto_track && std::find(dismissed.begin(), dismissed.end(), qid) == dismissed.end())
-		{
-			const QuestInfo* quest = QuestCatalog::get().find(qid);
-
-			if (quest && (!quest->end_mobs.empty() || !quest->end_items.empty()))
-				track(qid);
-		}
 	}
 
 	void QuestLog::add_in_progress(int16_t qid, int16_t qidl, const std::string &qdata)
@@ -49,7 +60,14 @@ namespace ms
 		started.erase(qid);
 		in_progress.erase(qid);
 		completed[qid] = time;
-		tracking.erase(std::remove(tracking.begin(), tracking.end(), qid), tracking.end());
+
+		if (is_tracked(qid))
+		{
+			tracking.erase(std::remove(tracking.begin(), tracking.end(), qid), tracking.end());
+			auto_since.erase(qid);
+			save_tracking();
+		}
+
 		++marker_revision;
 	}
 
@@ -58,7 +76,14 @@ namespace ms
 		started.erase(qid);
 		in_progress.erase(qid);
 		completed.erase(qid);
-		tracking.erase(std::remove(tracking.begin(), tracking.end(), qid), tracking.end());
+
+		if (is_tracked(qid))
+		{
+			tracking.erase(std::remove(tracking.begin(), tracking.end(), qid), tracking.end());
+			auto_since.erase(qid);
+			save_tracking();
+		}
+
 		++marker_revision;
 	}
 
@@ -81,8 +106,9 @@ namespace ms
 		if (QuestCatalog::get().is_title(id))
 			return false;
 
-		tracking.push_back(id);
+		tracking.insert(tracking.begin() + QuestAlarm::manual_slot(tracking, auto_since), id);
 		dismissed.erase(std::remove(dismissed.begin(), dismissed.end(), id), dismissed.end());
+		save_tracking();
 		++marker_revision;
 		return true;
 	}
@@ -93,18 +119,186 @@ namespace ms
 			return;
 
 		tracking.erase(std::remove(tracking.begin(), tracking.end(), id), tracking.end());
+		auto_since.erase(id);
 		dismissed.push_back(id);
+		save_tracking();
 		++marker_revision;
 	}
 
 	bool QuestLog::auto_tracks() const { return auto_track; }
 
-	void QuestLog::set_auto_track(bool on) { auto_track = on; }
+	void QuestLog::set_auto_track(bool on)
+	{
+		auto_track = on;
+		save_tracking();
+	}
+
+	void QuestLog::restore_tracking(const std::string& key)
+	{
+		tracking_key = key;
+		QuestAlarm::Saved saved = QuestAlarm::find(Setting<QuestAlarms>::get().load(), key);
+		auto_track = saved.auto_register;
+		tracking.clear();
+		auto_since.clear();
+
+		for (int16_t id : saved.quests)
+			if (started.count(id) && !QuestCatalog::get().is_title(id))
+				tracking.push_back(id);
+
+		++marker_revision;
+	}
+
+	bool QuestLog::offer(int16_t id, const Inventory& inventory, bool unless_done)
+	{
+		if (!auto_track || is_tracked(id) || tracking.size() >= MAX_TRACKED
+			|| std::find(dismissed.begin(), dismissed.end(), id) != dismissed.end())
+			return false;
+
+		auto record = started.find(id);
+		const QuestInfo* quest = QuestCatalog::get().find(id);
+
+		if (record == started.end() || !quest || QuestCatalog::get().is_title(id)
+			|| (quest->end_mobs.empty() && quest->end_items.empty()))
+			return false;
+
+		// Only once a kill is counted or an item held (0x885acf, 0x885b97),
+		// or with mesos for a quest that asks for them.
+		auto objectives = objectives_of(*quest, record->second, inventory);
+		bool progress = std::any_of(objectives.begin(), objectives.end(),
+			[](const QuestObjective& o) { return o.have > 0; })
+			|| (quest->end_meso > 0 && inventory.get_meso() > 0);
+
+		if (!progress)
+			return false;
+
+		if (unless_done && std::all_of(objectives.begin(), objectives.end(),
+			[](const QuestObjective& o) { return o.met(); }))
+			return false;
+
+		tracking.push_back(id);
+		auto_since[id] = now_ms();
+		save_tracking();
+		++marker_revision;
+		return true;
+	}
+
+	void QuestLog::touch(int16_t id)
+	{
+		auto found = auto_since.find(id);
+
+		if (found != auto_since.end())
+			found->second = now_ms();
+	}
+
+	void QuestLog::record_updated(int16_t id, const Inventory& inventory)
+	{
+		if (is_tracked(id))
+			touch(id);
+		else
+			offer(id, inventory, true);
+	}
+
+	std::map<int32_t, int16_t> QuestLog::wanted_items(const Inventory& inventory) const
+	{
+		std::map<int32_t, int16_t> counts;
+
+		for (const auto& [id, record] : started)
+			if (const QuestInfo* quest = QuestCatalog::get().find(id))
+				for (const auto& [item_id, need] : quest->end_items)
+					counts[item_id] = inventory.get_total_item_count(item_id);
+
+		return counts;
+	}
+
+	void QuestLog::items_changed(const std::map<int32_t, int16_t>& before, const Inventory& inventory)
+	{
+		std::vector<int16_t> ids;
+
+		for (const auto& [id, record] : started)
+			ids.push_back(id);
+
+		for (int16_t id : ids)
+		{
+			const QuestInfo* quest = QuestCatalog::get().find(id);
+
+			if (!quest)
+				continue;
+
+			bool gained = false;
+
+			for (const auto& [item_id, need] : quest->end_items)
+			{
+				auto was = before.find(item_id);
+
+				if (was != before.end() && inventory.get_total_item_count(item_id) > was->second)
+					gained = true;
+			}
+
+			if (!gained)
+				continue;
+
+			if (is_tracked(id))
+				touch(id);
+			else
+				offer(id, inventory, false);
+		}
+	}
+
+	bool QuestLog::objectives_met(int16_t id, const Inventory& inventory) const
+	{
+		auto record = started.find(id);
+		const QuestInfo* quest = QuestCatalog::get().find(id);
+
+		if (record == started.end() || !quest)
+			return false;
+
+		auto objectives = objectives_of(*quest, record->second, inventory);
+
+		return std::all_of(objectives.begin(), objectives.end(), [](const QuestObjective& o) { return o.met(); });
+	}
+
+	void QuestLog::expire_tracking(const Inventory& inventory)
+	{
+		int64_t now = now_ms();
+		bool changed = false;
+
+		for (auto it = auto_since.begin(); it != auto_since.end();)
+		{
+			if (now - it->second > QuestAlarm::IDLE_MS && !objectives_met(it->first, inventory))
+			{
+				tracking.erase(std::remove(tracking.begin(), tracking.end(), it->first), tracking.end());
+				it = auto_since.erase(it);
+				changed = true;
+			}
+			else
+			{
+				++it;
+			}
+		}
+
+		if (changed)
+		{
+			save_tracking();
+			++marker_revision;
+		}
+	}
+
+	void QuestLog::save_tracking() const
+	{
+		if (tracking_key.empty())
+			return;
+
+		auto& setting = Setting<QuestAlarms>::get();
+		setting.save(QuestAlarm::store(setting.load(), tracking_key, { tracking, auto_track }));
+		// v83 writes the registry at once (0x49e631), so a crash keeps the list.
+		Configuration::get().save();
+	}
 
 	void QuestLog::clear()
 	{
 		started.clear(); in_progress.clear(); completed.clear(); records_ex.clear();
-		tracking.clear(); dismissed.clear();
+		tracking.clear(); auto_since.clear(); dismissed.clear();
+		tracking_key.clear();
 		++marker_revision;
 	}
 	bool QuestLog::is_completed(int16_t id) const { return completed.count(id) != 0; }

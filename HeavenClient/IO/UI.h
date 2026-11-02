@@ -67,6 +67,8 @@ namespace ms
 		bool in_login() const;
 
 		void quit();
+		// Leaves the current state while the other singletons still exist.
+		void close();
 
 		bool not_quitted() const;
 

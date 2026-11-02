@@ -354,6 +354,8 @@ namespace ms
 		CharacterParser::parse_skillbook(recv, player.get_skills());
 		CharacterParser::parse_cooldowns(recv, player);
 		CharacterParser::parse_questlog(recv, player.get_quests());
+		// The helper lists what this character had in it last time (0x884cd5).
+		player.get_quests().restore_tracking(QuestAlarm::key(Configuration::get().get_worldid(), entry.id));
 		CharacterParser::parse_minigame(recv);
 		CharacterParser::parse_ring1(recv, player);
 		CharacterParser::parse_ring2(recv, player);

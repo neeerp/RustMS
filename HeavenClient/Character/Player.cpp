@@ -468,6 +468,8 @@ namespace ms
 	int8_t Player::update(const Physics &physics)
 	{
 		update_death();
+		// The helper's idle quests leave whether or not it is open (0xa03435).
+		questlog.expire_tracking(inventory);
 
 		const PlayerState *pst = get_state(state);
 

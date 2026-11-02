@@ -414,6 +414,9 @@ namespace ms
 		// A pet's item sent again may carry new closeness (FUN_00704c18).
 		std::array<int32_t, 3> closeness = Stage::get().get_player().get_pet_closeness();
 
+		QuestLog& quests = Stage::get().get_player().get_quests();
+		std::map<int32_t, int16_t> wanted = quests.wanted_items(inventory);
+
 		struct Mod
 		{
 			int8_t mode;
@@ -588,6 +591,9 @@ namespace ms
 				if (auto messenger = UI::get().get_element<UIStatusMessenger>())
 					messenger->show_status(Color::Name::YELLOW, line);
 		}
+
+		// A quest item gained keeps its quest in the helper or adds it (0xa1f387).
+		quests.items_changed(wanted, inventory);
 
 		// As after a stat change, v83 checks the alert's quests again (FUN_00a1ead9 -> FUN_00a0843c).
 		Stage::get().get_quest_alert().stats_changed();
