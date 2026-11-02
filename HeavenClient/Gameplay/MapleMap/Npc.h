@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "MapObject.h"
+#include "MapleTvScreen.h"
 
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
@@ -136,6 +137,7 @@ namespace ms
 		bool enabled = true;
 		// NpcSummon or NpcReturn, played once where the NPC stands.
 		Animation summon_effect;
+		MapleTvScreen tv;
 		bool summoning = false;
 
 		Randomizer random;

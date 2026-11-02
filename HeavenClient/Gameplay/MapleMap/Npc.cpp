@@ -64,6 +64,10 @@ namespace ms
 			static_cast<int16_t>(info["dcBottom"].get_integer(0)));
 		scripted = info["script"].size() > 0 || info["shop"].get_bool();
 
+		// The ad is one of TVmedia's three, picked once (asm 6d0f1d).
+		if (MapleTvScreen::enabled(info))
+			tv = MapleTvScreen(info, random.next_int(3));
+
 		for (auto npcnode : src)
 		{
 			std::string state = npcnode.name();
@@ -121,6 +125,8 @@ namespace ms
 
 		if (animations.count(stance))
 			animations.at(stance).draw(DrawArgument(absp, flip), alpha);
+
+		tv.draw(absp, alpha);
 
 		if (!hidename)
 		{
@@ -182,6 +188,7 @@ namespace ms
 
 		speech.update();
 		update_idle();
+		tv.update();
 
 		if (animations.count(stance))
 		{
