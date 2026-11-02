@@ -169,13 +169,17 @@ namespace ms
 				account.set_state(Textfield::State::FOCUSED);
 		};
 
-		if (account_text.empty())
+		// v83 checks the form before sending (0x620eab): an ID of 4 to 12
+		// characters with no '@' or '.', else notice 28; a password of 5 to
+		// 12, else notice 3.
+		if (account_text.length() < 4 || account_text.length() > 12
+			|| account_text.find_first_of("@.") != std::string::npos)
 		{
-			UI::get().emplace<UILoginNotice>(UILoginNotice::Message::NOT_REGISTERED, okhandler);
+			UI::get().emplace<UILoginNotice>(UILoginNotice::Message::INCORRECT_LOGINID, okhandler);
 			return;
 		}
 
-		if (password_text.length() <= 4)
+		if (password_text.length() < 5 || password_text.length() > 12)
 		{
 			UI::get().emplace<UILoginNotice>(UILoginNotice::Message::WRONG_PASSWORD, okhandler);
 			return;
