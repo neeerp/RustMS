@@ -794,6 +794,8 @@ add_executable(HeavenClient
     Gameplay/MapleMap/ObstacleRules.h
     Gameplay/MapleMap/Mob.cpp
     Gameplay/MapleMap/Mob.h
+    Gameplay/MapleMap/MapleTvScreen.cpp
+    Gameplay/MapleMap/MapleTvScreen.h
     Gameplay/MapleMap/Npc.cpp
     Gameplay/MapleMap/Npc.h
     Gameplay/MapleMap/Obj.cpp
