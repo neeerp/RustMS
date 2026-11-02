@@ -2193,3 +2193,50 @@ add = [
     { item = 4001362, prob = 0.08, quest = 28252 },  # Searching for the Treasures
     { item = 4001363, prob = 0.08, quest = 28252 },  # Searching for the Treasures
 ]
+
+# The reactors' quest drops the pack lacks, at Cosmic's rates
+# (131-reactordrops, chance n: one in n), for the same quest. Each reactor's
+# Cosmic script only drops (or sprays) its items.
+
+[reactors.2002018]
+# The Tower of Goddess's jail storage boxes (920010912, ...922, ...932): the
+# Diary of the Goddess for The record of Goddess Minerva (3099).
+add = [{ item = 4161014, prob = 1.0, quest = 3099 }]
+
+[reactors.2402008]
+# Neo City's <Year 2021> Average Town (240070100-240070102): the Primary Clue
+# to the Case for The First Clue (3720).
+add = [{ item = 4032512, prob = 0.2, quest = 3720 }]
+
+[reactors.1012000]
+# The plants around Ellinia (101010000, ...): the Fruit for The Plants are
+# Suspicious! (20717).
+add = [{ item = 4032143, prob = 0.166667, quest = 20717 }]
+
+[reactors.1022001]
+# Excavation Site I's (101030101): the Smirking Ghost Stump Puppet for Find
+# the Puppet (21723).
+add = [{ item = 4032319, prob = 0.142857, quest = 21723 }]
+
+[reactors.1022002]
+# The Construction Site North of Kerning City's (102040000): the Foreign
+# Object for Inspecting the Water Pipe (28167).
+add = [{ item = 4001340, prob = 1.0, quest = 28167 }]
+
+[reactors.1202000]
+# Sunset Sky's (102050000): the Paper with Strange Markings for Find the
+# Clues! (28194).
+add = [{ item = 4001366, prob = 1.0, quest = 28194 }]
+
+[reactors.1202003]
+# The Nautilus's Bottom Floor - Hallway (120000300): the Antique for Antique
+# Search (28225).
+add = [{ item = 4001346, prob = 0.333333, quest = 28225 }]
+
+[reactors.1202004]
+# Its other one, which also holds Crocell's Emblem for Searching for the Demon
+# (28255).
+add = [
+    { item = 4001346, prob = 0.333333, quest = 28225 },
+    { item = 4032494, prob = 1.0, quest = 28255 },
+]
