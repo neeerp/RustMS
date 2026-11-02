@@ -4511,6 +4511,12 @@ pub const NEO_BOSS: [Event; 5] = [
 /// Happyville (209000000), the Christmas town the Holiday PQ's lobbies
 /// lead back to.
 pub const HAPPYVILLE: i32 = 209_000_000;
+/// Happyville's Maplemas tree rooms, The Hill of Christmas (209000001 to
+/// 209000015, all everlast): what a player drops there, only they may pick
+/// up, as Cliff (2001000) says (Cosmic's `isSelfLootableOnly`).
+pub fn is_tree_room(map_id: i32) -> bool {
+    (209_000_001..=209_000_015).contains(&map_id)
+}
 /// The Holiday PQ's three lobbies, one for each of its difficulties, easy
 /// first (Map.nx 889100000/010/020): the Snow Spirit (9105004) starts it
 /// there, and the Snowman (9105005) leads back to Happyville. A
