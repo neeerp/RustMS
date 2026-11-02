@@ -115,7 +115,7 @@ namespace ms
 		return &npcs;
 	}
 
-	Cursor::State MapNpcs::send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos)
+	Cursor::State MapNpcs::send_cursor(bool released, Point<int16_t> position, Point<int16_t> viewpos)
 	{
 		for (auto &map_object : npcs)
 		{
@@ -123,17 +123,12 @@ namespace ms
 
 			if (npc && npc->is_active() && npc->inrange(position, viewpos))
 			{
-				if (pressed)
-				{
-					// The client offers the NPC's quests itself; only plain speech
-					// goes to the server.
+				// The client offers the NPC's quests itself; only plain speech
+				// goes to the server.
+				if (released)
 					QuestConversation::talk_to_npc(npc->get_npcid(), npc->get_oid());
 
-					return Cursor::State::IDLE;
-				} else
-				{
-					return Cursor::State::CANCLICK;
-				}
+				return Cursor::State::CANCLICK;
 			}
 		}
 
