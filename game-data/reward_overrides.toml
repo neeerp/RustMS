@@ -1385,6 +1385,7 @@ add = [
     { item = 4001347, prob = 0.16, quest = 28229 },  # The Fairies Like...
     { item = 4032374, prob = 0.08, quest = 2405 },  # The Lost Letter of Commendation
     { item = 4032376, prob = 0.08, quest = 2406 },  # The Lost Letter of Commendation
+    { item = 4001356, prob = 0.07 },  # Flint, for 28214 and 28246
 ]
 
 [mobs.1120100]
@@ -1420,6 +1421,7 @@ add = [
     { item = 4001357, prob = 0.07, quest = 28244 },  # Grendel the Really Tipsy
     { item = 4001350, prob = 0.2, quest = 28235 },  # So the Demons Like Noise?
     { item = 4032377, prob = 0.08, quest = 2407 },  # The Lost Letter of Commendation
+    { item = 4001343, prob = 0.07 },  # Pig Vein, for 28170 and 28209
 ]
 
 [mobs.1210102]
@@ -1650,6 +1652,7 @@ add = [
 add = [
     { item = 4030012, prob = 0.125 },
     { item = 4001342, prob = 0.07, quest = 28175 },  # A Special Wine
+    { item = 4001343, prob = 0.07 },  # Pig Vein, for 28170 and 28209
 ]
 
 [mobs.9300155]
@@ -1725,6 +1728,7 @@ add = [
 add = [
     { item = 4030012, prob = 0.125 },
     { item = 4001342, prob = 0.07, quest = 28175 },  # A Special Wine
+    { item = 4001343, prob = 0.07 },  # Pig Vein, for 28170 and 28209
 ]
 
 [mobs.9400246]
