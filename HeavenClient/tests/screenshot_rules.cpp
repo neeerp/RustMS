@@ -29,6 +29,15 @@ int main()
 
 		require(outside.press(1000, true) == Press::TAKE, "entering the game counts from one");
 
+		require(folder(0, "/game", "/home/bo") == "/game", "shots go to the game's folder by default");
+		require(folder(1, "/game", "/home/bo") == "/home/bo/Desktop", "or the desktop");
+#ifndef _WIN32
+		require(folder(2, "/game", "/home/bo") == "/home/bo", "the drive is the home folder outside Windows");
+		require(folder(2, "/game", nullptr) == "/game", "without a home, the game's folder");
+#endif
+		require(folder(1, "/game", "") == "/game", "an empty home counts as none");
+		require(folder(7, "/game", "/home/bo") == "/game", "an unknown place is the game's folder");
+
 		require(file_name(0) == "Maple0000.jpg", "names have four digits");
 		require(file_name(12345) == "Maple12345.jpg", "and grow past them");
 

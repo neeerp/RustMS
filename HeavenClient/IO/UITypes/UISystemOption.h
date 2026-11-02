@@ -6,6 +6,7 @@
 #include "../UIDragElement.h"
 
 #include "../Components/ClassicSlider.h"
+#include "../Components/MapleComboBox.h"
 
 namespace ms
 {
@@ -48,7 +49,9 @@ namespace ms
 			SFX_MUTE,
 			SHAKE,
 			WINDOW,
-			FULLSCREEN
+			FULLSCREEN,
+			SCREENSHOT_PLACE,
+			MONSTER_INFO
 		};
 
 		enum Sliders : uint16_t
@@ -71,5 +74,10 @@ namespace ms
 		uint8_t hp_alert = 0;
 		uint8_t mp_alert = 0;
 		Texture box[2];
+		// Owned by buttons
+		MapleComboBox *screenshot_place = nullptr;
+		MapleComboBox *monster_info = nullptr;
+		// Held since a click on an open list
+		bool picking = false;
 	};
 }

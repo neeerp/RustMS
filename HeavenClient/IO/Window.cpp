@@ -26,7 +26,9 @@
 #include "UiControl.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <vector>
 
@@ -314,7 +316,19 @@ namespace ms
 
 		// v83 asks for the first free index before every shot and writes the
 		// 800x600 frame as a quality 75 JPEG (IJL jquality 0x4b, FUN_00744d77).
-		std::string folder = GetCurrentWorkingDir() + "/";
+		// The folder set in the System Option, or the game's if it is gone.
+#ifdef _WIN32
+		const char *home = std::getenv("USERPROFILE");
+#else
+		const char *home = std::getenv("HOME");
+#endif
+		std::string game = GetCurrentWorkingDir();
+		std::string folder = Screenshot::folder(Setting<ScreenshotPlace>::get().place(), game, home);
+
+		if (std::error_code error; !std::filesystem::is_directory(folder, error))
+			folder = game;
+
+		folder += "/";
 		std::string file;
 
 		if (screenshot_name)
