@@ -156,7 +156,7 @@ namespace ms
 		const std::string &get_desc() const;
 
 		// Return the description of a level.
-		// If there is no description for this level, a warning message is returned.
+		// If there is no description for this level, it is empty.
 		const std::string &get_level_desc(int32_t level) const;
 
 		// Return one of the skill icons.

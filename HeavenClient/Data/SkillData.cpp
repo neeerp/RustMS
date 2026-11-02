@@ -339,7 +339,9 @@ namespace ms
 
 		if (iter == levels.end())
 		{
-			static const std::string null_level = "Missing level description.";
+			// v83 draws the level's line empty when String/Skill.img has
+			// no h<level>, as for Legendary Spirit (FUN_00760f23).
+			static const std::string null_level;
 
 			return null_level;
 		} else
