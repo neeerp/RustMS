@@ -218,6 +218,8 @@ namespace ms
 
 		Text text;
 		Text name;
+		// Where the name starts on its plate.
+		int16_t name_x = 0;
 
 		// The height of the middle, between top and bottom.
 		int16_t height;
