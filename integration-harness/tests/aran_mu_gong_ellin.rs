@@ -171,8 +171,8 @@ async fn an_aran_chases_the_shadow_knight_and_the_gentleman() {
         build_quest_action(SCRIPT_START, CATCH_THE_SHADOW_KNIGHT, MU_GONG),
     )
     .await;
-    assert_eq!(t.prompts, [(MU_GONG, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(MU_GONG, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&CATCH_THE_SHADOW_KNIGHT), Some(&1));
     step(c, &m, answer(0, 1, None)).await;
 

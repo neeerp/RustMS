@@ -86,8 +86,8 @@ async fn a_new_noblesse_starts_on_ereves_tutorial_path() {
     .await;
     assert_eq!(t.prompts, [(KIMU, 0)]);
     let t = next(c, &m, 3).await;
-    assert_eq!(t.prompts, [(KIMU, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(KIMU, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&WELCOME_TO_EREVE), Some(&1));
     assert_eq!(t.guide_talk, ["#2"]);
 

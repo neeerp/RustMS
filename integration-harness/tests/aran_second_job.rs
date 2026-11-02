@@ -87,8 +87,8 @@ async fn maha_remembered_through_the_mirror_makes_a_second_job_aran() {
     // Lilin hears the Polearm calling; Maha ends it.
     let start = build_quest_action(SCRIPT_START, POLEARM_CALLING, LILIN);
     let t = quest(c, &m, RIEN, LILIN, start).await;
-    assert_eq!(t.prompts, [(LILIN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(LILIN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&POLEARM_CALLING), Some(&1));
     assert!(next(c, &m, 1).await.prompts.is_empty());
     let end = build_quest_action(SCRIPT_END, POLEARM_CALLING, MAHA);
@@ -117,8 +117,8 @@ async fn maha_remembered_through_the_mirror_makes_a_second_job_aran() {
     let t = quest(c, &m, MIRROR_ROOM, SIR_BLACKSMITH, start).await;
     assert_eq!(t.prompts, [(SIR_BLACKSMITH, 0)]);
     let t = next(c, &m, 4).await;
-    assert_eq!(t.prompts, [(SIR_BLACKSMITH, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(SIR_BLACKSMITH, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&ULTIMATE_WEAPON), Some(&1));
     assert!(next(c, &m, 1).await.prompts.is_empty());
     let end = build_quest_action(SCRIPT_END, ULTIMATE_WEAPON, SIR_BLACKSMITH);

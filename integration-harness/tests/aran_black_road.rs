@@ -114,8 +114,8 @@ async fn the_black_road_leads_an_aran_from_the_ark_to_the_ice_cave() {
     assert!(t.broadcasts.iter().any(|b| b.0 == PINK), "{t:?}");
     let start = build_quest_action(SCRIPT_START, MISSING_KID_1, ATHENA);
     let t = quest(c, &m, ARK, ATHENA, start).await;
-    assert_eq!(t.prompts, [(ATHENA, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(ATHENA, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&MISSING_KID_1), Some(&1));
     for _ in 0..3 {
         step(c, &m, answer(0, 1, None)).await;
@@ -157,8 +157,8 @@ async fn the_black_road_leads_an_aran_from_the_ark_to_the_ice_cave() {
     assert_eq!(t.states.get(&MISSING_KID_1), Some(&2));
     let start = build_quest_action(SCRIPT_START, MISSING_KID_2, LOST_KID);
     let t = step(c, &m, start).await;
-    assert_eq!(t.prompts, [(LOST_KID, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(LOST_KID, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&MISSING_KID_2), Some(&1));
     assert_eq!(t.items, [(LOST_CHILD, 1)]);
     assert_eq!(t.warps, [LOST_KIDS_FOREST]);

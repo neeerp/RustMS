@@ -85,8 +85,8 @@ async fn maha_tamed_makes_a_fourth_job_aran() {
     // Lilin sends the Aran to Maha, who ends it from the data.
     let start = build_quest_action(SCRIPT_START, POLEARM_STARTS_A_FIGHT, LILIN);
     let t = quest(c, &m, RIEN, LILIN, start).await;
-    assert_eq!(t.prompts, [(LILIN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(LILIN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&POLEARM_STARTS_A_FIGHT), Some(&1));
     assert!(next(c, &m, 1).await.prompts.is_empty());
     let done = build_quest_completion(POLEARM_STARTS_A_FIGHT, MAHA, -1);
@@ -98,8 +98,8 @@ async fn maha_tamed_makes_a_fourth_job_aran() {
     let t = step(c, &m, start).await;
     assert_eq!(t.prompts, [(MAHA, 0)]);
     let t = next(c, &m, 3).await;
-    assert_eq!(t.prompts, [(MAHA, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(MAHA, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert!(t.warps.is_empty());
     assert_eq!(t.states.get(&TAMING_THE_POLEARM), None);
     next(c, &m, 1).await;
@@ -110,7 +110,7 @@ async fn maha_tamed_makes_a_fourth_job_aran() {
     let start = build_quest_action(SCRIPT_START, TAMING_THE_POLEARM, MAHA);
     step(c, &m, start).await;
     next(c, &m, 3).await;
-    let t = step(c, &m, answer(1, 1, None)).await;
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&TAMING_THE_POLEARM), Some(&1));
     assert_eq!(t.warps, [MAHAS_BATTLE]);
     assert_eq!(t.countdowns, [600]);

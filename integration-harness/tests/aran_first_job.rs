@@ -70,8 +70,8 @@ async fn lilin_and_the_polearm_make_a_legend_of_10_an_aran() {
     .await;
     assert_eq!(t.prompts, [(LILIN, 0)]);
     let t = next(c, &m, 6).await;
-    assert_eq!(t.prompts, [(LILIN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(LILIN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&FIVE_HEROES), Some(&1));
     assert_eq!(
         t.scene_parts,
@@ -85,8 +85,8 @@ async fn lilin_and_the_polearm_make_a_legend_of_10_an_aran() {
     // A touch starts the Polearm's quest; held again, it makes an Aran.
     let start = build_quest_action(SCRIPT_START, POLEARM_WIELDING_HERO, POLEARM);
     let t = quest(c, &m, POLEARM, start).await;
-    assert_eq!(t.prompts, [(POLEARM, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(POLEARM, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&POLEARM_WIELDING_HERO), Some(&1));
     next(c, &m, 1).await;
     let end = build_quest_action(SCRIPT_END, POLEARM_WIELDING_HERO, POLEARM);

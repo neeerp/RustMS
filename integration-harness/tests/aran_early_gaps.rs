@@ -102,8 +102,8 @@ async fn an_aran_fills_the_early_gaps_from_rien_to_lith_harbor() {
     .await;
     assert_eq!(t.prompts, [(LILIN, 0)]);
     let t = next(c, &m, 2).await;
-    assert_eq!(t.prompts, [(LILIN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(LILIN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&NEW_BEGINNINGS), Some(&1));
     assert_eq!(t.items, [(PRACTICE_POLEARM, 1)]);
     next(c, &m, 1).await;
@@ -130,8 +130,8 @@ async fn an_aran_fills_the_early_gaps_from_rien_to_lith_harbor() {
     .await;
     assert_eq!(t.prompts, [(PUO, 0)]);
     let t = next(c, &m, 1).await;
-    assert_eq!(t.prompts, [(PUO, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(PUO, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&TRAIN_OR_DIE_3), Some(&1));
     next(c, &m, 1).await;
 
@@ -191,8 +191,8 @@ async fn an_aran_fills_the_early_gaps_from_rien_to_lith_harbor() {
         .await;
         assert_eq!(t.prompts, [(npc, 0)]);
         let t = next(c, &m, 1).await;
-        assert_eq!(t.prompts, [(npc, 1)]);
-        let t = step(c, &m, answer(1, 1, None)).await;
+        assert_eq!(t.prompts, [(npc, 12)]);
+        let t = step(c, &m, answer(12, 1, None)).await;
         assert_eq!(t.states.get(&quest_id), Some(&1));
         next(c, &m, 2).await;
     }
@@ -217,8 +217,8 @@ async fn an_aran_fills_the_early_gaps_from_rien_to_lith_harbor() {
     .await;
     assert_eq!(t.prompts, [(SHADOW, 0)]);
     let t = next(c, &m, 2).await;
-    assert_eq!(t.prompts, [(SHADOW, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(SHADOW, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&PUPPETEERS_INVITATION), Some(&1));
     assert_eq!(t.kills[&WARNING_RECORD], "0");
     assert_eq!(t.warps, [PUPPETEERS_CAVE]);

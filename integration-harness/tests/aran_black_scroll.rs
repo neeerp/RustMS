@@ -111,8 +111,8 @@ async fn an_aran_clears_the_sealed_garden_and_restores_mr_dos_scroll() {
     .await;
     assert_eq!(t.prompts, [(SPIRUNA, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(SPIRUNA, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(SPIRUNA, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&SEALED_GARDEN), Some(&1));
     let t = step(c, &m, build_quest_completion(SEALED_GARDEN, SPIRUNA, -1)).await;
     assert_eq!(t.states.get(&SEALED_GARDEN), Some(&2));
@@ -207,8 +207,8 @@ async fn an_aran_clears_the_sealed_garden_and_restores_mr_dos_scroll() {
     .await;
     assert_eq!(t.prompts, [(TRU, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(TRU, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(TRU, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&INVESTIGATING_MU_LUNG), Some(&1));
     send(c, answer(0, 1, None)).await;
     assert_eq!(warp(c, MU_LUNG, "", &mut trace).await, MU_LUNG);
@@ -232,8 +232,8 @@ async fn an_aran_clears_the_sealed_garden_and_restores_mr_dos_scroll() {
     .await;
     assert_eq!(t.prompts, [(MR_DO, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(MR_DO, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(MR_DO, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&THE_BLACK_SCROLL), Some(&1));
     assert_eq!(t.items, [(HANGING_SCROLL, 1)]);
     step(c, &m, answer(0, 1, None)).await;

@@ -36,9 +36,13 @@ pub enum NpcInteraction {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Prompt {
     Text(DialoguePage),
+    /// A yes or no; `quest` asks it as a quest's offer, message type 12,
+    /// which the client draws with its Accept and Decline buttons
+    /// (746677, 9a80a1) and answers as 12 (746a0d).
     YesNo {
         npc_id: i32,
         text: String,
+        quest: bool,
     },
     /// A menu; choices are embedded in `text` as `#L<id>#label#l`.
     Selection {

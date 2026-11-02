@@ -123,8 +123,8 @@ async fn an_aran_rides_and_raises_a_wolf() {
     .await;
     assert_eq!(t.prompts, [(PUCCI, 0)]);
     let t = next(c, &m, 1).await;
-    assert_eq!(t.prompts, [(PUCCI, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(PUCCI, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&PUCCIS_REQUEST), Some(&1));
     next(c, &m, 1).await;
 
@@ -187,8 +187,8 @@ async fn an_aran_rides_and_raises_a_wolf() {
     .await;
     assert_eq!(t.prompts, [(PACK_WOLF, 0)]);
     let t = next(c, &m, 2).await;
-    assert_eq!(t.prompts, [(PACK_WOLF, 1)]);
-    send(c, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(PACK_WOLF, 12)]);
+    send(c, answer(12, 1, None)).await;
     let t = into_the_test_room(c).await;
     assert_eq!(t.states.get(&THE_WOLVES_TEST), Some(&1));
     let t = step(c, &m, enter("out00")).await;
@@ -241,8 +241,8 @@ async fn an_aran_rides_and_raises_a_wolf() {
     .await;
     assert_eq!(t.prompts, [(MAHA, 0)]);
     let t = next(c, &m, 2).await;
-    assert_eq!(t.prompts, [(MAHA, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(MAHA, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&THE_WOLFS_EVOLUTION), Some(&1));
     let t = step(
         c,

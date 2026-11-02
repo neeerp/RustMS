@@ -81,8 +81,8 @@ async fn the_timers_egg_grows_on_bird_feed_until_bob_takes_it_back() {
     assert_eq!(t.prompts, [(BOB, 0)]);
     step(c, &m, answer(0, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(BOB, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(BOB, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&A_CUTE_BABY_BIRD), Some(&1));
     assert_eq!(t.items, [(TIMERS_EGG, 1)]);
     step(c, &m, answer(0, 1, None)).await;

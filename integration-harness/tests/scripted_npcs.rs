@@ -74,8 +74,8 @@ async fn rogers_apple_teaches_using_items_and_pays_once() {
     assert_eq!(t.prompts, [(ROGER, 0)]);
     step(c, &m, answer(0, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(ROGER, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(ROGER, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.progress, [(1021, 1)]);
     assert_eq!(t.stat_values(stat::HP), [25]);
     let &(kind, slot, item) = t.added.first().expect("Roger's apple");
@@ -129,7 +129,7 @@ async fn natural_recovery_is_rate_limited() {
     step(c, &m, build_quest_action(SCRIPT_START, 1021, ROGER)).await;
     step(c, &m, answer(0, 1, None)).await;
     step(c, &m, answer(0, 1, None)).await;
-    step(c, &m, answer(1, 1, None)).await; // HP 25
+    step(c, &m, answer(12, 1, None)).await; // HP 25
     let t = step(c, &m, heal(10, 0)).await;
     assert_eq!(t.stat_values(stat::HP), [35]);
     let t = step(c, &m, heal(10, 0)).await;
@@ -158,7 +158,7 @@ async fn a_portable_chair_heals_its_recovery_hp() {
     step(c, &m, build_quest_action(SCRIPT_START, 1021, ROGER)).await;
     step(c, &m, answer(0, 1, None)).await;
     step(c, &m, answer(0, 1, None)).await;
-    step(c, &m, answer(1, 1, None)).await; // HP 25
+    step(c, &m, answer(12, 1, None)).await; // HP 25
 
     let t = step(c, &m, heal(50, 0)).await;
     assert!(t.stat_values(stat::HP).is_empty(), "too much off the chair");

@@ -93,7 +93,7 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
     run.step(build_quest_action(SCRIPT_START, 1021, 2000)).await;
     run.step(answer(0, 1, None)).await;
     run.step(answer(0, 1, None)).await;
-    run.step(answer(1, 1, None)).await;
+    run.step(answer(12, 1, None)).await;
     assert_eq!(run.state(1021), Some(1));
     let &(_, slot, _) = run
         .trace
