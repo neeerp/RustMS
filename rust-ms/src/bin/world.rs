@@ -2,8 +2,21 @@ use std::env;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
-#[tokio::main]
-async fn main() {
+// Workers get 16 MiB stacks: in a debug build a client actor's NPC talk
+// (handle_server_message, start_npc_conversation, talk_to) takes about 1.95
+// MiB of frames, past tokio's 2 MiB default, and aborts the whole server.
+const WORKER_STACK: usize = 16 * 1024 * 1024;
+
+fn main() {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(WORKER_STACK)
+        .build()
+        .expect("Failed to build the tokio runtime")
+        .block_on(run());
+}
+
+async fn run() {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env()
