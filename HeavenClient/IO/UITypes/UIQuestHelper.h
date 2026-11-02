@@ -30,6 +30,7 @@ namespace ms
 		void update_screen(int16_t new_width, int16_t new_height) override;
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void remove_cursor() override;
 
 		UIElement::Type get_type() const override;
 
@@ -39,6 +40,7 @@ namespace ms
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
+		bool own_cursor(uint16_t buttonid) const override;
 
 	private:
 		// Each tracked quest's untrack button is UNTRACK plus its place.
@@ -83,6 +85,11 @@ namespace ms
 		void rebuild();
 		void set_minimized(bool minimized);
 		int16_t height() const;
+		// The auto button keeps the disabled look while auto alarm is off,
+		// yet still hovers and clicks (FUN_008849a3).
+		Cursor::State send_cursor_to_auto(bool clicked, Point<int16_t> cursorpos);
+		Button::State auto_rest() const;
+		void leave_auto();
 
 		QuestLog& quests;
 		const Inventory& inventory;
@@ -92,6 +99,8 @@ namespace ms
 		std::vector<Shown> shown;
 		bool minimized = false;
 		bool moved;
+		bool auto_held = false;
+		bool auto_help = false;
 
 		static constexpr int16_t WIDTH = 223, ROW = 18, TOP = 25, TOP_MINIMIZED = 20, BOTTOM = 5;
 	};
