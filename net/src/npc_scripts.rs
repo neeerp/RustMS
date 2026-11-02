@@ -13455,7 +13455,10 @@ fn scarf_snowman(player: &Player) -> Option<NpcScript> {
                 SCARF_SNOWMAN,
                 vec![Page::Ask {
                     text: text(keys::SNOWMAN_OUT),
-                    on_yes: vec![Effect::WarpToPortal(events::HAPPYVILLE, 3)],
+                    on_yes: vec![
+                        Effect::ReclaimDrops,
+                        Effect::WarpToPortal(events::HAPPYVILLE, 3),
+                    ],
                     on_no: None,
                 }],
             )
@@ -24416,7 +24419,10 @@ mod tests {
             assert_eq!(question(&out.begin()), text(keys::SNOWMAN_OUT));
             assert_eq!(
                 out.respond(ScriptInput::Yes).unwrap().effects,
-                [Effect::WarpToPortal(events::HAPPYVILLE, 3)]
+                [
+                    Effect::ReclaimDrops,
+                    Effect::WarpToPortal(events::HAPPYVILLE, 3)
+                ]
             );
         }
         assert!(NpcScript::for_npc(SCARF_SNOWMAN, &rider(100, 0, events::HAPPYVILLE)).is_none());

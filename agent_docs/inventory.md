@@ -200,6 +200,10 @@ In Happyville's Maplemas tree rooms (209000001 to 209000015, The Hill of
 Christmas) only the player who dropped something may pick it up, as Cliff
 (2001000) says (Cosmic's `isSelfLootableOnly`; `DropSet::self_loot`). Anyone
 else's pickup gets only the enable-actions stat update.
+When a player says yes to the Scarf Snowman (2001004) on the way out
+(`Effect::ReclaimDrops`), whatever they dropped in the room comes back to them,
+as if picked up, before the warp. Anything that doesn't fit stays where it
+lies.
 
 GATHER_ITEMS (`0x45`) and SORT_ITEMS (`0x46`) (tick, type) are the item
 window's Gather and Sort buttons. The rearrangement goes out as one

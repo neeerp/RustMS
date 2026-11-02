@@ -159,6 +159,7 @@ impl ClientActor {
         let mut gachapon_win = None;
         let mut evolved = Vec::new();
         let mut item_buffs = Vec::new();
+        let mut reclaim = false;
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -172,6 +173,7 @@ impl ClientActor {
                     afterwards.push(effect::build_own_effect(CharEffect::PortalSound)?)
                 }
                 Effect::ApplyItemBuff(_) | Effect::CancelItemBuff(_) => item_buffs.push(effect),
+                Effect::ReclaimDrops => reclaim = true,
                 Effect::SaveLocation(kind, location) => {
                     match location {
                         Some(map_id) => next.saved_locations.insert(*kind, *map_id),
@@ -1062,6 +1064,9 @@ impl ClientActor {
                 Effect::CancelItemBuff(item_id) => self.end_buff(-item_id).await?,
                 _ => {}
             }
+        }
+        if reclaim {
+            self.reclaim_drops().await?;
         }
         if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;

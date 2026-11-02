@@ -382,6 +382,15 @@ impl DropSet {
     }
 
     /// Put back a drop that couldn't be picked up (a full inventory).
+    /// Take every drop `owner` owns off the map.
+    pub fn take_owned(&mut self, owner: ClientId) -> Vec<Drop> {
+        let ids: Vec<i32> = (self.drops.values())
+            .filter(|drop| drop.owner == owner)
+            .map(|drop| drop.object_id)
+            .collect();
+        ids.iter().filter_map(|id| self.drops.remove(id)).collect()
+    }
+
     pub fn restore(&mut self, drop: Drop) {
         self.drops.insert(drop.object_id, drop);
     }
@@ -691,6 +700,23 @@ mod tests {
         let id = drops.spawn(vec![Loot::Mesos(5)], 1, Ownership::Owner, 0, 0, 9, now)[0].object_id;
         assert_eq!(drops.expire(now + LIFETIME), [id]);
         assert_eq!(drops.all().count(), 0);
+    }
+
+    #[test]
+    fn a_player_takes_back_only_their_own_drops() {
+        let now = Instant::now();
+        let mut drops = DropSet::default().everlast().self_loot();
+        let item = game::Item::stack(2010000, 3);
+        let mine = drops.throw(Loot::Dropped(item), 1, 0, 0, now).object_id;
+        let bag = drops.throw(Loot::Mesos(50), 1, 10, 0, now).object_id;
+        let theirs = drops.throw(Loot::Mesos(20), 2, 20, 0, now).object_id;
+        let mut taken: Vec<i32> = drops.take_owned(1).iter().map(|d| d.object_id).collect();
+        taken.sort();
+        assert_eq!(taken, [mine, bag]);
+        assert_eq!(
+            drops.all().map(|d| d.object_id).collect::<Vec<_>>(),
+            [theirs]
+        );
     }
 
     #[test]

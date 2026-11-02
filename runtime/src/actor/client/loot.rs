@@ -197,6 +197,21 @@ impl ClientActor {
         Ok(())
     }
 
+    /// Take back everything this player dropped on their map; what doesn't
+    /// fit stays there.
+    pub(super) async fn reclaim_drops(&mut self) -> Result<(), RuntimeError> {
+        let (reply, drops) = tokio::sync::oneshot::channel();
+        self.send_to_field(FieldMessage::ReclaimDrops {
+            from: self.client_id,
+            reply,
+        })
+        .await?;
+        for drop in drops.await.unwrap_or_default() {
+            self.picked_up(drop).await?;
+        }
+        Ok(())
+    }
+
     /// The field handed this player's pet at `pet` a drop it still shows:
     /// put it in the inventory, and have the field show the pet taking it or
     /// leave it lying.

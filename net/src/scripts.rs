@@ -1100,6 +1100,10 @@ pub enum Effect {
     /// Nothing is applied while a monster is left on the player's map; the
     /// script says its `refused` text instead.
     RequireNoMobs,
+    /// Whatever the player dropped on their map comes back to them, before
+    /// any warp: on the way out of Happyville's tree rooms, as Cliff
+    /// (2001000) says.
+    ReclaimDrops,
     /// Add a row of four slots to a bag, up to 96.
     AddSlotRow(InventoryType),
     /// Give the player a new hair (3xxxx), face (2xxxx) or skin (anything

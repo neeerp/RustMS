@@ -795,6 +795,11 @@ pub enum FieldMessage {
     HolidaySnowman {
         reply: tokio::sync::oneshot::Sender<(u8, bool)>,
     },
+    /// Hand `from` everything they dropped here, taking it off the map.
+    ReclaimDrops {
+        from: ClientId,
+        reply: tokio::sync::oneshot::Sender<Vec<crate::actor::field_drops::Drop>>,
+    },
     /// How many drops, items or mesos, lie on the map.
     DropCount {
         reply: tokio::sync::oneshot::Sender<usize>,
