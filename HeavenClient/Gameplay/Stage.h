@@ -479,6 +479,9 @@ namespace ms
 		int32_t since_reactor_touch = 0;
 		uint64_t quest_tags_revision = 0;
 		QuestAlert quest_alert;
+		// The field took the press of the button now held, so its release
+		// may talk to an NPC.
+		bool field_pressed = false;
 		MapBackgrounds backgrounds;
 		MapPortals portals;
 		MapReactors reactors;

@@ -1752,6 +1752,7 @@ namespace ms
 	{
 		player.release_chalkboard_cursor();
 		quest_alert.release_cursor();
+		field_pressed = false;
 	}
 
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
@@ -1801,8 +1802,15 @@ namespace ms
 			return Cursor::State::CANCLICK;
 		}
 
-		// Nor do the NPCs or the quest alert, so no hand shows over them.
-		Cursor::State npcstate = locked ? Cursor::State::IDLE : npcs.send_cursor(pressed, position, camera.position());
+		// An NPC talks on the button's release over it, wherever in the field
+		// the press was (WM_LBUTTONUP, FUN_0094fa8e). Nor do the NPCs or the
+		// quest alert take a click under a dialog, so no hand shows over them.
+		bool released = !pressed && field_pressed && !UI::get().is_cursor_pressed();
+
+		if (pressed)
+			field_pressed = true;
+
+		Cursor::State npcstate = locked ? Cursor::State::IDLE : npcs.send_cursor(released, position, camera.position());
 
 		// Then the quest alert (FUN_0094fa8e).
 		if (!locked && npcstate == Cursor::State::IDLE)
