@@ -35,6 +35,10 @@ namespace ms
 		// Draws the object at the given position and with the specified interpolation.
 		virtual void draw(double viewx, double viewy, float alpha) const = 0;
 
+		// Draws the object's chat balloons, which v83 puts above every map
+		// layer (z 0xc00613dc, FUN_0048a935).
+		virtual void draw_balloons(double viewx, double viewy, float alpha) const;
+
 		// Updates the object and returns the updated layer.
 		virtual int8_t update(const Physics &physics);
 

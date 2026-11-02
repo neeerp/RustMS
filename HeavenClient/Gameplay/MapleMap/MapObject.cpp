@@ -25,6 +25,8 @@ namespace ms
 		active = true;
 	}
 
+	void MapObject::draw_balloons(double, double, float) const {}
+
 	int8_t MapObject::update(const Physics &physics)
 	{
 		physics.move_object(phobj);

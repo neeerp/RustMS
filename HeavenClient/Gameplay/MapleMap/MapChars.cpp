@@ -24,6 +24,18 @@ namespace ms
 		chars.draw(layer, viewx, viewy, alpha);
 	}
 
+	void MapChars::draw_balloons(double viewx, double viewy, float alpha) const
+	{
+		chars.draw_balloons(viewx, viewy, alpha);
+	}
+
+	void MapChars::draw_room_balloons(double viewx, double viewy, float alpha) const
+	{
+		for (auto &[oid, object] : chars)
+			if (object && object->is_active())
+				static_cast<const OtherChar &>(*object).draw_room_balloon(viewx, viewy, alpha);
+	}
+
 	void MapChars::update(const Physics &physics)
 	{
 		add_spawns();

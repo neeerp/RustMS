@@ -130,6 +130,14 @@ namespace ms
 		}
 		if (quest_marker != QuestMarker::NONE)
 			quest_marker_animation.draw(DrawArgument(absp + quest_marker_offset()), alpha);
+	}
+
+	void Npc::draw_balloons(double viewx, double viewy, float alpha) const
+	{
+		if (!enabled)
+			return;
+
+		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
 		// The balloon sits above the head, and above the quest marker if there is one.
 		int16_t lift = quest_marker != QuestMarker::NONE

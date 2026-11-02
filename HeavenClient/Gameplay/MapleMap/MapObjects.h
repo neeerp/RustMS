@@ -38,6 +38,9 @@ namespace ms
 		// Draw all MapObjects that are on the specified layer
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
 
+		// Draw the balloons of all MapObjects, from the back layer up.
+		void draw_balloons(double viewx, double viewy, float alpha) const;
+
 		// Update all mapobjects of this type. Also updates layers eg. drawing order.
 		void update(const Physics &physics);
 

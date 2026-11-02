@@ -38,6 +38,10 @@ namespace ms
 	public:
 		// Draw all characters on a layer.
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
+		// Draw all characters' chat balloons and chalkboards, above the map's layers.
+		void draw_balloons(double viewx, double viewy, float alpha) const;
+		// Draw all characters' mini room balloons, in front of the chat balloons.
+		void draw_room_balloons(double viewx, double viewy, float alpha) const;
 
 		// Update all characters.
 		void update(const Physics &physics);

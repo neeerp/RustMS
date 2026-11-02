@@ -30,6 +30,11 @@ namespace ms
 		npcs.draw(layer, viewx, viewy, alpha);
 	}
 
+	void MapNpcs::draw_balloons(double viewx, double viewy, float alpha) const
+	{
+		npcs.draw_balloons(viewx, viewy, alpha);
+	}
+
 	void MapNpcs::update(const Physics &physics)
 	{
 		for (; !spawns.empty(); spawns.pop())

@@ -37,6 +37,8 @@ namespace ms
 	public:
 		// Draw all NPCs on a layer.
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
+		// Draw all NPCs' speech balloons, above the map's layers.
+		void draw_balloons(double viewx, double viewy, float alpha) const;
 
 		// Update all NPCs.
 		void update(const Physics &physics);

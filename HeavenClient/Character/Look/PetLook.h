@@ -65,6 +65,8 @@ namespace ms
 		PetLook();
 
 		void draw(double viewx, double viewy, float alpha) const;
+		// Draw what it says, above the map's layers.
+		void draw_balloon(double viewx, double viewy, float alpha) const;
 
 		// Stand in its clothes at `pos` in a window, without its name tag,
 		// as the Character Info window shows it (FUN_0090433a).

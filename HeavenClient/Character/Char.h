@@ -83,6 +83,10 @@ namespace ms
 
 		// Draw look, NameTag, effects and chat bubble.
 		void draw(double viewx, double viewy, float alpha) const override;
+		// Draw the chalkboard and the character's and pets' chat balloons.
+		void draw_balloons(double viewx, double viewy, float alpha) const override;
+		// Draw the mini room balloon, in front of every chat balloon (z 0xc0061440).
+		void draw_room_balloon(double viewx, double viewy, float alpha) const;
 		// Draw look
 		void draw_preview(Point<int16_t> position, float alpha) const;
 		// Update look and movements
@@ -573,5 +577,7 @@ namespace ms
 		static Texture combo_sprites[2][6];
 
 		void draw_combo(Point<int16_t> position) const;
+		// Where the feet are drawn: a dead character's ghost circles its tombstone.
+		Point<int16_t> drawn_feet(double viewx, double viewy, float alpha) const;
 	};
 }
