@@ -112,6 +112,16 @@ namespace ms
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
 	{
+		// v83 fades out the layers as they stand when the field changes
+		// (FUN_00776e65), so a window closed by the click that asked for the
+		// warp is gone. The frame drawn last can be older than that click.
+		if (!UI::get().in_login())
+		{
+			GraphicsGL::get().clearscene();
+			Stage::get().draw(1.0f);
+			UI::get().draw(1.0f);
+		}
+
 		int32_t fieldtype = NxHelper::Map::get_map_node_name(mapid)["info"]["fieldType"];
 		carnival::enter_field(mapid, fieldtype);
 		UI::get().remove(UIElement::Type::MONSTERCARNIVAL);
