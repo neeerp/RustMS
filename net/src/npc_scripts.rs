@@ -792,6 +792,8 @@ const TREE_SNOWMEN: [(i32, i32); 3] = [
     (2001003, 209_000_003),
 ];
 const SCARF_SNOWMAN: i32 = 2001004;
+/// At most this many players in a tree room at once, as Cliff (2001000) says.
+const TREE_ROOM_MOST: usize = 6;
 /// Thomas Swift, free between Henesys and Amoria: to Amoria's portal 0, and
 /// back to Henesys's portal 5, at the town's east end.
 const THOMAS_SWIFT: i32 = 9201022;
@@ -13434,14 +13436,22 @@ fn roodolph(player: &Player) -> Option<NpcScript> {
 fn tree_snowman(npc_id: i32, player: &Player) -> Option<NpcScript> {
     let &(_, room) = TREE_SNOWMEN.iter().find(|(id, _)| *id == npc_id)?;
     (player.stats.map_id == events::HAPPYVILLE).then(|| {
-        NpcScript::new(
+        let mut script = NpcScript::new(
             npc_id,
             vec![Page::Ask {
                 text: text(keys::SNOWMAN_TREE),
-                on_yes: vec![Effect::WarpToPortal(room, 0)],
+                on_yes: vec![
+                    Effect::RequireRoom {
+                        map_id: room,
+                        most: TREE_ROOM_MOST,
+                    },
+                    Effect::WarpToPortal(room, 0),
+                ],
                 on_no: None,
             }],
-        )
+        );
+        script.refused = Some(text(keys::SNOWMAN_FULL));
+        script
     })
 }
 
@@ -24411,7 +24421,17 @@ mod tests {
             assert_eq!(question(&trip.begin()), text(keys::SNOWMAN_TREE));
             assert_eq!(
                 trip.respond(ScriptInput::Yes).unwrap().effects,
-                [Effect::WarpToPortal(room, 0)]
+                [
+                    Effect::RequireRoom {
+                        map_id: room,
+                        most: TREE_ROOM_MOST
+                    },
+                    Effect::WarpToPortal(room, 0)
+                ]
+            );
+            assert_eq!(
+                page_text(&trip.refused().unwrap()),
+                text(keys::SNOWMAN_FULL)
             );
             assert!(NpcScript::for_npc(snowman, &rider(100, 0, room)).is_none());
 
