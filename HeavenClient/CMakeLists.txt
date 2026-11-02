@@ -414,6 +414,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME map_tooltip_rules COMMAND map_tooltip_rules_tests)
     add_executable(screenshot_rules_tests tests/screenshot_rules.cpp)
     add_test(NAME screenshot_rules COMMAND screenshot_rules_tests)
+    add_executable(key_repeat_rules_tests tests/key_repeat_rules.cpp)
+    add_test(NAME key_repeat_rules COMMAND key_repeat_rules_tests)
     add_executable(medal_tag_layout_tests tests/medal_tag_layout.cpp)
     add_test(NAME medal_tag_layout COMMAND medal_tag_layout_tests)
     add_executable(mob_gage_layout_tests tests/mob_gage_layout.cpp)
@@ -1197,6 +1199,7 @@ add_executable(HeavenClient
     IO/GuildCommands.cpp
     IO/GuildCommands.h
     IO/ChatCommand.h
+    IO/KeyRepeatRules.h
     IO/ScreenshotRules.h
     IO/UI.cpp
     IO/UI.h

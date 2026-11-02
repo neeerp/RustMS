@@ -21,6 +21,7 @@
 
 #include <cstdint>
 
+#include "KeyRepeatRules.h"
 #include "ScreenshotRules.h"
 #include "UIState.h"
 
@@ -104,6 +105,8 @@ namespace ms
 		void doubleclick();
 
 		void send_key(int32_t keycode, bool pressed);
+		// A key from the window: GLFW_PRESS, GLFW_RELEASE or GLFW_REPEAT.
+		void send_window_key(int32_t keycode, int32_t action);
 
 		void set_scrollnotice(const std::string &notice);
 
@@ -201,6 +204,7 @@ namespace ms
 		bool quitted;
 		bool caps_lock_enabled = false;
 		Screenshot::Throttle screenshots;
+		key_repeat::Repeater key_repeater;
 		dojo_energy::Chord secret_chord;
 		// GLFW_KEY_UNKNOWN for none.
 		int32_t held_key = -1;
