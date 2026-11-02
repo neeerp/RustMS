@@ -266,6 +266,7 @@ pub mod keys {
     pub const ROODOLPH_BACK: &str = "roodolph.back";
     pub const SNOWMAN_TREE: &str = "snowman.tree";
     pub const SNOWMAN_OUT: &str = "snowman.out";
+    pub const SNOWMAN_FULL: &str = "snowman.full";
     pub const GRASSY_LUMP_ASK: &str = "grassy_lump.ask";
     pub const GRASSY_LUMP_LEAVE: &str = "grassy_lump.leave";
     pub const GRASSY_LUMP_POOP: &str = "grassy_lump.poop";
@@ -4281,6 +4282,7 @@ mod tests {
             keys::ROODOLPH_BACK,
             keys::SNOWMAN_TREE,
             keys::SNOWMAN_OUT,
+            keys::SNOWMAN_FULL,
             keys::GRASSY_LUMP_ASK,
             keys::GRASSY_LUMP_LEAVE,
             keys::GRASSY_LUMP_POOP,

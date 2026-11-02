@@ -186,6 +186,7 @@
 "roodolph.back" = "[placeholder] Ready to head back down to Happyville?"
 "snowman.tree" = "[placeholder] Want to see our Maplemas tree, or help decorate it?"
 "snowman.out" = "[placeholder] Ready to head back out to Happyville?"
+"snowman.full" = "[placeholder] The tree is crowded right now. Only 6 may be there at once."
 "grassy_lump.ask" = "[placeholder] #b(Something is hidden under the grass. Pull it out?)"
 "grassy_lump.leave" = "[placeholder] #b(Better leave it alone.)"
 "grassy_lump.poop" = "[placeholder] #b(Ugh... it's pet poop!)"
