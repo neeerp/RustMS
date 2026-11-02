@@ -264,6 +264,8 @@ pub mod keys {
     pub const RUPI_LEAVE_ASK: &str = "rupi.leave_ask";
     pub const ROODOLPH_SPRINKLER: &str = "roodolph.sprinkler";
     pub const ROODOLPH_BACK: &str = "roodolph.back";
+    pub const SNOWMAN_TREE: &str = "snowman.tree";
+    pub const SNOWMAN_OUT: &str = "snowman.out";
     pub const GRASSY_LUMP_ASK: &str = "grassy_lump.ask";
     pub const GRASSY_LUMP_LEAVE: &str = "grassy_lump.leave";
     pub const GRASSY_LUMP_POOP: &str = "grassy_lump.poop";
@@ -4277,6 +4279,8 @@ mod tests {
             keys::RUPI_LEAVE_ASK,
             keys::ROODOLPH_SPRINKLER,
             keys::ROODOLPH_BACK,
+            keys::SNOWMAN_TREE,
+            keys::SNOWMAN_OUT,
             keys::GRASSY_LUMP_ASK,
             keys::GRASSY_LUMP_LEAVE,
             keys::GRASSY_LUMP_POOP,

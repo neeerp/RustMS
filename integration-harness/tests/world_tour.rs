@@ -35,6 +35,7 @@ const ROONEY: i32 = 1022101;
 const RUPI: i32 = 2002000;
 const ROODOLPH: i32 = 9220005;
 const SNOW_SPRINKLER: i32 = 209_080_000;
+const SCARF_SNOWMAN: i32 = 2001004;
 const VIP_TICKET_TO_FLORINA: i32 = 4031134;
 const ETC: i16 = 4;
 
@@ -215,6 +216,24 @@ async fn roodolph_goes_up_to_the_snow_sprinkler_and_back_to_happyville() {
         assert_eq!(t.prompts, [(ROODOLPH, 1)]);
         let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
         assert_eq!(t.warps, [to]);
+    }
+}
+
+#[tokio::test]
+async fn a_snowman_shows_its_tree_room_and_the_scarf_snowman_sees_players_out() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = traveller(&config, 0, None, HAPPYVILLE).await;
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    for (snowman, room) in [(2001001, 209_000_001), (2001002, 209_000_002)] {
+        let t = step(c, &format!("{m} talk"), talk(HAPPYVILLE, snowman)).await;
+        assert_eq!(t.prompts, [(snowman, 1)]);
+        let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+        assert_eq!(t.warps, [room]);
+        let t = step(c, &format!("{m} talk"), talk(room, SCARF_SNOWMAN)).await;
+        assert_eq!(t.prompts, [(SCARF_SNOWMAN, 1)]);
+        let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+        assert_eq!(t.warps, [HAPPYVILLE]);
     }
 }
 
