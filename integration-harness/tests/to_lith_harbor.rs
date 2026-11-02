@@ -53,8 +53,8 @@ async fn shanks_sails_for_lucas_and_olaf_completes_the_quest() {
         build_quest_action(SCRIPT_START, TO_LITH_HARBOR, SHANKS),
     )
     .await;
-    assert_eq!(t.prompts, [(SHANKS, 1)]);
-    let t = step(c, &m, answer(1, 0, None)).await;
+    assert_eq!(t.prompts, [(SHANKS, 12)]);
+    let t = step(c, &m, answer(12, 0, None)).await;
     assert_eq!(t.prompts, [(SHANKS, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
     assert!(t.states.is_empty() && t.warps.is_empty(), "{t:?}");
@@ -65,7 +65,7 @@ async fn shanks_sails_for_lucas_and_olaf_completes_the_quest() {
         build_quest_action(SCRIPT_START, TO_LITH_HARBOR, SHANKS),
     )
     .await;
-    let t = step(c, &m, answer(1, 1, None)).await;
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&TO_LITH_HARBOR), Some(&1));
     assert_eq!(t.warps, [LITH_HARBOR]);
     assert!(t.stat_values(stat::MESO).is_empty());

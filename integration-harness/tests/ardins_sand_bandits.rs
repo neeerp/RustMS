@@ -58,8 +58,8 @@ async fn ask_ardin(player: &mut WorldSession, m: &str) -> Trace {
     .await;
     assert_eq!(t.prompts, [(ARDIN, 0)]);
     let t = step(c, m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(ARDIN, 1)]);
-    let t = step(c, m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(ARDIN, 12)]);
+    let t = step(c, m, answer(12, 1, None)).await;
     assert_eq!(t.prompts, [(ARDIN, 0)]);
     step(c, m, answer(0, 1, None)).await
 }

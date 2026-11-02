@@ -72,8 +72,8 @@ async fn parwen_de_lang_and_the_secret_passage_password() {
     send(c, to(PARWENS_MAP, PARWEN)).await;
     barrier(c, &m, &mut trace).await;
     let t = step(c, &m, build_quest_action(SCRIPT_START, 3320, PARWEN)).await;
-    assert_eq!(t.prompts, [(PARWEN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(PARWEN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.progress, [(3320, 1)]);
     assert_eq!(t.warps, [DRANS_LAB]);
     send(c, to(DRANS_LAB, DE_LANG)).await;
@@ -87,8 +87,8 @@ async fn parwen_de_lang_and_the_secret_passage_password() {
     assert_eq!(t.prompts, [(DE_LANG, 0)]);
     step(c, &m, answer(0, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(DE_LANG, 1)]);
-    step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(DE_LANG, 12)]);
+    step(c, &m, answer(12, 1, None)).await;
     step(c, &m, answer(0, 1, None)).await;
     step(c, &m, answer(0, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
@@ -105,8 +105,8 @@ async fn parwen_de_lang_and_the_secret_passage_password() {
     barrier(c, &m, &mut trace).await;
     step(c, &m, build_quest_action(SCRIPT_START, 3353, PARWEN)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(PARWEN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(PARWEN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.progress, [(3353, 1)]);
     assert_eq!(t.warps, [DRANS_LAB]);
     send(c, to(DRANS_LAB, DE_LANG)).await;
@@ -114,8 +114,8 @@ async fn parwen_de_lang_and_the_secret_passage_password() {
     let t = step(c, &m, build_quest_completion(3353, DE_LANG, -1)).await;
     assert_eq!(t.states.get(&3353), Some(&2));
     let t = step(c, &m, build_quest_action(SCRIPT_START, 3354, DE_LANG)).await;
-    assert_eq!(t.prompts, [(DE_LANG, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(DE_LANG, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.progress, [(3354, 1)]);
     assert_eq!(
         warp(c, ALCADNO_SOCIETY, "", &mut trace).await,
@@ -133,8 +133,8 @@ async fn parwen_de_lang_and_the_secret_passage_password() {
     barrier(c, &m, &mut trace).await;
     step(c, &m, build_quest_action(SCRIPT_START, 3360, PARWEN)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(PARWEN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(PARWEN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.prompts, [(PARWEN, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.progress, [(VERIFYING_THE_PASSWORD, 1)]);

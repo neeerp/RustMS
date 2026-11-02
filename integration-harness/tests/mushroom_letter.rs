@@ -64,8 +64,8 @@ async fn the_instructors_letter_takes_the_player_to_the_mushking_empire() {
     barrier(c, &m, &mut trace).await;
     let start = build_quest_action(SCRIPT_START, ENDANGERED_MUSHKING_EMPIRE, DANCES_WITH_BALROG);
     let t = step(c, &m, start).await;
-    assert_eq!(t.prompts, [(DANCES_WITH_BALROG, 1)], "asked");
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(DANCES_WITH_BALROG, 12)], "asked");
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.prompts, [(DANCES_WITH_BALROG, 0)], "the kingdom");
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.items, [(LETTER, 1)]);
@@ -111,8 +111,8 @@ async fn mihile_writes_a_dawn_warrior_the_same_letter() {
     barrier(c, &m, &mut trace).await;
     let start = build_quest_action(SCRIPT_START, DAWN_WARRIORS_LETTER, MIHILE);
     let t = step(c, &m, start).await;
-    assert_eq!(t.prompts, [(MIHILE, 1)], "asked");
-    step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(MIHILE, 12)], "asked");
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.items, [(LETTER, 1)]);
     assert_eq!(t.progress, [(DAWN_WARRIORS_LETTER, 1)]);

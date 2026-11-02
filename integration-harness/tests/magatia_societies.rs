@@ -77,8 +77,8 @@ async fn han_the_broker_and_the_society_capes() {
     let t = step(c, &m, build_quest_action(SCRIPT_START, 3305, CARSON)).await;
     assert_eq!(t.prompts, [(CARSON, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(CARSON, 1)]);
-    step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(CARSON, 12)]);
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.progress, [(3305, 1)]);
     let t = step(c, &m, build_quest_completion(3305, CARSON, -1)).await;
@@ -97,12 +97,12 @@ async fn han_the_broker_and_the_society_capes() {
     barrier(c, &m, &mut trace).await;
     step(c, &m, build_quest_action(SCRIPT_START, 3306, MAED)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(MAED, 1)]);
-    let t = step(c, &m, answer(1, 0, None)).await;
+    assert_eq!(t.prompts, [(MAED, 12)]);
+    let t = step(c, &m, answer(12, 0, None)).await;
     assert!(t.progress.is_empty() && t.prompts.is_empty(), "{t:?}");
     step(c, &m, build_quest_action(SCRIPT_START, 3306, MAED)).await;
     step(c, &m, answer(0, 1, None)).await;
-    step(c, &m, answer(1, 1, None)).await;
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.progress, [(3306, 1)]);
 }
