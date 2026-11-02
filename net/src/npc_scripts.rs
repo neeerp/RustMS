@@ -24404,8 +24404,7 @@ mod tests {
     #[test]
     fn snowmen_go_to_their_tree_rooms_and_the_scarf_snowman_back() {
         for (snowman, room) in TREE_SNOWMEN {
-            let mut trip =
-                NpcScript::for_npc(snowman, &rider(100, 0, events::HAPPYVILLE)).unwrap();
+            let mut trip = NpcScript::for_npc(snowman, &rider(100, 0, events::HAPPYVILLE)).unwrap();
             assert_eq!(question(&trip.begin()), text(keys::SNOWMAN_TREE));
             assert_eq!(
                 trip.respond(ScriptInput::Yes).unwrap().effects,
