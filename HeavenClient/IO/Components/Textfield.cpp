@@ -399,7 +399,7 @@ namespace ms
 		}
 		else
 		{
-			if (clicked && state == State::FOCUSED)
+			if (clicked && state == State::FOCUSED && !keeps_focus)
 				set_state(State::NORMAL);
 
 			return Cursor::State::IDLE;
@@ -437,6 +437,11 @@ namespace ms
 	void Textfield::set_shown_disabled()
 	{
 		shown_disabled = true;
+	}
+
+	void Textfield::set_keeps_focus()
+	{
+		keeps_focus = true;
 	}
 
 	void Textfield::set_cryptchar(int8_t character)

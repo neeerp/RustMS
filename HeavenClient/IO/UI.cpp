@@ -259,7 +259,8 @@ namespace ms
 			switch (tstate)
 			{
 				case Cursor::State::IDLE:
-					focusedtextfield = {};
+					if (focusedtextfield->get_state() != Textfield::State::FOCUSED)
+						focusedtextfield = {};
 					break;
 			}
 		}
