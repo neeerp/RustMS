@@ -12,6 +12,8 @@ use packet::Packet;
 const FOREST: i32 = 50_000;
 /// OPQ's Jail Storage, an everlast map.
 const JAIL_STORAGE: i32 = 920_010_911;
+/// The Hill of Christmas, Happyville's first Maplemas tree room.
+const TREE_ROOM: i32 = 209_000_001;
 const SNAIL: i32 = 100100;
 const WEAPON: i16 = -11;
 const EQUIP: i8 = 1;
@@ -88,6 +90,69 @@ async fn a_dropped_weapon_is_anyones_and_gone_from_the_dropper() {
     assert!(!dropper.items.contains_key(&weapon));
     let finder = relogin(&finder_config).await;
     assert_eq!(finder.items.get(&weapon), Some(&1));
+}
+
+/// In Happyville's tree rooms what a player drops, only they may pick up.
+#[tokio::test]
+async fn only_the_dropper_picks_up_in_a_tree_room() {
+    let dropper_config = load_harness_config_or_fail().await;
+    let finder_config = load_harness_config_or_fail().await;
+    let mut dropper = login_to_world_session(&dropper_config).await.unwrap();
+    let mut finder = login_to_world_session(&finder_config).await.unwrap();
+    let weapon = dropper.equipped[&WEAPON.abs()];
+    let (mut d, mut f) = (Trace::default(), Trace::default());
+    assert_eq!(
+        warp(&mut dropper.connection, TREE_ROOM, "", &mut d).await,
+        TREE_ROOM
+    );
+    assert_eq!(
+        warp(&mut finder.connection, TREE_ROOM, "", &mut f).await,
+        TREE_ROOM
+    );
+    read_for(&mut dropper.connection, &mut d, 300).await;
+    read_for(&mut finder.connection, &mut f, 300).await;
+
+    send(&mut dropper.connection, item_move(EQUIPPED, WEAPON, 1, 1)).await;
+    read_for(&mut dropper.connection, &mut d, 300).await;
+    send(&mut dropper.connection, item_move(EQUIP, 1, 0, 1)).await;
+    until(&mut finder.connection, &mut f, |t| {
+        t.field.item_drop(weapon).is_some()
+    })
+    .await;
+    let loot = f.field.item_drop(weapon).unwrap();
+    until(&mut dropper.connection, &mut d, |t| {
+        t.field.item_drop(weapon).is_some()
+    })
+    .await;
+
+    // Someone else's pickup is refused.
+    send(
+        &mut finder.connection,
+        pickup(loot.object_id, loot.x, loot.y),
+    )
+    .await;
+    read_for(&mut finder.connection, &mut f, 500).await;
+    assert!(f.field.removals(loot.object_id).is_empty());
+    assert!(!f.added.iter().any(|a| a.2 == weapon));
+
+    // The dropper's is not.
+    send(
+        &mut dropper.connection,
+        pickup(loot.object_id, loot.x, loot.y),
+    )
+    .await;
+    until(&mut dropper.connection, &mut d, |t| {
+        t.added.iter().any(|a| a.2 == weapon)
+    })
+    .await;
+    until(&mut finder.connection, &mut f, |t| {
+        !t.field.removals(loot.object_id).is_empty()
+    })
+    .await;
+    assert_eq!(
+        f.field.removals(loot.object_id),
+        [Some(dropper.character_id)]
+    );
 }
 
 /// As in v83, whose drop check skips the map's everlast flag.

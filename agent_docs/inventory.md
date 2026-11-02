@@ -196,6 +196,11 @@ An `info/everlast` map takes thrown items like any other and keeps
 them: v83's drop check (FUN_004f31a5) reads the map's everlast flag only when
 its first argument is set, and its one caller, the inventory drag, passes 0.
 
+In Happyville's Maplemas tree rooms (209000001 to 209000015, The Hill of
+Christmas) only the player who dropped something may pick it up, as Cliff
+(2001000) says (Cosmic's `isSelfLootableOnly`; `DropSet::self_loot`). Anyone
+else's pickup gets only the enable-actions stat update.
+
 GATHER_ITEMS (`0x45`) and SORT_ITEMS (`0x46`) (tick, type) are the item
 window's Gather and Sort buttons. The rearrangement goes out as one
 INVENTORY_OPERATION of swaps (mode 2), then GATHER_ITEM_RESULT (`0x34`) or

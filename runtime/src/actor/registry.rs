@@ -207,9 +207,14 @@ fn load_field_drops(field_key: FieldKey) -> DropSet {
             .map(|field| field.footholds.clone())
             .unwrap_or_default(),
     );
-    match field {
+    let drops = match field {
         Some(field) if field.everlast => drops.everlast(),
         _ => drops,
+    };
+    if net::events::is_tree_room(field_key.map_id) {
+        drops.self_loot()
+    } else {
+        drops
     }
 }
 

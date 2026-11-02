@@ -137,6 +137,8 @@ pub struct DropSet {
     /// How long a drop lies here; `None` on everlast maps, where drops
     /// stay until picked up.
     lifetime: Option<Duration>,
+    /// Only a drop's owner may ever pick it up (the tree rooms).
+    self_loot: bool,
 }
 
 impl Default for DropSet {
@@ -153,6 +155,7 @@ impl DropSet {
             object_ids: ObjectIds::new(object_ids::DROPS),
             footholds,
             lifetime: Some(LIFETIME),
+            self_loot: false,
         }
     }
 
@@ -162,6 +165,29 @@ impl DropSet {
             lifetime: None,
             ..self
         }
+    }
+
+    /// Drops only their owner may pick up (`events::is_tree_room`).
+    pub fn self_loot(self) -> Self {
+        Self {
+            self_loot: true,
+            ..self
+        }
+    }
+
+    /// Whether `client` may pick up `drop` here.
+    fn may_take(
+        &self,
+        drop: &Drop,
+        client: ClientId,
+        party: Option<i32>,
+        needs: &QuestNeeds,
+        now: Instant,
+    ) -> bool {
+        if self.self_loot && drop.owner != client {
+            return false;
+        }
+        drop.takeable_by(client, party, needs, now)
     }
 
     pub fn all(&self) -> impl Iterator<Item = &Drop> {
@@ -291,7 +317,7 @@ impl DropSet {
         {
             return Err(PickupError::TooFar);
         }
-        if !drop.takeable_by(client, party, needs, now) {
+        if !self.may_take(drop, client, party, needs, now) {
             return Err(PickupError::NotYours);
         }
         self.drops.remove(&object_id).ok_or(PickupError::Gone)
@@ -338,7 +364,7 @@ impl DropSet {
         let drop = self.drops.get(&object_id)?;
         let mesos = matches!(drop.loot, Loot::Mesos(_));
         if !mesos
-            || !drop.takeable_by(client, party, &QuestNeeds::default(), now)
+            || !self.may_take(drop, client, party, &QuestNeeds::default(), now)
             || !reaches(drop.x, drop.y)
         {
             return None;
@@ -665,6 +691,27 @@ mod tests {
         let id = drops.spawn(vec![Loot::Mesos(5)], 1, Ownership::Owner, 0, 0, 9, now)[0].object_id;
         assert_eq!(drops.expire(now + LIFETIME), [id]);
         assert_eq!(drops.all().count(), 0);
+    }
+
+    #[test]
+    fn only_the_dropper_picks_up_in_a_tree_room() {
+        let now = Instant::now();
+        let mut drops = DropSet::default().everlast().self_loot();
+        let item = game::Item::stack(2010000, 3);
+        let id = drops.throw(Loot::Dropped(item), 1, 0, 0, now).object_id;
+        let later = now + OWNERSHIP * 100;
+        assert_eq!(
+            drops
+                .take(2, None, id, 0, 0, later, &QuestNeeds::default())
+                .unwrap_err(),
+            PickupError::NotYours
+        );
+        let mesos = drops.throw(Loot::Mesos(50), 1, 10, 0, now).object_id;
+        assert!(drops.explode(2, None, mesos, |_, _| true, later).is_none());
+        assert!(drops
+            .take(1, None, id, 0, 0, later, &QuestNeeds::default())
+            .is_ok());
+        assert!(drops.explode(1, None, mesos, |_, _| true, later).is_some());
     }
 
     #[test]
