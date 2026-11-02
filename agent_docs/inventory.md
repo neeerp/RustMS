@@ -500,8 +500,15 @@ The client has no timer of its own, so these are Cosmic's. A player coming
 online sees the message up if it reaches them. The client shows those seconds
 only in its "This message will be sent to Maple TV in %d seconds." question.
 
-v83 draws the TV only in maps whose `info` sets `MapleTV` and its anchors,
-and no map in the v83 data does (report c056).
+v83 draws the TV on the NPCs whose Npc.nx `info` sets `MapleTV` and its
+anchors `MapleTVmsgX/Y` and `MapleTVadX/Y` (9250046 in Orbis, 9201066,
+9250023 to 9250026, 9250042 to 9250046, 9270000 to 9270016, 9270040, 9270066;
+reports b-p41 and b-p42). HeavenClient's `MapleTvScreen`, owned by `Npc`,
+loops one of three ads below and holds TVoff's logo above. SEND_TV puts the
+message on every TV at once, in maps entered later too: a black screen (a
+star's or heart's frame for those) with the five lines in white Arial 12, the
+names along the bottom, and the sender facing the receiver. The client stars
+out curse words in the names and lines. REMOVE_TV plays TVoff again.
 
 In HeavenClient, using one opens `UIMapleTv`. This is v83's modal dialog on
 `UIWindow.img/MapleTV`: the To bar, one box that wraps onto five rows,
@@ -517,8 +524,7 @@ only OK sends. Once the dialog closes:
    (`UseMapleTvPacket`).
 
 TV_RESULT's codes 1 to 3 show StringPool 0xf75 to 0xf77
-(`Util/MapleTv.h`, `tests/maple_tv.cpp`). SEND_TV is read only for that
-wait, as there is no TV to draw.
+(`Util/MapleTv.h`, `tests/maple_tv.cpp`).
 
 ### Chalkboard
 

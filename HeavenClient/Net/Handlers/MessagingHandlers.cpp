@@ -30,6 +30,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
 #include "../../Data/SwindleData.h"
+#include "../../Gameplay/MapleMap/MapleTvScreen.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/WeatherRules.h"
 #include "../../IO/UI.h"
@@ -420,23 +421,34 @@ namespace ms
 
 	void SendTvHandler::handle(InPacket& recv) const
 	{
-		// The flag (2: the receiver's look follows), the screen, the
-		// sender's look, the sender and receiver, and the five lines.
-		recv.skip_byte();
-		recv.skip_byte();
-		LoginParser::parse_look(recv);
-		recv.read_string();
-		recv.read_string();
+		// The flag (2: the receiver's look follows), the type, the sender's
+		// look, the sender and receiver, the five lines, the line's wait
+		// and the receiver's look (FUN_006371c1). The TVs filter the names
+		// and lines themselves (FUN_007a06f3).
+		bool receiver_look = (recv.read_byte() & 2) != 0;
+		uint8_t type = static_cast<uint8_t>(recv.read_byte());
+		LookEntry sender_look = LoginParser::parse_look(recv);
+		std::string sender = CurseData::filter(recv.read_string());
+		std::string receiver = CurseData::filter(recv.read_string());
+		MapleTv::Lines lines;
 
-		for (size_t i = 0; i < MapleTv::ROWS; i++)
-			recv.read_string();
+		for (std::string& line : lines)
+			line = CurseData::filter(recv.read_string());
 
 		MapleTv::line_wait = recv.read_int();
+
+		MapleTvScreen::Message message = { type, sender_look, std::nullopt, sender, receiver, lines };
+
+		if (receiver_look)
+			message.receiver_look = LoginParser::parse_look(recv);
+
+		MapleTvScreen::show(std::move(message));
 	}
 
 	void RemoveTvHandler::handle(InPacket&) const
 	{
 		MapleTv::line_wait = 0;
+		MapleTvScreen::clear();
 	}
 
 	void TvResultHandler::handle(InPacket& recv) const
