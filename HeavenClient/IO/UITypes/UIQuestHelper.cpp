@@ -6,6 +6,7 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Character/Inventory/Inventory.h"
 #include "../../Character/QuestCatalog.h"
 #include "../../Constants.h"
@@ -74,6 +75,7 @@ namespace ms
 		buttons[MAXIMIZE] = std::make_unique<MapleButton>(basic["BtMax"], Point<int16_t>(190, 4));
 		buttons[CLOSE] = std::make_unique<MapleButton>(basic["BtClose"], Point<int16_t>(203, 4));
 		buttons[MAXIMIZE]->set_active(false);
+		buttons[AUTO]->set_state(auto_rest());
 
 		if (!moved)
 			position = default_position();
@@ -297,12 +299,135 @@ namespace ms
 
 	Cursor::State UIQuestHelper::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		// A held auto button keeps the cursor, and the window stays put.
+		if (auto_held && clicked)
+			return send_cursor_to_auto(clicked, cursorpos);
+
 		Cursor::State state = UIDragElement::send_cursor(clicked, cursorpos);
 
 		if (dragged)
+		{
 			moved = true;
+			leave_auto();
 
-		return state;
+			return state;
+		}
+
+		Cursor::State auto_state = send_cursor_to_auto(clicked, cursorpos);
+
+		return auto_state != Cursor::State::IDLE ? auto_state : state;
+	}
+
+	void UIQuestHelper::remove_cursor()
+	{
+		UIDragElement::remove_cursor();
+		leave_auto();
+	}
+
+	bool UIQuestHelper::own_cursor(uint16_t buttonid) const
+	{
+		return buttonid == AUTO;
+	}
+
+	Button::State UIQuestHelper::auto_rest() const
+	{
+		return quests.auto_tracks() ? Button::State::NORMAL : Button::State::DISABLED;
+	}
+
+	Cursor::State UIQuestHelper::send_cursor_to_auto(bool clicked, Point<int16_t> cursorpos)
+	{
+		Button& button = *buttons[AUTO];
+		// The disabled look leaves it out of button_under.
+		bool under = button.bounds(position).contains(cursorpos);
+
+		if (auto_held)
+		{
+			if (clicked)
+			{
+				button.set_state(under ? Button::State::PRESSED : auto_rest());
+
+				return Cursor::State::CLICKING;
+			}
+
+			auto_held = false;
+
+			// It clicks as the mouse comes back up over it (FUN_00887f8a),
+			// and is left hovered without a sound.
+			if (under)
+			{
+				Sound(Sound::Name::BUTTONCLICK).play();
+				quests.set_auto_track(!quests.auto_tracks());
+				button.set_state(auto_rest() == Button::State::NORMAL ? Button::State::MOUSEOVER : auto_rest());
+			}
+		}
+
+		if (!under)
+		{
+			leave_auto();
+
+			return Cursor::State::IDLE;
+		}
+
+		if (clicked && UI::get().is_cursor_press())
+		{
+			auto_held = true;
+			button.set_state(Button::State::PRESSED);
+
+			if (auto_help)
+			{
+				auto_help = false;
+				UI::get().clear_help(TYPE);
+			}
+
+			return Cursor::State::CLICKING;
+		}
+
+		// The mouse held down from elsewhere neither hovers nor presses it.
+		if (clicked)
+		{
+			leave_auto();
+
+			return Cursor::State::IDLE;
+		}
+
+		// Only the hover while it's on looks and sounds like one.
+		if (quests.auto_tracks())
+		{
+			if (button.get_state() == Button::State::NORMAL)
+				Sound(Sound::Name::BUTTONOVER).play();
+
+			button.set_state(Button::State::MOUSEOVER);
+		}
+		else
+		{
+			button.set_state(Button::State::DISABLED);
+		}
+
+		// The tip offers what a click does, 0x1052 and 0x1054 while auto
+		// alarm is off, 0x1053 and 0x1055 while it's on (FUN_00884a70).
+		if (quests.auto_tracks())
+			UI::get().show_help(TYPE, "Auto Alarm off",
+				"When you click it, the quest will not register automatically even when the quest is in progress.");
+		else
+			UI::get().show_help(TYPE, "Auto Alarm on",
+				"When you click it, quests in progress will register automatically and if it is not in progress "
+				"for 10 minutes, it will disappear.");
+
+		auto_help = true;
+
+		return Cursor::State::CANCLICK;
+	}
+
+	void UIQuestHelper::leave_auto()
+	{
+		auto_held = false;
+		buttons[AUTO]->set_state(auto_rest());
+
+		if (auto_help)
+		{
+			auto_help = false;
+			UI::get().clear_help(TYPE);
+		}
 	}
 
 	bool UIQuestHelper::indragrange(Point<int16_t> cursorpos) const
@@ -313,7 +438,7 @@ namespace ms
 			return false;
 
 		for (const auto& [id, button] : buttons)
-			if (button->is_active() && button->bounds(position).contains(cursorpos))
+			if ((button->is_active() || id == AUTO) && button->bounds(position).contains(cursorpos))
 				return false;
 
 		return true;
@@ -323,9 +448,6 @@ namespace ms
 	{
 		switch (buttonid)
 		{
-			case AUTO:
-				quests.set_auto_track(!quests.auto_tracks());
-				break;
 			case MINIMIZE:
 			case MAXIMIZE:
 				set_minimized(buttonid == MINIMIZE);
