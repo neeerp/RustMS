@@ -61,7 +61,9 @@ The detail panel shows:
   headings, and `#c` for counts. The mouse wheel scrolls whichever box it is
   over.
 
-The text keeps its `#b`/`#k` colours and `#p`/`#m`/`#t`/`#o` names. `#c` and
+The text keeps its `#b`/`#k` colours and `#p`/`#m`/`#t`/`#o` names, `#y` a
+quest's name, `#u` its state ("Not Started", "In Progress" or "Ended") and `#q`
+a skill's name. `#c` and
 `#a` show live counts, and `#i`/`#v` item icons sit inline. `#k` returns to the
 text's own colour, black here. `Basic.img/BtHide` closes the panel. The buttons
 along the bottom depend on the tab:

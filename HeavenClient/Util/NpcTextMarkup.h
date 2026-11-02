@@ -51,7 +51,19 @@ namespace ms
 			std::function<std::string(int32_t)> item_name;
 			std::function<std::string(int32_t)> mob_name;
 			std::function<std::string(int32_t)> map_name;
+			// #y and #u: a quest's name and where the player stands with it
+			// (`quest_state`); #q a skill's name. Left as text where unset.
+			std::function<std::string(int32_t)> quest_name;
+			std::function<std::string(int32_t)> quest_state;
+			std::function<std::string(int32_t)> skill_name;
 		};
+
+		// #u's words for a quest (StringPool 0x10c8-0x10ca, 0x9a1d27): started
+		// before completed, as v83 asks.
+		inline std::string quest_state(bool started, bool completed)
+		{
+			return started ? "In Progress" : completed ? "Ended" : "Not Started";
+		}
 
 		inline bool is_digits(const std::string& s)
 		{
@@ -122,7 +134,8 @@ namespace ms
 				// v83 writes ids as "#v2000002:#" as well as "#v2000002#".
 				std::string number = !arg.empty() && arg.back() == ':' ? arg.substr(0, arg.size() - 1) : arg;
 				auto id = [&]() { return static_cast<int32_t>(std::stol(number)); };
-				bool numeric = is_digits(number);
+				// Ids of up to 9 digits, which std::stol can't overflow.
+				bool numeric = is_digits(number) && number.size() <= 9;
 
 				switch (tag)
 				{
@@ -147,6 +160,15 @@ namespace ms
 						break;
 					case 'm':
 						if (numeric) { name('m', id(), lookups.map_name(id())); i = close + 1; continue; }
+						break;
+					case 'y':
+						if (numeric && lookups.quest_name) { out += lookups.quest_name(id()); i = close + 1; continue; }
+						break;
+					case 'u':
+						if (numeric && lookups.quest_state) { out += lookups.quest_state(id()); i = close + 1; continue; }
+						break;
+					case 'q':
+						if (numeric && lookups.skill_name) { out += lookups.skill_name(id()); i = close + 1; continue; }
 						break;
 					case 'v':
 					case 'i':

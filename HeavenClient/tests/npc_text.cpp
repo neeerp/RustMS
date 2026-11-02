@@ -50,6 +50,16 @@ int main()
 		require(ms::NpcTextMarkup::expand("See #b#p2000##k in #m10000#, not #m1#.", lookups, nullptr, &links) ==
 			"See #bRoger#k in Mushroom Town, not ?.", "links keep the text");
 		require(links == Links{{'p', 2000, 6, 11}, {'m', 10000, 17, 30}, {'m', 1, 36, 37}}, "each NPC and map name is a link");
+		// Quest 1040's started text: each training by name and state.
+		require(expand("#y1041# #b(#u1041#)#k") == "#y1041# #b(#u1041#)#k", "quest tags stay without their lookups");
+		ms::NpcTextMarkup::Lookups quests = lookups;
+		quests.quest_name = [](int32_t id) { return id == 1041 ? std::string("Mai's First Training") : std::string(); };
+		quests.quest_state = [](int32_t id) { return ms::NpcTextMarkup::quest_state(id == 1042, id <= 1042); };
+		quests.skill_name = [](int32_t id) { return id == 2321003 ? std::string("Bahamut") : std::string(); };
+		require(ms::NpcTextMarkup::expand("#y1041# #b(#u1041#)#k\\n#y1042#  #b(#u1042#)#k #u1043#", quests) ==
+			"Mai's First Training #b(Ended)#k\\n  #b(In Progress)#k Not Started", "quest names and states");
+		require(ms::NpcTextMarkup::expand("raise #q2321003#'s power", quests) == "raise Bahamut's power", "a skill's name");
+		require(expand("#p99999999999999999999#") == "#p99999999999999999999#", "an overlong id is text");
 		using Choices = std::vector<std::pair<int32_t, std::string>>;
 		auto choices = ms::NpcTextMarkup::choices;
 		require(choices("Pick:\\r\\n#L0#One#l\\r\\n#L1#Two#l") == Choices{{0, "One"}, {1, "Two"}}, "closed choices");

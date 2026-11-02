@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIQuestLog.h"
 #include "UINotice.h"
+#include "UINpcTalk.h"
 #include "UIQuestHelper.h"
 #include "UIWorldMap.h"
 
@@ -240,7 +241,7 @@ namespace ms
 				std::string number = !arg.empty() && arg.back() == ':' ? arg.substr(0, arg.size() - 1) : arg;
 
 				if (close != std::string::npos && tag != 0
-					&& ((std::string("ptzomvis").find(tag) != std::string::npos && NpcTextMarkup::is_digits(number))
+					&& ((std::string("ptzomvisyuq").find(tag) != std::string::npos && NpcTextMarkup::is_digits(number))
 						|| ((tag == 'f' || tag == 'F') && arg.find('/') != std::string::npos)
 						|| (tag == 'W' && NpcTextMarkup::is_key(arg))))
 				{
@@ -603,14 +604,7 @@ namespace ms
 		// What the quest says in its current state: offered, started or done.
 		std::string text = nl::nx::quest["QuestInfo.img"][std::to_string(selected)][std::to_string(tab)];
 
-		NpcTextMarkup::Lookups lookups {
-			[]() { return Stage::get().get_player().get_name(); },
-			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
-			[](int32_t id) { return ItemData::get(id).get_name(); },
-			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
-			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
-		};
-
+		NpcTextMarkup::Lookups lookups = UINpcTalk::markup_lookups();
 		std::vector<NpcTextMarkup::InlineImage> tags;
 		links.clear();
 		text = NpcTextMarkup::expand(quest_counts(text, selected), lookups, &tags, &links);
