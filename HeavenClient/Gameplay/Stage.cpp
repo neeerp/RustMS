@@ -419,6 +419,12 @@ namespace ms
 		summons.draw(-1, viewx, viewy, alpha);
 		guide.draw(viewx, viewy, alpha);
 		clock.draw(viewx, viewy);
+		// The portals are just above the clock (z 0xc0041f78, 0x711fbd) and
+		// the front backgrounds above them (0xc0042360 + 1000i), below the
+		// Balrog's ship, the balloons and the effect layer, where the damage
+		// numbers are (z 0xc00614a4, 0x43849c).
+		portals.draw(viewpos, alpha);
+		backgrounds.drawforegrounds(viewx, viewy, alpha);
 		ship.draw_above(viewx, viewy, alpha);
 
 		const Party &party = player.get_party();
@@ -451,8 +457,6 @@ namespace ms
 		combat.draw(viewx, viewy, alpha);
 		snowfield.draw_front(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
-		portals.draw(viewpos, alpha);
-		backgrounds.drawforegrounds(viewx, viewy, alpha);
 		// FIELD_EFFECT's screens are at z 0xc00614a4, below the clouds, the
 		// dark of a LimitedView or Fear, the weather's bar and OX_QUIZ's
 		// notice (FUN_005330f7).
