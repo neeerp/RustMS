@@ -111,18 +111,23 @@ namespace ms
 		}
 	}
 
-	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
+	// v83 fades out the layers as they stand when the field changes
+	// (FUN_00776e65), so a window closed by the click that asked for the
+	// warp is gone. The frame drawn last can be older than that click. The
+	// field's own windows, such as its clock, last until the fade is done:
+	// CField::Close (FUN_005294ce) fades before the field goes.
+	static void freeze_frame()
 	{
-		// v83 fades out the layers as they stand when the field changes
-		// (FUN_00776e65), so a window closed by the click that asked for the
-		// warp is gone. The frame drawn last can be older than that click.
 		if (!UI::get().in_login())
 		{
 			GraphicsGL::get().clearscene();
 			Stage::get().draw(1.0f);
 			UI::get().draw(1.0f);
 		}
+	}
 
+	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
+	{
 		int32_t fieldtype = NxHelper::Map::get_map_node_name(mapid)["info"]["fieldType"];
 		carnival::enter_field(mapid, fieldtype);
 		UI::get().remove(UIElement::Type::MONSTERCARNIVAL);
@@ -245,6 +250,8 @@ namespace ms
 		// again in its fields.
 		Stage::get().get_player().set_team(carnival::NO_TEAM);
 
+		freeze_frame();
+
 		// The server ends a trade when we leave the field.
 		if (auto room = UI::get().get_element<UITradingRoom>())
 			room->close();
@@ -366,6 +373,7 @@ namespace ms
 		uint8_t portalid = player.get_stats().get_portal();
 		int32_t mapid = player.get_stats().get_mapid();
 
+		freeze_frame();
 		transition(mapid, portalid);
 
 		UI::get().change_state(UI::State::GAME);
