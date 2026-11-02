@@ -19,6 +19,10 @@
 
 namespace ms
 {
-	// Asks whether to quit, as v83 does, and goes back to the login screen on yes.
+	// Goes back to the login screen. The game menu's Quit does this at once: v83 asks
+	// nothing (FUN_00a2465e builds CLogin), except for guest accounts.
+	void quit_to_login();
+
+	// Asks first, for the window's close button.
 	void ask_to_quit();
 }

@@ -28,33 +28,30 @@
 
 namespace ms
 {
-	namespace
+	void quit_to_login()
 	{
-		void quit_to_login()
-		{
-			Constants::Constants::get().set_viewwidth(800);
-			Constants::Constants::get().set_viewheight(600);
+		Constants::Constants::get().set_viewwidth(800);
+		Constants::Constants::get().set_viewheight(600);
 
-			Window::get().fadeout(
-					[]()
-					{
-						GraphicsGL::get().clear();
+		Window::get().fadeout(
+				[]()
+				{
+					GraphicsGL::get().clear();
 
-						PartySearchActions::reset();
-						UI::get().change_state(UI::State::LOGIN);
-						UI::get().set_scrollnotice("");
-						Session::get().reconnect();
+					PartySearchActions::reset();
+					UI::get().change_state(UI::State::LOGIN);
+					UI::get().set_scrollnotice("");
+					Session::get().reconnect();
 
-						UI::get().enable();
-						Timer::get().start();
-						GraphicsGL::get().unlock();
-					}
-			);
+					UI::get().enable();
+					Timer::get().start();
+					GraphicsGL::get().unlock();
+				}
+		);
 
-			GraphicsGL::get().lock();
-			Stage::get().clear();
-			Timer::get().start();
-		}
+		GraphicsGL::get().lock();
+		Stage::get().clear();
+		Timer::get().start();
 	}
 
 	void ask_to_quit()
