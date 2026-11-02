@@ -101,7 +101,7 @@ namespace ms
 		StatsEntry stats = parse_stats(recv);
 		LookEntry look = parse_look(recv);
 
-		recv.read_bool(); // 'rankinfo' bool
+		stats.family = recv.read_bool();
 
 		if (recv.read_bool())
 		{

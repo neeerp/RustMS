@@ -74,6 +74,9 @@ namespace ms
 		uint8_t portal;
 		std::pair<int32_t, int8_t> rank;
 		std::pair<int32_t, int8_t> jobrank;
+		// The byte before the rankings (CLogin +0x19c): deleting the
+		// character warns about leaving its Family (Notice/text/57, 58).
+		bool family = false;
 	};
 
 	struct LookEntry

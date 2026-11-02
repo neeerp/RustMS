@@ -764,6 +764,18 @@ namespace ms
 
 		int32_t id = characters[selected].id;
 
+		// v83 (0x5f7c96) takes the PIC, then asks Yes or No before sending:
+		// explorers and Arans are warned about their cash items, Cygnus
+		// Knights get the plain question, and either about a Family.
+		uint16_t job = characters[selected].stats.stats[MapleStat::Id::JOB];
+		bool family = characters[selected].stats.family;
+		bool cash_warning = job / 1000 == 0 || job / 1000 == 2;
+		uint16_t question = cash_warning
+			? (family ? UILoginNotice::Message::FAMILY_AND_CASH_ITEMS_CONFIRM_DELETION
+				: UILoginNotice::Message::CASH_ITEMS_CONFIRM_DELETION)
+			: (family ? UILoginNotice::Message::FAMILY_CONFIRM_DELETION
+				: UILoginNotice::Message::DELETE_CONFIRMATION);
+
 		switch (require_pic)
 		{
 		case 0:
@@ -771,27 +783,24 @@ namespace ms
 			break;
 		case 1:
 		{
-			std::function<void()> onok = [id]()
+			std::function<void(const std::string &)> onpic = [id, question](const std::string &pic)
 			{
-				std::function<void(const std::string &)> onpic = [id](const std::string &pic)
+				UI::get().emplace<UILoginNotice>(question, [id, pic]()
 				{
 					DeleteCharPicPacket(pic, id).dispatch();
-				};
-
-				UI::get().emplace<UISoftKey>(onpic);
+				});
 			};
 
-			uint16_t job = characters[selected].stats.stats[MapleStat::Id::JOB];
-
-			if (job < 1000)
-				UI::get().emplace<UILoginNotice>(UILoginNotice::Message::DELETE_CONFIRMATION, onok);
-			else
-				UI::get().emplace<UILoginNotice>(UILoginNotice::Message::CASH_ITEMS_CONFIRM_DELETION, onok);
-
+			UI::get().emplace<UISoftKey>(onpic);
 			break;
 		}
 		case 2:
-			DeleteCharPacket(id).dispatch();
+			// No PIC: v83 refuses with notice 94; RustMS runs without PIC,
+			// so it keeps v83's question and sends no PIC.
+			UI::get().emplace<UILoginNotice>(question, [id]()
+			{
+				DeleteCharPacket(id).dispatch();
+			});
 			break;
 		}
 	}
