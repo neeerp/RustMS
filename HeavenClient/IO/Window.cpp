@@ -66,7 +66,7 @@ namespace ms
 
 	void key_callback(GLFWwindow *, int key, int, int action, int)
 	{
-		UI::get().send_key(key, action != GLFW_RELEASE);
+		UI::get().send_window_key(key, action);
 	}
 
 	std::chrono::time_point<std::chrono::steady_clock> start = ContinuousTimer::get().start();

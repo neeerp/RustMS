@@ -85,8 +85,21 @@ namespace ms
 		cursor.draw(alpha);
 	}
 
+	namespace
+	{
+		int64_t now_ms()
+		{
+			return std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now().time_since_epoch()).count();
+		}
+	}
+
 	void UI::update()
 	{
+		// A text field types with the system's repeat instead.
+		if (int32_t key = key_repeater.update(now_ms()); key != key_repeat::NONE && !focusedtextfield)
+			send_key(key, true);
+
 		state->update();
 
 		Slider::update_held(cursor.is_pressed());
@@ -202,6 +215,7 @@ namespace ms
 			Music::set_bgmvolume(0);
 
 			is_key_down.clear();
+			key_repeater.stop();
 			Stage::get().release_keys();
 			Stage::get().release_cursor();
 			cursor.set_pressed(false);
@@ -286,6 +300,26 @@ namespace ms
 		state->doubleclick(pos);
 	}
 
+	void UI::send_window_key(int32_t keycode, int32_t action)
+	{
+		if (action == GLFW_REPEAT)
+		{
+			if (focusedtextfield)
+				send_key(keycode, true);
+
+			return;
+		}
+
+		bool pressed = action == GLFW_PRESS;
+
+		if (pressed)
+			key_repeater.press(keycode, now_ms());
+		else
+			key_repeater.release(keycode);
+
+		send_key(keycode, pressed);
+	}
+
 	void UI::send_key(int32_t keycode, bool pressed)
 	{
 		// Scroll Lock takes a screenshot before anything else sees the key
@@ -294,8 +328,7 @@ namespace ms
 		{
 			if (pressed)
 			{
-				int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
-					std::chrono::steady_clock::now().time_since_epoch()).count();
+				int64_t now = now_ms();
 				bool in_game = static_cast<bool>(get_element<UIStatusBar>());
 
 				switch (screenshots.press(now, in_game))
@@ -652,6 +685,15 @@ namespace ms
 
 		if (down != is_key_down.end() && down->second)
 			return false;
+
+		// Nor is the key held back, repeating (FUN_0059b2d2): it goes on as a press.
+		if (keycode == held_key)
+		{
+			held_key = GLFW_KEY_UNKNOWN;
+			secret_chord.reset();
+
+			return false;
+		}
 
 		Chord::Modifier modifier = Chord::Modifier::NONE;
 
