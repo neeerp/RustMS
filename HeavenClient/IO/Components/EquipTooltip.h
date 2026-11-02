@@ -66,7 +66,6 @@ namespace ms
 		{
 			Text label;
 			Text value;
-			int16_t gap;
 		};
 
 		Tooltip::Parent parent;
