@@ -330,8 +330,13 @@ from `UI.nx`. Moved so far:
   steps of 10, and MUTE greys the slider out; Cancel and Esc put the volume
   back. OK saves `BGMVolume`, `SFXVolume`, `BGMMute`, `SFXMute`,
   `ShakeScreen`, and the stored-only `PictureQuality`, `MouseSpeed`,
-  `HPAlert` and `MPAlert`, and switches to the chosen viewing mode. MONSTER INFO has
-  no control, and the post-Big Bang Options window's resolution picker is
+  `HPAlert` and `MPAlert`, `ScreenshotPlace` and `MonsterInfo`, and switches
+  to the chosen viewing mode. SCREEN SHOT's combo box (v83 soScreenShot) puts
+  Scroll Lock's shots in the game's folder (the default), `Desktop` under the
+  home folder, or `C:\`, which outside Windows is the home folder; a missing
+  folder falls back to the game's. MONSTER INFO's combo box (v83 soMobInfo)
+  picks what a mob shows for 5 s after a hit: nothing, its name and level
+  tag, its HP bar, or both (the default). The post-Big Bang Options window's resolution picker is
   gone; set `Width` and `Height` in `Settings` instead.
 - **Notices** (`UIOk`, `UIYesNo`, `UIEnterNumber`, `Basic.img/Notice2` and
   `YesNo2`): the silver bolted boxes. `t`, then `c` repeated to fit the black

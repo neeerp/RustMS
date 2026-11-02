@@ -286,6 +286,14 @@ namespace ms
 		return selected_index;
 	}
 
+	void MapleComboBox::set_parentpos(Point<int16_t> ppos)
+	{
+		for (auto &[i, button] : buttons)
+			button->set_position(Point<int16_t>(1, box_height() + i * HEIGHT + 1) + ppos);
+
+		parentpos = ppos;
+	}
+
 	Button::State MapleComboBox::button_pressed(uint16_t buttonid)
 	{
 		selected_index = buttonid;

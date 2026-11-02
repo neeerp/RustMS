@@ -64,6 +64,29 @@ namespace ms
 			int32_t count = 0;
 		};
 
+		// The folder for the System Option's place (FUN_007450b1): 0 the
+		// game's, 1 the desktop, 2 the drive, "C:", which elsewhere than
+		// Windows is the home folder. Without a home, the game's.
+		inline std::string folder(uint8_t place, const std::string &game, const char *home)
+		{
+#ifdef _WIN32
+			if (place == 2)
+				return "C:";
+#endif
+			if (!home || !*home)
+				return game;
+
+			switch (place)
+			{
+				case 1:
+					return std::string(home) + "/Desktop";
+				case 2:
+					return home;
+				default:
+					return game;
+			}
+		}
+
 		// "%s\Maple%04d.jpg" (0x6b6), without the folder.
 		inline std::string file_name(int32_t index)
 		{

@@ -41,6 +41,8 @@ namespace ms
 		settings.emplace<HPAlert>();
 		settings.emplace<MPAlert>();
 		settings.emplace<ShakeScreen>();
+		settings.emplace<MonsterInfo>();
+		settings.emplace<ScreenshotPlace>();
 		settings.emplace<AllowWhisper>();
 		settings.emplace<AllowFriends>();
 		settings.emplace<AllowChatInvite>();

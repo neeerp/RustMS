@@ -5,6 +5,7 @@
 
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
+#include "../Components/MapleComboBox.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Util/NxFiles.h"
@@ -53,6 +54,11 @@ namespace ms
 		constexpr Point<int16_t> WINDOW_BOX = Point<int16_t>(64, 304);
 		constexpr Point<int16_t> FULLSCREEN_BOX = Point<int16_t>(64, 316);
 
+		// The combo boxes are 175 wide, with caps of 5 and 18 (0x994163).
+		constexpr Point<int16_t> SCREENSHOT_AT = Point<int16_t>(67, 127);
+		constexpr Point<int16_t> MONSTER_INFO_AT = Point<int16_t>(67, 278);
+		constexpr int64_t COMBO_MIDDLE = 152;
+
 		// The buttons stand at the right of the bar along the bottom.
 		constexpr Point<int16_t> BT_OK = Point<int16_t>(192, 341);
 		constexpr Point<int16_t> BT_CANCEL = Point<int16_t>(243, 341);
@@ -79,6 +85,24 @@ namespace ms
 		buttons[Buttons::SHAKE] = std::make_unique<AreaButton>(SHAKE_BOX, box_size);
 		buttons[Buttons::WINDOW] = std::make_unique<AreaButton>(WINDOW_BOX, box_size);
 		buttons[Buttons::FULLSCREEN] = std::make_unique<AreaButton>(FULLSCREEN_BOX, box_size);
+
+		auto combo = [this](uint16_t id, std::vector<std::string> items, uint8_t selected, Point<int16_t> at)
+		{
+			auto owned = std::make_unique<MapleComboBox>(MapleComboBox::Type::DEFAULT, items, selected, position, at,
+					COMBO_MIDDLE);
+			MapleComboBox *made = owned.get();
+			buttons[id] = std::move(owned);
+
+			return made;
+		};
+
+		// StringPool 0x32f, 0x330 and a literal.
+		screenshot_place = combo(Buttons::SCREENSHOT_PLACE, { "MapleStory Folder", "Desktop", "C:\\" },
+				Setting<ScreenshotPlace>::get().place(), SCREENSHOT_AT);
+		// StringPool 0x105c to 0x105f.
+		monster_info = combo(Buttons::MONSTER_INFO,
+				{ "Don't mark", "Mark name only", "Mark HP only", "Mark name and HP" },
+				Setting<MonsterInfo>::get().mark(), MONSTER_INFO_AT);
 
 		auto slider = [](SliderPlace place, std::function<void(int16_t)> onmoved = {})
 		{
@@ -147,6 +171,28 @@ namespace ms
 
 	Cursor::State UISystemOption::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		// A press that picked from a list ends there, though the list closes
+		// before the button is let go.
+		if (picking)
+		{
+			if (clicked)
+				return Cursor::State::CLICKING;
+
+			picking = false;
+		}
+
+		// An open list covers what is under it.
+		for (MapleComboBox *combo : { screenshot_place, monster_info })
+		{
+			if (combo->is_pressed() && combo->in_combobox(cursorpos))
+			{
+				Cursor::State state = combo->send_cursor(clicked, cursorpos);
+				picking = clicked;
+
+				return clicked && state == Cursor::State::IDLE ? Cursor::State::CLICKING : state;
+			}
+		}
+
 		if (!dragged)
 		{
 			Point<int16_t> relative = cursorpos - position;
@@ -156,7 +202,13 @@ namespace ms
 					return state;
 		}
 
-		return UIDragElement::send_cursor(clicked, cursorpos);
+		Cursor::State state = UIDragElement::send_cursor(clicked, cursorpos);
+
+		// The boxes go where the window was dragged.
+		for (MapleComboBox *combo : { screenshot_place, monster_info })
+			combo->set_parentpos(position);
+
+		return state;
 	}
 
 	void UISystemOption::send_key(int32_t keycode, bool pressed, bool escape)
@@ -205,6 +257,10 @@ namespace ms
 			case Buttons::FULLSCREEN:
 				fullscreen = true;
 				break;
+			case Buttons::SCREENSHOT_PLACE:
+			case Buttons::MONSTER_INFO:
+				buttons[buttonid]->toggle_pressed();
+				break;
 			default:
 				break;
 		}
@@ -223,6 +279,8 @@ namespace ms
 		Setting<BGMMute>::get().save(bgm_mute);
 		Setting<SFXMute>::get().save(sfx_mute);
 		Setting<ShakeScreen>::get().save(shake);
+		Setting<ScreenshotPlace>::get().save(static_cast<uint8_t>(screenshot_place->get_selected()));
+		Setting<MonsterInfo>::get().save(static_cast<uint8_t>(monster_info->get_selected()));
 
 		// Saves the new mode itself.
 		if (fullscreen != Setting<Fullscreen>::get().load())

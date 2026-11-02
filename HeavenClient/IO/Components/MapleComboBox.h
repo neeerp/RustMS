@@ -76,6 +76,9 @@ namespace ms
 
 		uint16_t get_selected() const override;
 
+		// Moves the box with its parent, as when a window is dragged.
+		void set_parentpos(Point<int16_t> parentpos);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid);
 

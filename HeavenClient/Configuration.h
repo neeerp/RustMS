@@ -423,6 +423,21 @@ namespace ms
 		{}
 	};
 
+	// Where Scroll Lock's shots go: 0 the game's folder, 1 the desktop, 2 the
+	// drive (v83 soScreenShot, 0 to 2, by default 0; 0x49c73e, 0x7450b1)
+	struct ScreenshotPlace : public Configuration::ByteEntry
+	{
+		ScreenshotPlace() : ByteEntry("ScreenshotPlace", "0")
+		{}
+
+		// A place past 2 reads as the default, as in v83 (0x49ef65)
+		uint8_t place() const
+		{
+			uint8_t place = load();
+			return place > 2 ? 0 : place;
+		}
+	};
+
 	// Mouse cursor speed from 0 (slow) to 19 (fast)
 	struct MouseSpeed : public Configuration::ByteEntry
 	{
@@ -465,6 +480,30 @@ namespace ms
 	{
 		ShakeScreen() : BoolEntry("ShakeScreen", "true")
 		{}
+	};
+
+	// What a hit mob shows for 5 s: 0 nothing, 1 its name, 2 its HP, 3 both
+	// (v83 soMobInfo, 0 to 3, by default 3; 0x49c865, 0x49ea33).
+	struct MonsterInfo : public Configuration::ByteEntry
+	{
+		MonsterInfo() : ByteEntry("MonsterInfo", "3")
+		{}
+
+		uint8_t mark() const
+		{
+			uint8_t mark = load();
+			return mark > 3 ? 3 : mark;
+		}
+
+		bool names() const
+		{
+			return mark() & 1;
+		}
+
+		bool hp() const
+		{
+			return mark() & 2;
+		}
 	};
 
 	// The Game Option settings: whether to allow each kind of request. As in

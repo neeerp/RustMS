@@ -31,6 +31,7 @@
 #include "../Combat/Prepare.h"
 #include "../Combat/ShotPath.h"
 #include "../../Character/SkillId.h"
+#include "../../Configuration.h"
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
@@ -1665,12 +1666,18 @@ namespace ms
 			if (friendly && !dying)
 				draw_hp_bar(absp, friendlypct, Color::Name::RED);
 
+			// The System Option's Monster Info picks what a hit mob shows
+			// (0x668a51); the level tag goes with the name (0x5f1b78).
+			MonsterInfo &info = Setting<MonsterInfo>::get();
+
 			if (showhp)
 			{
-				if (!hidename)
+				bool names = info.names();
+
+				if (names && !hidename)
 					namelabel.draw(absp);
 
-				if (showleveltag)
+				if (names && showleveltag)
 				{
 					int16_t width = 0;
 
@@ -1688,7 +1695,7 @@ namespace ms
 					}
 				}
 
-				if (!dying && hppercent > 0 && !hidehp)
+				if (!dying && hppercent > 0 && !hidehp && info.hp())
 					draw_hp_bar(absp, hppercent, Color::Name::LIGHTGREEN);
 			}
 		}
