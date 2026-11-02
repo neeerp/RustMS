@@ -113,8 +113,8 @@ async fn maha_with_the_red_jade_back_makes_a_third_job_aran() {
     let t = quest(c, &m, RIEN, LILIN, start).await;
     assert_eq!(t.prompts, [(LILIN, 0)]);
     let t = next(c, &m, 1).await;
-    assert_eq!(t.prompts, [(LILIN, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(LILIN, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&WEAPON_NEVER_LEAVES), Some(&1));
     assert!(next(c, &m, 1).await.prompts.is_empty());
     let done = build_quest_completion(WEAPON_NEVER_LEAVES, MAHA, -1);

@@ -61,8 +61,8 @@ async fn through(s: &mut WorldSession, map: i32, npc: i32, first: Packet) -> Vec
     told(s, walk_to(at.x, at.y)).await;
     let mut seen = vec![told(s, first).await];
     while let Some(&(_, kind)) = seen.last().unwrap().prompts.last() {
-        let reply = if kind == 1 {
-            answer(1, 1, None)
+        let reply = if kind == 1 || kind == 12 {
+            answer(kind, 1, None)
         } else {
             answer(0, 1, None)
         };

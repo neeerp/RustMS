@@ -63,8 +63,8 @@ async fn a_knight_finds_matthiass_clue_in_kerning_citys_trash_can() {
     assert_eq!(warp(c, KERNING, "", &mut t).await, KERNING);
     let start = build_quest_action(SCRIPT_START, HIDDEN_INSIDE_THE_TRASH_CAN, MATTHIAS);
     let t = at(c, &m, KERNING, MATTHIAS, start).await;
-    assert_eq!(t.prompts, [(MATTHIAS, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(MATTHIAS, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&HIDDEN_INSIDE_THE_TRASH_CAN), Some(&1));
 
     let mut t = Trace::default();

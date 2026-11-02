@@ -191,8 +191,8 @@ async fn an_aran_beats_the_puppeteer_in_its_arena_and_heads_for_orbis() {
     .await;
     assert_eq!(t.prompts, [(TRU, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
-    assert_eq!(t.prompts, [(TRU, 1)]);
-    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(TRU, 12)]);
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&TO_ORBIS), Some(&1));
     assert_eq!(warp(c, ORBIS, "", &mut trace).await, ORBIS);
     let t = quest(

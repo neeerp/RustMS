@@ -3885,9 +3885,19 @@ impl NpcScript {
                 has_next: false,
                 player_speaks: self.player_speaks,
             }),
-            Page::Ask { text, .. } | Page::Decide { text, .. } => Prompt::YesNo {
+            // A yes that starts a quest is the quest's offer, as Cosmic's
+            // sendAcceptDecline.
+            Page::Ask { text, on_yes, .. } => Prompt::YesNo {
                 npc_id,
                 text: text.clone(),
+                quest: on_yes
+                    .iter()
+                    .any(|effect| matches!(effect, Effect::StartQuest(_))),
+            },
+            Page::Decide { text, .. } => Prompt::YesNo {
+                npc_id,
+                text: text.clone(),
+                quest: false,
             },
             Page::Menu { text, choices } => {
                 let mut menu = text.clone();
@@ -19181,6 +19191,15 @@ fn text(key: &str) -> String {
     content::text().get(key, &[])
 }
 
+/// A yes or no prompt's message type: 12 for a quest's offer, else 1.
+fn yes_no(quest: bool) -> u8 {
+    if quest {
+        12
+    } else {
+        1
+    }
+}
+
 /// Map an NPC_TALK_MORE answer to a script input, given the prompt it
 /// answers. `None` closes the conversation.
 pub fn input(
@@ -19193,8 +19212,8 @@ pub fn input(
     match (prompt, message_type, response) {
         (Prompt::Text(_), 0, 1) => Some(ScriptInput::Next),
         (Prompt::Text(page), 0, 0) if page.has_previous => Some(ScriptInput::Previous),
-        (Prompt::YesNo { .. }, 1, 1) => Some(ScriptInput::Yes),
-        (Prompt::YesNo { .. }, 1, 0) => Some(ScriptInput::No),
+        (Prompt::YesNo { quest, .. }, kind, 1) if kind == yes_no(*quest) => Some(ScriptInput::Yes),
+        (Prompt::YesNo { quest, .. }, kind, 0) if kind == yes_no(*quest) => Some(ScriptInput::No),
         (Prompt::Selection { .. }, 4, 1) => selection.map(ScriptInput::Select),
         (Prompt::Style { .. }, 7, 1) => selection.map(ScriptInput::Select),
         (Prompt::Slide { .. }, 14, 1) => selection.map(ScriptInput::Select),
@@ -19222,7 +19241,7 @@ mod tests {
     fn kind(step: &Step) -> Option<u8> {
         step.prompt.as_ref().map(|p| match p {
             Prompt::Text(_) => 0,
-            Prompt::YesNo { .. } => 1,
+            Prompt::YesNo { quest, .. } => yes_no(*quest),
             Prompt::Selection { .. } => 4,
             Prompt::Style { .. } => 7,
             Prompt::AskText { .. } => 2,
@@ -19261,7 +19280,8 @@ mod tests {
             (true, true)
         );
         let ask = script.respond(ScriptInput::Next).unwrap();
-        assert_eq!(kind(&ask), Some(1));
+        // The offer, with Accept and Decline.
+        assert_eq!(kind(&ask), Some(12));
         let accepted = script.respond(ScriptInput::Yes).unwrap();
         assert_eq!(
             accepted.effects,
@@ -20164,7 +20184,7 @@ mod tests {
             ("q21001e", keys::ATHENA_KID_SAFE_DECLINED),
         ] {
             let mut npc = NpcScript::for_quest(script, &aran).unwrap();
-            assert_eq!(kind(&npc.begin()), Some(1), "{script}");
+            assert_eq!(kind(&npc.begin()), Some(offer_or_ask(script)), "{script}");
             let step = npc.respond(ScriptInput::No).unwrap();
             assert_eq!(page_text(&step), text(declined), "{script}");
             assert!(step.effects.is_empty(), "{script}");
@@ -20316,7 +20336,7 @@ mod tests {
         ] {
             let mut npc = NpcScript::for_quest(script, &aran).unwrap();
             let mut step = npc.begin();
-            while kind(&step) != Some(1) {
+            while kind(&step) != Some(offer_or_ask(script)) {
                 step = npc.respond(ScriptInput::Next).unwrap();
             }
             let step = npc.respond(ScriptInput::No).unwrap();
@@ -20365,7 +20385,7 @@ mod tests {
             // Declined: told so, and nothing else.
             let mut lilin = NpcScript::for_quest(script, &aran).unwrap();
             let mut step = lilin.begin();
-            while kind(&step) != Some(1) {
+            while kind(&step) != Some(12) {
                 step = lilin.respond(ScriptInput::Next).unwrap();
             }
             let step = lilin.respond(ScriptInput::No).unwrap();
@@ -20893,6 +20913,16 @@ mod tests {
     }
 
     /// Every effect of `script` read to its end, answering yes to each ask.
+    /// A quest's yes or no: its start script's is the offer, 12, its end
+    /// script's a plain 1.
+    fn offer_or_ask(script: &str) -> u8 {
+        if script.ends_with('s') {
+            12
+        } else {
+            1
+        }
+    }
+
     fn yes_through(mut script: NpcScript) -> (i32, Vec<Effect>) {
         let npc = script.npc_id();
         let mut step = script.begin();
@@ -20900,7 +20930,7 @@ mod tests {
         loop {
             effects.append(&mut step.effects);
             let input = match kind(&step) {
-                Some(1) => ScriptInput::Yes,
+                Some(1 | 12) => ScriptInput::Yes,
                 Some(_) => ScriptInput::Next,
                 None => return (npc, effects),
             };
@@ -20974,7 +21004,7 @@ mod tests {
         let orbis = || {
             let mut tru = NpcScript::for_quest("q21736s", &aran).unwrap();
             tru.begin();
-            assert_eq!(kind(&tru.respond(ScriptInput::Next).unwrap()), Some(1));
+            assert_eq!(kind(&tru.respond(ScriptInput::Next).unwrap()), Some(12));
             tru
         };
         assert_eq!(
@@ -20994,7 +21024,7 @@ mod tests {
         );
         let mut spiruna = NpcScript::for_quest("q21738s", &aran).unwrap();
         spiruna.begin();
-        assert_eq!(kind(&spiruna.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(kind(&spiruna.respond(ScriptInput::Next).unwrap()), Some(12));
         assert!(spiruna.respond(ScriptInput::No).unwrap().effects.is_empty());
         assert_eq!(
             quest("q21739e"),
@@ -21098,7 +21128,7 @@ mod tests {
             assert_eq!(bob.npc_id(), GHOSTHUNTER_BOB);
             bob.begin();
             bob.respond(ScriptInput::Next).unwrap();
-            assert_eq!(kind(&bob.respond(ScriptInput::Next).unwrap()), Some(1));
+            assert_eq!(kind(&bob.respond(ScriptInput::Next).unwrap()), Some(12));
             bob
         };
         let mut bob = offer(&player(70));
@@ -22141,7 +22171,7 @@ mod tests {
         // A no leaves the quest untaken.
         let mut kimu = NpcScript::for_quest("q20010s", &noblesse).unwrap();
         let mut step = kimu.begin();
-        while kind(&step) != Some(1) {
+        while kind(&step) != Some(12) {
             step = kimu.respond(ScriptInput::Next).unwrap();
         }
         let declined = kimu.respond(ScriptInput::No).unwrap();
@@ -25940,6 +25970,27 @@ mod tests {
         assert_eq!(input(&page, 0, 1, None, None), Some(ScriptInput::Next));
         assert_eq!(input(&page, 0, 0, None, None), None, "no previous page");
         assert_eq!(input(&page, 1, 1, None, None), None);
+
+        let yes_no = |quest| Prompt::YesNo {
+            npc_id: 1,
+            text: String::new(),
+            quest,
+        };
+        assert_eq!(
+            input(&yes_no(false), 1, 1, None, None),
+            Some(ScriptInput::Yes)
+        );
+        assert_eq!(input(&yes_no(false), 12, 1, None, None), None);
+        assert_eq!(
+            input(&yes_no(true), 12, 1, None, None),
+            Some(ScriptInput::Yes)
+        );
+        assert_eq!(
+            input(&yes_no(true), 12, 0, None, None),
+            Some(ScriptInput::No)
+        );
+        assert_eq!(input(&yes_no(true), 12, -1, None, None), None, "closed");
+        assert_eq!(input(&yes_no(true), 1, 1, None, None), None);
         let menu = Prompt::Selection {
             npc_id: 1,
             text: String::new(),

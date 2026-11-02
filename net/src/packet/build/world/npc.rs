@@ -7,7 +7,11 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
     use crate::dialogue::Prompt;
     let (npc_id, message_type, text) = match prompt {
         Prompt::Text(page) => return build_npc_dialogue(page),
-        Prompt::YesNo { npc_id, text } => (*npc_id, 1, text),
+        Prompt::YesNo {
+            npc_id,
+            text,
+            quest,
+        } => (*npc_id, if *quest { 12 } else { 1 }, text),
         Prompt::Selection { npc_id, text } => (*npc_id, 4, text),
         Prompt::Style { npc_id, text, .. } => (*npc_id, 7, text),
         Prompt::AskText { npc_id, text, .. } => (*npc_id, 2, text),
@@ -402,6 +406,7 @@ mod tests {
         let prompt = crate::dialogue::Prompt::YesNo {
             npc_id: 1012100,
             text: "Will you help?".to_string(),
+            quest: false,
         };
         let packet = build_prompt(&prompt).unwrap();
 
@@ -409,6 +414,22 @@ mod tests {
         expect.short(SendOpcode::NpcDialogue as i16);
         expect.byte(4).int(1012100).byte(1).byte(0);
         expect.string("Will you help?");
+        expect.end();
+    }
+
+    #[test]
+    fn prompt_quest_offer_uses_message_type_twelve() {
+        let prompt = crate::dialogue::Prompt::YesNo {
+            npc_id: 2000,
+            text: "Abaracadabra~!".to_string(),
+            quest: true,
+        };
+        let packet = build_prompt(&prompt).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::NpcDialogue as i16);
+        expect.byte(4).int(2000).byte(12).byte(0);
+        expect.string("Abaracadabra~!");
         expect.end();
     }
 
