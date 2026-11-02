@@ -38,6 +38,7 @@
 #include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Combat/DojoEnergy.h"
 #include "../../Gameplay/Combat/Massacre.h"
+#include "../../Gameplay/MapleMap/MapleTvScreen.h"
 #include "../../Gameplay/OxQuizRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
@@ -311,6 +312,10 @@ namespace ms
 		// The server forgets a proposal on a channel change, the Cash Shop
 		// and a new login, without answering it.
 		MarriageActions::answered();
+
+		// A message the TVs kept may have ended while away. The server puts
+		// one still up back on after this packet.
+		MapleTvScreen::clear();
 
 		// The cached entry is the character-select snapshot; after a channel
 		// change its map and stats are stale, so take them from this packet.
