@@ -20912,7 +20912,6 @@ mod tests {
         );
     }
 
-    /// Every effect of `script` read to its end, answering yes to each ask.
     /// A quest's yes or no: its start script's is the offer, 12, its end
     /// script's a plain 1.
     fn offer_or_ask(script: &str) -> u8 {
@@ -20923,6 +20922,7 @@ mod tests {
         }
     }
 
+    /// Every effect of `script` read to its end, answering yes to each ask.
     fn yes_through(mut script: NpcScript) -> (i32, Vec<Effect>) {
         let npc = script.npc_id();
         let mut step = script.begin();
