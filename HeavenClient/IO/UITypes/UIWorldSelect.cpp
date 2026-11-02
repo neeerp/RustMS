@@ -448,6 +448,20 @@ namespace ms
 		deactivate();
 	}
 
+	void UIWorldSelect::come_back()
+	{
+		selected = -1;
+		requested = -1;
+		held_plank = -1;
+		status_pending = false;
+		scroll = Scroll::CLOSED;
+		channel_select.reset();
+		channel_select_done = false;
+		buttons[Buttons::BT_ENTERWORLD]->set_active(false);
+
+		makeactive();
+	}
+
 	std::string UIWorldSelect::get_world_name(uint8_t worldid) const
 	{
 		for (auto &world : worlds)
