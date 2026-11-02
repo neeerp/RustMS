@@ -201,7 +201,8 @@ from `UI.nx`. Moved so far:
   and skills show a blue dot before the name and the icon at twice its size in
   a light box. Equips have the required stats and the job row from
   `UIWindow.img/ToolTip/Equip` (white and orange when met, red and grey when
-  not), then a line and one row per stat ("CATEGORY :OVERALL", "LUK : +11").
+  not), then a line and one row per stat ("CATEGORY : OVERALL", "LUK : +11",
+  "HP : +5"; v83 starts each value with a space, 0x8e7836).
   Upgraded equips' names are light blue with the upgrades and gender run
   together, "(+4Male)", as in footage. Skills show the current and next levels
   under a line, "[Next Level 1]". Skills with a master level (4th job, and

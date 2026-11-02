@@ -50,8 +50,6 @@ namespace ms
 		constexpr int16_t STAT_STEP = 13;
 		const Point<int16_t> STAT_DOT = { 10, 11 };
 		constexpr int16_t STAT_X = 16;
-		// Numbers stand a little apart from their labels, words right after.
-		constexpr int16_t VALUE_GAP = 4;
 		constexpr int16_t DESC_X = 8;
 		constexpr int16_t DESC_WIDTH = 220;
 		// The expiry line under the name, after a dot like the stat lines'. Everything under it moves down
@@ -70,7 +68,7 @@ namespace ms
 
 		constexpr const char *JOB_NAMES[] = { "beginner", "warrior", "magician", "bowman", "thief", "pirate" };
 
-		// A stat line's label, as in footage.
+		// A stat line's label (StringPool 0x291-0x299, 0x7fa-0x7ff).
 		std::string stat_label(EquipStat::Id stat)
 		{
 			switch (stat)
@@ -84,9 +82,9 @@ namespace ms
 				case EquipStat::Id::LUK:
 					return "LUK";
 				case EquipStat::Id::HP:
-					return "MaxHP";
+					return "HP";
 				case EquipStat::Id::MP:
-					return "MaxMP";
+					return "MP";
 				case EquipStat::Id::WATK:
 					return "WEAPON ATTACK";
 				case EquipStat::Id::MAGIC:
@@ -361,14 +359,15 @@ namespace ms
 
 		stats.clear();
 
+		// v83 starts each value with a space (" BOW", " +%d", 0x8e7836) and
+		// draws it right after its label (0x8f39e1).
 		auto add_line = [&](const std::string &label, const std::string &value, bool word)
 		{
 			StatLine statline;
 			statline.label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE,
 								  label.empty() ? "" : label + " :");
 			statline.value = Text(word ? Text::Font::A11M : Text::Font::A11B, Text::Alignment::LEFT,
-								  Color::Name::WHITE, value);
-			statline.gap = word ? 0 : VALUE_GAP;
+								  Color::Name::WHITE, label.empty() ? value : " " + value);
 			stats.push_back(statline);
 		};
 
@@ -413,7 +412,7 @@ namespace ms
 		width = WIDTH;
 
 		for (const StatLine &statline : stats)
-			width = std::max<int16_t>(width, statline.label.width() + statline.gap + statline.value.width() + LINE_MARGIN);
+			width = std::max<int16_t>(width, statline.label.width() + statline.value.width() + LINE_MARGIN);
 
 		line.setwidth(width - 2 * LINE_POS.x());
 
@@ -538,7 +537,7 @@ namespace ms
 		{
 			stat_dot.draw(statpos + STAT_DOT);
 			statline.label.draw(statpos + Point<int16_t>(STAT_X, 0));
-			statline.value.draw(statpos + Point<int16_t>(STAT_X + statline.label.width() + statline.gap, 0));
+			statline.value.draw(statpos + Point<int16_t>(STAT_X + statline.label.width(), 0));
 			statpos.shift_y(STAT_STEP);
 		}
 
