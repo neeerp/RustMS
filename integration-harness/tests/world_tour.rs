@@ -5,6 +5,7 @@
 
 use game_data::GameData;
 use integration_harness::database::{grant_item, set_job, set_meso};
+use integration_harness::hunting::meso_drop;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{stat, step, warp, Trace};
@@ -222,7 +223,7 @@ async fn roodolph_goes_up_to_the_snow_sprinkler_and_back_to_happyville() {
 #[tokio::test]
 async fn a_snowman_shows_its_tree_room_and_the_scarf_snowman_sees_players_out() {
     let config = load_harness_config_or_fail().await;
-    let mut session = traveller(&config, 0, None, HAPPYVILLE).await;
+    let mut session = traveller(&config, 100, None, HAPPYVILLE).await;
     let m = session.character_name.clone();
     let c = &mut session.connection;
     for (snowman, room) in [(2001001, 209_000_001), (2001002, 209_000_002)] {
@@ -230,9 +231,13 @@ async fn a_snowman_shows_its_tree_room_and_the_scarf_snowman_sees_players_out() 
         assert_eq!(t.prompts, [(snowman, 1)]);
         let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
         assert_eq!(t.warps, [room]);
+        // What a player drops in the room comes back on the way out.
+        let t = step(c, &format!("{m} drop"), meso_drop(10)).await;
+        assert_eq!(t.stat(stat::MESO), Some(90));
         let t = step(c, &format!("{m} talk"), talk(room, SCARF_SNOWMAN)).await;
         assert_eq!(t.prompts, [(SCARF_SNOWMAN, 1)]);
         let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+        assert_eq!(t.stat(stat::MESO), Some(100));
         assert_eq!(t.warps, [HAPPYVILLE]);
     }
 }

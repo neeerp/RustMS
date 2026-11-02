@@ -986,6 +986,15 @@ impl FieldActor {
                 let _ = reply
                     .send(arena.map_or((0, false), |arena| (arena.snowman.form, arena.scrooge)));
             }
+            FieldMessage::ReclaimDrops { from, reply } => {
+                let drops = self.drops.take_owned(from);
+                for drop in &drops {
+                    if let Ok(packet) = build_remove_drop(drop.object_id, Some(from)) {
+                        self.send_drop_packet(packet);
+                    }
+                }
+                let _ = reply.send(drops);
+            }
             FieldMessage::DropCount { reply } => {
                 let _ = reply.send(self.drops.all().count());
             }
