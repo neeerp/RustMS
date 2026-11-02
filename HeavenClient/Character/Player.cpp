@@ -534,6 +534,11 @@ namespace ms
 			Char::update(physics, 1.0f);
 		}
 
+		// v83's Cash Shop has no field and no CUserLocal, so its preview
+		// sends nothing: no moves, heals or ended buffs.
+		if (previewing)
+			return get_layer();
+
 		update_recovery();
 
 		// The combo goes 3 seconds after the server last showed it (0x94bdba).
@@ -2112,6 +2117,11 @@ namespace ms
 	{
 		underwater = uw;
 		phobj.swim = uw;
+	}
+
+	void Player::set_previewing(bool p)
+	{
+		previewing = p;
 	}
 
 	void Player::set_flymap(bool flymap)
