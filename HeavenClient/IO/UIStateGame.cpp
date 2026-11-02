@@ -206,7 +206,7 @@ namespace ms
 		emplace<UIScriptMessage>();
 		emplace<UIPartyHP>(Stage::get().get_player().get_party(), stats);
 		emplace<UIShop>(look, inventory);
-		emplace<UIStorage>(inventory);
+		emplace<UIStorage>(look, inventory);
 		emplace<UIInviteCard>();
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();

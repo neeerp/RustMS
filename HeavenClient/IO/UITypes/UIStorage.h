@@ -11,6 +11,7 @@
 #include "../Graphics/Text.h"
 
 #include "../Character/Inventory/Inventory.h"
+#include "../Character/Look/CharLook.h"
 
 #include "../Net/Handlers/StorageContents.h"
 
@@ -26,7 +27,7 @@ namespace ms
 		static constexpr bool FOCUSED = true;
 		static constexpr bool TOGGLED = true;
 
-		UIStorage(const Inventory &inventory);
+		UIStorage(const CharLook &charlook, const Inventory &inventory);
 
 		void draw(float alpha) const override;
 
@@ -130,6 +131,7 @@ namespace ms
 			NUM_BUTTONS
 		};
 
+		const CharLook &charlook;
 		const Inventory &inventory;
 
 		int32_t npcid;
