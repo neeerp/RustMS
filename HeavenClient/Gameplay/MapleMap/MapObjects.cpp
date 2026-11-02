@@ -30,6 +30,20 @@ namespace ms
 		}
 	}
 
+	void MapObjects::draw_balloons(double viewx, double viewy, float alpha) const
+	{
+		for (auto &layer : layers)
+		{
+			for (auto &oid : layer)
+			{
+				auto mmo = get(oid);
+
+				if (mmo && mmo->is_active())
+					mmo->draw_balloons(viewx, viewy, alpha);
+			}
+		}
+	}
+
 	void MapObjects::update(const Physics &physics)
 	{
 		for (auto iter = objects.begin(); iter != objects.end();)

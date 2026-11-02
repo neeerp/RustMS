@@ -426,10 +426,18 @@ namespace ms
 		if (party.shows_hp_marks())
 			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
 
+		// Every chat balloon is above the map's layers, 100 behind the mini
+		// room balloons (z 0xc00613dc, FUN_0048a935).
+		npcs.draw_balloons(viewx, viewy, alpha);
+		chars.draw_balloons(viewx, viewy, alpha);
+		player.draw_balloons(viewx, viewy, alpha);
+
 		// Kites share the mini room balloons' z (0xc0061440), in front of
 		// everyone and behind the effect layer.
 		kites.draw(viewx, viewy, alpha);
 		merchants.draw_balloons(viewx, viewy);
+		chars.draw_room_balloons(viewx, viewy, alpha);
+		player.draw_room_balloon(viewx, viewy, alpha);
 		// v83 puts a mist's clouds on the effect layer, above the map's
 		// objects (z 0xc00614a4).
 		mists.draw(viewx, viewy, alpha);

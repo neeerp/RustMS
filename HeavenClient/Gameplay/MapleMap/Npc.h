@@ -43,6 +43,8 @@ namespace ms
 
 		// Draws the current animation and name/function tags
 		void draw(double viewx, double viewy, float alpha) const override;
+		// Draws the speech balloon.
+		void draw_balloons(double viewx, double viewy, float alpha) const override;
 
 		// Updates the current animation and physics.
 		int8_t update(const Physics &physics) override;

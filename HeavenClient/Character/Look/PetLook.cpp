@@ -150,7 +150,11 @@ namespace ms
 
 		// The tag's top is 2 px under the pet's feet (origin cy -2, 0x5f1654).
 		nametag.draw(absp + Point<int16_t>(0, 2));
-		balloon.draw(absp - Point<int16_t>(0, balloon_lift));
+	}
+
+	void PetLook::draw_balloon(double viewx, double viewy, float alpha) const
+	{
+		balloon.draw(phobj.get_absolute(viewx, viewy, alpha) - Point<int16_t>(0, balloon_lift));
 	}
 
 	void PetLook::draw_standing(Point<int16_t> pos, float alpha) const

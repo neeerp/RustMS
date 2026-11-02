@@ -105,10 +105,7 @@ namespace ms
 			tomb.draw(absp - Point<int16_t>(0, drop), alpha);
 			color = color * Color(1.0f, 1.0f, 1.0f, ghost_opacity.get(alpha));
 
-			float angle = 6.2831853f * (ghost_tick + alpha) / GHOST_LAP;
-			absp = absp + Point<int16_t>(
-				static_cast<int16_t>(std::lround(GHOST_RADIUS * std::sin(angle))),
-				static_cast<int16_t>(std::lround(-GHOST_RISE - GHOST_RADIUS * std::cos(angle))));
+			absp = drawn_feet(viewx, viewy, alpha);
 		}
 
 		bool on_chair = chair && state == State::SIT;
@@ -189,12 +186,6 @@ namespace ms
 		// tag's 2).
 		draw_combo(absp);
 
-		chalkboard.draw(absp, AVATAR_HEIGHT);
-		chatballoon.draw(absp - Point<int16_t>(0, 85));
-		hintballoon.draw(absp - Point<int16_t>(0, 85));
-		// v83 puts a room's balloon in front of the chat balloon.
-		miniroom.draw(absp, AVATAR_HEIGHT);
-
 		effects.drawabove(absp, alpha);
 		held_effects.drawabove(absp, alpha);
 		energy_glow.drawabove(absp, alpha);
@@ -222,6 +213,39 @@ namespace ms
 
 		for (auto &number : damagenumbers)
 			number.draw(viewx, viewy, alpha);
+	}
+
+	void Char::draw_balloons(double viewx, double viewy, float alpha) const
+	{
+		Point<int16_t> absp = drawn_feet(viewx, viewy, alpha);
+
+		for (auto &pet : pets)
+			if (pet.get_itemid())
+				pet.draw_balloon(viewx, viewy, alpha);
+
+		// The chalkboard is a balloon too, at the same z (0x3eb, report 179c).
+		chalkboard.draw(absp, AVATAR_HEIGHT);
+		chatballoon.draw(absp - Point<int16_t>(0, 85));
+		hintballoon.draw(absp - Point<int16_t>(0, 85));
+	}
+
+	void Char::draw_room_balloon(double viewx, double viewy, float alpha) const
+	{
+		miniroom.draw(drawn_feet(viewx, viewy, alpha), AVATAR_HEIGHT);
+	}
+
+	Point<int16_t> Char::drawn_feet(double viewx, double viewy, float alpha) const
+	{
+		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+
+		if (state != State::DIED)
+			return absp;
+
+		float angle = 6.2831853f * (ghost_tick + alpha) / GHOST_LAP;
+
+		return absp + Point<int16_t>(
+			static_cast<int16_t>(std::lround(GHOST_RADIUS * std::sin(angle))),
+			static_cast<int16_t>(std::lround(-GHOST_RISE - GHOST_RADIUS * std::cos(angle))));
 	}
 
 	Point<int16_t> Char::get_face_offset() const
