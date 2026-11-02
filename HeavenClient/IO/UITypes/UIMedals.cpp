@@ -1,5 +1,6 @@
 #include "UIMedals.h"
 #include "UINotice.h"
+#include "UINpcTalk.h"
 #include "UIQuestLog.h"
 
 #include "../UI.h"
@@ -433,17 +434,9 @@ namespace ms
 	{
 		std::string text = nl::nx::quest["QuestInfo.img"][std::to_string(selected)][std::to_string(selected_state)];
 
-		NpcTextMarkup::Lookups lookups {
-			[]() { return Stage::get().get_player().get_name(); },
-			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
-			[](int32_t id) { return ItemData::get(id).get_name(); },
-			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
-			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
-		};
-
 		std::vector<NpcTextMarkup::InlineImage> tags;
 		description = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
-			NpcTextMarkup::expand(quest_text(text, selected), lookups, &tags), TEXT_WIDTH);
+			NpcTextMarkup::expand(quest_text(text, selected), UINpcTalk::markup_lookups(), &tags), TEXT_WIDTH);
 		images.set(tags, description);
 
 		int16_t view = TEXT_VIEW.length() - (TEXT_POS.y() - TEXT_VIEW.first());

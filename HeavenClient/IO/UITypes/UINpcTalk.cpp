@@ -699,7 +699,16 @@ namespace ms
 			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
 			[](int32_t id) { return ItemData::get(id).get_name(); },
 			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
-			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
+			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; },
+			[](int32_t id) { return std::string(nl::nx::quest["QuestInfo.img"][std::to_string(id)]["name"]); },
+			[](int32_t id)
+			{
+				auto& quests = Stage::get().get_player().get_quests();
+				int16_t quest = static_cast<int16_t>(id);
+
+				return NpcTextMarkup::quest_state(quests.is_started(quest), quests.is_completed(quest));
+			},
+			[](int32_t id) { return std::string(nl::nx::string["Skill.img"][string_format::extend_id(id, 7)]["name"]); }
 		};
 	}
 
