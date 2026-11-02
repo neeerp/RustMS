@@ -30,6 +30,9 @@ namespace ms
 		constexpr Point<int16_t> OUT_COIN_BUTTON = Point<int16_t>(5, 294);
 		constexpr Point<int16_t> IN_COIN_BUTTON = Point<int16_t>(236, 294);
 		constexpr Point<int16_t> NPC_FEET = Point<int16_t>(53, 76);
+		// The player stands in the right box, as in the shop (7c70c8: the
+		// local user's look, standing).
+		constexpr Point<int16_t> PLAYER_FEET = Point<int16_t>(288, 75);
 		// The right ends of the stored and carried mesos.
 		constexpr Point<int16_t> STORED_MESO = Point<int16_t>(190, 296);
 		constexpr Point<int16_t> CARRIED_MESO = Point<int16_t>(418, 296);
@@ -104,9 +107,9 @@ namespace ms
 		}
 	}
 
-	UIStorage::UIStorage(const Inventory &in_inventory)
-			: UIDragElement<PosSTORAGE>(), inventory(in_inventory), npcid(0), put_fee(0), get_fee(0), slots(0),
-			  meso(0), tab(InventoryType::Id::EQUIP), pending(false)
+	UIStorage::UIStorage(const CharLook &in_charlook, const Inventory &in_inventory)
+			: UIDragElement<PosSTORAGE>(), charlook(in_charlook), inventory(in_inventory), npcid(0), put_fee(0),
+			  get_fee(0), slots(0), meso(0), tab(InventoryType::Id::EQUIP), pending(false)
 	{
 		nl::node src = NxFiles::ui_classic["UIWindow.img"]["Trunk"];
 
@@ -175,6 +178,7 @@ namespace ms
 		UIElement::draw_sprites(alpha);
 
 		npc.draw(DrawArgument(position + NPC_FEET, true));
+		charlook.draw(position + PLAYER_FEET, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
 
 		stored_meso_label.draw(position + STORED_MESO);
 		carried_meso_label.draw(position + CARRIED_MESO);
