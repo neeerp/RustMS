@@ -104,13 +104,19 @@ add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 
 [mobs.3400003]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4032508, prob = 1.0, quest = 2273 },  # The Secret Recipe
+]
 
 [mobs.3400004]
 add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 
 [mobs.3400005]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4032508, prob = 1.0, quest = 2273 },  # The Secret Recipe
+]
 
 [mobs.3400006]
 add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
@@ -119,7 +125,10 @@ add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 
 [mobs.3400008]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4032508, prob = 0.08, quest = 2273 },  # The Secret Recipe
+]
 
 [mobs.4300000]
 add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
@@ -140,13 +149,22 @@ add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 
 [mobs.4300006]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4032506, prob = 0.08, quest = 2277 },  # Marshall's Refusal
+]
 
 [mobs.4300007]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4032506, prob = 0.08, quest = 2277 },  # Marshall's Refusal
+]
 
 [mobs.4300008]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4032506, prob = 0.08, quest = 2277 },  # Marshall's Refusal
+]
 
 [mobs.4300009]
 add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
@@ -181,7 +199,10 @@ add = [{ item = 4001156, prob = 1.0 }]
 # Pentagram's last circle takes for The Black Magician's Magic Pentagram
 # (3345, Quest.nx QuestInfo.img/3345/1: from the monsters of Magatia). The
 # pack has no drop for it; Cosmic's rate.
-add = [{ item = 4031740, prob = 0.04, quest = 3345 }]
+add = [
+    { item = 4031740, prob = 0.04, quest = 3345 },
+    { item = 4031737, prob = 0.4, quest = 3343 },  # The Hidden Words
+]
 
 [mobs.7110300]
 # D. Roy drops its Magic Stone of Trust 4031741, likewise.
@@ -592,7 +613,10 @@ add = [{ item = 4032399, prob = 0.2, quest = 2251 }]
 
 [mobs.2230131]
 # Annoyed Zombie Mushroom (Studying the Mushroom Signals 2's): the same.
-add = [{ item = 4032399, prob = 0.2, quest = 2251 }]
+add = [
+    { item = 4032399, prob = 0.2, quest = 2251 },
+    { item = 4032321, prob = 0.02, quest = 21727 },  # Zombie Mushrooms
+]
 
 [mobs.3210207]
 # Tick drops the Bird Feed 4031992 that grows the Timer's Egg for A Cute
@@ -1337,46 +1361,97 @@ add = [{ item = 4031874, prob = 0.06, quest = 6390 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.130100]
-add = [{ item = 4030009, prob = 0.028 }]
+add = [
+    { item = 4030009, prob = 0.028 },
+    { item = 4001358, prob = 0.02, quest = 28248 },  # Calming the Soul with Music
+    { item = 4031773, prob = 0.08, quest = 2145 },  # Stump Research
+    { item = 4032374, prob = 0.08, quest = 2405 },  # The Lost Letter of Commendation
+    { item = 4032378, prob = 0.08, quest = 2408 },  # The Lost Letter of Commendation
+]
 
 [mobs.210100]
-add = [{ item = 4030000, prob = 0.01 }]
+add = [
+    { item = 4030000, prob = 0.01 },
+    { item = 4032376, prob = 0.08, quest = 2406 },  # The Lost Letter of Commendation
+    { item = 4032377, prob = 0.08, quest = 2407 },  # The Lost Letter of Commendation
+]
 
 [mobs.1110101]
-add = [{ item = 4030009, prob = 0.028 }]
+add = [
+    { item = 4030009, prob = 0.028 },
+    { item = 4001360, prob = 0.12, quest = 28248 },  # Calming the Soul with Music
+    { item = 4031773, prob = 0.08, quest = 2145 },  # Stump Research
+    { item = 4001371, prob = 0.04, quest = 28261 },  # Who Broke the Seal of Marbas?
+    { item = 4001347, prob = 0.16, quest = 28229 },  # The Fairies Like...
+    { item = 4032374, prob = 0.08, quest = 2405 },  # The Lost Letter of Commendation
+    { item = 4032376, prob = 0.08, quest = 2406 },  # The Lost Letter of Commendation
+]
 
 [mobs.1120100]
 add = [
     { item = 4030010, prob = 0.077 },
     { item = 4030012, prob = 0.125 },
+    { item = 4001365, prob = 0.08, quest = 28192 },  # Virus Sample Research
+    { item = 4001361, prob = 0.07, quest = 28250 },  # The Mystery of the White Portion
+    { item = 4001349, prob = 0.2, quest = 28235 },  # So the Demons Like Noise?
+    { item = 4032378, prob = 0.08, quest = 2408 },  # The Lost Letter of Commendation
 ]
 
 [mobs.1140100]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4031773, prob = 0.08, quest = 2145 },  # Stump Research
+]
 
 [mobs.1210100]
 add = [
     { item = 4030011, prob = 0.077 },
     { item = 4030012, prob = 0.125 },
+    { item = 4032340, prob = 0.2, quest = 21710 },  # A Monster War?
+    { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
+    { item = 4032379, prob = 0.08, quest = 2409 },  # The Lost Letter of Commendation
 ]
 
 [mobs.1210101]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4001342, prob = 0.07, quest = 28175 },  # A Special Wine
+    { item = 4001370, prob = 0.04, quest = 28260 },  # Who Broke the Seal of Crocell?
+    { item = 4001357, prob = 0.07, quest = 28244 },  # Grendel the Really Tipsy
+    { item = 4001350, prob = 0.2, quest = 28235 },  # So the Demons Like Noise?
+    { item = 4032377, prob = 0.08, quest = 2407 },  # The Lost Letter of Commendation
+]
 
 [mobs.1210102]
-add = [{ item = 4030001, prob = 0.01 }]
+add = [
+    { item = 4030001, prob = 0.01 },
+    { item = 4032314, prob = 0.15, quest = 21709 },  # Check Out the Orange Mushroom
+    { item = 4001345, prob = 0.07, quest = 28170 },  # What Does Chief Stan Like?
+    { item = 4001354, prob = 0.08, quest = 28209 },  # Baine Likes...
+    { item = 4001364, prob = 0.08, quest = 28192 },  # Virus Sample Research
+]
 
 [mobs.2100103]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.2110200]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032390, prob = 0.2, quest = 2248 },  # Understanding the Horny Mushroom Signals
+    { item = 4001368, prob = 0.04, quest = 28258 },  # Who Broke the Seal of Valefor?
+]
 
 [mobs.2220100]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4001351, prob = 0.2, quest = 28237 },  # The Legendary Revival
+]
 
 [mobs.2230100]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4001373, prob = 0.2, quest = 28282 },  # How to Avoid the Stink
+]
 
 [mobs.2230103]
 add = [{ item = 4030012, prob = 0.125 }, { item = 4030016, prob = 0.077 }]
@@ -1385,7 +1460,10 @@ add = [{ item = 4030012, prob = 0.125 }, { item = 4030016, prob = 0.077 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.2230110]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032146, prob = 0.04, quest = 20722 },  # Wooden Mask
+]
 
 [mobs.3210200]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1454,7 +1532,10 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.4230116]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4031926, prob = 0.01, quest = 3454 },  # Wave Translator
+]
 
 [mobs.4230120]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1478,7 +1559,10 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.5300100]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4031925, prob = 0.1, quest = 2223 },  # The Name He Calls
+]
 
 [mobs.6130101]
 add = [{ item = 4030001, prob = 0.01 }]
@@ -1505,10 +1589,16 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.7130002]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032511, prob = 0.06, quest = 3718 },  # Andy the Time Traveler
+]
 
 [mobs.7130003]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032511, prob = 0.06, quest = 3718 },  # Andy the Time Traveler
+]
 
 [mobs.7130020]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1520,13 +1610,22 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.8140102]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032511, prob = 0.06, quest = 3718 },  # Andy the Time Traveler
+]
 
 [mobs.8140110]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032511, prob = 0.06, quest = 3718 },  # Andy the Time Traveler
+]
 
 [mobs.8140111]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032511, prob = 0.06, quest = 3718 },  # Andy the Time Traveler
+]
 
 [mobs.8150000]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1544,19 +1643,29 @@ add = [{ item = 4030009, prob = 0.028 }]
 add = [
     { item = 4030011, prob = 0.077 },
     { item = 4030012, prob = 0.125 },
+    { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
 ]
 
 [mobs.9300059]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4001342, prob = 0.07, quest = 28175 },  # A Special Wine
+]
 
 [mobs.9300155]
 add = [
     { item = 4030011, prob = 0.077 },
     { item = 4030012, prob = 0.125 },
+    { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
 ]
 
 [mobs.9300274]
-add = [{ item = 4030001, prob = 0.01 }]
+add = [
+    { item = 4030001, prob = 0.01 },
+    { item = 4032190, prob = 0.05, quest = 20705 },  # A Cynical Orange Mushroom
+    { item = 4032314, prob = 0.15, quest = 21709 },  # Check Out the Orange Mushroom
+    { item = 4032315, prob = 0.05, quest = 21711 },  # Enter the Cynical Orange Mushrooms!
+]
 
 [mobs.9300332]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1571,12 +1680,20 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030000, prob = 0.01 }]
 
 [mobs.9300342]
-add = [{ item = 4030001, prob = 0.01 }]
+add = [
+    { item = 4030001, prob = 0.01 },
+    { item = 4032314, prob = 0.15, quest = 21709 },  # Check Out the Orange Mushroom
+    { item = 4001345, prob = 0.07, quest = 28170 },  # What Does Chief Stan Like?
+    { item = 4001354, prob = 0.08, quest = 28209 },  # Baine Likes...
+    { item = 4001364, prob = 0.08, quest = 28192 },  # Virus Sample Research
+]
 
 [mobs.9300343]
 add = [
     { item = 4030011, prob = 0.077 },
     { item = 4030012, prob = 0.125 },
+    { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
+    { item = 4032340, prob = 0.2, quest = 21710 },  # A Monster War?
 ]
 
 [mobs.9303004]
@@ -1601,10 +1718,14 @@ add = [{ item = 4030009, prob = 0.028 }]
 add = [
     { item = 4030011, prob = 0.077 },
     { item = 4030012, prob = 0.125 },
+    { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
 ]
 
 [mobs.9400242]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4001342, prob = 0.07, quest = 28175 },  # A Special Wine
+]
 
 [mobs.9400246]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1655,10 +1776,14 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [
     { item = 4030011, prob = 0.077 },
     { item = 4030012, prob = 0.125 },
+    { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
 ]
 
 [mobs.9500102]
-add = [{ item = 4030001, prob = 0.01 }]
+add = [
+    { item = 4030001, prob = 0.01 },
+    { item = 4001345, prob = 0.07, quest = 28170 },  # What Does Chief Stan Like?
+]
 
 [mobs.9500104]
 add = [
@@ -1733,7 +1858,10 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.3110101]
-add = [{ item = 4030014, prob = 0.077 }]
+add = [
+    { item = 4030014, prob = 0.077 },
+    { item = 4031527, prob = 0.4, quest = 8849 },  # Amoria : The Sakura Garden 2 - Finishing Touches
+]
 
 [mobs.3210203]
 add = [{ item = 4030015, prob = 0.077 }]
@@ -1805,4 +1933,263 @@ replace = [
     { item = 1082074, prob = 0.002 },
     { item = 1002285, prob = 0.001287 },
     { item = 1002210, prob = 0.002 },
+]
+
+# Quest drops the pack lacks, at Cosmic's rates (152-drop-data, for the same
+# quest): the items supported quests check for (Quest.nx Check.img/*/1/item)
+# that no mob, reactor, shop or reward gives (v83ref QUESTIONS b428).
+
+[mobs.130101]
+# Red Snail.
+add = [{ item = 4001359, prob = 0.024, quest = 28248 }]  # Calming the Soul with Music
+
+[mobs.1110100]
+# Green Mushroom.
+add = [
+    { item = 4001369, prob = 0.04, quest = 28259 },  # Who Broke the Seal of Amdusias?
+    { item = 4032317, prob = 0.04, quest = 21717 },  # Rowen's Request 1
+    { item = 4032318, prob = 0.04, quest = 21718 },  # Rowen's Request 2
+    { item = 4001348, prob = 0.8, quest = 28231 },  # Restoring the Memory of the Ancient Bow
+    { item = 4032379, prob = 0.08, quest = 2409 },  # The Lost Letter of Commendation
+]
+
+[mobs.1110130]
+# Dejected Green Mushroom.
+add = [
+    { item = 4032316, prob = 0.05, quest = 21714 },  # Green Mushrooms
+    { item = 4032317, prob = 0.04, quest = 21717 },  # Rowen's Request 1
+    { item = 4032318, prob = 0.04, quest = 21718 },  # Rowen's Request 2
+]
+
+[mobs.1130100]
+# Axe Stump.
+add = [{ item = 4031773, prob = 0.08, quest = 2145 }]  # Stump Research
+
+[mobs.1140130]
+# Smirking Ghost Stump.
+add = [
+    { item = 4031773, prob = 0.08, quest = 2145 },  # Stump Research
+    { item = 4032319, prob = 0.1, quest = 21723 },  # Find the Puppet
+]
+
+[mobs.1210103]
+# Bubbling.
+add = [
+    { item = 4032137, prob = 0.04, quest = 20711 },  # Fake Doll
+    { item = 4032139, prob = 0.04, quest = 20713 },  # A Deal With Mr. Pickall
+]
+
+[mobs.2100108]
+# Meerkat.
+add = [{ item = 4031568, prob = 0.08, quest = 3911 }]  # Making the Fancy Sword
+
+[mobs.2110300]
+# Sand Rat.
+add = [{ item = 4032402, prob = 0.1, quest = 2263 }]  # Camel's Training Session 3 (Repeatable)
+
+[mobs.2110301]
+# Scorpion.
+add = [{ item = 4032401, prob = 0.1, quest = 2261 }]  # Camel's Training Session 1 (Repeatable)
+
+[mobs.2130100]
+# Dark Axe Stump.
+add = [
+    { item = 4031773, prob = 0.2, quest = 2145 },  # Stump Research
+    { item = 4001367, prob = 0.04, quest = 28257 },  # Who Broke the Seal of Andras?
+]
+
+[mobs.2230102]
+# Wild Boar.
+add = [{ item = 4001372, prob = 0.2, quest = 28282 }]  # How to Avoid the Stink
+
+[mobs.2230111]
+# Rocky Mask.
+add = [{ item = 4032147, prob = 0.04, quest = 20723 }]  # Stone Mask
+
+[mobs.3110302]
+# Rumo.
+add = [{ item = 4031694, prob = 0.05, quest = 3312 }]  # Russellon's Items for Experiment
+
+[mobs.3110303]
+# Triple Rumo.
+add = [{ item = 4031694, prob = 0.1, quest = 3312 }]  # Russellon's Items for Experiment
+
+[mobs.3300003]
+# Helmet Pepe.
+add = [{ item = 4001317, prob = 0.02, quest = 2326 }]  # James's Whereabouts (2)
+
+[mobs.4230117]
+# Zeta Gray.
+add = [{ item = 4031926, prob = 0.01, quest = 3454 }]  # Wave Translator
+
+[mobs.4230118]
+# Ultra Gray.
+add = [{ item = 4031926, prob = 0.01, quest = 3454 }]  # Wave Translator
+
+[mobs.4240000]
+# Chief Gray.
+add = [{ item = 4031926, prob = 1.0, quest = 3454 }]  # Wave Translator
+
+[mobs.5100004]
+# Samiho.
+add = [{ item = 4031790, prob = 0.1, quest = 3642 }]  # Chil Sung's Request
+
+[mobs.5130107]
+# Coolie Zombie.
+add = [{ item = 4001207, prob = 0.1, quest = 20402 }]  # Black Scale
+
+[mobs.5130108]
+# Miner Zombie.
+add = [{ item = 4001207, prob = 0.1, quest = 20402 }]  # Black Scale
+
+[mobs.5220003]
+# Timer.
+add = [{ item = 4031991, prob = 1.0, quest = 3248 }]  # Operation Strategy 1 : Collect All the Eggs
+
+[mobs.6110301]
+# Saitie.
+add = [{ item = 4031745, prob = 0.005, quest = 3358 }]  # Parwen's Pass
+
+[mobs.7120103]
+# Red Slime.
+add = [{ item = 4032513, prob = 0.2, quest = 3722 }]  # The Crying Girl's Sketchbook
+
+[mobs.7120104]
+# Silver Slime.
+add = [{ item = 4032513, prob = 0.2, quest = 3722 }]  # The Crying Girl's Sketchbook
+
+[mobs.7120105]
+# Gold Slime.
+add = [{ item = 4032513, prob = 0.2, quest = 3722 }]  # The Crying Girl's Sketchbook
+
+[mobs.7120106]
+# Overlord A.
+add = [{ item = 4032514, prob = 0.06, quest = 3727 }]  # The Shelter Key
+
+[mobs.7120107]
+# Overlord B.
+add = [{ item = 4032514, prob = 0.06, quest = 3727 }]  # The Shelter Key
+
+[mobs.7130004]
+# Hankie.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.7130500]
+# Rash.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.7130501]
+# Dark Rash.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.7130600]
+# Hobi.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.7130601]
+# Green Hobi.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.7220002]
+# King Sage Cat.
+add = [{ item = 4031789, prob = 1.0, quest = 3844 }]  # Eliminating King Sage Cat
+
+[mobs.8140001]
+# Harp.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.8140002]
+# Blood Harp.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.8140101]
+# Black Kentaurus.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.8140103]
+# Blue Kentaurus.
+add = [{ item = 4032511, prob = 0.06, quest = 3718 }]  # Andy the Time Traveler
+
+[mobs.8220010]
+# Dunas.
+add = [{ item = 4032516, prob = 0.4, quest = 3735 }]  # The Wreckage of the Missile
+
+[mobs.8220011]
+# Aufheben.
+add = [{ item = 4032517, prob = 0.4, quest = 3740 }]  # What Was That I Saw?
+
+[mobs.8220012]
+# Oberon.
+add = [{ item = 4032518, prob = 0.4, quest = 3743 }]  # The New and Improved, Oberon
+
+[mobs.9001009]
+# Master of Disguise.
+add = [
+    { item = 4032102, prob = 0.7, quest = 20302 },  # The Master of Disguise
+    { item = 4032103, prob = 0.7, quest = 20303 },  # The Master of Disguise
+    { item = 4032104, prob = 0.7, quest = 20304 },  # The Master of Disguise
+    { item = 4032105, prob = 0.7, quest = 20305 },  # The Master of Disguise
+]
+
+[mobs.9300289]
+# Snipe of Competence.
+add = [
+    { item = 4032121, prob = 1.0, quest = 20602 },  # A New Skill for Blaze Wizards
+    { item = 4032122, prob = 1.0, quest = 20603 },  # A New Skill for Wind Archer
+    { item = 4032123, prob = 1.0, quest = 20604 },  # A New Skill for Night Walkers
+]
+
+[mobs.9300294]
+# Advanced Pianus.
+add = [
+    { item = 4032126, prob = 1.0, quest = 20612 },  # Another New Skill for Blaze Wizards
+    { item = 4032127, prob = 1.0, quest = 20613 },  # Another New Skill for Wind Archers
+    { item = 4032128, prob = 1.0, quest = 20614 },  # Another New Skill for Night Walker
+]
+
+[mobs.9300344]
+# Puppeteer.
+add = [{ item = 4032322, prob = 1.0, quest = 21731 }]  # Eliminate the Puppeteer!
+
+[mobs.9400614]
+# Strange Orange Mushroom.
+add = [
+    { item = 4001341, prob = 0.03, quest = 28172 },  # Searching for Clues
+    { item = 4001352, prob = 0.08, quest = 28205 },  # Searching for the Lost Book
+]
+
+[mobs.9400615]
+# Strange Ribbon Pig.
+add = [
+    { item = 4001341, prob = 0.03, quest = 28172 },  # Searching for Clues
+    { item = 4001352, prob = 0.08, quest = 28205 },  # Searching for the Lost Book
+]
+
+[mobs.9400616]
+# Strange Green Mushroom.
+add = [
+    { item = 4001341, prob = 0.03, quest = 28172 },  # Searching for Clues
+    { item = 4001352, prob = 0.08, quest = 28205 },  # Searching for the Lost Book
+]
+
+[mobs.9400617]
+# Strange Pig.
+add = [
+    { item = 4001352, prob = 0.08, quest = 28205 },  # Searching for the Lost Book
+    { item = 4001362, prob = 0.08, quest = 28252 },  # Searching for the Treasures
+    { item = 4001363, prob = 0.08, quest = 28252 },  # Searching for the Treasures
+]
+
+[mobs.9400655]
+# Strange Orange Mushroom.
+add = [
+    { item = 4001362, prob = 0.08, quest = 28252 },  # Searching for the Treasures
+    { item = 4001363, prob = 0.08, quest = 28252 },  # Searching for the Treasures
+]
+
+[mobs.9400656]
+# Strange Ribbon Pig.
+add = [
+    { item = 4001362, prob = 0.08, quest = 28252 },  # Searching for the Treasures
+    { item = 4001363, prob = 0.08, quest = 28252 },  # Searching for the Treasures
 ]
