@@ -67,7 +67,10 @@ namespace ms
 		sprites.emplace_back(backgrnd);
 		sprites.emplace_back(Notice["text"][message], TEXT_POS);
 
-		if (message == Message::DELETE_CONFIRMATION)
+		// v83 asks these with Yes and No (0x60eb58).
+		if (message == Message::DELETE_CONFIRMATION || message == Message::CASH_ITEMS_CONFIRM_DELETION
+			|| message == Message::FAMILY_CONFIRM_DELETION
+			|| message == Message::FAMILY_AND_CASH_ITEMS_CONFIRM_DELETION)
 		{
 			multiple = true;
 

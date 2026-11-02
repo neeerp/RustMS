@@ -140,22 +140,24 @@ namespace ms
 		bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE
 			|| cursorstate == Cursor::State::HSCROLLIDLE;
 
-		if (auto focusedelement = get(focused))
+		UIElement *focusedelement = get(focused);
+
+		// A notice closed by a key leaves its focus behind; the next press
+		// goes to the window in front, as one at a still cursor must.
+		if (focusedelement && !focusedelement->is_active())
+		{
+			focused = UIElement::Type::NONE;
+			focusedelement = nullptr;
+		}
+
+		if (focusedelement)
 		{
 			if (waits_for_camera(focused))
 				return Cursor::State::IDLE;
 
-			if (focusedelement->is_active())
-			{
-				remove_cursor(focusedelement->get_type());
+			remove_cursor(focusedelement->get_type());
 
-				return focusedelement->send_cursor(clicked, cursorpos);
-			} else
-			{
-				focused = UIElement::Type::NONE;
-
-				return cursorstate;
-			}
+			return focusedelement->send_cursor(clicked, cursorpos);
 		} else
 		{
 			if (auto front = get_front())
