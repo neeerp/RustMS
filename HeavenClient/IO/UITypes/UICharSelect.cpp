@@ -612,7 +612,7 @@ namespace ms
 
 			if (auto worldselect = UI::get().get_element<UIWorldSelect>())
 			{
-				worldselect->makeactive();
+				worldselect->come_back();
 				LoginScene::get().move_to(LoginScene::Step::WORLD_SELECT);
 			}
 

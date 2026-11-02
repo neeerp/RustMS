@@ -63,6 +63,12 @@ namespace ms
 
 		void remove_selected();
 
+		// Back from the character select. v83 drops the world select and
+		// the channel window on reaching it (CLogin step 2, 0x5f5ec9) and
+		// builds a new world select on the way back, so the channel panel
+		// only opens again for a world click (0x624b2f).
+		void come_back();
+
 		// The answer to the status request a picked world sent: 0 opens its
 		// channels, 1 also warns that it's busy, 2 says it's full and keeps
 		// the list (FUN_006283c1). `populated_level` picks the banner beside the
