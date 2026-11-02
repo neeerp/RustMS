@@ -819,6 +819,11 @@ namespace ms
 		state->show_item(parent, item_id, expiration, flags, owned, remain_life, owner);
 	}
 
+	void UI::show_template_equip(Tooltip::Parent parent, int32_t item_id)
+	{
+		state->show_template_equip(parent, item_id);
+	}
+
 	void UI::show_item(Tooltip::Parent parent, const storage_contents::Stored &item)
 	{
 		if (item.itemid / 10000 == 500)

@@ -130,6 +130,9 @@ namespace ms
 		void show_item(Tooltip::Parent parent, int32_t item_id, int64_t expiration = 0, int16_t flags = 0,
 					   bool owned = false, int32_t remain_life = 0, const std::string &owner = {});
 
+		// A kind of equip, before any upgrade, such as one an NPC shop sells.
+		void show_template_equip(Tooltip::Parent parent, int32_t item_id);
+
 		// An item as storage, a trade, a personal shop or a parcel carries it.
 		void show_item(Tooltip::Parent parent, const storage_contents::Stored &item);
 

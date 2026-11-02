@@ -1421,6 +1421,12 @@ gets only an enable-actions stat update.
   set, refilled for `unitPrice` per missing one, rounded up. The client
   sends it from the Rech. button on the stack's row in the shop window.
 
+Hovering a row shows the item's tooltip. An equip for sale shows the full
+equip tooltip with its Character.nx stats, as v83 does: its shop-open handler
+builds each row's item from the template (0x752a9b), and the hover goes to the
+equip tooltip (FUN_007541c7). The 2025 client also shows the equipped item
+beside it (FUN_008eba5b). HeavenClient leaves that out (QUESTIONS b424).
+
 ## Storage
 
 An account's storage (`game::Storage`) holds mesos and up to its slot count

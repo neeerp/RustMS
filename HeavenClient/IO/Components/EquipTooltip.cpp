@@ -236,6 +236,17 @@ namespace ms
 		}
 	}
 
+	void EquipTooltip::set_template(Tooltip::Parent p, int32_t item_id)
+	{
+		if (parent == p && invpos == -1 && template_id == item_id)
+			return;
+
+		parent = p;
+		invpos = -1;
+		build(template_equip(item_id), "", "");
+		template_id = item_id;
+	}
+
 	void EquipTooltip::set_commodity(int32_t item_id, int32_t period)
 	{
 		parent = Tooltip::Parent::CASHSHOP;
@@ -262,6 +273,8 @@ namespace ms
 	void EquipTooltip::build(const Equip &equip, const std::string &expirystr, const std::string &giftstr,
 							 int64_t cash_id)
 	{
+		template_id = 0;
+
 		const CharStats &charstats = Stage::get().get_player().get_stats();
 		int32_t item_id = equip.get_item_id();
 		const EquipData &equipdata = EquipData::get(item_id);

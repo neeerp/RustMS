@@ -716,7 +716,12 @@ namespace ms
 			return;
 
 		int32_t itemid = items[absslot].get_id();
-		UI::get().show_item(Tooltip::Parent::SHOP, itemid);
+
+		// An equip for sale shows its stats as Character.nx makes it.
+		if (itemid / 1000000 == 1)
+			UI::get().show_template_equip(Tooltip::Parent::SHOP, itemid);
+		else
+			UI::get().show_item(Tooltip::Parent::SHOP, itemid);
 	}
 
 	void UIShop::BuyState::add(BuyItem item)

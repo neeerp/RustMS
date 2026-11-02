@@ -50,6 +50,8 @@ namespace ms
 		void set_cash_item(int32_t item_id, int64_t expiration, const std::string &gift_from);
 		// An equip that is not the player's, as a packet made it: in storage, a trade, a shop or a parcel.
 		void set_stored(Tooltip::Parent parent, const Equip &equip, bool cash);
+		// A kind of equip, as Character.nx makes it, such as one an NPC shop sells.
+		void set_template(Tooltip::Parent parent, int32_t item_id);
 
 		void draw(Point<int16_t> position) const override;
 
@@ -69,6 +71,8 @@ namespace ms
 
 		Tooltip::Parent parent;
 		int16_t invpos;
+		// The kind of equip set_template last showed, so moving over it does not build again.
+		int32_t template_id = 0;
 		Point<int16_t> size;
 		// The box's, at least WIDTH.
 		int16_t width;
