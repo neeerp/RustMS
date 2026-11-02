@@ -80,6 +80,7 @@ namespace ms
 		// An equip that is not the player's: in storage, a trade, a shop, a parcel or a search result.
 		// `cash` if it has a Cash Shop serial.
 		virtual void show_stored_equip(Tooltip::Parent parent, const Equip &equip, bool cash) {}
+		virtual void show_template_equip(Tooltip::Parent parent, int32_t item_id) {}
 
 		virtual void show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags,
 							   bool owned, int32_t remain_life, const std::string &owner) = 0;

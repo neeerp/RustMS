@@ -753,6 +753,13 @@ namespace ms
 		tooltipparent = parent;
 	}
 
+	void UIStateGame::show_template_equip(Tooltip::Parent parent, int32_t item_id)
+	{
+		eqtooltip.set_template(parent, item_id);
+		tooltip = eqtooltip;
+		tooltipparent = parent;
+	}
+
 	void UIStateGame::show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags,
 								bool owned, int32_t remain_life, const std::string &owner)
 	{
