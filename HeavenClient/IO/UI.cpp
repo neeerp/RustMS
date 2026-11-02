@@ -419,6 +419,12 @@ namespace ms
 			{
 				npctalk->send_key(mapping.action, pressed, escape);
 				sent = true;
+			} else if (notice_open && (escape || enter))
+			{
+				// A notice is modal over the window that raised it: Enter and
+				// Esc answer it, and must not close a shop or storage behind it.
+				notice->send_key(mapping.action, pressed, escape);
+				sent = true;
 			} else if (statusbar && statusbar->is_menu_active())
 			{
 				statusbar->send_key(mapping.action, pressed, escape);
