@@ -253,7 +253,10 @@ namespace ms
 			if (status == 0)
 				quests.remove(id);
 			else if (status == 1)
+			{
 				quests.add_started(id, record = recv.read_string());
+				quests.record_updated(id, Stage::get().get_player().get_inventory());
+			}
 			else if (status == 2)
 				quests.add_completed(id, recv.read_long());
 

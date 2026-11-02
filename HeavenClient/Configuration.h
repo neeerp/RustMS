@@ -896,6 +896,14 @@ namespace ms
 		{}
 	};
 
+	// Each character's Quest Helper list and AUTO, as QuestAlarm::format writes them
+	// (CConfig's per-character QuestAlarm_* values).
+	struct QuestAlarms : public Configuration::StringEntry
+	{
+		QuestAlarms() : StringEntry("QuestAlarm", "")
+		{}
+	};
+
 	template<typename T>
 	// Can be used to access settings.
 	struct Setting

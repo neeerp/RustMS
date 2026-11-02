@@ -145,6 +145,11 @@ namespace ms
 		quitted = true;
 	}
 
+	void UI::close()
+	{
+		state = std::make_unique<UIStateNull>();
+	}
+
 	bool UI::not_quitted() const
 	{
 		return !quitted;

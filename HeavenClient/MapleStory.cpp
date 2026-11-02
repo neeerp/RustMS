@@ -15,6 +15,7 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
+#include "Configuration.h"
 #include "Gameplay/Stage.h"
 #include "IO/UI.h"
 #include "IO/Window.h"
@@ -127,6 +128,12 @@ namespace ms
 				}
 			}
 		}
+
+		// Leave the UI state and write the settings before static destruction,
+		// whose order across the singletons is unspecified: UIStateLogin's
+		// destructor used to reach an already destroyed LoginScene.
+		UI::get().close();
+		Configuration::get().save();
 
 		Sound::close();
 	}
