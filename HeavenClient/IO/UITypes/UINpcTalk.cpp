@@ -87,6 +87,8 @@ namespace ms
 		// A box text writes in the balloon font, A12M's face with the
 		// tightest lines we have, and is a line a row instead of 12 px.
 		constexpr Text::Font BOX_FONT = Text::Font::BALLOON;
+		// The speaker's name plate, as wide as its bar, which it centres.
+		constexpr int16_t NAME_WIDTH = 121;
 
 		// How far apart a font's lines are, and so how far below its anchor
 		// its first line's baseline sits.
@@ -124,7 +126,7 @@ namespace ms
 		buttons[Buttons::QYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQYes"]);
 		buttons[Buttons::YES] = std::make_unique<MapleButton>(UtilDlgEx["BtYes"]);
 
-		name = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
+		name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE);
 
 		onmoved = [&](bool upwards)
 		{
@@ -160,7 +162,8 @@ namespace ms
 			speaker.draw(DrawArgument(center_pos, flip_speaker));
 
 		nametag.draw(speaker_pos);
-		name.draw(center_pos + Point<int16_t>(0, -4));
+		name.draw_between(speaker_pos + Point<int16_t>(name_x, -4),
+						  Range<int16_t>(speaker_pos.x(), speaker_pos.x() + NAME_WIDTH));
 
 		Point<int16_t> origin = position + text_origin();
 		Range<int16_t> rows = visible_rows();
@@ -947,6 +950,14 @@ namespace ms
 			std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
 			name.change_text(namestr);
 		}
+
+		// Arial 12 (98a707 font 0). A name too wide for the plate is cut to
+		// fit with "..", but still placed by its full width (9a73fe, 9a7481),
+		// so the plate's left edge hides its first letters.
+		name_x = (NAME_WIDTH - name.width()) / 2;
+
+		if (name.width() > NAME_WIDTH)
+			string_format::format_with_ellipsis(name, NAME_WIDTH);
 
 		// A prompt never scrolls (9a3d71).
 		show_slider = !has_field() && block + PADDING > MAX_HEIGHT;
