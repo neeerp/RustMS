@@ -104,6 +104,8 @@ namespace ms
 		int8_t user_type;
 		Texture canvas, mark;
 		OutlinedText street, name;
+		// The folded bar's names.
+		Text min_street, min_name;
 		int16_t scale = 1;
 		Point<int16_t> center_offset;
 		int16_t width = MIN_WIDTH;

@@ -39,10 +39,13 @@ namespace ms
 		// Laid out from footage, against the window's top-left corner or,
 		// for the buttons, its right edge.
 		const Point<int16_t> TITLE = { 8, 10 };
-		const Point<int16_t> TITLE_MIN = { 8, 7 };
 		const Point<int16_t> MARK = { 6, 23 };
 		constexpr int16_t NAME_X = 49, STREET_Y = 22, NAME_Y = 38, NAME_RIGHT = 10;
 		constexpr int16_t BT_Y = 6, BT_Y_MIN = 4, BT_MIN_RIGHT = 68, BT_MAX_RIGHT = 55, BT_MAP_RIGHT = 41;
+		// Folded, v83 (0x856ad1) writes the map name at (6, 3) and the street
+		// 7 px after it, spaced by the bold names' widths +5 each. The bar is
+		// those two spans +80 wide (0x85640e), its buttons 2 px further in (0x8583ea).
+		constexpr int16_t MIN_TEXT_X = 6, MIN_TEXT_Y = 3 - 6, MIN_GAP = 7, MIN_EXTRA = 80, BT_MIN_SHIFT = 2;
 	}
 
 	UIMiniMap::Frame::Frame(nl::node src) :
@@ -100,6 +103,8 @@ namespace ms
 
 		street = OutlinedText(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, Color::Name::SANJUAN);
 		name = OutlinedText(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, Color::Name::SANJUAN);
+		min_street = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		min_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
 		user_type = Setting<MiniMapType>::get().load();
 		type = user_type;
@@ -113,7 +118,8 @@ namespace ms
 			min_center.draw(DrawArgument(position + Point<int16_t>(min_left.get_dimensions().x(), 0),
 				Point<int16_t>(width - min_left.get_dimensions().x() - min_right.get_dimensions().x(), 0)));
 			min_right.draw(position + Point<int16_t>(width - min_right.get_dimensions().x(), 0));
-			title.draw(position + TITLE_MIN);
+			min_name.draw(position + Point<int16_t>(MIN_TEXT_X, MIN_TEXT_Y));
+			min_street.draw(position + Point<int16_t>(name.width() + 5 + MIN_GAP, MIN_TEXT_Y));
 		}
 		else
 		{
@@ -195,6 +201,8 @@ namespace ms
 		NxHelper::Map::MapInfo info = NxHelper::Map::get_map_info_by_id(mapid);
 		street.change_text(info.street_name);
 		name.change_text(info.name);
+		min_street.change_text(info.street_name);
+		min_name.change_text(info.name);
 
 		portals.clear();
 
@@ -231,7 +239,7 @@ namespace ms
 
 		if (type == Type::MIN)
 		{
-			width = MIN_WIDTH;
+			width = street.width() + 5 + name.width() + 5 + MIN_EXTRA;
 			dimension = Point<int16_t>(width, min_center.get_dimensions().y());
 		}
 		else
@@ -248,9 +256,10 @@ namespace ms
 		dragarea = Point<int16_t>(width, 20);
 
 		int16_t y = type == Type::MIN ? BT_Y_MIN : BT_Y;
-		buttons[BT_MIN]->set_position(Point<int16_t>(width - BT_MIN_RIGHT, y));
-		buttons[BT_MAX]->set_position(Point<int16_t>(width - BT_MAX_RIGHT, y));
-		buttons[BT_MAP]->set_position(Point<int16_t>(width - BT_MAP_RIGHT, y));
+		int16_t in = type == Type::MIN ? BT_MIN_SHIFT : 0;
+		buttons[BT_MIN]->set_position(Point<int16_t>(width - BT_MIN_RIGHT - in, y));
+		buttons[BT_MAX]->set_position(Point<int16_t>(width - BT_MAX_RIGHT - in, y));
+		buttons[BT_MAP]->set_position(Point<int16_t>(width - BT_MAP_RIGHT - in, y));
 		buttons[BT_MIN]->set_state(type == Type::MIN ? Button::State::DISABLED : Button::State::NORMAL);
 		buttons[BT_MAX]->set_state(type == Type::MAX || !has_map ? Button::State::DISABLED : Button::State::NORMAL);
 	}
