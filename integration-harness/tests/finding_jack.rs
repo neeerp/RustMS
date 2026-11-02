@@ -61,8 +61,8 @@ async fn jack_john_elpam_and_lukan_carry_the_masteria_story() {
     send(c, to(map, npc)).await;
     barrier(c, &m, &mut trace).await;
     let t = step(c, &m, build_quest_action(SCRIPT_START, 8219, npc)).await;
-    assert_eq!(t.prompts, [(npc, 1)]);
-    step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(npc, 12)]);
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&8219), Some(&1));
 
@@ -79,14 +79,14 @@ async fn jack_john_elpam_and_lukan_carry_the_masteria_story() {
 
     // Lost in Translation 1: Jack's letter, the data's end at John.
     step(c, &m, build_quest_action(SCRIPT_START, 8227, npc)).await;
-    step(c, &m, answer(1, 1, None)).await;
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&8227), Some(&1));
     assert_eq!(t.items, [(CODED_COMMUNIQUE, 1)]);
 
     // Stemming the Tide, ended with the keystone kept.
     step(c, &m, build_quest_action(SCRIPT_START, 8230, npc)).await;
-    step(c, &m, answer(1, 1, None)).await;
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&8230), Some(&1));
     step(c, &m, build_quest_action(SCRIPT_END, 8230, npc)).await;
@@ -102,7 +102,7 @@ async fn jack_john_elpam_and_lukan_carry_the_masteria_story() {
     assert_eq!(t.states.get(&8227), Some(&2));
     // Lost in Translation 2: the letter already held goes to Elpam.
     step(c, &m, build_quest_action(SCRIPT_START, 8228, npc)).await;
-    step(c, &m, answer(1, 1, None)).await;
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&8228), Some(&1));
     assert!(t.items.is_empty(), "{t:?}");
@@ -122,7 +122,7 @@ async fn jack_john_elpam_and_lukan_carry_the_masteria_story() {
     send(c, to(map, npc)).await;
     barrier(c, &m, &mut trace).await;
     step(c, &m, build_quest_action(SCRIPT_START, 8229, npc)).await;
-    let t = step(c, &m, answer(1, 1, None)).await;
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.states.get(&8229), Some(&1));
     assert_eq!(t.items, [(TRANSLATED_COMMUNIQUE, 1)]);
 
@@ -142,7 +142,7 @@ async fn jack_john_elpam_and_lukan_carry_the_masteria_story() {
     send(c, to(map, npc)).await;
     barrier(c, &m, &mut trace).await;
     step(c, &m, build_quest_action(SCRIPT_START, 8222, npc)).await;
-    step(c, &m, answer(1, 1, None)).await;
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&8222), Some(&1));
     step(c, &m, build_quest_action(SCRIPT_END, 8222, npc)).await;

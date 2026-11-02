@@ -57,8 +57,8 @@ async fn sent(c: &mut MapleTestConnection, m: &str, quest: i16) -> Trace {
     );
     send(c, walk_to(SECRETARY_AT.0, SECRETARY_AT.1)).await;
     let t = step(c, m, build_quest_action(SCRIPT_START, quest, SECRETARY)).await;
-    assert_eq!(t.prompts, [(SECRETARY, 1)], "asked");
-    let t = step(c, m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(SECRETARY, 12)], "asked");
+    let t = step(c, m, answer(12, 1, None)).await;
     assert_eq!(t.prompts, [(SECRETARY, 0)], "told where to go");
     step(c, m, answer(0, 1, None)).await
 }

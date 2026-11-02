@@ -97,8 +97,8 @@ async fn the_camel_cab_tells_the_way_to_the_mushroom_castle() {
 
     // The Meerkats: asked, then started with its clock.
     let t = step(c, &m, build_quest_action(SCRIPT_START, 2258, CAMEL_CAB)).await;
-    assert_eq!(t.prompts, [(CAMEL_CAB, 1)]);
-    step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(CAMEL_CAB, 12)]);
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.progress, [(2258, 1)]);
     assert_eq!(

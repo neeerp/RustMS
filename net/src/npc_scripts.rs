@@ -3849,6 +3849,26 @@ impl NpcScript {
         self.page > 0 && matches!(self.pages[self.page - 1], Page::Say(_) | Page::Reply(_))
     }
 
+    /// Whether reading on through `pages` starts a quest before anything
+    /// else is asked: on a page that acts, or at the script's end.
+    fn starts_quest(&self, pages: &[Page]) -> bool {
+        let starts = |effects: &[Effect]| {
+            effects
+                .iter()
+                .any(|effect| matches!(effect, Effect::StartQuest(_)))
+        };
+        for page in pages {
+            match page {
+                Page::Say(_) | Page::Reply(_) => {}
+                Page::Act { effects, .. } if starts(effects) => return true,
+                Page::Act { .. } => {}
+                Page::Done(effects) => return starts(effects) || starts(&self.on_end),
+                _ => return false,
+            }
+        }
+        starts(&self.on_end)
+    }
+
     fn step(&self, mut effects: Vec<Effect>) -> Step {
         let npc_id = self.npc_id;
         let prompt = match &self.pages[self.page] {
@@ -3885,19 +3905,24 @@ impl NpcScript {
                 has_next: false,
                 player_speaks: self.player_speaks,
             }),
-            // A yes that starts a quest is the quest's offer, as Cosmic's
-            // sendAcceptDecline.
+            // A yes that starts a quest, at once or on the pages it leads
+            // to, is the quest's offer, as Cosmic's sendAcceptDecline.
             Page::Ask { text, on_yes, .. } => Prompt::YesNo {
                 npc_id,
                 text: text.clone(),
                 quest: on_yes
                     .iter()
-                    .any(|effect| matches!(effect, Effect::StartQuest(_))),
+                    .any(|effect| matches!(effect, Effect::StartQuest(_)))
+                    || self.starts_quest(&self.pages[self.page + 1..]),
             },
-            Page::Decide { text, .. } => Prompt::YesNo {
+            Page::Decide {
+                text,
+                on_yes,
+                on_no,
+            } => Prompt::YesNo {
                 npc_id,
                 text: text.clone(),
-                quest: false,
+                quest: self.starts_quest(on_yes) && !self.starts_quest(on_no),
             },
             Page::Menu { text, choices } => {
                 let mut menu = text.clone();
@@ -21499,7 +21524,7 @@ mod tests {
 
         // 2258 asks first; no is the end of it.
         let mut meerkats = script("q2258s", OUTSIDE_ARIANT);
-        assert_eq!(kind(&meerkats.begin()), Some(1));
+        assert_eq!(kind(&meerkats.begin()), Some(12));
         let no = meerkats.respond(ScriptInput::No).unwrap();
         assert_eq!((no.prompt, no.effects), (None, vec![]));
         let mut meerkats = script("q2258s", OUTSIDE_ARIANT);
@@ -22786,7 +22811,7 @@ mod tests {
         let mut no = NpcScript::for_quest("q3933s", &player(50)).unwrap();
         assert_eq!(no.npc_id(), ARDIN);
         no.begin();
-        assert_eq!(kind(&no.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(kind(&no.respond(ScriptInput::Next).unwrap()), Some(12));
         let declined = no.respond(ScriptInput::No).unwrap();
         assert_eq!((declined.prompt, declined.effects), (None, vec![]));
         let mut yes = NpcScript::for_quest("q3933s", &player(50)).unwrap();
@@ -22865,7 +22890,7 @@ mod tests {
             let script = || NpcScript::for_quest(name, &player(50)).unwrap();
             let mut no = script();
             no.begin();
-            assert_eq!(kind(&no.respond(ScriptInput::Next).unwrap()), Some(1));
+            assert_eq!(kind(&no.respond(ScriptInput::Next).unwrap()), Some(12));
             let declined = no.respond(ScriptInput::No).unwrap();
             assert_eq!((declined.prompt, declined.effects), (None, vec![]));
             let mut yes = script();
@@ -22889,7 +22914,7 @@ mod tests {
             let mut step = script.begin();
             loop {
                 let input = match kind(&step) {
-                    Some(1) => ScriptInput::Yes,
+                    Some(1 | 12) => ScriptInput::Yes,
                     _ => ScriptInput::Next,
                 };
                 if !step.effects.is_empty() {
@@ -22932,7 +22957,7 @@ mod tests {
         let mut parwen = verifying_the_password(rng);
         parwen.begin();
         let ask = parwen.respond(ScriptInput::Next).unwrap();
-        assert_eq!(kind(&ask), Some(1));
+        assert_eq!(kind(&ask), Some(12));
         let code = parwen.respond(ScriptInput::Yes).unwrap();
         let [_, Effect::SetQuestInfo { quest, value }] =
             &parwen.respond(ScriptInput::Next).unwrap().effects[..]
@@ -25956,6 +25981,51 @@ mod tests {
             let (lenario, step) = lenario_picks(&player, view, choice);
             says_one_page(lenario, &step);
         }
+    }
+
+    #[test]
+    fn a_yes_that_leads_to_a_quests_start_is_its_offer() {
+        let ask = || Page::Ask {
+            text: "Will you?".into(),
+            on_yes: Vec::new(),
+            on_no: None,
+        };
+        let say = || Page::Say("Off you go.".into());
+        let asked = |pages: Vec<Page>, on_end: Vec<Effect>| {
+            let mut script = NpcScript::new(2000, pages);
+            script.on_end = on_end;
+            kind(&script.begin())
+        };
+        let start = || vec![Effect::StartQuest(1021)];
+        // Started at the script's end, or on a page that acts.
+        assert_eq!(asked(vec![ask(), say()], start()), Some(12));
+        let act = Page::Act {
+            text: "Here.".into(),
+            effects: start(),
+        };
+        assert_eq!(asked(vec![ask(), say(), act], Vec::new()), Some(12));
+        assert_eq!(
+            asked(vec![ask(), Page::Done(start())], Vec::new()),
+            Some(12)
+        );
+        // Not if another question comes first, a page ends it, or nothing starts.
+        assert_eq!(asked(vec![ask(), ask()], start()), Some(1));
+        assert_eq!(
+            asked(vec![ask(), Page::End("No.".into())], start()),
+            Some(1)
+        );
+        assert_eq!(asked(vec![ask(), say()], Vec::new()), Some(1));
+        // A decision is the offer when only its yes starts the quest.
+        let decide = |on_no: Vec<Page>| Page::Decide {
+            text: "Will you?".into(),
+            on_yes: vec![Page::Done(start())],
+            on_no,
+        };
+        assert_eq!(asked(vec![decide(vec![say()])], Vec::new()), Some(12));
+        assert_eq!(
+            asked(vec![decide(vec![Page::Done(start())])], Vec::new()),
+            Some(1)
+        );
     }
 
     #[test]

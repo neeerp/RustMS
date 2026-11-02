@@ -52,8 +52,8 @@ async fn lita_and_taggrin_start_their_quests() {
         build_quest_action(SCRIPT_START, FOOLS_GOLD, LITA_LAWLESS),
     )
     .await;
-    assert_eq!(t.prompts, [(LITA_LAWLESS, 1)]);
-    let t = step(c, &m, answer(1, 0, None)).await;
+    assert_eq!(t.prompts, [(LITA_LAWLESS, 12)]);
+    let t = step(c, &m, answer(12, 0, None)).await;
     assert_eq!(t.prompts, [(LITA_LAWLESS, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
     assert!(t.states.is_empty(), "{t:?}");
@@ -64,7 +64,7 @@ async fn lita_and_taggrin_start_their_quests() {
         build_quest_action(SCRIPT_START, FOOLS_GOLD, LITA_LAWLESS),
     )
     .await;
-    let t = step(c, &m, answer(1, 1, None)).await;
+    let t = step(c, &m, answer(12, 1, None)).await;
     assert_eq!(t.prompts, [(LITA_LAWLESS, 0)]);
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&FOOLS_GOLD), Some(&1));
@@ -80,7 +80,7 @@ async fn lita_and_taggrin_start_their_quests() {
         build_quest_action(SCRIPT_START, FOOLS_GOLD_AGAIN, LITA_LAWLESS),
     )
     .await;
-    step(c, &m, answer(1, 1, None)).await;
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&FOOLS_GOLD_AGAIN), Some(&1));
 
@@ -96,7 +96,7 @@ async fn lita_and_taggrin_start_their_quests() {
         build_quest_action(SCRIPT_START, THE_FALLEN_WOODS, TAGGRIN),
     )
     .await;
-    step(c, &m, answer(1, 1, None)).await;
+    step(c, &m, answer(12, 1, None)).await;
     let t = step(c, &m, answer(0, 1, None)).await;
     assert_eq!(t.states.get(&THE_FALLEN_WOODS), Some(&1));
 }
