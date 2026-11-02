@@ -218,6 +218,7 @@ namespace ms
 				}
 		);
 
+		numfield.set_keeps_focus();
 		numfield.set_state(Textfield::State::FOCUSED);
 	}
 
@@ -338,6 +339,7 @@ namespace ms
 				}
 		);
 
+		textfield.set_keeps_focus();
 		textfield.set_state(Textfield::State::FOCUSED);
 	}
 

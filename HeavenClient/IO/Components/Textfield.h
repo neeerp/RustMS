@@ -71,6 +71,11 @@ namespace ms
 		// Keep drawing the text while disabled, as v83's edits do
 		// (0x4ca700).
 		void set_shown_disabled();
+		// Keep the focus when a click lands outside, as the edit of a v83
+		// modal dialog does: the window manager sends every click to the
+		// modal (0x9e42b2), which hands the focus back to its edit
+		// (0x9e0369).
+		void set_keeps_focus();
 
 		// Wrap the text at width pixels instead of keeping it on one line,
 		// its lines `line_adj` px closer than the font's. With `max_rows`,
@@ -162,6 +167,7 @@ namespace ms
 		int8_t crypt;
 		bool digits = false;
 		bool shown_disabled = false;
+		bool keeps_focus = false;
 		State state;
 		bool selected = false;
 		Text selectedlabel;
