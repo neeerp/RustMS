@@ -334,6 +334,10 @@ namespace ms
 		// Set whether the map is one to fly through (MapInfo::is_flying).
 		void set_flymap(bool flymap);
 
+		// Set whether the player stands only in the Cash Shop's preview
+		// (map -1), out of any field.
+		void set_previewing(bool previewing);
+
 		// Whether the player swims or flies when off a platform: in water,
 		// or in a fly map (CanJumpInAir, r25 0x9b214a, for a user).
 		bool is_afloat() const;
@@ -639,6 +643,7 @@ namespace ms
 		Optional<const Ladder> ladder;
 
 		bool underwater;
+		bool previewing = false;
 
 		static constexpr int64_t JUMP_AFLOAT_DELAY = 300;
 		int64_t jumped_afloat_at = -JUMP_AFLOAT_DELAY;

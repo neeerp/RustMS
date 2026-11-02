@@ -334,6 +334,7 @@ namespace ms
 		weather.stop_sounds();
 		weather = mapid == -1 ? MapWeather() : MapWeather(src["weather"], mapinfo.get_bgm());
 		jukebox = false;
+		player.set_previewing(mapid == -1);
 
 		if (mapid != -1)
 			player.get_stats().set_mapid(mapid);
