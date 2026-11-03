@@ -746,23 +746,23 @@ namespace ms
 		if (tag.tag == 'f' || tag.tag == 'F')
 		{
 			image.texture = path_image(tag.arg);
-			image.size = image.texture.get_dimensions();
-			image.anchor = image.texture.get_origin();
 		} else
 		{
-			// Icons fill a 32x32 slot, their origin at its bottom left.
 			int32_t id = tag.arg.size() <= 9 ? std::stoi(tag.arg) : 0;
 
 			if (tag.tag == 's')
 				image.texture = SkillData::get(id).get_icon(SkillData::Icon::NORMAL);
 			else if (ItemData::get(id).is_valid())
 				image.texture = ItemData::get(id).get_icon(false);
+		}
 
-			if (image.texture.is_valid())
-			{
-				image.size = Point<int16_t>(32, 32);
-				image.anchor = Point<int16_t>(0, 32);
-			}
+		// Every image is its own canvas's size and is drawn from its top
+		// left (0x99e5f2, 0x9a4362): a 58x66 icon (Hersha's plant, 4032206)
+		// makes its line that tall rather than rising over the text above.
+		if (image.texture.is_valid())
+		{
+			image.size = image.texture.get_dimensions();
+			image.anchor = image.texture.get_origin();
 		}
 
 		return image;

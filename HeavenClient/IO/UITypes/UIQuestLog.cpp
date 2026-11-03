@@ -107,8 +107,6 @@ namespace ms
 		constexpr Point<int16_t> HELPER_POS = Point<int16_t>(150, 372);
 		constexpr Point<int16_t> FORFEIT_POS = Point<int16_t>(242, 372);
 		constexpr Point<int16_t> FIND_NPC_POS = Point<int16_t>(217, 372);
-		// Item icons take a 32x32 box in the description.
-		constexpr int16_t ICON_SIZE = 32;
 
 		// The list's area headings by QuestInfo.img/<id>/area. Most are read
 		// from period footage; the rest name the region their quests are in.
@@ -317,9 +315,11 @@ namespace ms
 
 			if ((tag.tag == 'i' || tag.tag == 'v') && tag.arg.size() <= 9 && ItemData::get(std::stoi(tag.arg)).is_valid())
 			{
+				// An icon is its own canvas's size, drawn from its top left
+				// (0x99e5f2, 0x9a4362), as a path image is.
 				image.texture = ItemData::get(std::stoi(tag.arg)).get_icon(false);
-				image.size = Point<int16_t>(ICON_SIZE, ICON_SIZE);
-				image.anchor = Point<int16_t>(0, ICON_SIZE);
+				image.size = image.texture.get_dimensions();
+				image.anchor = image.texture.get_origin();
 			}
 			else if (tag.tag == 'f' || tag.tag == 'F')
 			{
