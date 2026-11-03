@@ -359,14 +359,15 @@ namespace ms
 
 	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level,
 		const std::function<int32_t(int32_t)>& count,
-		const std::function<bool(const QuestInfo&)>& holds) const
+		const std::function<bool(const QuestInfo&)>& holds,
+		const std::function<bool(const QuestInfo&)>& completable) const
 	{
 		return select_quest_marker(npc_id, job, QuestCatalog::get().quests(), [&](int16_t id) { return state(id); }, level, count,
 			[&](int16_t id)
 			{
 				auto iter = started.find(id);
 				return iter == started.end() ? std::string() : iter->second;
-			}, holds);
+			}, holds, completable);
 	}
 
 	bool QuestLog::is_started(int16_t qid)
