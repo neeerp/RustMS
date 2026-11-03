@@ -1667,6 +1667,8 @@ pub mod keys {
     pub const KERNING_TRASH_CAN_FOUND: &str = "kerning_trash_can.found";
     pub const KERNING_TRASH_CAN_FULL: &str = "kerning_trash_can.full";
     pub const KERNING_TRASH_CAN_EMPTY: &str = "kerning_trash_can.empty";
+    pub const LUKE_PROOF: &str = "luke.proof";
+    pub const LUKE_FULL: &str = "luke.full";
     pub const TREE_STUMP_BOTTLED: &str = "tree_stump.bottled";
     pub const TREE_STUMP_FULL: &str = "tree_stump.full";
     pub const TREE_STUMP_SAP: &str = "tree_stump.sap";
@@ -5279,6 +5281,8 @@ mod tests {
                 keys::KERNING_TRASH_CAN_FOUND,
                 keys::KERNING_TRASH_CAN_FULL,
                 keys::KERNING_TRASH_CAN_EMPTY,
+                keys::LUKE_PROOF,
+                keys::LUKE_FULL,
                 keys::TREE_STUMP_BOTTLED,
                 keys::TREE_STUMP_FULL,
                 keys::TREE_STUMP_SAP,

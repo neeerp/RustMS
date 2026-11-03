@@ -2533,6 +2533,9 @@ impl NpcScript {
         if npc_id == KERNING_TRASH_CAN {
             return Some(kerning_trash_can(player));
         }
+        if npc_id == LUKE {
+            return luke(player);
+        }
         if OTHER_TRASH_CANS.contains(&npc_id) {
             let empty = Page::Say(text(keys::KERNING_TRASH_CAN_EMPTY));
             return Some(NpcScript::new(npc_id, vec![empty]));
@@ -5941,6 +5944,29 @@ fn kerning_trash_can(player: &Player) -> NpcScript {
         script.inventory_full = Some(text(keys::KERNING_TRASH_CAN_FULL));
     }
     script
+}
+
+/// Luke, the guard at the dungeon entrance (106010100).
+const LUKE: i32 = 1040000;
+/// Catching the Suspect (28177), which ends with Luke's proof.
+const CATCHING_THE_SUSPECT: i16 = 28177;
+const LUKES_PROOF: i32 = 4032479;
+
+/// Luke's proof for one on Catching the Suspect (28177) without it (Cosmic
+/// `1040000`); anyone else gets his own lines.
+fn luke(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(CATCHING_THE_SUSPECT) != QuestState::Started
+        || player.inventory.count(LUKES_PROOF) > 0
+    {
+        return None;
+    }
+    let mut script = NpcScript::new(LUKE, vec![Page::Say(text(keys::LUKE_PROOF))]);
+    script.on_end = vec![Effect::GiveItem {
+        item_id: LUKES_PROOF,
+        quantity: 1,
+    }];
+    script.inventory_full = Some(text(keys::LUKE_FULL));
+    Some(script)
 }
 
 /// The Nautilus's trash can (Npc.nx `nautil_letter`), holding the letter
@@ -22734,6 +22760,33 @@ mod tests {
         let leave = NpcScript::for_quest("q20700s", &knight).unwrap();
         let done = vec![Effect::FinishQuest(ARE_YOU_SURE_YOU_CAN_LEAVE)];
         assert_eq!(yes_through(leave), (NEINHEART, done));
+    }
+
+    #[test]
+    fn luke_hands_his_proof_to_one_catching_the_suspect() {
+        let mut hunter = player(50);
+        assert!(NpcScript::for_npc(LUKE, &hunter).is_none());
+        hunter.quests.upsert(game::QuestRecord {
+            quest_id: CATCHING_THE_SUSPECT,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let mut script = NpcScript::for_npc(LUKE, &hunter).unwrap();
+        assert_eq!(page_text(&script.begin()), text(keys::LUKE_PROOF));
+        let proof = vec![Effect::GiveItem {
+            item_id: LUKES_PROOF,
+            quantity: 1,
+        }];
+        assert_eq!(
+            yes_through(NpcScript::for_npc(LUKE, &hunter).unwrap()),
+            (LUKE, proof)
+        );
+        hunter
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(LUKES_PROOF, 1));
+        assert!(NpcScript::for_npc(LUKE, &hunter).is_none());
     }
 
     #[test]
