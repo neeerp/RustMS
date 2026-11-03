@@ -19,6 +19,7 @@
 
 #include "UICashBuy.h"
 #include "UICashGift.h"
+#include "UICashSearch.h"
 #include "UICouponDialog.h"
 #include "UINotice.h"
 
@@ -354,12 +355,12 @@ namespace ms
 			subtab_pos.shift_x(text.width());
 		}
 
-		if (tab == MAIN)
+		if (!listing())
 		{
 			if (subtab < 2)
 				how_to[subtab].draw(position + LIST_POS);
 		}
-		else if (listed.empty() && tab != WISH_LIST)
+		else if (listed.empty() && tab != WISH_LIST && !searching)
 		{
 			sold_out.draw(position + LIST_POS);
 		}
@@ -611,7 +612,7 @@ namespace ms
 	{
 		size_t first = page * PAGE_SIZE;
 
-		if (tab == MAIN || first >= listed.size())
+		if (!listing() || first >= listed.size())
 			return 0;
 
 		return static_cast<int16_t>(std::min(PAGE_SIZE, listed.size() - first));
@@ -665,6 +666,10 @@ namespace ms
 			// v83 (0x471240) ignores it while a request is out.
 			if (!pending)
 				UI::get().emplace<UICouponDialog>();
+
+			return Button::State::NORMAL;
+		case Buttons::BT_SEARCH:
+			UI::get().emplace<UICashSearch>();
 
 			return Button::State::NORMAL;
 		case Buttons::BT_CHECK:
@@ -748,8 +753,9 @@ namespace ms
 		{
 			Tab clicked_tab = in_bar.x() >= WISH_LIST_LEFT ? WISH_LIST : static_cast<Tab>(std::min<int16_t>(in_bar.x() / TAB_WIDTH, PACKAGE));
 
-			// v83's bar (FUN_004d9adb) clicks only when the tab changes.
-			if (clicked && clicked_tab != tab)
+			// v83's bar (FUN_004d9adb) clicks only when the tab changes,
+			// and any tab leaves a search.
+			if (clicked && (clicked_tab != tab || searching))
 			{
 				Sound(Sound::Name::BUTTONCLICK).play();
 				change_tab(clicked_tab);
@@ -759,7 +765,7 @@ namespace ms
 		}
 
 		// The sub-tabs, laid out left to right in the bar.
-		if (cursor.y() >= SUBTAB_POS.y() && cursor.y() < SUBTAB_POS.y() + 16)
+		if (!searching && cursor.y() >= SUBTAB_POS.y() && cursor.y() < SUBTAB_POS.y() + 16)
 		{
 			int16_t x = SUBTAB_POS.x();
 
@@ -783,7 +789,7 @@ namespace ms
 		}
 
 		// The page numbers under the list; every other text is a separator.
-		if (tab != MAIN && cursor.y() >= PAGES_POS.y() && cursor.y() < PAGES_POS.y() + 16)
+		if (listing() && cursor.y() >= PAGES_POS.y() && cursor.y() < PAGES_POS.y() + 16)
 		{
 			int16_t width = 0;
 
@@ -838,7 +844,7 @@ namespace ms
 		// the icons it stays up until the cursor leaves the list.
 		Point<int16_t> in_list = cursor - LIST_WINDOW;
 
-		if (tab != MAIN && in_list.x() >= 0 && in_list.y() >= 0 && in_list.x() < LIST_SIZE.x()
+		if (listing() && in_list.x() >= 0 && in_list.y() >= 0 && in_list.x() < LIST_SIZE.x()
 			&& in_list.y() < LIST_SIZE.y())
 		{
 			for (size_t i = 0; i < PAGE_SIZE && page * PAGE_SIZE + i < listed.size(); i++)
@@ -1022,7 +1028,7 @@ namespace ms
 		}
 
 		// A commodity's icon tries it on.
-		for (size_t i = 0; tab != MAIN && i < PAGE_SIZE && page * PAGE_SIZE + i < listed.size(); i++)
+		for (size_t i = 0; listing() && i < PAGE_SIZE && page * PAGE_SIZE + i < listed.size(); i++)
 		{
 			Point<int16_t> in_icon = cursor - LIST_POS - LIST_ICON
 				- Point<int16_t>(CELL_STEP.x() * (i % LIST_COLUMNS), CELL_STEP.y() * (i / LIST_COLUMNS));
@@ -1913,11 +1919,34 @@ namespace ms
 
 	void UICashShop::change_tab(Tab new_tab)
 	{
+		searching = false;
 		tab = new_tab;
 		subtab = 0;
 		page = 0;
 
 		update_list();
+	}
+
+	void UICashShop::show_search(const std::string& query, int32_t min, int32_t max)
+	{
+		found.clear();
+
+		for (const Commodity& commodity : search(commodities, query, min, max, [](int32_t item_id) { return ItemData::get(item_id).get_name(); }))
+			found.push_back(commodity.sn);
+
+		// The results are a category of their own (v83 473681, 46cafe(10))
+		// on MAIN's blue bar (0xbd8b14).
+		searching = true;
+		tab = MAIN;
+		subtab = 0;
+		page = 0;
+
+		update_list();
+	}
+
+	bool UICashShop::listing() const
+	{
+		return tab != MAIN || searching;
 	}
 
 	void UICashShop::change_subtab(size_t new_subtab)
@@ -1941,13 +1970,22 @@ namespace ms
 
 		const std::vector<std::string>& names = subtab_names[tab];
 
-		for (size_t i = 0; i < names.size(); i++)
+		// The search and the wish list have a line in the sub-tabs' place
+		// (v83 4b694b, StringPool 0x12ea and 0x238).
+		if (searching)
+			subtab_texts.emplace_back(subtab_font(true), Text::Alignment::LEFT, Color::Name::WHITE, "This is your search result.");
+		else if (tab == WISH_LIST)
+			subtab_texts.emplace_back(subtab_font(true), Text::Alignment::LEFT, Color::Name::WHITE, "This is your wish list.");
+
+		for (size_t i = 0; !searching && i < names.size(); i++)
 		{
 			std::string text = i + 1 < names.size() ? names[i] + " |" : names[i];
 			subtab_texts.emplace_back(subtab_font(i == subtab), Text::Alignment::LEFT, subtab_color(tab), text);
 		}
 
-		if (tab == WISH_LIST)
+		if (searching)
+			listed = find(commodities, found);
+		else if (tab == WISH_LIST)
 			listed = find(commodities, wish_list);
 		else if (tab == MAIN)
 			listed.clear();
@@ -1990,7 +2028,7 @@ namespace ms
 		for (size_t i = 0; i < PAGE_SIZE; i++)
 		{
 			size_t index = page * PAGE_SIZE + i;
-			bool shown = tab != MAIN && index < listed.size();
+			bool shown = listing() && index < listed.size();
 			uint16_t first = Buttons::BT_LIST + 3 * i;
 
 			// A commodity for mesos, or for nothing, has no GIFT or WISH (v83 4baa51).
