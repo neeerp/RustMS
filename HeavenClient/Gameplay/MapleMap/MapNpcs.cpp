@@ -117,18 +117,25 @@ namespace ms
 
 	Cursor::State MapNpcs::send_cursor(bool released, Point<int16_t> position, Point<int16_t> viewpos)
 	{
-		for (auto &map_object : npcs)
+		// v83 takes the first NPC whose rect or sprite box holds the point
+		// (6d92ee). Every rect is tried before any box here, so a big sprite
+		// such as a Maple TV's does not take the clicks of an NPC under it.
+		for (bool sprites : { false, true })
 		{
-			Npc *npc = static_cast<Npc *>(map_object.second.get());
-
-			if (npc && npc->is_active() && npc->inrange(position, viewpos))
+			for (auto &map_object : npcs)
 			{
-				// The client offers the NPC's quests itself; only plain speech
-				// goes to the server.
-				if (released)
-					QuestConversation::talk_to_npc(npc->get_npcid(), npc->get_oid());
+				Npc *npc = static_cast<Npc *>(map_object.second.get());
 
-				return Cursor::State::CANCLICK;
+				if (npc && npc->is_active() &&
+					(sprites ? npc->insprite(position, viewpos) : npc->inrange(position, viewpos)))
+				{
+					// The client offers the NPC's quests itself; only plain speech
+					// goes to the server.
+					if (released)
+						QuestConversation::talk_to_npc(npc->get_npcid(), npc->get_oid());
+
+					return Cursor::State::CANCLICK;
+				}
 			}
 		}
 

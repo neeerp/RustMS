@@ -80,6 +80,8 @@ namespace ms
 
 		// Check if the NPC is in range of the cursor.
 		bool inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const;
+		// Check if the cursor is on the box of the NPC's current frame.
+		bool insprite(Point<int16_t> cursorpos, Point<int16_t> viewpos) const;
 
 		// Returns the NPC name
 		std::string get_name();

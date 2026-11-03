@@ -237,6 +237,28 @@ namespace ms
 				absp + quest_marker_offset() - quest_marker_animation.get_origin() + quest_marker_animation.get_dimensions()).contains(cursorpos));
 	}
 
+	bool Npc::insprite(Point<int16_t> cursorpos, Point<int16_t> viewpos) const
+	{
+		if (!active || !enabled)
+			return false;
+
+		auto iter = animations.find(stance);
+
+		if (iter == animations.end())
+			return false;
+
+		// v83 also takes a click anywhere on the box of the sprite's frame
+		// (6d4029, 6d935a), so an NPC drawn far from its spot, like New Leaf
+		// City's taxi, can still be clicked.
+		Point<int16_t> origin = iter->second.get_origin();
+		Point<int16_t> dimensions = iter->second.get_dimensions();
+		Point<int16_t> absp = get_position() + viewpos;
+		int16_t left = flip ? absp.x() + origin.x() - dimensions.x() : absp.x() - origin.x();
+		int16_t top = absp.y() - origin.y();
+
+		return Rectangle<int16_t>(left, left + dimensions.x(), top, top + dimensions.y()).contains(cursorpos);
+	}
+
 	int16_t Npc::head_height() const
 	{
 		// Anchor to the standing sprite so changing NPC poses does not move what
