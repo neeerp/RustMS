@@ -106,6 +106,16 @@ int main()
 		require(hunt_marker() == QuestMarker::IN_PROGRESS, "the item alone is not enough");
 		progress = "001";
 		require(hunt_marker() == QuestMarker::READY, "kills and item complete the hunt");
+		// The rest of 721d2c (mesos and the like) comes from the menu's check.
+		bool payable = false;
+		auto fee_marker = [&]() {
+			return ms::select_quest_marker(2002, 0, {hunt}, [](int16_t) { return 1; }, 1,
+				[&](int32_t) { return shells; }, [&](int16_t) { return progress; }, anyone,
+				[&](const ms::QuestInfo&) { return payable; });
+		};
+		require(fee_marker() == QuestMarker::IN_PROGRESS, "a quest the NPC cannot complete yet keeps the open book");
+		payable = true;
+		require(fee_marker() == QuestMarker::READY, "the closed book once the NPC can complete it");
 		require(ms::decode_kills("003012") == std::vector<int16_t>({3, 12}), "progress decodes three digits per mob");
 		// v83 checks the NPC, items, quests, then kills (FUN_00721d2c).
 		hunt.end_prerequisites = {{1034, 2}};

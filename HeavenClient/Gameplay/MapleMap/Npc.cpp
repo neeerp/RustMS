@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Npc.h"
 #include "NpcIdle.h"
+#include "../QuestConversation.h"
 #include "../Stage.h"
 #include "../../Constants.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
@@ -172,7 +173,8 @@ namespace ms
 			const Inventory& inventory = player.get_inventory();
 			QuestMarker next = quests.npc_marker(npcid, job, level,
 				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); },
-				[&](const QuestInfo& quest) { return player.quest_start_met(quest); });
+				[&](const QuestInfo& quest) { return player.quest_start_met(quest); },
+				[&](const QuestInfo& quest) { return QuestConversation::completable(quest, npcid); });
 			if (next != quest_marker)
 			{
 				quest_marker = next;

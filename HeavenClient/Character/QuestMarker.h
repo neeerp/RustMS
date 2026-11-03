@@ -348,6 +348,11 @@ namespace ms
 			holds(quest);
 	}
 
+	struct AnyCompletable
+	{
+		bool operator()(const QuestInfo&) const { return true; }
+	};
+
 	// The icon over an NPC, as v83 chooses it (FUN_006d1779). The NPC's quests
 	// are those it starts or finishes, less party quests (1200-1399). A started
 	// quest it can finish now (kills, items and Check/1 quests in, as 721d2c
@@ -355,11 +360,13 @@ namespace ms
 	// otherwise a quest it can start gives the bulb, and a started quest the
 	// open book. Kept free of graphics so the choice can be tested.
 	// `progress` gives a started quest's progress string (its kill counts),
-	// and `holds` checks start_holdings_met.
-	template<class Status, class Count, class Progress, class Holds>
+	// and `holds` checks start_holdings_met. `completable` is the rest of
+	// 721d2c (mesos, pets, buffs, the Monster Book, ranks), which the NPC's
+	// menu also uses, so the closed book and the menu's group agree.
+	template<class Status, class Count, class Progress, class Holds, class Completable = AnyCompletable>
 	QuestMarker select_quest_marker(int32_t npc_id, int16_t job,
 		const std::vector<QuestInfo>& quests, Status status, int16_t level, Count count,
-		Progress progress, Holds holds)
+		Progress progress, Holds holds, Completable completable = {})
 	{
 		bool available = false, in_progress = false;
 
@@ -380,7 +387,7 @@ namespace ms
 				{
 					std::string record = progress(quest.end_info_record);
 
-					if (end_info_met(quest, &record))
+					if (end_info_met(quest, &record) && completable(quest))
 						return QuestMarker::READY;
 				}
 

@@ -79,11 +79,13 @@ namespace ms
 		bool is_completed(int16_t id) const;
 		const std::map<int16_t, std::string>& started_quests() const;
 		const std::map<int16_t, int64_t>& completed_quests() const;
-		// `count` gives how many of an item the player holds, and `holds`
-		// whether they meet a quest's start_holdings_met.
+		// `count` gives how many of an item the player holds, `holds`
+		// whether they meet a quest's start_holdings_met, and `completable`
+		// whether the NPC can complete a started quest now.
 		QuestMarker npc_marker(int32_t npc_id, int16_t job, int16_t level,
 			const std::function<int32_t(int32_t)>& count,
-			const std::function<bool(const QuestInfo&)>& holds) const;
+			const std::function<bool(const QuestInfo&)>& holds,
+			const std::function<bool(const QuestInfo&)>& completable) const;
 		uint64_t revision() const;
 		// The records kept beside the quest log ("quest record ex"), each
 		// "k=v;k=v" as the server sends it whole, which the Quest Log's #j
