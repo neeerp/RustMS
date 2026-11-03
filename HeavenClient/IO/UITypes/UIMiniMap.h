@@ -106,7 +106,7 @@ namespace ms
 		nl::node map;
 		bool has_map = false;
 		int8_t type;
-		// The type the player chose, kept while towns force MAX.
+		// The type the player chose, kept while a map without one folds the window.
 		int8_t user_type;
 		Texture canvas, mark;
 		OutlinedText street, name;

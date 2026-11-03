@@ -229,9 +229,8 @@ namespace ms
 			portals.push_back({ Point<int16_t>(portal["x"], portal["y"]), tip, portal["pn"], target });
 		}
 
-		// Towns open with their mark and names.
-		nl::node town = map_info["town"];
-		set_type(!has_map ? Type::MIN : town && town.get_bool() ? Type::MAX : user_type);
+		// v83 keeps the player's choice in every map, towns too (FUN_00858344).
+		set_type(has_map ? user_type : Type::MIN);
 	}
 
 	bool UIMiniMap::switched_on = true;
