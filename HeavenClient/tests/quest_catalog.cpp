@@ -194,6 +194,17 @@ int main()
 		return 1;
 	}
 
+	// A Mission in Henesys keys its third page "2 = Your destination ...";
+	// v83 shows it after the second.
+	ms::QuestScript mission = catalog.script(20704, false);
+
+	if (mission.yes.size() != 4 || mission.yes[2].rfind("Your destination is Ellinia", 0) != 0 ||
+		mission.yes[3].rfind("Find Roca", 0) != 0)
+	{
+		std::cerr << "Quest 20704's yes pages did not parse as expected\n";
+		return 1;
+	}
+
 	std::cout << "All " << catalog.quests().size() << " supported quests load\n";
 	return 0;
 }
