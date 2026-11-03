@@ -2711,6 +2711,8 @@ impl NpcScript {
                 return Some(parwen())
             }
             SECRET_PASSAGE => return secret_passage(player),
+            CARSON | HUMANOID_A => return magatia_errand(npc_id, player),
+            DE_LANG_DESK => return de_lang_desk(player),
             KEROBEN => return Some(keroben(player)),
             SQUAD_SLATE => return Some(squad_slate(player)),
             CRYSTAL_OF_ROOTS => return Some(crystal_of_roots(player)),
@@ -4485,6 +4487,43 @@ pub const SECRET_PASSAGE: i32 = 2111024;
 /// Parwen's password: this many of `PASSWORD_CHARS`.
 const PASSWORD_LEN: usize = 10;
 const PASSWORD_CHARS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/// Carson's experiment (3310) and Humanoid A's snow rose (3335): while one
+/// is under way and its item not yet held, its NPC sends the player into
+/// its room (Cosmic `2111000.js`, `2111003.js`); otherwise the NPC says its
+/// String.nx line (`DEFAULT_LINE_NPCS`).
+const HUMANOID_A: i32 = 2111003;
+const MAGATIA_ERRANDS: [(i32, i16, i32, i32); 2] = [
+    (CARSON, 3310, 4031709, 926120100),
+    (HUMANOID_A, 3335, 4031695, 926120300),
+];
+/// The desk in De Lang's home, which only says something while The Clue
+/// (3311) is under way: the player's own thought (Cosmic `2111014.js`).
+const DE_LANG_DESK: i32 = 2111014;
+const THE_CLUE: i16 = 3311;
+
+fn magatia_errand(npc: i32, player: &Player) -> Option<NpcScript> {
+    let &(_, quest, item, room) = MAGATIA_ERRANDS.iter().find(|errand| errand.0 == npc)?;
+    if player.quests.state(quest) != QuestState::Started || player.inventory.count(item) > 0 {
+        return None;
+    }
+    Some(NpcScript::new(
+        npc,
+        vec![Page::Done(vec![Effect::WarpToPortal(
+            room,
+            scripts::named(room, "out00"),
+        )])],
+    ))
+}
+
+fn de_lang_desk(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(THE_CLUE) != QuestState::Started {
+        return None;
+    }
+    let mut script = NpcScript::new(DE_LANG_DESK, vec![Page::Say(text(keys::DE_LANG_DIARY))]);
+    script.player_speaks = true;
+    Some(script)
+}
 
 /// Parwen once What Parwen Knows is taken: straight to Dran's Lab (Cosmic
 /// `2111006.js`).
@@ -23004,6 +23043,45 @@ mod tests {
                     .unwrap();
             assert_eq!(parwen.begin().effects, [Effect::Warp(DRANS_LAB)]);
         }
+    }
+
+    #[test]
+    fn carson_and_humanoid_a_send_one_into_their_rooms_until_the_item_is_held() {
+        for (npc, quest, item, room) in MAGATIA_ERRANDS {
+            assert_eq!(NpcScript::for_npc(npc, &with_quests(&[])), None);
+            assert_eq!(
+                NpcScript::for_npc(npc, &with_quests(&[(quest, true)])),
+                None
+            );
+            let started = with_quests(&[(quest, false)]);
+            let errand = NpcScript::for_npc(npc, &started).unwrap();
+            assert_eq!(
+                errand.begin().effects,
+                [Effect::WarpToPortal(room, scripts::named(room, "out00"))]
+            );
+            let mut holding = started.clone();
+            holding
+                .inventory
+                .insert(game::InventoryType::Etc, 1, game::Item::stack(item, 1));
+            assert_eq!(NpcScript::for_npc(npc, &holding), None);
+        }
+        assert!(game_data::DEFAULT_LINE_NPCS.contains(&CARSON));
+        assert!(game_data::DEFAULT_LINE_NPCS.contains(&HUMANOID_A));
+    }
+
+    #[test]
+    fn de_lang_s_desk_is_a_thought_during_the_clue() {
+        assert_eq!(NpcScript::for_npc(DE_LANG_DESK, &with_quests(&[])), None);
+        let mut desk =
+            NpcScript::for_npc(DE_LANG_DESK, &with_quests(&[(THE_CLUE, false)])).unwrap();
+        let Some(Prompt::Text(page)) = desk.begin().prompt else {
+            panic!("a page");
+        };
+        assert!(page.player_speaks && page.text == text(keys::DE_LANG_DIARY));
+        assert_eq!(
+            NpcScript::for_npc(DE_LANG_DESK, &with_quests(&[(THE_CLUE, true)])),
+            None
+        );
     }
 
     #[test]
