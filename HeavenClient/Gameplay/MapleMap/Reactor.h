@@ -39,7 +39,7 @@ namespace ms
 	class Reactor : public MapObject
 	{
 	public:
-		Reactor(int32_t oid, int32_t rid, int8_t state, Point<int16_t> position);
+		Reactor(int32_t oid, int32_t rid, int8_t state, Point<int16_t> position, uint8_t layer);
 
 		void draw(double viewx, double viewy, float alpha) const override;
 
@@ -102,8 +102,6 @@ namespace ms
 		int32_t flags;
 
 		Animation animation;
-		// The reactor is drawn this far up from its foothold.
-		int16_t shift;
 
 		// Sound/Reactor.img/<id>/<state>/Hit, played with that state's hit
 		// animation.

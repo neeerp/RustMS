@@ -663,6 +663,32 @@ namespace ms
 		return get_fhid_below(position.x(), position.y());
 	}
 
+	uint16_t FootholdTree::get_fhid_nearest(Point<int16_t> position) const
+	{
+		uint16_t nearest = 0;
+		int64_t best = 0;
+
+		for (auto &iter : footholds)
+		{
+			const Foothold &fh = iter.second;
+
+			if (fh.x2() < fh.x1() + 8)
+				continue;
+
+			int64_t dx = (fh.x1() + fh.x2()) / 2 - position.x();
+			int64_t dy = (fh.y1() + fh.y2()) / 2 - position.y();
+			int64_t distance = dx * dx + dy * dy;
+
+			if (nearest == 0 || distance < best || (distance == best && iter.first < nearest))
+			{
+				nearest = iter.first;
+				best = distance;
+			}
+		}
+
+		return nearest;
+	}
+
 	int16_t FootholdTree::get_y_below(Point<int16_t> position) const
 	{
 		if (uint16_t fhid = get_fhid_below(position.x(), position.y()))

@@ -89,8 +89,12 @@ namespace ms
 
 	std::unique_ptr<MapObject> ReactorSpawn::instantiate(const Physics &physics) const
 	{
-		auto spawnposition = physics.get_y_below(position);
-		return std::make_unique<Reactor>(oid, rid, state, spawnposition);
+		// v83 puts a reactor at the packet's point, where it stays (735127),
+		// on the layer of the nearest platform (7348a0).
+		const FootholdTree &fht = physics.get_fht();
+		uint8_t layer = fht.get_fh(fht.get_fhid_nearest(position)).layer();
+
+		return std::make_unique<Reactor>(oid, rid, state, position, layer);
 	}
 
 	DropSpawn::DropSpawn(int32_t o, int32_t i, bool ms, int32_t ow, Point<int16_t> p, Point<int16_t> d, int8_t t,

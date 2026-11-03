@@ -92,6 +92,11 @@ namespace ms
 		// Returns the platform at or below a position, 0 if there is none.
 		uint16_t get_fhid_below(Point<int16_t> position) const;
 
+		// Returns the platform whose midpoint is nearest a position, 0 if
+		// there is none. Walls and platforms under 8 px running right are
+		// skipped (v83's a45677, which gives a reactor its layer).
+		uint16_t get_fhid_nearest(Point<int16_t> position) const;
+
 		// Returns a platform, or an empty one for an id the map doesn't have.
 		const Foothold &get_fh(uint16_t fhid) const;
 
