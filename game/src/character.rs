@@ -728,7 +728,8 @@ impl Player {
     }
 
     /// Add EXP, levelling up as many times as it covers. Each level grants
-    /// 5 AP, 3 SP past beginner, and the job family's max HP/MP growth plus
+    /// 5 AP (6 for a Knight of Cygnus up to level 69), 3 SP past beginner,
+    /// and the job family's max HP/MP growth plus
     /// `bonus`, what the player's skills and INT add to it, up to 30000;
     /// `roll(spread)` picks the random part, 0 to `spread`. Current HP and MP
     /// stay as they were, as in v83. Returns the number of levels gained.
@@ -749,7 +750,7 @@ impl Player {
             }
             exp -= needed;
             self.stats.level += 1;
-            self.stats.ap = self.stats.ap.saturating_add(5);
+            self.stats.ap = self.stats.ap.saturating_add(level_up_ap(&self.stats));
             if self.stats.job % 1000 != 0 {
                 self.stats.sp = self.stats.sp.saturating_add(3);
             }
@@ -1058,6 +1059,18 @@ impl Growth {
     fn rolled((hp, mp): (i16, i16), roll: &mut impl FnMut(i16) -> i16) -> (i16, i16) {
         let hp = hp + roll(HP_SPREAD).clamp(0, HP_SPREAD);
         (hp, mp + roll(MP_SPREAD).clamp(0, MP_SPREAD))
+    }
+}
+
+/// The AP a level-up brings, counted at the new level: 6 for a Knight of
+/// Cygnus (1100 to 1512) up to level 69, else 5. GMS gave Cygnus Knights the
+/// sixth AP until level 70 for their level cap of 120 (StrategyWiki,
+/// MapleSEA); Cosmic's +2 at levels 12 to 18 and +1 to 77 is its own.
+fn level_up_ap(stats: &CharacterStats) -> i16 {
+    if (1100..1600).contains(&stats.job) && stats.level < 70 {
+        6
+    } else {
+        5
     }
 }
 
@@ -1391,6 +1404,27 @@ mod tests {
         assert_eq!((player.stats.max_mp, player.stats.mp), (25, 5));
         assert_eq!(player.gain_exp(0, (0, 0), floor), 0);
         assert!(player.is_dirty());
+    }
+
+    #[test]
+    fn knights_of_cygnus_get_a_sixth_ap_until_level_70() {
+        let mut player = player();
+        player.stats.job = 1100;
+        player.stats.level = 12;
+        player.gain_exp(crate::exp::to_next_level(12).unwrap() as i32, (0, 0), floor);
+        assert_eq!((player.stats.level, player.stats.ap), (13, 6));
+        player.stats.level = 69;
+        player.stats.ap = 0;
+        player.gain_exp(crate::exp::to_next_level(69).unwrap() as i32, (0, 0), floor);
+        assert_eq!((player.stats.level, player.stats.ap), (70, 5));
+        // A Noblesse and an Explorer get the usual 5.
+        for job in [1000, 100] {
+            player.stats.job = job;
+            player.stats.level = 12;
+            player.stats.ap = 0;
+            player.gain_exp(crate::exp::to_next_level(12).unwrap() as i32, (0, 0), floor);
+            assert_eq!(player.stats.ap, 5);
+        }
     }
 
     #[test]
