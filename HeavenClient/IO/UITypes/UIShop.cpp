@@ -578,10 +578,15 @@ namespace ms
 
 	void UIShop::exit_shop()
 	{
+		leave_field();
+		NpcShopActionPacket().dispatch();
+	}
+
+	void UIShop::leave_field()
+	{
 		clear_tooltip();
 
 		deactivate();
-		NpcShopActionPacket().dispatch();
 	}
 
 	UIShop::BuyItem::BuyItem(Texture cur, const shop_list::Row &r) : currency(cur), row(r)

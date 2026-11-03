@@ -63,7 +63,9 @@
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UIPyramidHud.h"
 #include "../../IO/UITypes/UIPyramidResult.h"
+#include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
+#include "../../IO/UITypes/UIStorage.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../../IO/UITypes/UIMiniGame.h"
 #include "../../IO/UITypes/UITimedQuests.h"
@@ -263,8 +265,24 @@ namespace ms
 		// The field's countdown and boss HP bar go with it.
 		UI::get().remove(UIElement::Type::FIELDCLOCK);
 
-		// So does Duey's window, and the server isn't told (report b029).
+		// So does Duey's window, and the server isn't told (report b029),
+		// and every other window that holds the one dialog slot (0xbe7910,
+		// deleted by FUN_00a0400e): a shop, storage, Fredrick's, the hammer,
+		// Vega's Spell, Legendary Spirit's and the rest.
 		UI::get().remove(UIElement::Type::DUEY);
+
+		for (auto type : { UIElement::Type::STOREBANK, UIElement::Type::VICIOUSHAMMER,
+				 UIElement::Type::VEGASPELL, UIElement::Type::ENCHANTSKILL,
+				 UIElement::Type::ITEMPROTECTOR, UIElement::Type::KARMASCISSORS,
+				 UIElement::Type::INCUBATOR, UIElement::Type::ITEMMEGAPHONE,
+				 UIElement::Type::KITEWRITE, UIElement::Type::TRANSFORM })
+			UI::get().remove(type);
+
+		if (auto shop = UI::get().get_element<UIShop>(); shop && shop->is_active())
+			shop->leave_field();
+
+		if (auto storage = UI::get().get_element<UIStorage>(); storage && storage->is_active())
+			storage->leave_field();
 
 		// And the wedding's wishlist and gift windows: the server forgets the
 		// open window when we leave the field.

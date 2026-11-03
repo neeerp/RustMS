@@ -67,6 +67,9 @@ namespace ms
 
 		void modify(InventoryType::Id type);
 
+		// The new field takes the window, and the server isn't told.
+		void leave_field();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 

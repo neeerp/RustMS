@@ -753,9 +753,14 @@ namespace ms
 
 	void UIStorage::close()
 	{
+		leave_field();
+		TrunkRequestPacket(TrunkRequestPacket::Mode::CLOSE).dispatch();
+	}
+
+	void UIStorage::leave_field()
+	{
 		clear_tooltip();
 
 		deactivate();
-		TrunkRequestPacket(TrunkRequestPacket::Mode::CLOSE).dispatch();
 	}
 }
