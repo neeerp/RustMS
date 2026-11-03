@@ -6,7 +6,8 @@
 //! Mr. Smith in Perion (1022004), Vicious in Henesys (1012002) and JM in
 //! Kerning City (1052002), who also make materials and arrows; and the
 //! five in Altaire Camp who trade a hundred of something for a Perfect
-//! Pitch; and Eurek the Alchemist (2040050), who makes skill rocks.
+//! Pitch; Eurek the Alchemist (2040050), who makes skill rocks; and Mr. Do
+//! in Mu Lung (2090004), who makes medicines and scrolls.
 //! Items, materials and prices follow Cosmic's scripts.
 
 use crate::item_makers::{recipe, Recipe};
@@ -681,6 +682,83 @@ pub const JM_CLAW_UPGRADES: &[Recipe] = &[
     recipe(1472020, &[(1472018, 1), (4021005, 6)], 40000),
 ];
 
+/// The book Mr. Do's medicines need the player to hold.
+pub const HERBAL_MEDICINE_BOOK: i32 = 4161030;
+
+/// Mr. Do's medicines: Canned Peach, Peach Juice, Bellflower Medicine Soup,
+/// Pill of Tunnel Vision, Pill of Intelligence, Slithering Balm, All Cure
+/// Potion and the Peach Tree Herb Pouch Tae Soo asks for (quest 3821).
+pub const MR_DO_MEDICINES: &[Refine] = &[
+    refine(2022145, &[(2022116, 3)], 0),
+    refine(2022146, &[(2022116, 3)], 0),
+    refine(2022147, &[(4000281, 10), (4000293, 10)], 910),
+    refine(2022148, &[(4000276, 20), (2002005, 1)], 950),
+    refine(2022149, &[(4000288, 20), (4000292, 20)], 1940),
+    refine(2022150, &[(4000295, 10)], 600),
+    refine(2050004, &[(2022131, 1), (2022132, 1)], 700),
+    refine(
+        4031554,
+        &[(4000286, 20), (4000287, 20), (4000293, 20)],
+        1000,
+    ),
+];
+
+/// Dr. Do's Marble, given for ingredients and spent on scrolls.
+pub const MR_DO_MARBLE: i32 = 4001124;
+
+/// Mr. Do's weapon ATT scrolls, the 100% ones, each of a hundred marbles
+/// and ten Steel Ore. One in `MR_DO_LUCKY` comes out as the 60% scroll,
+/// the next id.
+pub const MR_DO_SCROLLS: &[Refine] = &[
+    refine(2043000, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2043100, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2043200, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2043300, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2043700, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2043800, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044000, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044100, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044200, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044300, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044400, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044500, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044600, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044700, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044800, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+    refine(2044900, &[(MR_DO_MARBLE, 100), (4010001, 10)], 0),
+];
+
+/// One scroll in this many is the 60% one.
+pub const MR_DO_LUCKY: u32 = 10;
+
+/// How many of an ingredient Mr. Do takes at a time.
+pub const DONATION: i16 = 100;
+
+/// The ingredients Mr. Do takes, each with the fewest and most marbles a
+/// hundred of it is worth.
+pub const MR_DO_DONATIONS: &[(i32, i16, i16)] = &[
+    (4000276, 7, 7),
+    (4000277, 7, 7),
+    (4000278, 7, 8),
+    (4000279, 10, 10),
+    (4000280, 11, 11),
+    (4000291, 8, 8),
+    (4000292, 7, 8),
+    (4000286, 7, 9),
+    (4000287, 7, 8),
+    (4000293, 9, 9),
+    (4000294, 10, 10),
+    (4000298, 10, 11),
+    (4000284, 11, 11),
+    (4000288, 11, 12),
+    (4000285, 13, 13),
+    (4000282, 13, 13),
+    (4000295, 14, 14),
+    (4000289, 15, 15),
+    (4000296, 15, 16),
+    (4000297, 17, 17),
+];
+
 /// The Altaire campers, each with the item they take a hundred of for a
 /// Perfect Pitch: Perzen, Loha, Sion, Duru and Tess.
 pub const PITCH_TRADERS: &[(i32, i32)] = &[
@@ -716,6 +794,7 @@ mod tests {
             ROCKS,
             CRYSTALS_AND_DARK,
             MATERIALS,
+            MR_DO_MEDICINES,
             &[METAL_HOOF, SPIRUNA_DARK_CRYSTAL],
         ]
         .iter()
