@@ -981,7 +981,10 @@ namespace ms
 			name.change_text(Stage::get().get_player().get_stats().get_name());
 		} else
 		{
-			speaker = NxHelper::Npc::get_npc_node(npcid)["stand"]["0"];
+			// Its own portrait image when it has one (Npc/%07d.img/info/default,
+			// 9a6769), else it standing (9a69cf).
+			nl::node face = nl::nx::npc[string_format::extend_id(npcid, 7) + ".img"]["info"]["default"];
+			speaker = face.data_type() == nl::node::type::bitmap ? face : NxHelper::Npc::get_npc_node(npcid)["stand"]["0"];
 
 			std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
 			name.change_text(namestr);
