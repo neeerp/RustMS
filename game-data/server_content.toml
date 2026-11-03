@@ -477,6 +477,7 @@ unsourced = [
     "dolphin.coupon",
     "dolphin.ask",
     "dolphin.coupon_ask",
+    "taxi.coupon_ask",
     "dolphin.short",
     "nlc_taxi.ask",
     "nlc_taxi.decline",
