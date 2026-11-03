@@ -256,17 +256,23 @@ const ISA_PLATFORMS: [(&str, &str, i32); 6] = [
     ("Genie", "Ariant", 200000150),
     ("Ship", "Ereve", 200000160),
 ];
-/// The ferries' pilots, each with the one ride they sell and its fare
-/// (Cosmic's): Kiru between Orbis and Ereve, Kiriru between Ellinia and
-/// Ereve, and Puro between Lith Harbor and Rien.
-const FERRIES: [(i32, rides::Ride, i32); 6] = [
-    (1100008, rides::ORBIS_TO_EREVE, 1000),
-    (1100004, rides::EREVE_TO_ORBIS, 1000),
-    (1100007, rides::ELLINIA_TO_EREVE, 1000),
-    (1100003, rides::EREVE_TO_ELLINIA, 1000),
-    (1200004, rides::LITH_TO_RIEN, 800),
-    (1200003, rides::RIEN_TO_LITH, 800),
+/// The ferries' pilots, each with the one ride they sell, its fare
+/// (Cosmic's) and the town its choice names: Kiru between Orbis and Ereve,
+/// Kiriru between Ellinia and Ereve, and Puro between Lith Harbor and Rien.
+/// The docks' own names would mislead: Ellinia's is "Sky Ferry <To Ereve>"
+/// and Rien's "Dangerous Forest".
+const FERRIES: [(i32, rides::Ride, i32, i32); 6] = [
+    (1100008, rides::ORBIS_TO_EREVE, 1000, EREVE),
+    (1100004, rides::EREVE_TO_ORBIS, 1000, ORBIS),
+    (1100007, rides::ELLINIA_TO_EREVE, 1000, EREVE),
+    (1100003, rides::EREVE_TO_ELLINIA, 1000, ELLINIA),
+    (1200004, rides::LITH_TO_RIEN, 800, RIEN),
+    (1200003, rides::RIEN_TO_LITH, 800, LITH_HARBOR),
 ];
+const EREVE: i32 = 130000000;
+const ORBIS: i32 = 200000000;
+const RIEN: i32 = 140000000;
+
 /// The crane (`crane`), on Orbis Station's platform, at Mu Lung Temple and
 /// in Herb Town: a ride between Orbis and Mu Lung, and straight between Mu
 /// Lung and Herb Town (Cosmic's fares).
@@ -3178,8 +3184,8 @@ impl NpcScript {
         if let Some(&(_, fare)) = FLORINA_GUIDES.iter().find(|(guide, _)| *guide == npc_id) {
             return Some(florina_guide(npc_id, fare, player));
         }
-        if let Some(&(_, ride, fare)) = FERRIES.iter().find(|(pilot, ..)| *pilot == npc_id) {
-            return Some(ferry(npc_id, ride, fare, player));
+        if let Some(&(_, ride, fare, town)) = FERRIES.iter().find(|(pilot, ..)| *pilot == npc_id) {
+            return Some(ferry(npc_id, ride, fare, town, player));
         }
         if let Some(town) = gachapon::town(npc_id) {
             let inventory = &player.inventory;
@@ -14161,9 +14167,9 @@ fn fare_choice(to: i32, fare: i32, warp: Effect, player: &Player) -> (String, Ve
 
 /// A ferry's pilot: aboard for the fare, and the ride map's timer does the
 /// rest.
-fn ferry(npc_id: i32, ride: rides::Ride, fare: i32, player: &Player) -> NpcScript {
+fn ferry(npc_id: i32, ride: rides::Ride, fare: i32, town: i32, player: &Player) -> NpcScript {
     let warp = Effect::WarpToPortal(ride.map, 0);
-    let choices = vec![fare_choice(ride.to.0, fare, warp, player)];
+    let choices = vec![fare_choice(town, fare, warp, player)];
     let mut script = NpcScript::new(
         npc_id,
         vec![Page::Menu {
@@ -14192,12 +14198,8 @@ fn crane(player: &Player) -> Option<NpcScript> {
         MU_LUNG_TEMPLE => vec![Page::Menu {
             text: text(keys::FERRY_INTRO),
             choices: vec![
-                fare_choice(
-                    CRANE_PLATFORM,
-                    CRANE_FARE,
-                    aboard(rides::MU_LUNG_TO_ORBIS),
-                    player,
-                ),
+                // Orbis's platform is "Cabin <To Mu Lung>".
+                fare_choice(ORBIS, CRANE_FARE, aboard(rides::MU_LUNG_TO_ORBIS), player),
                 fare_choice(HERB_TOWN, HERB_TOWN_FARE, to_herb_town, player),
             ],
         }],
@@ -24765,14 +24767,21 @@ mod tests {
         // (npc, where it stands, choice, fare, where a yes warps, where the
         // choice says it goes)
         for (npc, from, choice, fare, warp, to) in [
-            (1100008, 200000161, Some(0), 1000, (200090020, 0), 130000210),
-            (1100004, 130000210, Some(0), 1000, (200090021, 0), 200000161),
-            (1100007, 101000400, Some(0), 1000, (200090030, 0), 130000210),
-            (1100003, 130000210, Some(0), 1000, (200090031, 0), 101000400),
-            (1200004, 104000000, Some(0), 800, (200090060, 0), 140020300),
-            (1200003, 140020300, Some(0), 800, (200090070, 0), 104000000),
+            (1100008, 200000161, Some(0), 1000, (200090020, 0), EREVE),
+            (1100004, 130000210, Some(0), 1000, (200090021, 0), ORBIS),
+            (1100007, 101000400, Some(0), 1000, (200090030, 0), EREVE),
+            (1100003, 130000210, Some(0), 1000, (200090031, 0), ELLINIA),
+            (1200004, 104000000, Some(0), 800, (200090060, 0), RIEN),
+            (
+                1200003,
+                140020300,
+                Some(0),
+                800,
+                (200090070, 0),
+                LITH_HARBOR,
+            ),
             (CRANE, 200000141, Some(0), 1500, (200090300, 0), 250000100),
-            (CRANE, 250000100, Some(0), 1500, (200090310, 0), 200000141),
+            (CRANE, 250000100, Some(0), 1500, (200090310, 0), ORBIS),
             (CRANE, 250000100, Some(1), 500, (251000000, 0), 251000000),
             (CRANE, 251000000, None, 500, (250000100, 0), 250000100),
         ] {
