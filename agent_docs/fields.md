@@ -242,8 +242,8 @@ same 0x04 again, which sends the gift; any other Cash Shop request forgets the
 ask. A package's second ask is 0x1F (the same fields), which sends at once,
 as the wish list's present of a package does; 0x1F for anything else fails.
 `db::cash_shop::gift` takes the price from the
-sender's NX Credit, or from their NX Prepaid if the credit is short (never Maple
-Points), and inserts the item into the receiver's account with `gift_from` and
+sender's NX Prepaid alone, as v83's notice of the sent gift says (`0xaf22b8`;
+its client also wants NX Credit to cover the price before it asks), and inserts the item into the receiver's account with `gift_from` and
 `gift_message` set, in one transaction. The sender gets 0x5E (receiver, item,
 count, price) and their new balance. When the receiving account next enters the
 shop, `db::cash_shop::open_cash_inventory` picks out the unseen gifts (rows
