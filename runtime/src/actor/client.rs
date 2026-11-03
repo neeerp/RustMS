@@ -570,6 +570,13 @@ impl ClientActor {
                 self.cwk_hidden_way().await?
             }
             WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
+                // The v83 client sends the talk even while dead (its click
+                // path has no check and the death window isn't modal); the
+                // server only unlocks it then, as Cosmic's NPCTalkHandler does.
+                if self.in_game()?.player.stats.hp <= 0 {
+                    let mut unlock = build::world::stat::build_stat_update(true, &[])?;
+                    return self.send(&mut unlock).await;
+                }
                 self.conversation = None;
                 self.script = None;
                 self.shop = None;
@@ -835,7 +842,7 @@ impl ClientActor {
             }
             WorldAction::MapleTv { slot, tv } => {
                 if self.maple_tv_waiting {
-                    let mut unlock = net::packet::build::world::stat::build_stat_update(true, &[])?;
+                    let mut unlock = build::world::stat::build_stat_update(true, &[])?;
                     return self.send(&mut unlock).await;
                 }
                 self.maple_tv_waiting = true;
