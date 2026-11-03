@@ -3,6 +3,7 @@
 #include "QuestMarker.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -28,6 +29,40 @@ namespace ms
 					numbered.emplace_back(std::stoll(child.name()), child.get_string());
 
 			std::sort(numbered.begin(), numbered.end());
+			std::vector<std::string> result;
+
+			for (auto& page : numbered)
+				result.push_back(std::move(page.second));
+
+			return result;
+		}
+
+		// The pages after ACCEPT. v83 (959c86-959d90) adds every non-empty
+		// string under yes in the order the file lists them, whatever its
+		// name; 20704's third is keyed "2 = Your destination ...". The NX
+		// files sort names as text, so pages go by the number their name
+		// starts with, and a name without one goes last.
+		std::vector<std::string> yes_pages(nl::node node)
+		{
+			std::vector<std::pair<int64_t, std::string>> numbered;
+
+			for (auto child : node)
+			{
+				if (child.data_type() != nl::node::type::string || child.get_string().empty())
+					continue;
+
+				std::string name = child.name();
+				size_t digits = 0;
+
+				while (digits < name.size() && digits < 9 && name[digits] >= '0' && name[digits] <= '9')
+					digits++;
+
+				int64_t order = digits ? std::stoll(name.substr(0, digits)) : INT64_MAX;
+				numbered.emplace_back(order, child.get_string());
+			}
+
+			std::stable_sort(numbered.begin(), numbered.end(),
+				[](const auto& a, const auto& b) { return a.first < b.first; });
 			std::vector<std::string> result;
 
 			for (auto& page : numbered)
@@ -300,7 +335,7 @@ namespace ms
 
 		QuestScript script;
 		script.pages = pages(say);
-		script.yes = pages(say["yes"]);
+		script.yes = yes_pages(say["yes"]);
 		script.no = pages(say["no"]);
 		script.ask = say["ask"].get_integer() != 0;
 		script.lost = pages(say["lost"]);
