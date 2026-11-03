@@ -119,6 +119,11 @@ namespace ms
 		std::string name;
 		std::string func;
 		bool hidename;
+		// info/imitate: the NPC stands for a player whose look and name come
+		// in IMITATED_NPC_DATA (0x51), which the server never sends. Without
+		// them v83 doesn't draw it (6d232a), update it, so it never speaks
+		// (6d2967), or take hovers and clicks on it (6d9309, 6d940e).
+		bool imitate;
 		bool scripted;
 		bool mouseonly;
 		// The double-click area around the feet, info/dcLeft..dcBottom (v83

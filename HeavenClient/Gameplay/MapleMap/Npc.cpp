@@ -56,6 +56,7 @@ namespace ms
 		nl::node info = src["info"];
 
 		hidename = info["hideName"].get_bool();
+		imitate = info["imitate"].get_bool();
 		mouseonly = info["talkMouseOnly"].get_bool();
 		dc_left_top = Point<int16_t>(
 			static_cast<int16_t>(info["dcLeft"].get_integer(-22)),
@@ -121,7 +122,7 @@ namespace ms
 		if (summoning)
 			summon_effect.draw(DrawArgument(absp), alpha);
 
-		if (!enabled)
+		if (!enabled || imitate)
 			return;
 
 		if (animations.count(stance))
@@ -141,7 +142,7 @@ namespace ms
 
 	void Npc::draw_balloons(double viewx, double viewy, float alpha) const
 	{
-		if (!enabled)
+		if (!enabled || imitate)
 			return;
 
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
@@ -155,7 +156,7 @@ namespace ms
 
 	int8_t Npc::update(const Physics &physics)
 	{
-		if (!active)
+		if (!active || imitate)
 			return phobj.fhlayer;
 
 		if (summoning && summon_effect.update())
@@ -229,7 +230,7 @@ namespace ms
 
 	bool Npc::inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const
 	{
-		if (!active || !enabled)
+		if (!active || !enabled || imitate)
 			return false;
 
 		Point<int16_t> absp = get_position() + viewpos;
@@ -241,7 +242,7 @@ namespace ms
 
 	bool Npc::insprite(Point<int16_t> cursorpos, Point<int16_t> viewpos) const
 	{
-		if (!active || !enabled)
+		if (!active || !enabled || imitate)
 			return false;
 
 		auto iter = animations.find(stance);
