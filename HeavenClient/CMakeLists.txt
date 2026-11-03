@@ -950,6 +950,8 @@ add_executable(HeavenClient
     IO/UITypes/UICashBuy.h
     IO/UITypes/UICashGift.cpp
     IO/UITypes/UICashGift.h
+    IO/UITypes/UICashSearch.cpp
+    IO/UITypes/UICashSearch.h
     IO/UITypes/UICouponDialog.cpp
     IO/UITypes/UICouponDialog.h
     IO/UITypes/UINameChange.cpp

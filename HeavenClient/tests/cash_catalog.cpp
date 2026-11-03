@@ -1,4 +1,5 @@
 #include "../Data/CashCatalog.h"
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <stdexcept>
@@ -209,6 +210,43 @@ int main()
 		require(slot_extender_question("Extra Pendant Slot", 2000, 30) ==
 			"If you purchase a Extra Pendant Slot(2000cash), you can equip \\n the item for 30 additional days. \\n "
 			"Refunds are not availabe after the purchase. \\n Do you still wish to purchase it?", "0x1458");
+
+		{
+			require(search_query("  Golden BELL \t") == "golden bell", "a query is trimmed and lowercased");
+			require(search_query("   ").empty(), "a blank query is empty");
+
+			std::vector<Commodity> shop = {
+				{ 50200003, 5220000, 30000, 35, 2, HOT, 12 },
+				{ 80000001, 4031191, 1, 1, 2, NONE, 0 },
+				{ 10000002, 1002000, 300, 1, 0, NONE, 8 },
+				{ 50200001, 5130000, 3200, 5, 2, NONE, 5 },
+				{ 50200009, 5300000, 2000, 5, 2, NONE, 1, 0, false }
+			};
+			auto name = [](int32_t item_id) -> std::string
+			{
+				switch (item_id)
+				{
+				case 5220000: return "Gachapon Ticket";
+				case 4031191: return "Golden Bell";
+				case 1002000: return "Blue Bandana";
+				case 5130000: return "Safety Charm";
+				default: return "Gachapon Stamp";
+				}
+			};
+
+			std::vector<Commodity> bell = search(shop, search_query("bell"), 0, INT32_MAX, name);
+			require(bell.size() == 1 && bell[0].sn == 80000001, "a name is found in any tab, meso items too");
+			require(search(shop, "gachapon", 0, INT32_MAX, name).size() == 1, "commodities off sale aren't found");
+			require(search(shop, "an", 0, INT32_MAX, name).size() == 1, "the query is found anywhere in the name");
+
+			std::vector<Commodity> every = search(shop, "", 0, INT32_MAX, name);
+			require(every.size() == 4 && every[0].sn == 10000002 && every[3].sn == 80000001, "an empty query finds all, by SN, either gender");
+
+			require(search(shop, "", 300, 300, name).size() == 1, "a range holds its ends");
+			require(search(shop, "", 0, 1000, name).size() == 2, "0 ~ 1000 has the bell and the bandana");
+			require(search(shop, "", 1000, 3000, name).empty(), "1000 ~ 3000 has nothing on sale here");
+			require(search(shop, "", 3000, 5000, name).size() == 1, "3000 ~ 5000 has the charm");
+		}
 
 		std::cout << "Cash catalog passed\n";
 		return 0;

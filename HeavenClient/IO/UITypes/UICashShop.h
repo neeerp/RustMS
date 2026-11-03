@@ -136,6 +136,9 @@ namespace ms
 		// Back to the map the player came from.
 		void leave();
 
+		// List what SEARCH ITEM found (v83 4b5cea), until a tab is clicked.
+		void show_search(const std::string& query, int32_t min, int32_t max);
+
 		// Buy Avatar buys the mannequin's commodities one at a time, the last
 		// first, then sums up (v83 46ba55, CCashShop+0x4cc to +0x4d8).
 		bool buying_avatar() const;
@@ -168,6 +171,8 @@ namespace ms
 		void put_back(int16_t slot);
 		void change_subtab(size_t subtab);
 		void change_page(size_t page);
+		// Whether the list shows commodities, not the how-to pages.
+		bool listing() const;
 		void update_list();
 		void update_page();
 		void update_cash_slider();
@@ -276,6 +281,9 @@ namespace ms
 		std::array<Cell, cash_catalog::PAGE_SIZE> cells;
 		std::vector<Best> best_items;
 		std::vector<int32_t> wish_list;
+		// The SNs SEARCH ITEM found, listed while searching.
+		std::vector<int32_t> found;
+		bool searching = false;
 
 		Text name_label;
 		Text account_label;

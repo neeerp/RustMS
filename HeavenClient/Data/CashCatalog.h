@@ -205,6 +205,53 @@ namespace ms
 			}
 		}
 
+		inline std::string lowercase(std::string text)
+		{
+			for (char& c : text)
+				if (c >= 'A' && c <= 'Z')
+					c = static_cast<char>(c - 'A' + 'a');
+
+			return text;
+		}
+
+		// SEARCH ITEM's query (v83 4b6270): trimmed at both ends and
+		// lowercased.
+		inline std::string search_query(const std::string& text)
+		{
+			const char* blank = " \t\r\n";
+			size_t first = text.find_first_not_of(blank);
+
+			if (first == std::string::npos)
+				return "";
+
+			size_t last = text.find_last_not_of(blank);
+
+			return lowercase(text.substr(first, last - first + 1));
+		}
+
+		// SEARCH ITEM (v83 4b5cea) looks through every commodity on sale,
+		// whatever its tab or gender, for those priced from min to max
+		// whose item's name holds the query, in any case; an empty query
+		// finds them all. The table is kept by SN.
+		template <typename Name>
+		std::vector<Commodity> search(const std::vector<Commodity>& all, const std::string& query, int32_t min, int32_t max, Name name)
+		{
+			std::vector<Commodity> found;
+
+			for (const Commodity& commodity : all)
+			{
+				if (!commodity.on_sale || commodity.price < min || commodity.price > max)
+					continue;
+
+				if (lowercase(name(commodity.item_id)).find(query) != std::string::npos)
+					found.push_back(commodity);
+			}
+
+			std::stable_sort(found.begin(), found.end(), [](const Commodity& a, const Commodity& b) { return a.sn < b.sn; });
+
+			return found;
+		}
+
 		// The commodities with these SNs, in order, skipping unknown ones.
 		inline std::vector<Commodity> find(const std::vector<Commodity>& all, const std::vector<int32_t>& sns)
 		{
