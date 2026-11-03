@@ -574,6 +574,40 @@ mod tests {
     }
 
     #[test]
+    fn the_third_jobs_clones_drop_the_black_charm_only_for_the_instructors_challenger() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(6);
+        let now = SystemTime::now();
+        let charm = |loot: &[Loot]| {
+            loot.iter()
+                .filter(|loot| {
+                    matches!(
+                        loot,
+                        Loot::Item {
+                            item_id: 4031059,
+                            ..
+                        }
+                    )
+                })
+                .count()
+        };
+        let mut player = crate::codec::stats::sample_player();
+        for clone in 9001000..=9001004 {
+            assert_eq!(charm(&roll(clone, 0, &player, false, now, &mut rng)), 0);
+        }
+        // The instructor's marker (`npc_scripts::INSTRUCTOR_ASSIGNED`).
+        player.quests.upsert(QuestRecord {
+            quest_id: 32101,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        for clone in 9001000..=9001004 {
+            assert_eq!(charm(&roll(clone, 0, &player, false, now, &mut rng)), 1);
+        }
+    }
+
+    #[test]
     fn untagged_quest_items_drop_for_their_quest() {
         let mut rng = rand::rngs::StdRng::seed_from_u64(5);
         // 4031792 is a quest item that only quest 1034 asks for.
