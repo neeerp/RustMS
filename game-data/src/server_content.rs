@@ -641,6 +641,10 @@ pub mod keys {
     pub const NAUTILUS_BUSH_SEARCH: &str = "nautilus_bush.search";
     pub const NAUTILUS_BUSH_SEARCHED: &str = "nautilus_bush.searched";
     pub const NAUTILUS_BUSH_FULL: &str = "nautilus_bush.full";
+    /// A bush clicked without Help Me Find My Glasses (2186) under way.
+    pub const NAUTILUS_BUSH_BOXES: &str = "nautilus_bush.boxes";
+    /// Shinsoo blessing a Knight of Cygnus of the third job.
+    pub const SHINSOO_BLESSING: &str = "ereve_shinsoo.blessing";
     pub const NAUTILUS_ABEL_FOUND: &str = "nautilus_abel.found";
     pub const NAUTILUS_ABEL_OTHER: &str = "nautilus_abel.other";
     pub const NAUTILUS_ABEL_FULL: &str = "nautilus_abel.full";
@@ -4473,6 +4477,8 @@ mod tests {
             keys::NAUTILUS_BUSH_SEARCH,
             keys::NAUTILUS_BUSH_SEARCHED,
             keys::NAUTILUS_BUSH_FULL,
+            keys::NAUTILUS_BUSH_BOXES,
+            keys::SHINSOO_BLESSING,
             keys::NAUTILUS_ABEL_FOUND,
             keys::NAUTILUS_ABEL_OTHER,
             keys::NAUTILUS_ABEL_FULL,

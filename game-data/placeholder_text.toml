@@ -429,6 +429,8 @@
 "perion_manji.desert_mission" = "[placeholder] Manji says the task is on and explains the mission in the desert."
 "nautilus_bush.search" = "[placeholder] There is a pair of glasses tangled in the bush."
 "nautilus_bush.searched" = "[placeholder] Nothing else is in the bush. One pair of glasses is enough to show Abel."
+"nautilus_bush.boxes" = "[placeholder] Just a pile of boxes, nothing special."
+"ereve_shinsoo.blessing" = "[placeholder] Shinsoo blesses the Knight and asks them to protect Maple World."
 "nautilus_bush.full" = "[placeholder] There is no room in the Etc inventory for the glasses."
 "nautilus_abel.found" = "[placeholder] Abel puts the glasses on and can see clearly again, and gives a reward."
 "nautilus_abel.other" = "[placeholder] These glasses are not the right pair, but Abel takes them anyway and gives a smaller reward."

@@ -2712,6 +2712,7 @@ impl NpcScript {
             }
             SECRET_PASSAGE => return secret_passage(player),
             CARSON | HUMANOID_A => return magatia_errand(npc_id, player),
+            SHINSOO if third_job_knight(player) => return Some(shinsoo_s_blessing()),
             DE_LANG_DESK => return de_lang_desk(player),
             KEROBEN => return Some(keroben(player)),
             SQUAD_SLATE => return Some(squad_slate(player)),
@@ -3115,9 +3116,13 @@ impl NpcScript {
                 return Some(script);
             }
         }
-        if NAUTILUS_BUSHES.contains(&npc_id)
-            && player.quests.state(FIND_MY_GLASSES) == QuestState::Started
-        {
+        if NAUTILUS_BUSHES.contains(&npc_id) {
+            if player.quests.state(FIND_MY_GLASSES) != QuestState::Started {
+                return Some(NpcScript::new(
+                    npc_id,
+                    vec![Page::Say(text(keys::NAUTILUS_BUSH_BOXES))],
+                ));
+            }
             return Some(nautilus_bush(npc_id, player, &mut rand::thread_rng()));
         }
         if npc_id == ABEL {
@@ -4523,6 +4528,27 @@ fn de_lang_desk(player: &Player) -> Option<NpcScript> {
     let mut script = NpcScript::new(DE_LANG_DESK, vec![Page::Say(text(keys::DE_LANG_DIARY))]);
     script.player_speaks = true;
     Some(script)
+}
+
+/// Shinsoo in Ereve blesses a Knight of Cygnus of the third job with
+/// Shinsoo's Blessing (Cosmic `1101001.js`, `getJobBranch > 2`); anyone else
+/// hears its String.nx line (`DEFAULT_LINE_NPCS`).
+const SHINSOO: i32 = 1101001;
+const SHINSOO_S_BLESSING: i32 = 2022458;
+
+fn third_job_knight(player: &Player) -> bool {
+    let job = player.stats.job;
+    job / 1000 == 1 && job % 100 != 0 && job % 10 >= 1
+}
+
+fn shinsoo_s_blessing() -> NpcScript {
+    NpcScript::new(
+        SHINSOO,
+        vec![Page::Act {
+            text: text(keys::SHINSOO_BLESSING),
+            effects: vec![Effect::ApplyItemBuff(SHINSOO_S_BLESSING)],
+        }],
+    )
 }
 
 /// Parwen once What Parwen Knows is taken: straight to Dran's Lab (Cosmic
@@ -21758,7 +21784,9 @@ mod tests {
         // One pair at a time; and without the quest the bush is a bush.
         let searched = nautilus_bush(1094004, &looking(Some(OTHER_GLASSES[1])), rng);
         assert_eq!(read_through(searched).1, []);
-        assert!(NpcScript::for_npc(1094004, &traveller(20, 0, false)).is_none());
+        let mut boxes = NpcScript::for_npc(1094004, &traveller(20, 0, false)).unwrap();
+        assert_eq!(page_text(&boxes.begin()), text(keys::NAUTILUS_BUSH_BOXES));
+        assert_eq!(read_through(boxes).1, []);
 
         let thanks = |glasses, exp, scrolls| {
             vec![
@@ -23067,6 +23095,28 @@ mod tests {
         }
         assert!(game_data::DEFAULT_LINE_NPCS.contains(&CARSON));
         assert!(game_data::DEFAULT_LINE_NPCS.contains(&HUMANOID_A));
+    }
+
+    #[test]
+    fn shinsoo_blesses_only_a_knight_of_the_third_job() {
+        for (job, blessed) in [(1111, true), (1512, true), (1110, false), (1100, false)] {
+            let mut player = traveller(70, 0, false);
+            player.stats.job = job;
+            let script = NpcScript::for_npc(SHINSOO, &player);
+            assert_eq!(script.is_some(), blessed, "{job}");
+            if let Some(mut script) = script {
+                assert_eq!(
+                    script.begin().effects,
+                    [Effect::ApplyItemBuff(SHINSOO_S_BLESSING)]
+                );
+            }
+        }
+        let mut hero = traveller(70, 0, false);
+        hero.stats.job = 111;
+        assert_eq!(NpcScript::for_npc(SHINSOO, &hero), None);
+        for npc in [SHINSOO, 1202010, 2071012] {
+            assert!(game_data::DEFAULT_LINE_NPCS.contains(&npc));
+        }
     }
 
     #[test]
