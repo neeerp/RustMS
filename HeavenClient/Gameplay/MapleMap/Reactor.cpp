@@ -25,9 +25,11 @@
 
 namespace ms
 {
-	Reactor::Reactor(int32_t o, int32_t r, int8_t s, Point<int16_t> p) : MapObject(o, p), rid(r), state(s), previous(s),
-		phase(Phase::IDLE), deadline(0), cooldown(800), event(UNKNOWN_EVENT), flags(0)
+	Reactor::Reactor(int32_t o, int32_t r, int8_t s, Point<int16_t> p, uint8_t l) : MapObject(o, p), rid(r), state(s),
+		previous(s), phase(Phase::IDLE), deadline(0), cooldown(800), event(UNKNOWN_EVENT), flags(0)
 	{
+		phobj.fhlayer = l;
+
 		std::string strid = string_format::extend_id(rid, 7);
 		src = nl::nx::reactor[strid + ".img"];
 		touch = src["info"]["activateByTouch"].get_integer() != 0;
@@ -39,7 +41,6 @@ namespace ms
 			src = nl::nx::reactor[link.get_string() + ".img"];
 
 		animation = src[std::to_string(state)];
-		shift = Animation(src["0"]).get_origin().y();
 
 		// v83 formats the path with "%d/%d", so the id has no leading zeros
 		// (0x6345e0).
@@ -103,16 +104,14 @@ namespace ms
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
 		// TODO: Handle 'default' animations (horntail reactor floating)
-		animation.draw(absp - Point<int16_t>(0, shift), alpha);
+		animation.draw(absp, alpha);
 	}
 
-	int8_t Reactor::update(const Physics &physics)
+	int8_t Reactor::update(const Physics &)
 	{
 		// A broken reactor is gone; one spawned again comes anew.
 		if (!active)
 			return -1;
-
-		physics.move_object(phobj);
 
 		cooldown = std::max(cooldown - Constants::TIMESTEP, 0);
 		bool ended = animation.update();
@@ -240,7 +239,7 @@ namespace ms
 		if (!active || phase != Phase::IDLE || cooldown > 0 || !reactor_rules::swingable(event_types(state)))
 			return {};
 
-		Point<int16_t> corner = get_position() - Point<int16_t>(0, shift) - animation.get_origin();
+		Point<int16_t> corner = get_position() - animation.get_origin();
 		Point<int16_t> size = animation.get_dimensions();
 
 		return { corner.x(), corner.y(), corner.x() + size.x(), corner.y() + size.y() };
@@ -251,7 +250,7 @@ namespace ms
 		if (!active || !touch)
 			return {};
 
-		Point<int16_t> corner = get_position() - Point<int16_t>(0, shift) - animation.get_origin();
+		Point<int16_t> corner = get_position() - animation.get_origin();
 		Point<int16_t> size = animation.get_dimensions();
 
 		return { corner.x(), corner.y(), corner.x() + size.x(), corner.y() + size.y() };
