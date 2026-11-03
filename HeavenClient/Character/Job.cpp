@@ -94,7 +94,7 @@ namespace ms
 
 	std::vector<uint16_t> Job::skill_roots(uint16_t id)
 	{
-		// Evan's are 2001's, though K opens another window for him.
+		// Evan's beginner skills are 2001's.
 		std::vector<uint16_t> roots = { static_cast<uint16_t>(id / 100 == 22 || id == 2001 ? 2001 : id / 1000 * 1000) };
 
 		// The advancements (0x4a8c4f): 100, 110, then 111 and 112.

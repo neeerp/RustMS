@@ -445,6 +445,11 @@ namespace ms
 	{
 		roots = Job::skill_roots(id);
 
+		// The window has five tabs; an Evan past 2212 keeps the beginner tab
+		// and the last four.
+		if (roots.size() > TABS)
+			roots.erase(roots.begin() + 1, roots.end() - (TABS - 1));
+
 		for (uint16_t i = 0; i < TABS; i++)
 			buttons[Buttons::BT_TAB0 + i]->set_active(i < tab_count());
 
