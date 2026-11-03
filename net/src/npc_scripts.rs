@@ -2712,7 +2712,7 @@ impl NpcScript {
             }
             SECRET_PASSAGE => return secret_passage(player),
             CARSON | HUMANOID_A => return magatia_errand(npc_id, player),
-            SHINSOO if third_job_knight(player) => return Some(shinsoo_s_blessing()),
+            SHINSOO if knight_of_cygnus(player) => return Some(shinsoo_s_blessing()),
             DE_LANG_DESK => return de_lang_desk(player),
             KEROBEN => return Some(keroben(player)),
             SQUAD_SLATE => return Some(squad_slate(player)),
@@ -4537,15 +4537,17 @@ fn de_lang_desk(player: &Player) -> Option<NpcScript> {
     Some(script)
 }
 
-/// Shinsoo in Ereve blesses a Knight of Cygnus of the third job with
-/// Shinsoo's Blessing (Cosmic `1101001.js`, `getJobBranch > 2`); anyone else
-/// hears its String.nx line (`DEFAULT_LINE_NPCS`).
+/// Shinsoo in Ereve blesses a Knight of Cygnus with Shinsoo's Blessing once
+/// they have their first job: A Mission in Henesys (20704, from level 13)
+/// tells them twice to ask for it before leaving Ereve, and its hour of
+/// Weapon Att +5 suits that level. Cosmic's `1101001.js` waits for the third
+/// job (`getJobBranch > 2`). Anyone else hears its String.nx line
+/// (`DEFAULT_LINE_NPCS`).
 const SHINSOO: i32 = 1101001;
 const SHINSOO_S_BLESSING: i32 = 2022458;
 
-fn third_job_knight(player: &Player) -> bool {
-    let job = player.stats.job;
-    job / 1000 == 1 && job % 100 != 0 && job % 10 >= 1
+fn knight_of_cygnus(player: &Player) -> bool {
+    (1100..2000).contains(&player.stats.job)
 }
 
 fn shinsoo_s_blessing() -> NpcScript {
@@ -23185,9 +23187,16 @@ mod tests {
     }
 
     #[test]
-    fn shinsoo_blesses_only_a_knight_of_the_third_job() {
-        for (job, blessed) in [(1111, true), (1512, true), (1110, false), (1100, false)] {
-            let mut player = traveller(70, 0, false);
+    fn shinsoo_blesses_a_knight_of_cygnus_from_the_first_job() {
+        for (job, blessed) in [
+            (1100, true),
+            (1110, true),
+            (1111, true),
+            (1512, true),
+            (1000, false),
+            (2100, false),
+        ] {
+            let mut player = traveller(13, 0, false);
             player.stats.job = job;
             let script = NpcScript::for_npc(SHINSOO, &player);
             assert_eq!(script.is_some(), blessed, "{job}");
