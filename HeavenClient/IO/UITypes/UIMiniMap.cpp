@@ -25,6 +25,7 @@
 
 #include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/MapleMap/MapTooltipRules.h"
+#include "../Gameplay/MapleMap/MiniMapView.h"
 #include "../Gameplay/MapleMap/Npc.h"
 
 #include "../../Configuration.h"
@@ -124,9 +125,10 @@ namespace ms
 		else
 		{
 			const Frame& frame = type == Type::MAX ? max_frame : normal_frame;
-			frame.draw(position, width, canvas.get_dimensions().y());
+			frame.draw(position, width, view.y());
 			title.draw(position + TITLE);
-			canvas.draw(position + to_window(-center_offset));
+			canvas.draw(DrawArgument(position + to_window(-center_offset)),
+				Rectangle<int16_t>(scroll.x(), scroll.x() + view.x(), scroll.y(), scroll.y() + view.y()));
 
 			if (type == Type::MAX)
 			{
@@ -139,7 +141,7 @@ namespace ms
 			auto draw_marker = [&](const Texture& marker, Point<int16_t> map_position)
 			{
 				Point<int16_t> size = marker.get_dimensions();
-				marker.draw(position + to_window(map_position) - Point<int16_t>(size.x() / 2, size.y()));
+				draw_in_view(marker, to_window(map_position) - Point<int16_t>(size.x() / 2, size.y()));
 			};
 
 			// v83's order (0x85a126): others, the partner, NPCs, portals and
@@ -180,6 +182,11 @@ namespace ms
 		if (Stage::get().get_mapid() != mapid)
 			change_map();
 
+		Point<int16_t> player = Stage::get().get_player().get_position();
+		scroll = Point<int16_t>(
+			minimap_view::scroll(player.x(), view.x(), canvas.get_dimensions().x(), center_offset.x(), map_size.x(), mag),
+			minimap_view::scroll(player.y(), view.y(), canvas.get_dimensions().y(), center_offset.y(), map_size.y(), mag));
+
 		UIElement::update();
 	}
 
@@ -194,8 +201,12 @@ namespace ms
 											 map_info["hideMinimap"].get_bool(), map_info["miniMapOnOff"].get_bool(),
 											 switched_on);
 		canvas = minimap["canvas"];
-		scale = static_cast<int16_t>(1 << static_cast<int>(minimap["mag"]));
+		mag = minimap["mag"];
+		scale = static_cast<int16_t>(1 << mag);
 		center_offset = Point<int16_t>(minimap["centerX"], minimap["centerY"]);
+		map_size = Point<int16_t>(minimap["width"], minimap["height"]);
+		Point<int16_t> canvas_size = canvas.get_dimensions();
+		view = Point<int16_t>(minimap_view::width(canvas_size.x()), minimap_view::height(canvas_size.y()));
 		mark = nl::nx::map["MapHelper.img"]["mark"][map_info["mapMark"].get_string()];
 
 		NxHelper::Map::MapInfo info = NxHelper::Map::get_map_info_by_id(mapid);
@@ -244,13 +255,13 @@ namespace ms
 		}
 		else
 		{
-			width = std::max<int16_t>(MIN_WIDTH, canvas.get_dimensions().x() + 2 * BORDER);
+			width = std::max<int16_t>(MIN_WIDTH, view.x() + 2 * BORDER);
 
 			if (type == Type::MAX)
 				width = std::max<int16_t>(width, NAME_X + std::max(street.width(), name.width()) + NAME_RIGHT);
 
 			const Frame& frame = type == Type::MAX ? max_frame : normal_frame;
-			dimension = Point<int16_t>(width, frame.top() + canvas.get_dimensions().y() + frame.bottom());
+			dimension = Point<int16_t>(width, frame.top() + view.y() + frame.bottom());
 		}
 
 		dragarea = Point<int16_t>(width, 20);
@@ -273,15 +284,32 @@ namespace ms
 
 	Point<int16_t> UIMiniMap::to_window(Point<int16_t> map_position) const
 	{
-		Point<int16_t> size = canvas.get_dimensions();
-		Point<int16_t> corner((width - size.x()) / 2, top());
-
-		return corner + (map_position + center_offset) / scale;
+		return view_area().get_left_top() + (map_position + center_offset) / scale - scroll;
 	}
 
 	int16_t UIMiniMap::top() const
 	{
 		return (type == Type::MAX ? max_frame : normal_frame).top();
+	}
+
+	Rectangle<int16_t> UIMiniMap::view_area() const
+	{
+		int16_t left = (width - view.x()) / 2;
+
+		return Rectangle<int16_t>(left, left + view.x(), top(), top() + view.y());
+	}
+
+	void UIMiniMap::draw_in_view(const Texture& texture, Point<int16_t> at) const
+	{
+		Rectangle<int16_t> area = view_area();
+		Point<int16_t> corner = at - texture.get_origin();
+		Point<int16_t> size = texture.get_dimensions();
+		Rectangle<int16_t> shown(
+			std::max<int16_t>(0, area.left() - corner.x()), std::min<int16_t>(size.x(), area.right() - corner.x()),
+			std::max<int16_t>(0, area.top() - corner.y()), std::min<int16_t>(size.y(), area.bottom() - corner.y()));
+
+		if (shown.left() < shown.right() && shown.top() < shown.bottom())
+			texture.draw(DrawArgument(position + at), shown);
 	}
 
 	void UIMiniMap::remove_cursor()
@@ -299,6 +327,14 @@ namespace ms
 			return dstate;
 
 		Point<int16_t> cursor = cursorpos - position;
+
+		// Markers off the view aren't drawn, so they have no tips.
+		if (!view_area().contains(cursor))
+		{
+			UI::get().clear_tooltip(Tooltip::Parent::MINIMAP);
+
+			return dstate;
+		}
 
 		// The spot a marker of the given size covers.
 		auto covers = [&](Point<int16_t> map_position, Point<int16_t> size)
