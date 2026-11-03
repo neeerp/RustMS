@@ -1467,6 +1467,8 @@
 "kerning_trash_can.found" = "[placeholder] You found a #b#t4032136##k in the trash can! #i4032136#"
 "kerning_trash_can.full" = "[placeholder] #i4032136# Your Etc inventory is full."
 "kerning_trash_can.empty" = "[placeholder] Just a trash can."
+"luke.proof" = "[placeholder] Chief Stan sent you, didn't he? I'm not the one you're after. Here, take this to #b#p1012003##k as proof. #i4032479#"
+"luke.full" = "[placeholder] Make room in your Etc inventory first."
 "tree_stump.bottled" = "[placeholder] You fill a bottle with the stump's clear sap. #i4032142#"
 "tree_stump.full" = "[placeholder] Your Etc inventory has no room for a bottle of sap."
 "tree_stump.sap" = "[placeholder] Clear sap keeps welling up from the little stump."
