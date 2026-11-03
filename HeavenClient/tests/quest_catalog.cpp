@@ -52,12 +52,13 @@ int main()
 	}
 
 	// The Test waits for the opening scene's record; Meren's classes read
-	// 6029, a quest, and are left to the server.
+	// 6029, a quest, and are left to the server, which makes them one-time.
 	const ms::QuestInfo* test = catalog.find(2312);
 	const ms::QuestInfo* meren = catalog.find(6030);
 
 	if (!test || test->start_info_record != 2311 || test->start_info.size() != 1 ||
-		test->start_info[0] != std::make_pair(1, std::string("1")) || !meren || meren->start_info_record != 0)
+		test->start_info[0] != std::make_pair(1, std::string("1")) || !meren || meren->start_info_record != 0 ||
+		meren->repeat_interval != -1)
 	{
 		std::cerr << "Quest 2312's or 6030's start record did not parse as expected\n";
 		return 1;
