@@ -32,7 +32,8 @@ pub const CARNIVAL2_ROOMS: RangeInclusive<u8> = 7..=9;
 pub const CARNIVAL2_LEVELS: RangeInclusive<u8> = 51..=70;
 /// Every room of both fields.
 pub const ALL_ROOMS: RangeInclusive<u8> = 1..=9;
-/// Where `mc_out` goes when no way back was saved (Kerning City).
+/// Where `mc_out` goes when no way back was saved (Perion, as Cosmic's
+/// `mc_out`).
 pub const CARNIVAL_FALLBACK: i32 = 102000000;
 /// A battle's length when its field's data has none (`timeDefault`).
 const BATTLE_SECONDS: u64 = 610;
@@ -48,6 +49,12 @@ pub const WAITING: Duration = Duration::from_secs(180);
 pub const READY: Duration = Duration::from_secs(10);
 /// How long a challenge waits for the waiting leader's answer.
 pub const CHALLENGE: Duration = Duration::from_secs(30);
+
+/// Whether `map_id` is one of the carnival's own maps: either field and
+/// their rooms, 980000000 to 980099999.
+pub const fn carnival_map(map_id: i32) -> bool {
+    map_id / 100_000 == CARNIVAL_LOBBY / 100_000
+}
 
 /// Whether `room` is one of Carnival Field 2's.
 pub const fn second(room: u8) -> bool {

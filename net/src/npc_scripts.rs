@@ -2590,7 +2590,12 @@ impl NpcScript {
             return milla(player.stats.map_id);
         }
         if npc_id == SPIEGELMANN && player.stats.map_id != carnival::CARNIVAL_LOBBY {
-            return Some(spiegelmann_away(player));
+            return Some(spiegelmann_away(SPIEGELMANN, player));
+        }
+        // Kerning City's Spiegelmann is 2042002, who also stands in the
+        // carnival's exit and result rooms (Map.nx 103000000).
+        if npc_id == CARNIVAL_GUIDE && !carnival::carnival_map(player.stats.map_id) {
+            return Some(spiegelmann_away(CARNIVAL_GUIDE, player));
         }
         if npc_id == guild_quest::NURIS && player.stats.map_id == guild_quest::RETURNING_PATH {
             let camp = guild_quest::CAMP;
@@ -17282,10 +17287,11 @@ fn ariant_king(player: &Player) -> NpcScript {
     script
 }
 
-/// Spiegelmann in town (Cosmic `2042000`): he takes a player of levels 30
-/// to 50 to the Carnival Field, and one of 51 to 70 to Carnival Field 2,
-/// keeping where they were for its way out.
-fn spiegelmann_away(player: &Player) -> NpcScript {
+/// Spiegelmann in town, `npc` (Cosmic `2042000`, and `2042002` in Kerning
+/// City): he takes a player of levels 30 to 50 to the Carnival Field, and
+/// one of 51 to 70 to Carnival Field 2, keeping where they were for its way
+/// out.
+fn spiegelmann_away(npc: i32, player: &Player) -> NpcScript {
     let level = player.stats.level;
     let field = if carnival::CARNIVAL_LEVELS.contains(&level) {
         Some((keys::CARNIVAL_SPIEGELMANN_GO, carnival::CARNIVAL_LOBBY))
@@ -17309,7 +17315,7 @@ fn spiegelmann_away(player: &Player) -> NpcScript {
             keys::CARNIVAL_SPIEGELMANN_LEVELS,
         ))
     };
-    NpcScript::new(SPIEGELMANN, vec![page])
+    NpcScript::new(npc, vec![page])
 }
 
 /// Duarte's way into Pharaoh Yeti's Tomb (Cosmic's menu item 3, unfinished
@@ -31161,6 +31167,21 @@ mod tests {
         );
         let mut script = NpcScript::for_npc(SPIEGELMANN, &at(71, 220000000)).unwrap();
         assert_eq!(page_text(&script.begin()), levels);
+
+        // Kerning City's is 2042002, who says the same.
+        let kerning = 103000000;
+        let mut script = NpcScript::for_npc(CARNIVAL_GUIDE, &at(16, kerning)).unwrap();
+        assert_eq!(script.npc_id, CARNIVAL_GUIDE);
+        assert_eq!(page_text(&script.begin()), levels);
+        let mut script = NpcScript::for_npc(CARNIVAL_GUIDE, &at(30, kerning)).unwrap();
+        assert_eq!(kind(&script.begin()), Some(1));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SaveLocation(CARNIVAL_RETURN, Some(kerning)),
+                Effect::WarpToPortal(lobby, 0),
+            ]
+        );
     }
 
     #[test]
