@@ -377,6 +377,17 @@ namespace ms
 			return ids;
 		}
 
+		// Whether a point of the trading room, `width` by `height`, is on it:
+		// its corner below the chat and right of the fee table is open, so a
+		// click there reaches the window behind (FUN_007c295b).
+		inline bool in_trade_window(int16_t x, int16_t y, int16_t width, int16_t height)
+		{
+			if (x < 0 || y < 0 || x >= width || y >= height)
+				return false;
+
+			return x < 288 || y < 275;
+		}
+
 		// The trade slot at a point of the window (FUN_007c3b52): 1 to 9 for
 		// mine, -1 to -9 for the partner's, 0 for none.
 		inline int8_t slot_at(int16_t x, int16_t y)

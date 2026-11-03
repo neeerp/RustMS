@@ -38,6 +38,8 @@ namespace ms
 
 		bool send_icon(const Icon &icon, Point<int16_t> cursorpos) override;
 
+		bool is_in_range(Point<int16_t> cursorpos) const override;
+
 		void send_scroll(double yoffset) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
