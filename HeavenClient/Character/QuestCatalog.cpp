@@ -92,17 +92,18 @@ namespace ms
 			info.end_script = end["endscript"].data_type() == nl::node::type::string;
 
 			info.end_meso = static_cast<int32_t>(end["endmeso"].get_integer());
-			info.end_info_record = static_cast<int16_t>(end["infoNumber"].get_integer());
+			// 721d2c reads the quest's own record when infoex names none.
+			info.end_info_record = static_cast<int16_t>(end["infoNumber"].get_integer(info.id));
 
 			for (auto entry : end["infoex"])
 				info.end_info.emplace_back(static_cast<int32_t>(entry["cond"].get_integer()),
 					entry["value"].get_string());
 
 			// v83 checks Check/0/infoex too (FUN_00721163). Meren's classes
-			// read 6029's string, which the server keeps not; those are left
-			// to it, as their completion is. Their digit in that string is
-			// what keeps a class from being taken again despite `interval 0`,
-			// so they are one-time, as on the server.
+			// read 6029's string, a quest's; those are left to the server, as
+			// their completion is. Their digit in that string is what keeps a
+			// class from being taken again despite `interval 0`, so they are
+			// one-time, as on the server.
 			auto start_record = static_cast<int16_t>(start["infoNumber"].get_integer());
 
 			if (start_record != 0 && !root["QuestInfo.img"][std::to_string(start_record)])

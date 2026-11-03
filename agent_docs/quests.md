@@ -274,10 +274,13 @@ lessons in Magatia are the exceptions to the info keys. Meren's are
 45) and its three classes (6030 Carson's alchemy, 6031 Hughes's science,
 6032 Meren's practice, each 10,000 mesos to start) share 6029's quest-info
 string, one digit per class (`info`, `infoNumber`, `infoex`). Each class
-needs 6029 started and 6029 needs all three completed, so the server keeps
-no string and reads past those keys; the classes, which `interval 0` would
-make repeatable, stay done once completed, as their digit keeps them in
-v83. Only a forfeited and restarted 6029 differs: its classes stay done.
+needs 6029 started and 6029 needs all three completed, so the server reads
+past the classes' keys; the classes, which `interval 0` would make
+repeatable, stay done once completed, as their digit keeps them in v83.
+6029 keeps the string (`INFO_QUESTS`), as the client's completion check
+reads it ("111"): a class's end script sets its digit, and a start, a
+forfeited and restarted 6029 too, or a load sets the classes already done
+(`QuestLog::maker_digits`).
 6029's completion teaches the Maker at level 1 (master level 3) through its
 skill action. Its Evan entry (20011007) has no `job` list, so it teaches
 no one; v83 has no Evan skills, and the crystal test teaches level 2 anyway.
@@ -1342,7 +1345,9 @@ the v83ref notes):
   record `infoNumber` names and needs one `infoex` entry to hold (cond 0
   equal, 1 at least, 2 at most, as numbers), so an explorer medal short of
   its places or 2324 before the Thorn Remover shows `stop/info`; entries
-  without an `infoNumber` (6029) are left to the server. A failure shows
+  without an `infoNumber` read the quest's own record, as 721d2c does, so
+  6029 waits for "111" and Cheng's 3239 ("dummy") is never ready. A
+  failure shows
   `stop/<npc|item|quest|info|mob>`, else
   `stop/default`, else the NPC's own `String/Npc.img/<npc>/d0`, and sends
   nothing. At the wrong NPC, `lost` replaces `stop/npc` when a quest item

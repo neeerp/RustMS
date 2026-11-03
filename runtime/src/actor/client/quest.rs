@@ -443,15 +443,21 @@ impl ClientActor {
             // Hunting quests start with every kill count at 0 ("000"), info
             // quests with their first info string, unless a script set the
             // string along with the start (`Effect::SetQuestInfo`), and timed
-            // titles with the date they end.
+            // titles with the date they end. Meren's Lessons starts from the
+            // Maker classes already done.
             let preset = next.quests.state(template.id) == QuestState::Started
                 && self.in_game()?.player.quests.state(template.id) != QuestState::Started;
             if !preset {
+                let info = if template.id == game::quest::MAKER_LESSONS {
+                    Some(next.quests.maker_digits(None))
+                } else {
+                    template.start_info.clone()
+                };
                 next.quests.upsert(QuestRecord {
                     quest_id: template.id,
                     status: QuestStatus::Started {
                         kills: vec![0; template.end_mobs.len()],
-                        info: template.start_info.clone().or_else(|| {
+                        info: info.or_else(|| {
                             template.time_limit2.map(|seconds| {
                                 game::quest::end_date(
                                     SystemTime::now() + Duration::from_secs(u64::from(seconds)),

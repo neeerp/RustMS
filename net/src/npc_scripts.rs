@@ -3705,9 +3705,9 @@ impl NpcScript {
             "q2291e" => Some(vip_admission(player)),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
-            "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
-            "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
-            "q6032e" => Some(maker_class(MEREN, keys::MAKER_PRACTICE, 6032)),
+            "q6030e" => Some(maker_class(player, CARSON, keys::MAKER_ALCHEMY, 6030)),
+            "q6031e" => Some(maker_class(player, HUGHES, keys::MAKER_SCIENCE, 6031)),
+            "q6032e" => Some(maker_class(player, MEREN, keys::MAKER_PRACTICE, 6032)),
             "q6033e" => Some(maker_lesson(player, keys::MAKER_CRYSTAL_TEST, 6033)),
             "q6036e" => Some(maker_lesson(player, keys::MAKER_GOLD_ANVIL, 6036)),
             "q4647e" => Some(pet_secret(player)),
@@ -4060,11 +4060,17 @@ fn roger_end(player: &Player) -> NpcScript {
     script
 }
 
-/// `q6030e`-`q6032e`: a Maker class ends. The fee was taken when it
-/// started (`Act/0 money`).
-fn maker_class(npc: i32, pages: [&str; 2], quest: i16) -> NpcScript {
+/// `q6030e`-`q6032e`: a Maker class ends and sets its digit in Meren's
+/// Lessons' string. The fee was taken when it started (`Act/0 money`).
+fn maker_class(player: &Player, npc: i32, pages: [&str; 2], quest: i16) -> NpcScript {
     let mut script = NpcScript::new(npc, pages.map(|key| Page::Say(text(key))).to_vec());
-    script.on_end = vec![Effect::CompleteQuest(quest)];
+    script.on_end = vec![
+        Effect::CompleteQuest(quest),
+        Effect::SetQuestInfo {
+            quest: game::quest::MAKER_LESSONS,
+            value: player.quests.maker_digits(Some(quest)),
+        },
+    ];
     script
 }
 
@@ -23522,14 +23528,23 @@ mod tests {
 
     #[test]
     fn a_maker_class_ends_with_its_teacher() {
-        for (script, npc, quest) in [
-            ("q6030e", CARSON, 6030),
-            ("q6031e", HUGHES, 6031),
-            ("q6032e", MEREN, 6032),
+        for (script, npc, quest, digits) in [
+            ("q6030e", CARSON, 6030, "100"),
+            ("q6031e", HUGHES, 6031, "010"),
+            ("q6032e", MEREN, 6032, "001"),
         ] {
             assert_eq!(
                 ending(script, &player(50)),
-                (npc, vec![Effect::CompleteQuest(quest)])
+                (
+                    npc,
+                    vec![
+                        Effect::CompleteQuest(quest),
+                        Effect::SetQuestInfo {
+                            quest: 6029,
+                            value: digits.into(),
+                        },
+                    ]
+                )
             );
         }
     }

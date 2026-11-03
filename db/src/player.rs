@@ -837,7 +837,12 @@ pub(crate) fn character_stats(character: &Character) -> CharacterStats {
 }
 
 pub(crate) fn quest_log(progress: Vec<QuestProgress>) -> QuestLog {
-    QuestLog::from_records(progress.iter().map(quest_record))
+    let mut log = QuestLog::from_records(progress.iter().map(quest_record));
+    // Meren's Lessons saved before it kept its string reads "": it is the
+    // classes done.
+    let digits = log.maker_digits(None);
+    log.set_info(game::quest::MAKER_LESSONS, &digits);
+    log
 }
 
 /// The domain form of one quest progress row.

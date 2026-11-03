@@ -64,6 +64,18 @@ int main()
 		return 1;
 	}
 
+	// Cheng's 3239 has a Check/1 infoex without infoNumber, which reads its
+	// own record; 2324 names its own.
+	const ms::QuestInfo* parts = catalog.find(3239);
+	const ms::QuestInfo* walls = catalog.find(2324);
+
+	if (!parts || parts->end_info_record != 3239 || parts->end_info.size() != 1 || !walls ||
+		walls->end_info_record != 2324)
+	{
+		std::cerr << "Quest 3239's or 2324's end record did not parse as expected\n";
+		return 1;
+	}
+
 	// Bartos's test needs one of the 45 pets out to start and to finish.
 	const ms::QuestInfo* bartos = catalog.find(4646);
 
