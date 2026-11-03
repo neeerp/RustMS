@@ -157,11 +157,13 @@ pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[2335, 3230, 3239, 3609];
 /// starts it at "000", a class starts only while its own digit is 0
 /// (`Check/0 infoNumber`/`infoex`), its end script sets the digit, and 6029
 /// completes at "111" (`Check/1 infoex`). 6029 also needs the three classes
-/// completed, and each class needs 6029 started, so the server keeps no
-/// string: it reads past these keys and makes the classes, which
-/// `interval 0` would let be taken again, one-time quests, as their digit
-/// does. Only a forfeited and restarted 6029, which resets the string,
-/// differs: its classes stay done.
+/// completed, and each class needs 6029 started, so the server reads past
+/// the classes' keys and makes them, which `interval 0` would let be taken
+/// again, one-time quests, as their digit does. 6029 keeps its string
+/// (`game::quest::INFO_QUESTS`), which the client's completion check reads
+/// too, but it starts from the classes done (`maker_digits`), so a
+/// forfeited and restarted 6029 doesn't wait for classes that can't be
+/// taken again.
 pub const MEREN_INFO_QUESTS: &[i16] = &[6029, 6030, 6031, 6032];
 const INFO_KEYS: &[&str] = &["info", "infoNumber", "infoex"];
 /// The explorer medals: each counts the maps of a region visited

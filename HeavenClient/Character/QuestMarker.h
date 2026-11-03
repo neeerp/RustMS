@@ -42,9 +42,8 @@ namespace ms
 	// Whether a quest's Check/1/infoex holds for `record`, the data string
 	// of its infoNumber quest, or nullptr if that quest isn't started
 	// (FUN_00721d2c). One entry must hold: cond 0 compares the strings, 1
-	// needs at least the value and 2 at most, as numbers. Entries without
-	// an infoNumber (Meren's 6029) are left to the server, which keeps no
-	// such string.
+	// needs at least the value and 2 at most, as numbers. Check/1 entries
+	// without an infoNumber read the quest's own record (QuestCatalog).
 	inline bool info_met(int16_t record_id, const std::vector<std::pair<int32_t, std::string>>& entries,
 		const std::string* record)
 	{

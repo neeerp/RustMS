@@ -13,8 +13,13 @@ pub const SCRIPT_MARKERS: i16 = 32000;
 /// given value (`Check/1/infoex`). Only quests whose strings the server's
 /// scripts can set are listed, as others could never be completed.
 pub const INFO_QUESTS: &[i16] = &[
-    2166, 2236, 3114, 3311, 3339, 3345, 3360, 3367, 3421, 3900, 3926, 3927, 3929,
+    2166, 2236, 3114, 3311, 3339, 3345, 3360, 3367, 3421, 3900, 3926, 3927, 3929, 6029,
 ];
+
+/// Meren's Lessons (6029), whose info string holds one digit per Maker
+/// class, in `MAKER_CLASSES` order: "1" once that class is done.
+pub const MAKER_LESSONS: i16 = 6029;
+pub const MAKER_CLASSES: [i16; 3] = [6030, 6031, 6032];
 
 /// Records that are no quest (Quest.nx has no such id) but that another
 /// quest's completion (`Check/1 infoNumber`) or start (`Check/0`) reads:
@@ -271,6 +276,21 @@ impl QuestLog {
         }
     }
 
+    /// Meren's Lessons' info string as the Maker classes stand, with
+    /// `done` counted as completed too.
+    pub fn maker_digits(&self, done: Option<i16>) -> String {
+        MAKER_CLASSES
+            .iter()
+            .map(|&class| {
+                if Some(class) == done || self.state(class) == QuestState::Completed {
+                    '1'
+                } else {
+                    '0'
+                }
+            })
+            .collect()
+    }
+
     /// Set a record (`RECORDS`) to `value`; `false` if it already reads so.
     pub fn set_record(&mut self, record: i16, value: &str) -> bool {
         debug_assert!(RECORDS.contains(&record));
@@ -413,6 +433,21 @@ mod tests {
         assert_eq!(log.state(1031), QuestState::Completed);
         log.remove(1031);
         assert_eq!(log.state(1031), QuestState::NotStarted);
+    }
+
+    #[test]
+    fn merens_lessons_string_has_a_digit_per_class_done() {
+        let mut log = QuestLog::default();
+        assert_eq!(log.maker_digits(None), "000");
+        assert_eq!(log.maker_digits(Some(6031)), "010");
+        log.upsert(QuestRecord {
+            quest_id: 6032,
+            status: QuestStatus::Completed {
+                at: SystemTime::UNIX_EPOCH,
+            },
+        });
+        assert_eq!(log.maker_digits(None), "001");
+        assert_eq!(log.maker_digits(Some(6030)), "101");
     }
 
     #[test]

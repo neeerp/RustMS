@@ -65,6 +65,7 @@ async fn merens_lessons_teach_the_maker() {
     assert!(t.progress.is_empty());
     let t = step(c, &m, build_quest_action(START, LESSONS, MEREN)).await;
     assert_eq!(t.progress, [(LESSONS, 1)]);
+    assert_eq!(t.kills[&LESSONS], "000", "a digit per class");
 
     // Each class costs 10,000 mesos.
     let mut meso: i64 = 100_000;
@@ -75,9 +76,11 @@ async fn merens_lessons_teach_the_maker() {
         assert_eq!(t.stat_values(stat::MESO), [meso]);
     }
 
-    // Meren's own class ends with him; the lessons need all three.
+    // Meren's own class ends with him and sets its digit; the lessons
+    // need all three.
     let t = end(c, &m, 6032, MEREN).await;
-    assert_eq!(t.progress, [(6032, 2)]);
+    assert_eq!(t.progress, [(6032, 2), (LESSONS, 1)]);
+    assert_eq!(t.kills[&LESSONS], "001");
     let t = step(c, &m, build_quest_completion(LESSONS, MEREN, -1)).await;
     assert!(t.progress.is_empty() && t.skills.is_empty());
     // A class is taken once.
@@ -86,10 +89,11 @@ async fn merens_lessons_teach_the_maker() {
 
     go(c, &m, CARSON_AT).await;
     let t = end(c, &m, 6030, CARSON).await;
-    assert_eq!(t.progress, [(6030, 2)]);
+    assert_eq!(t.progress, [(6030, 2), (LESSONS, 1)]);
     go(c, &m, HUGHES_AT).await;
     let t = end(c, &m, 6031, HUGHES).await;
-    assert_eq!(t.progress, [(6031, 2)]);
+    assert_eq!(t.progress, [(6031, 2), (LESSONS, 1)]);
+    assert_eq!(t.kills[&LESSONS], "111");
 
     go(c, &m, MEREN_AT).await;
     let t = step(c, &m, build_quest_completion(LESSONS, MEREN, -1)).await;

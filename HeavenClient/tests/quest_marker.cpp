@@ -179,10 +179,18 @@ int main()
 		require(info_stop(&record) == ms::QuestStop::INFO, "cond 2 is at most the value, cond 0 equal");
 		record = "abc";
 		require(info_stop(&record) == ms::QuestStop::NONE, "one entry holding is enough");
-		// Meren's 6029 names no record; the server checks it.
-		walls.end_info_record = 0;
+		// A Check/1 infoex without infoNumber reads the quest's own record
+		// (721d2c): Meren's 6029 completes at "111", and Cheng's 3239
+		// never, as nothing sets its "dummy".
+		walls.end_info_record = 6029;
 		walls.end_info = {{0, "111"}};
-		require(info_stop(nullptr) == ms::QuestStop::NONE, "infoex without infoNumber is the server's");
+		record = "011";
+		require(info_stop(&record) == ms::QuestStop::INFO, "a class not done leaves 6029 open");
+		record = "111";
+		require(info_stop(&record) == ms::QuestStop::NONE, "all three complete it");
+		walls.end_info = {{0, "dummy"}};
+		record = "";
+		require(info_stop(&record) == ms::QuestStop::INFO, "3239 waits for Cheng's script");
 		// 6029 also needs its three classes done (Check/1 quest), which
 		// 721d2c checks before the icon goes to the closed book (6d185b).
 		ms::QuestInfo meren = quest(6029, 2110004, 2110004);
