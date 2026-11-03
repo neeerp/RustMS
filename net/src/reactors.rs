@@ -174,6 +174,11 @@ pub enum Action {
     /// stay: the Forest of Poison Haze's fountain (Cosmic `3008000`, whose
     /// `hit` gives 52,000), which its states' timeouts empty again.
     ExpToAll(i32),
+    /// Drop its loot as it takes an item, and nothing when it breaks:
+    /// Zenumist's alchemy pillar and Homun's lab's Pentagram of Alchemy
+    /// (Cosmic `2612004` and `2619000`, whose `hit` sprays or drops the
+    /// items and whose `act` is empty).
+    DropsOnHit,
     /// One of the three beakers of a Magatia beaker room (Cosmic
     /// `2618000`), which takes a Magic Stone a state at a time and drains
     /// a state back each 9.5 seconds: the first time each reaches
@@ -582,6 +587,7 @@ pub fn action(reactor_id: i32) -> Action {
         },
         ELLIN_FOUNTAIN => Action::ExpToAll(crate::events::ELLIN_FOUNTAIN_EXP),
         MAGATIA_BEAKER => Action::Beaker,
+        ZENUMIST_PILLAR | PENTAGRAM => Action::DropsOnHit,
         id if crate::events::cwk_sigil(id).is_some() => Action::Sigil,
         // Crimsonwood Keep's thieves' room's watchful eyes, which stay
         // struck, out of sight, for its keeper to see (Cosmic `9201110`'s
@@ -678,6 +684,12 @@ pub const ELLIN_FOUNTAIN_NAME: &str = "";
 /// `2618000`'s `hit`); one Magic Stone more fills it to its last.
 pub const MAGATIA_BEAKER: i32 = 2618000;
 pub const BEAKER_FULL: u8 = 6;
+
+/// Zenumist's alchemy pillar, which takes a Strange Bottle of Water for
+/// the Zenumist Cape, and the Pentagram of Alchemy in Homun's lab, which
+/// takes a Magic Device for Carson's experiment.
+pub const ZENUMIST_PILLAR: i32 = 2612004;
+pub const PENTAGRAM: i32 = 2619000;
 
 /// A Magatia hub's doors to the rooms beside it, and those rooms' ways
 /// back, which stay where they are as the rooms' boxes are shuffled.
@@ -1143,6 +1155,8 @@ mod tests {
         assert_eq!(action(ELLIN_FOUNTAIN), Action::ExpToAll(52_000));
         assert_eq!(action(MAGATIA_BEAKER), Action::Beaker);
         assert!(!stays(MAGATIA_BEAKER) && !acts_staying(MAGATIA_BEAKER));
+        assert_eq!(action(ZENUMIST_PILLAR), Action::DropsOnHit);
+        assert_eq!(action(PENTAGRAM), Action::DropsOnHit);
         // The Keep's sigils, and its fifth stage's altars.
         for sigil in (6_109_000..=6_109_009).chain(6_109_016..=6_109_020) {
             assert_eq!(action(sigil), Action::Sigil);
