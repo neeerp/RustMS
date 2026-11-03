@@ -64,7 +64,9 @@ namespace ms
 		constexpr int16_t LINE = 18;
 		constexpr int16_t PADDING = 34;
 		// Lines shown at once when the text scrolls, and where they start.
-		constexpr int16_t SCROLL_LINES = 11;
+		// v83 draws scrolling text into a layer 2 px shorter than the 240 px
+		// box (9a3f08), which holds 13 lines and the last one's descenders.
+		constexpr int16_t SCROLL_LINES = 13;
 		constexpr int16_t SCROLL_TEXT_Y = 28;
 		// A choice's dot and label, from where the choice starts.
 		constexpr int16_t DOT_X = 10;
