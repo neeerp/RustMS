@@ -235,13 +235,20 @@ namespace ms
 		return pet_stop(quest.end_pets, quest.end_pet_closeness, quest.end_pet_skill_limit, first_pet);
 	}
 
+	// v83's test of a quest's skill requirement (FUN_007619b0): a skill
+	// with no data is never had, one hidden from the skill book only once it
+	// has a record, and any other always.
+	inline bool quest_skill_had(bool exists, bool recorded, bool invisible)
+	{
+		return exists && (recorded || !invisible);
+	}
+
 	// Whether the player's fame, items, skills, worn items and map meet a
 	// quest's start requirements, as v83 checks them (FUN_00721163), with
 	// `first_pet` the first pet out. `held`
 	// gives how many of an item the player holds, plus one if a copy is worn,
-	// and `worn` whether a copy is worn. `has_skill` is v83's loose test: any
-	// skill not hidden from the skill book counts, and a hidden one once it
-	// has a record (FUN_007619b0). `mount_level` is the level of the
+	// and `worn` whether a copy is worn. `has_skill` is v83's loose test,
+	// quest_skill_had. `mount_level` is the level of the
 	// player's mount as last sent (SET_TAMING_MOB_INFO), 0 before any.
 	template<class Held, class HasSkill, class Worn>
 	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill, Worn worn,

@@ -232,6 +232,13 @@ int main()
 		require(!holds(book), "a skill that must be lacked blocks it");
 		skills = {};
 		require(!holds(book), "a skill that must be had blocks it");
+		// FUN_007619b0: Meren's New Discovery (6029) must lack 20011007,
+		// which v83 has no data for, so it counts as lacked.
+		require(!ms::quest_skill_had(false, false, false), "a skill with no data is not had");
+		require(!ms::quest_skill_had(false, true, false), "nor with a record");
+		require(ms::quest_skill_had(true, false, false), "a visible skill is had");
+		require(!ms::quest_skill_had(true, false, true), "a hidden one without a record is not");
+		require(ms::quest_skill_had(true, true, true), "a hidden one with a record is");
 		// equipAllNeed, equipSelectNeed and fieldEnter.
 		ms::QuestInfo cape = quest(3307, 2111008, 2111008);
 		cape.worn_all = {1102135};

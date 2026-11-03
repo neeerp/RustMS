@@ -133,6 +133,9 @@ namespace ms
 		// Return the skill's element (magic_damage::element), 0 if it has none.
 		uint8_t get_element() const;
 
+		// Return whether Skill.nx has an entry for this skill.
+		bool is_valid() const;
+
 		// Return whether this skill is invisible in the skill book ui.
 		bool is_invisible() const;
 
@@ -186,6 +189,7 @@ namespace ms
 		int32_t masterlevel;
 		int32_t flags;
 		bool passive;
+		bool valid;
 		bool invisible;
 		bool disabled;
 		bool cooltime = false;
