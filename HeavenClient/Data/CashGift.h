@@ -79,8 +79,10 @@ namespace ms
 			std::string text;
 		};
 
-		// StringPool 0x155f.
-		constexpr const char* EXPIRES = "This contains an item that will disappear once \\nthe expiration date has passed. Do you want to give it as a gift?";
+		// StringPool 0x155f, less its break after "once": v83 breaks only there
+		// and doesn't wrap the box (report p122), but here the box wraps, which
+		// left "once" on a line of its own.
+		constexpr const char* EXPIRES = "This contains an item that will disappear once the expiration date has passed. Do you want to give it as a gift?";
 		// StringPool 0x22d.
 		constexpr const char* UNKNOWN_ERROR = "Due to an unknown error,\\nthe request for Cash Shop has failed.";
 
