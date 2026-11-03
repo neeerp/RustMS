@@ -470,7 +470,7 @@ namespace ms
 		size_t used = ATLASW * border.y() + border.x() * yrange.second();
 		double usedpercent = static_cast<double>(used) / (ATLASW * ATLASH);
 
-		if (usedpercent > 80.0)
+		if (usedpercent > 0.8)
 			clearinternal();
 	}
 
@@ -553,12 +553,14 @@ namespace ms
 			{
 				border.set_x(0);
 				border.shift_y(yrange.second());
-
-				if (border.y() + height > ATLASH)
-					clearinternal();
-				else
-					yrange = Range<GLshort>();
+				yrange = Range<GLshort>();
 			}
+
+			// A bitmap taller than its row can run off the bottom too. GL
+			// would refuse the upload, and the default GL_REPEAT would wrap
+			// the quad onto the font rows at the top, drawn raw as red text.
+			if (border.y() + height > ATLASH)
+				clearinternal();
 
 			x = border.x();
 			y = border.y();
