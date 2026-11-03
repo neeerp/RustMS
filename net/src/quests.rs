@@ -571,24 +571,43 @@ pub fn count_play_time(
     Some(after.write(player, quest.id))
 }
 
-/// Count a kill of `mob_id` toward every started quest that needs it.
+/// Mob ids that exist only in quest data (String.nx names them, Mob.nx
+/// has no such mob): each stands for a mob and its twin, so a kill of
+/// either counts for it as well as for itself, as Cosmic's
+/// `raiseQuestMobCount` does. DANGER! <1-G. Mushroom> (2105), Information
+/// From Those Who Remember (20726), Ghost Stumps (21722) and 10 more
+/// supported quests count only these ids.
+const QUEST_MOB_GROUPS: [([i32; 2], i32); 3] = [
+    ([1110100, 1110130], 9101000), // (Dejected) Green Mushroom
+    ([2230101, 2230131], 9101001), // (Annoyed) Zombie Mushroom
+    ([1140100, 1140130], 9101002), // (Smirking) Ghost Stump
+];
+
+/// The quest-only id a kill of `mob_id` also counts for, if any.
+fn quest_mob_group(mob_id: i32) -> Option<i32> {
+    QUEST_MOB_GROUPS
+        .iter()
+        .find(|(mobs, _)| mobs.contains(&mob_id))
+        .map(|&(_, group)| group)
+}
+
+/// Count a kill of `mob_id` toward every started quest that needs it, or
+/// needs the quest-only id standing for it.
 /// Returns the quests whose progress changed.
 pub fn count_kill<'a>(
     quest: impl Fn(i16) -> Option<&'a QuestTemplate>,
     player: &mut Player,
     mob_id: i32,
 ) -> Vec<i16> {
+    let group = quest_mob_group(mob_id);
+    let counts = |required: i32| required == mob_id || Some(required) == group;
     let started: Vec<i16> = player.quests.started().map(|r| r.quest_id).collect();
     let mut changed = Vec::new();
     for quest_id in started {
         let Some(quest) = quest(quest_id) else {
             continue;
         };
-        if !quest
-            .end_mobs
-            .iter()
-            .any(|&(required, _)| required == mob_id)
-        {
+        if !quest.end_mobs.iter().any(|&(required, _)| counts(required)) {
             continue;
         }
         let Some(kills) = player.quests.kills_mut(quest_id) else {
@@ -598,7 +617,7 @@ pub fn count_kill<'a>(
         let mut counted = false;
         for (index, &(required, count)) in quest.end_mobs.iter().enumerate() {
             // Kills past the required count are not recorded.
-            if required == mob_id && kills[index] < count {
+            if counts(required) && kills[index] < count {
                 kills[index] += 1;
                 counted = true;
             }
@@ -1466,6 +1485,29 @@ mod tests {
         );
         assert_eq!(count_kill(catalog, &mut p, 100101), [1033]);
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn a_mob_and_its_twin_count_for_their_quest_only_id() {
+        // Information From Those Who Remember (20726) counts 9101001, which no map has.
+        let mut q = quest();
+        q.end_mobs = vec![(9101001, 3)];
+        let mut p = player(1, 0);
+        set(&mut p, 20726, QuestState::Started);
+        let catalog = |id| (id == 20726).then_some(&q);
+        assert_eq!(count_kill(catalog, &mut p, 2230101), [20726]);
+        assert_eq!(count_kill(catalog, &mut p, 2230131), [20726]);
+        assert!(count_kill(catalog, &mut p, 1110100).is_empty());
+        assert_eq!(p.quests.kills(20726), [2]);
+
+        // A quest naming the mob itself still counts it, once per kill.
+        q.end_mobs = vec![(2230101, 5), (9101001, 5)];
+        let mut p = player(1, 0);
+        set(&mut p, 20726, QuestState::Started);
+        let catalog = |id| (id == 20726).then_some(&q);
+        assert_eq!(count_kill(catalog, &mut p, 2230101), [20726]);
+        assert_eq!(count_kill(catalog, &mut p, 2230131), [20726]);
+        assert_eq!(p.quests.kills(20726), [1, 2]);
     }
 
     #[test]
