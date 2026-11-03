@@ -2870,6 +2870,7 @@ impl NpcScript {
             ARWEN => return Some(arwen(player)),
             CHIEF_TATAMO => return Some(chief_tatamo()),
             EUREK => return Some(eurek()),
+            MR_DO => return Some(mr_do(player, &mut rand::thread_rng())),
             CHICO => return Some(chico()),
             CLOY => return Some(cloy()),
             WISP => return Some(wisp()),
@@ -19144,6 +19145,86 @@ fn eurek() -> NpcScript {
     with_maker_words(NpcScript::new(EUREK, vec![hello, menu]))
 }
 
+/// `make_murueng`: Mr. Do in Mu Lung makes medicines for a player holding
+/// his Book on Herbal Medicine, any number at once; makes a weapon ATT
+/// scroll of a hundred of his marbles and ten Steel Ore, one in ten the 60%
+/// one; and gives marbles for a hundred of a medicine ingredient (Cosmic
+/// `2090004.js`). Which scroll and how many marbles are rolled here, unseen,
+/// since both scrolls have the same name.
+fn mr_do(player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let medicines = if player.inventory.count(refiners::HERBAL_MEDICINE_BOOK) > 0 {
+        refine_menu(refiners::MR_DO_MEDICINES, |refine| {
+            vec![how_many(
+                refine,
+                OnNumber::Refine {
+                    refine,
+                    percent: 100,
+                },
+            )]
+        })
+    } else {
+        Page::Say(text(keys::MR_DO_NO_BOOK))
+    };
+    let lucky: Vec<bool> = refiners::MR_DO_SCROLLS
+        .iter()
+        .map(|_| rng.gen_ratio(1, refiners::MR_DO_LUCKY))
+        .collect();
+    let scrolls = refine_menu(refiners::MR_DO_SCROLLS, |refine| {
+        let nth = refiners::MR_DO_SCROLLS
+            .iter()
+            .position(|other| other == refine)
+            .unwrap_or_default();
+        let made = Refine {
+            item: refine.item + i32::from(lucky[nth]),
+            ..*refine
+        };
+        refine_batches(&made, 100, 1)
+    });
+    let count = refiners::DONATION.to_string();
+    let donations = refiners::MR_DO_DONATIONS
+        .iter()
+        .map(|&(item_id, fewest, most)| {
+            let item = item_id.to_string();
+            let ask = content::text().get(
+                keys::MR_DO_DONATE_ASK,
+                &[("count", count.as_str()), ("item", item.as_str())],
+            );
+            let marbles = rng.gen_range(fewest, most + 1);
+            let pages = vec![
+                Page::Ask {
+                    text: ask,
+                    on_yes: vec![
+                        Effect::GiveItem {
+                            item_id: refiners::MR_DO_MARBLE,
+                            quantity: marbles,
+                        },
+                        Effect::TakeItem {
+                            item_id,
+                            quantity: refiners::DONATION,
+                        },
+                    ],
+                    on_no: None,
+                },
+                Page::Say(text(keys::MR_DO_THANKS)),
+            ];
+            (format!("#v{item_id}# #t{item_id}#"), pages)
+        })
+        .collect();
+    let donate = Page::Menu {
+        text: content::text().get(keys::MR_DO_DONATE_PICK, &[("count", count.as_str())]),
+        choices: donations,
+    };
+    let menu = Page::Menu {
+        text: text(keys::MR_DO_HELLO),
+        choices: vec![
+            (text(keys::MR_DO_MAKE_MEDICINE), vec![medicines]),
+            (text(keys::MR_DO_MAKE_SCROLL), vec![scrolls]),
+            (text(keys::MR_DO_DONATE), vec![donate]),
+        ],
+    };
+    with_maker_words(NpcScript::new(MR_DO, vec![menu]))
+}
+
 /// Chief Tatamo in Leafre, who sells Magic Seeds, any number up to
 /// `MAGIC_SEEDS_AT_ONCE` at once (`OnNumber::MagicSeeds`).
 fn chief_tatamo() -> NpcScript {
@@ -29715,6 +29796,90 @@ mod tests {
             ]
         );
         assert!(eurek.refused().is_some() && eurek.inventory_full().is_some());
+    }
+
+    #[test]
+    fn mr_do_makes_medicines_for_a_reader_scrolls_of_marbles_and_takes_ingredients() {
+        use rand::SeedableRng;
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let unread = traveller(60, 0, false);
+        let mut npc = NpcScript::for_npc(MR_DO, &unread).unwrap();
+        assert_eq!(menu(npc.begin()).matches("#L").count(), 3);
+        let told = npc.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(page_text(&told), text(keys::MR_DO_NO_BOOK));
+
+        let mut reader = unread.clone();
+        reader.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(refiners::HERBAL_MEDICINE_BOOK, 1),
+        );
+        let mut npc = NpcScript::for_npc(MR_DO, &reader).unwrap();
+        npc.begin();
+        let medicines = menu(npc.respond(ScriptInput::Select(0)).unwrap());
+        assert_eq!(medicines.matches("#L").count(), 8);
+        match npc.respond(ScriptInput::Select(2)).unwrap().prompt {
+            Some(Prompt::AskNumber { min, max, .. }) => assert_eq!((min, max), (1, 100)),
+            other => panic!("number expected, got {other:?}"),
+        }
+        let asked = question(&npc.respond(ScriptInput::Number(2)).unwrap());
+        assert!(asked.contains("#i4000281# 20 #t4000281#"), "{asked}");
+        let made = npc.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                Effect::GiveItem {
+                    item_id: 2022147,
+                    quantity: 2
+                },
+                Effect::SpendMeso(1_820),
+                take(4000281, 20),
+                take(4000293, 20),
+            ]
+        );
+        assert!(npc.refused().is_some() && npc.inventory_full().is_some());
+
+        let mut scrolls = std::collections::HashSet::new();
+        for seed in 0..64 {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+            let mut npc = mr_do(&unread, &mut rng);
+            npc.begin();
+            npc.respond(ScriptInput::Select(1)).unwrap();
+            let asked = question(&npc.respond(ScriptInput::Select(11)).unwrap());
+            assert!(asked.contains("#i4001124# 100 #t4001124#"), "{asked}");
+            let made = npc.respond(ScriptInput::Yes).unwrap();
+            let Effect::GiveItem { item_id, quantity } = made.effects[0] else {
+                panic!("scroll expected, got {:?}", made.effects);
+            };
+            assert_eq!(quantity, 1);
+            assert_eq!(made.effects[1..], [take(4001124, 100), take(4010001, 10)]);
+            scrolls.insert(item_id);
+        }
+        assert_eq!(scrolls, [2044500, 2044501].into());
+
+        let mut marbles = std::collections::HashSet::new();
+        for seed in 0..64 {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+            let mut npc = mr_do(&unread, &mut rng);
+            npc.begin();
+            let pick = menu(npc.respond(ScriptInput::Select(2)).unwrap());
+            assert_eq!(pick.matches("#L").count(), 20);
+            let asked = question(&npc.respond(ScriptInput::Select(11)).unwrap());
+            assert!(asked.contains("#t4000298#"), "{asked}");
+            let given = npc.respond(ScriptInput::Yes).unwrap();
+            let Effect::GiveItem { item_id, quantity } = given.effects[0] else {
+                panic!("marbles expected, got {:?}", given.effects);
+            };
+            assert_eq!(item_id, refiners::MR_DO_MARBLE);
+            assert_eq!(given.effects[1..], [take(4000298, 100)]);
+            assert_eq!(page_text(&given), text(keys::MR_DO_THANKS));
+            marbles.insert(quantity);
+        }
+        assert_eq!(marbles, [10, 11].into());
     }
 
     #[test]

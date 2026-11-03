@@ -3144,6 +3144,14 @@ pub mod keys {
     pub const EUREK_SUMMONING_ROCK: &str = "eurek.summoning_rock";
     pub const EUREK_WAYS: &str = "eurek.ways";
     pub const EUREK_WAY: &str = "eurek.way";
+    pub const MR_DO_HELLO: &str = "mr_do.hello";
+    pub const MR_DO_MAKE_MEDICINE: &str = "mr_do.make_medicine";
+    pub const MR_DO_MAKE_SCROLL: &str = "mr_do.make_scroll";
+    pub const MR_DO_DONATE: &str = "mr_do.donate";
+    pub const MR_DO_NO_BOOK: &str = "mr_do.no_book";
+    pub const MR_DO_DONATE_PICK: &str = "mr_do.donate_pick";
+    pub const MR_DO_DONATE_ASK: &str = "mr_do.donate_ask";
+    pub const MR_DO_THANKS: &str = "mr_do.thanks";
     pub const CHICO_HELLO: &str = "chico.hello";
     pub const CLOY_HELLO: &str = "cloy.hello";
     pub const CLOY_ASK: &str = "cloy.ask";
@@ -5478,6 +5486,14 @@ mod tests {
                 keys::EUREK_SUMMONING_ROCK,
                 keys::EUREK_WAYS,
                 keys::EUREK_WAY,
+                keys::MR_DO_HELLO,
+                keys::MR_DO_MAKE_MEDICINE,
+                keys::MR_DO_MAKE_SCROLL,
+                keys::MR_DO_DONATE,
+                keys::MR_DO_NO_BOOK,
+                keys::MR_DO_DONATE_PICK,
+                keys::MR_DO_DONATE_ASK,
+                keys::MR_DO_THANKS,
                 keys::CHICO_HELLO,
                 keys::CLOY_HELLO,
                 keys::CLOY_ASK,

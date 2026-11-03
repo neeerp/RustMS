@@ -1322,6 +1322,19 @@ and 4,000 mesos (`refiners::EUREK_MAGIC_ROCKS`, `EUREK_SUMMONING_ROCKS`,
 asked through the refiners' `refine_batches`). The lines are placeholders
 (`eurek.*`, QUESTIONS b388).
 
+Mr. Do (2090004, Mu Lung 250000000, Npc.nx script `make_murueng`) offers
+three things, as Cosmic `2090004.js` does. He makes eight medicines, any
+number of batches at once, but only for a player holding his Book on Herbal
+Medicine (4161030, the reward of quest 3830); one of them is the Peach Tree
+Herb Pouch (4031554) that quest 3821 asks for (`refiners::MR_DO_MEDICINES`).
+He makes sixteen weapon ATT scrolls, each of 100 Dr. Do's Marbles (4001124)
+and 10 Steel Ore; one in ten comes out as the 60% scroll, the next id
+(`MR_DO_SCROLLS`, `MR_DO_LUCKY`). And he takes 100 of one of twenty medicine
+ingredients for 7 to 17 marbles (`MR_DO_DONATIONS`). The scroll and the
+marble count are rolled when the conversation starts; both scrolls have the
+same name, so the player can't tell. The lines are placeholders (`mr_do.*`,
+QUESTIONS b434).
+
 ### Refiners
 
 Refiners make plates, jewels, crystals, materials and arrows in batches.
