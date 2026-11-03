@@ -89,6 +89,8 @@ namespace ms
 		constexpr Text::Font BOX_FONT = Text::Font::BALLOON;
 		// The speaker's name plate, as wide as its bar, which it centres.
 		constexpr int16_t NAME_WIDTH = 121;
+		// The room a portrait's plate takes below it (9a7720).
+		constexpr int16_t PLATE_ROOM = 23;
 
 		// How far apart a font's lines are, and so how far below its anchor
 		// its first line's baseline sits.
@@ -153,13 +155,36 @@ namespace ms
 		UIElement::draw(inter);
 
 		int16_t total = TOP + height + bottom.height();
-		Point<int16_t> center_pos = position + Point<int16_t>(right_side ? RIGHT_SPEAKER_X : SPEAKER_X, total / 2 + 11);
+		int16_t speaker_x = right_side ? RIGHT_SPEAKER_X : SPEAKER_X;
+		Point<int16_t> center_pos = position + Point<int16_t>(speaker_x, total / 2 + 11);
 		Point<int16_t> speaker_pos = center_pos - Point<int16_t>(nametag.width() / 2, 0);
 
 		if (player_speaks)
+		{
 			Stage::get().get_player().get_look().draw(center_pos, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
-		else
-			speaker.draw(DrawArgument(center_pos, flip_speaker));
+		} else
+		{
+			// v83 moves the portrait's layer, which draws its canvas from the
+			// top left, so the sprite's origin plays no part: it is centred
+			// on the speaker's x by its width (9a7b51). With its plate below
+			// it is centred in the text area, or, when taller than that,
+			// stands on the bottom bar (9a7ac1); the plate follows (9a7799).
+			int16_t h = speaker.height();
+			int16_t stack = h + PLATE_ROOM;
+			bool tall = stack > height;
+			int16_t top_y = tall ? total - stack - 55 : (height - stack) / 2 + 35;
+			int16_t plate_y = tall ? total - stack + h - 52 : (height - stack) / 2 + 28 + h;
+			Point<int16_t> top_left = position + Point<int16_t>(speaker_x - speaker.width() / 2, top_y);
+			Point<int16_t> origin = speaker.get_origin();
+
+			// Mirrored in place, as the flipped layer keeps its box (I).
+			if (flip_speaker)
+				speaker.draw(DrawArgument(top_left + Point<int16_t>(speaker.width() - origin.x(), origin.y()), true));
+			else
+				speaker.draw(DrawArgument(top_left + origin, false));
+
+			speaker_pos = position + Point<int16_t>(speaker_x - nametag.width() / 2, plate_y);
+		}
 
 		nametag.draw(speaker_pos);
 		name.draw_between(speaker_pos + Point<int16_t>(name_x, -4),
