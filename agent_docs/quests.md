@@ -704,11 +704,16 @@ EXP; 2233 needs 1,000 Rep earned in all; 2234 needs 2,000 earned and less
 than 500 left to spend. The data gives no rewards, and Cosmic has a
 script for 2232 only. The lines are placeholders (`family.captain_al.*`).
 
+The Rumor in the Sea of Fog (3845) is left out (`NOWHERE_TO_END`): the quest
+alert would offer it from Captain Hwang (2092001) at levels 60-80, but it ends
+at Norrington (2060103), whom no map places, since the Sea of Fog isn't in
+v83's data. Accepting it would leave a quest that can't be finished.
+
 The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1401 quests qualify
+changing the server's allowlist and regenerating the list. 2264 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |

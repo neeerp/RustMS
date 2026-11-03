@@ -165,6 +165,11 @@ pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[2335, 3230, 3239, 3609];
 /// forfeited and restarted 6029 doesn't wait for classes that can't be
 /// taken again.
 pub const MEREN_INFO_QUESTS: &[i16] = &[6029, 6030, 6031, 6032];
+/// Quests that can be started but end at an NPC no map places, so they
+/// could never be finished. The Rumor in the Sea of Fog (3845) is offered by
+/// the quest alert (`normalAutoStart`, levels 60-80) and ends at Norrington
+/// (2060103), who stands in the Sea of Fog, a place v83's data doesn't have.
+pub const NOWHERE_TO_END: &[i16] = &[3845];
 const INFO_KEYS: &[&str] = &["info", "infoNumber", "infoex"];
 /// The explorer medals: each counts the maps of a region visited
 /// (`map/onUserEnter/explorationPoint`, or for 29004 the `highposition`
@@ -759,7 +764,12 @@ impl QuestCatalog {
             if id == REQUIREMENTS_IN_START_ACTIONS {
                 keys.start_act.clear();
             }
-            match classify(&keys).and_then(|()| template(&nx, id).map_err(|e| e.to_string())) {
+            let checked = if NOWHERE_TO_END.contains(&id) {
+                Err("end NPC on no map".into())
+            } else {
+                classify(&keys)
+            };
+            match checked.and_then(|()| template(&nx, id).map_err(|e| e.to_string())) {
                 Ok(mut template) => {
                     if MEREN_INFO_QUESTS.contains(&id) {
                         template.start.repeat_interval = None;
