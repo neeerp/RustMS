@@ -4914,6 +4914,22 @@ impl FieldActor {
                     }
                     // Cosmic `2708000`'s `hit`: `killMonster(8820000)`.
                     reactors::Action::Lightning => self.slay(net::mobs::PINK_BEAN_STATUE),
+                    // Cosmic `2612004`'s and `2619000`'s `hit`: its loot
+                    // falls as it takes the item, to whoever put it there
+                    // or, if they have gone, to anyone still here.
+                    reactors::Action::DropsOnHit => {
+                        let dropper =
+                            (self.occupants.get(&by)).or_else(|| self.occupants.values().next());
+                        if let Some(occupant) = dropper {
+                            occupant.handle.send(ServerMessage::ReactorBroken {
+                                field: self.key,
+                                reactor_id: view.reactor_id,
+                                object_id: view.object_id,
+                                x: view.x,
+                                y: view.y,
+                            });
+                        }
+                    }
                     _ => {}
                 }
                 return;
@@ -5102,6 +5118,8 @@ impl FieldActor {
                     }
                 }
             }
+            // Its `act` is empty: it dropped its loot as it was hit.
+            reactors::Action::DropsOnHit => {}
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here. Minerva's statue brings her out
@@ -8288,6 +8306,66 @@ mod tests {
             staying: false,
         });
         assert_eq!(state(&actor), Some(0));
+    }
+
+    #[tokio::test]
+    async fn zenumists_pillar_drops_its_loot_as_it_takes_the_bottle_and_stays() {
+        let Some(data) = net::reactors::template(reactors::ZENUMIST_PILLAR) else {
+            return;
+        };
+        let spot = game_data::MapReactorTemplate {
+            reactor_id: reactors::ZENUMIST_PILLAR,
+            x: -119,
+            y: -111,
+            flip: false,
+            reactor_time: -1,
+            name: String::new(),
+        };
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 261000010),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::new([(spot, data)]),
+            Duration::from_millis(50),
+        );
+        let (handle, mut rx) = client(1);
+        actor.handle_message(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, -119, -111),
+            party: None,
+        });
+        opcodes(&mut rx).await;
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Throw {
+                loot: Loot::Dropped(game::Item::stack(4031705, 1)),
+                vanish: false,
+            },
+        });
+        actor.on_tick(Instant::now() + Duration::from_secs(6));
+
+        assert_eq!(actor.reactors.live().next().map(|r| r.state), Some(1));
+        assert_eq!(actor.drops.all().count(), 0);
+        let mut seen = Vec::new();
+        let mut broken = false;
+        while let Ok(Some(message)) = timeout(Duration::from_millis(100), rx.recv()).await {
+            match message {
+                ServerMessage::SendPacket(packet) => seen.push(packet.opcode()),
+                ServerMessage::ReactorBroken { reactor_id, .. } => {
+                    broken = reactor_id == reactors::ZENUMIST_PILLAR
+                }
+                _ => {}
+            }
+        }
+        assert!(broken);
+        assert!(seen.contains(&(SendOpcode::HitReactor as i16)), "{seen:?}");
+        assert!(
+            !seen.contains(&(SendOpcode::RemoveReactor as i16)),
+            "{seen:?}"
+        );
     }
 
     #[tokio::test]
