@@ -1,5 +1,7 @@
 use integration_harness::connection::{MapleTestConnection, PacketEnvelope};
-use integration_harness::database::{item_owner_and_hours, set_meso, set_nx_credit};
+use integration_harness::database::{
+    item_owner_and_hours, set_meso, set_nx_credit, set_nx_prepaid,
+};
 use integration_harness::packets::{
     build_cash_shop_buy, build_cash_shop_buy_package, build_cash_shop_buy_with_mesos,
     build_cash_shop_expand, build_cash_shop_gift, build_cash_shop_package_gift,
@@ -243,6 +245,15 @@ async fn credit(connection: &mut MapleTestConnection, phase: &'static str) -> i3
         .expect("NX Credit")
 }
 
+/// The NX Credit and NX Prepaid in the balance that follows a purchase.
+async fn balance(connection: &mut MapleTestConnection, phase: &'static str) -> (i32, i32) {
+    let balance = read_until(connection, phase, SendOpcode::QueryCashResult).await;
+    let mut balance = Cursor::new(&balance.packet.bytes[2..]);
+    let credit = balance.read_int().expect("NX Credit");
+    balance.read_int().expect("Maple Points");
+    (credit, balance.read_int().expect("NX Prepaid"))
+}
+
 /// Ask about a gift, and read the receiver's character id from the answer,
 /// which echoes the gift first.
 async fn look_up(
@@ -323,7 +334,7 @@ async fn nx_buys_items_packages_gifts_and_slots() {
     let mut session = login_to_world_session(&config)
         .await
         .expect("login-to-world session flow failed");
-    set_nx_credit(&config.username, 30_000)
+    set_nx_credit(&config.username, 29_000)
         .await
         .expect("grant NX");
     enter_cash_shop(&mut session.connection).await;
@@ -331,18 +342,29 @@ async fn nx_buys_items_packages_gifts_and_slots() {
 
     let bought = request(connection, build_cash_shop_buy(1, TICKET).unwrap(), "buy").await;
     assert_eq!(bought[0], 0x57, "buy an item");
-    assert_eq!(credit(connection, "buy an item").await, 29_000);
+    assert_eq!(credit(connection, "buy an item").await, 28_000);
 
     let package = build_cash_shop_buy_package(1, PACKAGE).unwrap();
     let bought = request(connection, package, "buy a package").await;
     assert_eq!(bought[..2], [0x89, 3], "a package's three items");
-    assert_eq!(credit(connection, "buy a package").await, 12_100);
+    assert_eq!(credit(connection, "buy a package").await, 11_100);
 
+    // A gift is paid from NX Prepaid alone.
     let gift = || build_cash_shop_gift(19830113, TICKET, &receiver_config.character_name, "enjoy");
+    look_up(connection, gift().unwrap(), "ask about a gift").await;
+    let failed = request(connection, gift().unwrap(), "gift without NX Prepaid").await;
+    assert_eq!(failed, [0x5C, 0xA5]);
+    set_nx_prepaid(&config.username, 3_000)
+        .await
+        .expect("grant NX Prepaid");
     look_up(connection, gift().unwrap(), "ask about a gift").await;
     let sent = request(connection, gift().unwrap(), "gift").await;
     assert_eq!(sent[0], 0x5E, "send a gift");
-    assert_eq!(credit(connection, "gift").await, 11_100);
+    assert_eq!(
+        balance(connection, "gift").await,
+        (11_100, 2_000),
+        "NX Credit and NX Prepaid after a gift"
+    );
 
     // The slot buttons add four slots for 4,000 NX.
     let expand = build_cash_shop_expand(1, Some(3)).unwrap();
@@ -447,9 +469,9 @@ async fn packages_go_as_gifts_of_their_items() {
     let mut session = login_to_world_session(&config)
         .await
         .expect("login-to-world session flow failed");
-    set_nx_credit(&config.username, 20_000)
+    set_nx_prepaid(&config.username, 20_000)
         .await
-        .expect("grant NX");
+        .expect("grant NX Prepaid");
     enter_cash_shop(&mut session.connection).await;
     let connection = &mut session.connection;
 
@@ -467,7 +489,7 @@ async fn packages_go_as_gifts_of_their_items() {
     assert_eq!(reply.read_int().unwrap(), 9102232, "the package");
     assert_eq!(reply.read_short().unwrap(), 1);
     assert_eq!(reply.read_int().unwrap(), 16_900);
-    assert_eq!(credit(connection, "gift a package").await, 3_100);
+    assert_eq!(balance(connection, "gift a package").await, (0, 3_100));
     drop(session);
 
     let mut receiver = relogin(&receiver_config).await;
