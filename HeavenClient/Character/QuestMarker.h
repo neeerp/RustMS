@@ -351,7 +351,8 @@ namespace ms
 
 	// The icon over an NPC, as v83 chooses it (FUN_006d1779). The NPC's quests
 	// are those it starts or finishes, less party quests (1200-1399). A started
-	// quest it can finish now (kills and items in) gives the closed book;
+	// quest it can finish now (kills, items and Check/1 quests in, as 721d2c
+	// checks them) gives the closed book;
 	// otherwise a quest it can start gives the bulb, and a started quest the
 	// open book. Kept free of graphics so the choice can be tested.
 	// `progress` gives a started quest's progress string (its kill counts),
@@ -374,7 +375,9 @@ namespace ms
 			if (status(quest.id) == 1)
 			{
 				if ((quest.end_npc == 0 || quest.end_npc == npc_id) &&
-					end_items_met(quest, count) && end_mobs_met(quest, progress(quest.id)))
+					end_items_met(quest, count) && end_mobs_met(quest, progress(quest.id)) &&
+					std::all_of(quest.end_prerequisites.begin(), quest.end_prerequisites.end(),
+						[&](const auto& requirement) { return status(requirement.first) == requirement.second; }))
 				{
 					std::string record = progress(quest.end_info_record);
 
