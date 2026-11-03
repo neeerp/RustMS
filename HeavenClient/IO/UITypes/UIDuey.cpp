@@ -103,6 +103,9 @@ namespace ms
 		const Point<int16_t> HINTS[2] = { Point<int16_t>(89, 122), Point<int16_t>(89, 135) };
 		// With its fee table folded away, a send panel ends here.
 		constexpr int16_t FOLDED_HEIGHT = 350;
+		// The receive panel ends here, or lower with a parcel chosen (FUN_006f0c6f).
+		constexpr int16_t RECEIVE_HEIGHT = 334;
+		constexpr int16_t CHOSEN_HEIGHT = 442;
 
 		// v83's edits are at (123, 213), 154 by 14, and (95, 115), 165 by 68;
 		// our text sits 3 px lower than v83's.
@@ -684,8 +687,14 @@ namespace ms
 
 	bool UIDuey::is_in_range(Point<int16_t> cursorpos) const
 	{
-		// A send panel with its table folded lets clicks through below it.
-		if (tab != Tab::RECEIVE && !outgoing(tab).table && cursorpos.y() - position.y() > FOLDED_HEIGHT)
+		int16_t y = cursorpos.y() - position.y();
+
+		// A send panel with its table folded lets clicks through below it,
+		// and so does the receive panel below its list or chosen parcel.
+		if (tab != Tab::RECEIVE && !outgoing(tab).table && y > FOLDED_HEIGHT)
+			return false;
+
+		if (tab == Tab::RECEIVE && y > (selection < 0 ? RECEIVE_HEIGHT : CHOSEN_HEIGHT))
 			return false;
 
 		return UIElement::is_in_range(cursorpos);
