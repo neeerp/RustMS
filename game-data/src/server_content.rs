@@ -591,6 +591,9 @@ pub mod keys {
     pub const MAED_CAPE_LOST: &str = "magatia_cape.maed_lost";
     pub const MAED_CAPE_ASK: &str = "magatia_cape.maed_ask";
     pub const MAED_CAPE_GO: &str = "magatia_cape.maed_go";
+    /// The desk in De Lang's home during The Clue (3311), the player's
+    /// thought.
+    pub const DE_LANG_DIARY: &str = "magatia_de_lang.diary";
     /// Dr. De Lang in Dran's Lab (`q3320s`, `q3321s`, `q3353s`, `q3354s`),
     /// Parwen's password (`q3360s`, `{password}`) and the Secret Passage
     /// asking for it.
@@ -4428,6 +4431,7 @@ mod tests {
             keys::MAED_CAPE_LOST,
             keys::MAED_CAPE_ASK,
             keys::MAED_CAPE_GO,
+            keys::DE_LANG_DIARY,
             keys::PARWEN_KNOWS_ASK,
             keys::DE_LANG_MISSING_STORY,
             keys::DE_LANG_MISSING_HELP,

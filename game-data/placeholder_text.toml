@@ -388,6 +388,7 @@
 "magatia_cape.maed_lost" = "[placeholder] Maed sees the player has lost their Alcadno cape and offers to make another, given materials."
 "magatia_cape.maed_ask" = "[placeholder] Maed asks for 5 Topazes, 10 Leather and 10,000 mesos to make a new cape."
 "magatia_cape.maed_go" = "[placeholder] Maed says to come back with everything."
+"magatia_de_lang.diary" = "[placeholder] The player finds Dr. De Lang's diary, full of formulas."
 "magatia_de_lang.parwen_knows_ask" = "[placeholder] Parwen knows where Dr. De Lang hides and asks whether the player will go and see."
 "magatia_de_lang.missing_story" = "[placeholder] Dr. De Lang tells why they went into hiding."
 "magatia_de_lang.missing_help" = "[placeholder] Dr. De Lang needs someone to go where they can't."

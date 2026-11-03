@@ -163,10 +163,11 @@ pub struct StorageFees {
 /// the two Puros on board the ships to and from Ereve and Rien, Andy by the
 /// Tera Forest Time Gate, Sejan in Ariant, Spindle in Ludibrium, the
 /// Glimmer Man in New Leaf City, Witch Malady, the Steward and the Maid by
-/// and in the Haunted House, and Santa in Happyville.
-pub const DEFAULT_LINE_NPCS: [i32; 12] = [
-    1100005, 1100006, 1200005, 1200006, 2082004, 2101011, 2120003, 9201082, 9201083, 9201142,
-    9201143, 9310058,
+/// and in the Haunted House, Santa in Happyville, and Magatia's Carson and
+/// Humanoid A when not sending one on an errand.
+pub const DEFAULT_LINE_NPCS: [i32; 14] = [
+    1100005, 1100006, 1200005, 1200006, 2082004, 2101011, 2111000, 2111003, 2120003, 9201082,
+    9201083, 9201142, 9201143, 9310058,
 ];
 
 #[derive(Debug, Default)]
