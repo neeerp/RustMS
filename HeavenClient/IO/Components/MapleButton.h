@@ -60,6 +60,10 @@ namespace ms
 		Animation animations[Button::State::NUM_STATES];
 		// Drawn over the state's texture while the button has key focus.
 		Texture focus;
+		// The fixed hit box: the largest frame of the four states, placed by
+		// the normal state's origin.
+		Point<int16_t> hitorigin;
+		Point<int16_t> hitsize;
 		float opacity = 1.0f;
 		bool greyed = false;
 	};

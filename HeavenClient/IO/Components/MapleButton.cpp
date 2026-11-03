@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapleButton.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	MapleButton::MapleButton(nl::node src, Point<int16_t> pos)
@@ -32,6 +34,27 @@ namespace ms
 		textures[Button::State::MOUSEOVER] = src["mouseOver"]["0"];
 		textures[Button::State::DISABLED] = src["disabled"]["0"];
 		focus = src["keyFocused"]["0"];
+
+		// v83 sizes a button once, when it is made, to the largest frame of
+		// its normal, pressed, disabled and mouseOver states (CCtrlButton::
+		// CreateCtrl, 4c007a), and a change of state never resizes it. So a
+		// press shown by a smaller frame, as the race select's 1x1, still
+		// takes the release.
+		for (const char *name : { "normal", "pressed", "disabled", "mouseOver" })
+		{
+			for (nl::node frame : src[name])
+			{
+				Point<int16_t> dimensions = Texture(frame).get_dimensions();
+				hitsize = Point<int16_t>(
+						std::max(hitsize.x(), dimensions.x()),
+						std::max(hitsize.y(), dimensions.y())
+				);
+			}
+		}
+
+		hitorigin = textures[Button::State::NORMAL].is_valid()
+			? textures[Button::State::NORMAL].get_origin()
+			: animations[Button::State::NORMAL].get_origin();
 
 		active = true;
 		position = pos;
@@ -77,20 +100,9 @@ namespace ms
 
 	Rectangle<int16_t> MapleButton::bounds(Point<int16_t> parentpos) const
 	{
-		Point<int16_t> lt;
-		Point<int16_t> rb;
+		Point<int16_t> lt = parentpos + position - hitorigin;
 
-		if (textures[state].is_valid())
-		{
-			lt = parentpos + position - textures[state].get_origin();
-			rb = lt + textures[state].get_dimensions();
-		} else
-		{
-			lt = parentpos + position - animations[state].get_origin();
-			rb = lt + animations[state].get_dimensions();
-		}
-
-		return Rectangle<int16_t>(lt, rb);
+		return Rectangle<int16_t>(lt, lt + hitsize);
 	}
 
 	int16_t MapleButton::width() const
