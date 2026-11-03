@@ -183,6 +183,19 @@ int main()
 		walls.end_info_record = 0;
 		walls.end_info = {{0, "111"}};
 		require(info_stop(nullptr) == ms::QuestStop::NONE, "infoex without infoNumber is the server's");
+		// 6029 also needs its three classes done (Check/1 quest), which
+		// 721d2c checks before the icon goes to the closed book (6d185b).
+		ms::QuestInfo meren = quest(6029, 2110004, 2110004);
+		meren.end_prerequisites = {{6030, 2}, {6031, 2}, {6032, 2}};
+		std::map<int16_t, int16_t> classes { {6029, 1} };
+		auto meren_marker = [&]() {
+			return ms::select_quest_marker(2110004, 0, {meren}, [&](int16_t id) { return classes[id]; }, 45,
+				[](int32_t) { return 0; }, [](int16_t) { return std::string(); },
+				[](const ms::QuestInfo&) { return true; });
+		};
+		require(meren_marker() == QuestMarker::IN_PROGRESS, "classes not done leave the open book");
+		classes[6030] = classes[6031] = classes[6032] = 2;
+		require(meren_marker() == QuestMarker::READY, "all three done close it");
 		// Check/0/infoex (FUN_00721163): The Test (2312) waits for the
 		// opening scene to set 2311 to "1".
 		ms::QuestInfo the_test = quest(2312, 1300005, 1300005);
