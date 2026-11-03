@@ -105,6 +105,7 @@ namespace ms
 		masterlevel = static_cast<int32_t>(stats.size());
 		passive = (id % 10000) / 1000 == 0;
 		flags = flags_of(id);
+		valid = static_cast<bool>(src);
 		invisible = src["invisible"].get_bool();
 		disabled = src["disable"].get_bool();
 
@@ -286,6 +287,11 @@ namespace ms
 	uint8_t SkillData::get_element() const
 	{
 		return element.empty() ? 0 : magic_damage::element(element[0]);
+	}
+
+	bool SkillData::is_valid() const
+	{
+		return valid;
 	}
 
 	bool SkillData::is_invisible() const
