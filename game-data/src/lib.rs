@@ -165,10 +165,11 @@ pub struct StorageFees {
 /// Glimmer Man in New Leaf City, Witch Malady, the Steward and the Maid by
 /// and in the Haunted House, Santa in Happyville, Magatia's Carson and
 /// Humanoid A when not sending one on an errand, Shinsoo to anyone it
-/// doesn't bless, Pudin in Rien's hall of heroes, and A Familiar Lady.
-pub const DEFAULT_LINE_NPCS: [i32; 17] = [
+/// doesn't bless, Pudin in Rien's hall of heroes, A Familiar Lady, and
+/// Cassandra in Henesys.
+pub const DEFAULT_LINE_NPCS: [i32; 18] = [
     1100005, 1100006, 1101001, 1200005, 1200006, 1202010, 2071012, 2082004, 2101011, 2111000,
-    2111003, 2120003, 9201082, 9201083, 9201142, 9201143, 9310058,
+    2111003, 2120003, 9010010, 9201082, 9201083, 9201142, 9201143, 9310058,
 ];
 
 #[derive(Debug, Default)]
