@@ -172,6 +172,7 @@ namespace ms
 		Texture recommend;
 		Texture bookicon;
 		Text booktext;
+		Point<int16_t> booktext_pos;
 		Text splabel;
 
 		// The job whose skills each tab shows.
