@@ -114,6 +114,7 @@
 "taxi.ask" = "[placeholder] Go to #b#m{map}##k for #b{price} mesos#k?"
 "taxi.decline" = "[placeholder] Come back when you want to go to another town."
 "taxi.short" = "[placeholder] You don't have enough mesos for the cab."
+"taxi.coupon_ask" = "[placeholder] Neinheart sent you, so the ride to #b#m{map}##k is free this once. Go?"
 "vip_cab.intro" = "[placeholder] The VIP Cab goes to Ant Tunnel Park."
 "vip_cab.ask" = "[placeholder] Go to Ant Tunnel Park for #b{price} mesos#k?"
 "vip_cab.decline" = "[placeholder] Come back when you want to go to Ant Tunnel Park."

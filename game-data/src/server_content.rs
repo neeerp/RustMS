@@ -178,6 +178,9 @@ pub mod keys {
     pub const TAXI_ASK: &str = "taxi.ask";
     pub const TAXI_DECLINE: &str = "taxi.decline";
     pub const TAXI_SHORT: &str = "taxi.short";
+    /// Ellinia's cab asks a holder of Neinheart's Taxi Coupon about the
+    /// free ride to Henesys (`{map}`).
+    pub const TAXI_COUPON_ASK: &str = "taxi.coupon_ask";
 
     /// The VIP Cabs (`mTaxi`) to Ant Tunnel Park; a beginner's yes or no
     /// opens with the Regular Cabs' discount line.
@@ -4225,6 +4228,7 @@ mod tests {
             keys::TAXI_ASK,
             keys::TAXI_DECLINE,
             keys::TAXI_SHORT,
+            keys::TAXI_COUPON_ASK,
             keys::VIP_CAB_INTRO,
             keys::VIP_CAB_ASK,
             keys::VIP_CAB_DECLINE,

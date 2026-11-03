@@ -12930,6 +12930,7 @@ fn isa() -> NpcScript {
 /// `taxi1`-`taxi6`: a Regular Cab to another of Victoria's towns.
 fn regular_cab(npc_id: i32, fares: &[(i32, i32)], player: &Player) -> NpcScript {
     let beginner = player.stats.job == 0;
+    let coupon = npc_id == ELLINIA_CAB && player.inventory.count(NEINHEARTS_TAXI_COUPON) > 0;
     let mut menu = if beginner {
         text(keys::TAXI_DISCOUNT)
     } else {
@@ -12942,6 +12943,20 @@ fn regular_cab(npc_id: i32, fares: &[(i32, i32)], player: &Player) -> NpcScript 
             let fare = if beginner { fare / 10 } else { fare };
             let (map, price) = (town.to_string(), fare.to_string());
             let vars = [("map", map.as_str()), ("price", price.as_str())];
+            if coupon && town == HENESYS.0 {
+                let free = Page::Ask {
+                    text: content::text().get(keys::TAXI_COUPON_ASK, &vars),
+                    on_yes: vec![
+                        Effect::TakeItem {
+                            item_id: NEINHEARTS_TAXI_COUPON,
+                            quantity: 1,
+                        },
+                        Effect::Warp(town),
+                    ],
+                    on_no: Some(text(keys::TAXI_DECLINE)),
+                };
+                return (content::text().get(keys::TAXI_CHOICE, &vars), vec![free]);
+            }
             let ride = ride(
                 content::text().get(keys::TAXI_ASK, &vars),
                 Some(keys::TAXI_DECLINE),
@@ -12966,6 +12981,12 @@ fn regular_cab(npc_id: i32, fares: &[(i32, i32)], player: &Player) -> NpcScript 
     script.refused = Some(text(keys::TAXI_SHORT));
     script
 }
+
+/// Ellinia's Regular Cab takes a holder of Neinheart's Taxi Coupon, from
+/// A Mission in Henesys (20704), to Henesys for the coupon instead of the
+/// fare, once (the coupon's String.nx description; Cosmic `1032000.js`).
+const ELLINIA_CAB: i32 = 1032000;
+const NEINHEARTS_TAXI_COUPON: i32 = 4032288;
 
 /// `mTaxi`: the VIP Cab to Ant Tunnel Park, a tenth of the fare for a
 /// beginner.
@@ -25887,6 +25908,54 @@ mod tests {
                 [Effect::SpendMeso(fare), Effect::Warp(ANT_TUNNEL_PARK)]
             );
         }
+    }
+
+    #[test]
+    fn ellinias_cab_takes_neinhearts_coupon_to_henesys() {
+        let mut holder = rider(1100, 0, 101000000);
+        holder.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(NEINHEARTS_TAXI_COUPON, 1),
+        );
+        let mut cab = NpcScript::for_npc(ELLINIA_CAB, &holder).unwrap();
+        cab.begin();
+        cab.respond(ScriptInput::Next);
+        let ask = cab.respond(ScriptInput::Select(2)).unwrap();
+        assert_eq!(kind(&ask), Some(1));
+        assert_eq!(
+            cab.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: NEINHEARTS_TAXI_COUPON,
+                    quantity: 1
+                },
+                Effect::Warp(100000000)
+            ]
+        );
+
+        // Other towns are paid for as ever.
+        let mut cab = NpcScript::for_npc(ELLINIA_CAB, &holder).unwrap();
+        cab.begin();
+        cab.respond(ScriptInput::Next);
+        cab.respond(ScriptInput::Select(0));
+        assert!(cab.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+
+        // Henesys's cab doesn't take it.
+        let mut holder = rider(1100, 1000, 100000000);
+        holder.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(NEINHEARTS_TAXI_COUPON, 1),
+        );
+        let mut cab = NpcScript::for_npc(1012000, &holder).unwrap();
+        cab.begin();
+        cab.respond(ScriptInput::Next);
+        cab.respond(ScriptInput::Select(2));
+        assert_eq!(
+            cab.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::SpendMeso(800), Effect::Warp(101000000)]
+        );
     }
 
     #[test]
