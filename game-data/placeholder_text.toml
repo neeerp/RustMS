@@ -1462,6 +1462,8 @@
 "sure_you_can_leave.blessing" = "[placeholder] And did you know that Shinsoo will bless you if you speak to it? The blessing will help you on your way."
 "trash_can_mission.ask" = "[placeholder] You don't fill me with confidence, but you're a Cygnus Knight, and nobody else is free to search right now... All right, let me tell you what this mission is."
 "trash_can_mission.declined" = "[placeholder] What, you're turning the mission down? Suit yourself. I'll report it straight to Neinheart."
+"trash_can_mission.subway" = "[placeholder] Word is the Kerning City subway is full of strange dolls. Jake says one was thrown out lately, and it looks like the one found in Henesys."
+"trash_can_mission.search" = "[placeholder] Jake had the dolls in the subway thrown out, so go through the subway trash can and bring me one."
 "kerning_trash_can.found" = "[placeholder] You found a #b#t4032136##k in the trash can! #i4032136#"
 "kerning_trash_can.full" = "[placeholder] #i4032136# Your Etc inventory is full."
 "kerning_trash_can.empty" = "[placeholder] Just a trash can."
