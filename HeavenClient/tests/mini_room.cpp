@@ -181,6 +181,12 @@ int main()
 		require(slot_at(172, 130) == 0 && slot_at(172, 131 + 74 + 32) == 0, "above and below the grid is no slot");
 		require(slot_at(172 + 39, 131 + 37) == 5, "the slots go row by row");
 
+		// The corner below the chat and right of the fee table lets clicks through.
+		require(in_trade_window(0, 0, 560, 470) && in_trade_window(287, 469, 560, 470), "the fee table is on the window");
+		require(in_trade_window(559, 274, 560, 470), "the chat is on the window");
+		require(!in_trade_window(288, 275, 560, 470) && !in_trade_window(559, 469, 560, 470), "the open corner is not");
+		require(!in_trade_window(-1, 0, 560, 470) && !in_trade_window(0, 470, 560, 470), "outside is not");
+
 		require(meso_text(0) == "0" && meso_text(999) == "999", "small amounts have no commas");
 		require(meso_text(1000) == "1,000" && meso_text(1234567) == "1,234,567", "thousands are separated");
 		require(meso_text(2147483647) == "2,147,483,647", "the largest amount");

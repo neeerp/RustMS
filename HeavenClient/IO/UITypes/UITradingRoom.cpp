@@ -262,6 +262,13 @@ namespace ms
 		return true;
 	}
 
+	bool UITradingRoom::is_in_range(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> at = cursorpos - position;
+
+		return mini_room::in_trade_window(at.x(), at.y(), dimension.x(), dimension.y());
+	}
+
 	void UITradingRoom::send_scroll(double yoffset)
 	{
 		slider.send_scroll(yoffset);
