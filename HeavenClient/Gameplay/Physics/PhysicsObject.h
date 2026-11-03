@@ -293,5 +293,15 @@ namespace ms
 		{
 			flags = 0;
 		}
+
+		// Puts the object at a new spot, off the platform it stood on, so
+		// its next move takes the one below the spot. Kept, a platform under
+		// the old spot and the new would pull the object back down to it.
+		void place(double px, double py)
+		{
+			set_x(px);
+			set_y(py);
+			fhid = 0;
+		}
 	};
 }

@@ -283,6 +283,36 @@ void conveyor_belts()
 	std::filesystem::remove(path);
 }
 
+// A portal within the map may lead straight up or down, onto a floor over
+// the same span as the one the player stands on (Eos Tower, 221023400). v83
+// stands the player on the floor below the target (0x957b74).
+void placed_on_another_floor()
+{
+	auto path = foothold_map({
+		{0, 1, -1000, 0, 1000, 0, 0, 0},
+		{1, 2, -1000, -500, 1000, -500, 0, 0}});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(0); player.set_y(0);
+		physics.move_object(player);
+		require(player.onground && player.fhid == 1, "stacked fixture did not find its lower floor");
+
+		player.place(0, -500);
+		for (int tick = 0; tick < 5; ++tick)
+			physics.move_object(player);
+		require(player.onground && player.fhid == 2 && player.crnt_y() == -500, "a player placed on the upper floor fell back to the lower one");
+
+		player.place(0, 0);
+		for (int tick = 0; tick < 5; ++tick)
+			physics.move_object(player);
+		require(player.onground && player.fhid == 1 && player.crnt_y() == 0, "a player placed on the lower floor stayed on the upper one");
+	}
+	std::filesystem::remove(path);
+}
+
 // HeavenClient's own model, which flying mobs, NPCs and pets still use.
 void legacy_jumps_keep_momentum(const ms::Physics& physics)
 {
@@ -1054,6 +1084,7 @@ int main()
 			jumping_down(physics);
 			knockback(physics);
 			conveyor_belts();
+			placed_on_another_floor();
 			// A knocked back mob sets its own ground speed; friction must not
 			// eat into it, even below the usual stopping threshold.
 			ms::PhysicsObject mob = grounded_shoe(physics);

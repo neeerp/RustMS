@@ -192,9 +192,12 @@ namespace ms
 	Player::Player() : Char(0, {}, "")
 	{}
 
+	// A portal within the map moves the player onto the foothold below its
+	// target (v83 FUN_00957b74), as a new field does, whatever floor they
+	// stood on.
 	void Player::respawn(Point<int16_t> pos, bool uw)
 	{
-		set_position(pos.x(), pos.y());
+		phobj.place(pos.x(), pos.y());
 		underwater = uw;
 		phobj.swim = uw;
 		phobj.flydir = 0;
