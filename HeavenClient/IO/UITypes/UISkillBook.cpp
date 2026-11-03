@@ -46,6 +46,11 @@ namespace ms
 		// The book icon's origin and the centre of the job name above it.
 		constexpr Point<int16_t> BOOK = Point<int16_t>(6, 87);
 		constexpr Point<int16_t> BOOK_NAME = Point<int16_t>(103, 62);
+		// v83 (FUN_008ac38a) centres a name up to 125 px wide; a longer one
+		// is cut with ".." to 125 px (FUN_00988cf3) and starts 60 px left of
+		// the centre (x 45 against the centre's 105).
+		constexpr int16_t BOOK_NAME_WIDTH = 125;
+		constexpr int16_t BOOK_NAME_LEFT = 60;
 		// The first row's top-left; each row's parts are offsets from it.
 		constexpr Point<int16_t> ROW = Point<int16_t>(7, 99);
 		constexpr int16_t ROW_WIDTH = 141;
@@ -173,6 +178,7 @@ namespace ms
 		buttons[Buttons::BT_MACRO] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtMacro"], MACRO);
 
 		booktext = Text(Text::Font::A10M, Text::Alignment::CENTER, Color::Name::WHITE);
+		booktext_pos = BOOK_NAME;
 		splabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 
 		Range<int16_t> rows = Range<int16_t>(ROW.y(), ROW.y() + ROW_HEIGHT * (ROWS - 1) + 21);
@@ -203,7 +209,7 @@ namespace ms
 		tabs.draw(position + TAB_STRIP, tab_count(), tab);
 
 		bookicon.draw(position + BOOK);
-		booktext.draw(position + BOOK_NAME);
+		booktext.draw(position + booktext_pos);
 		splabel.draw(position + SP_LABEL);
 
 		for (int16_t i = 0; i < ROWS; i++)
@@ -507,7 +513,22 @@ namespace ms
 		const JobData &data = JobData::get(subid);
 
 		bookicon = data.get_icon();
-		booktext.change_text(data.get_name());
+
+		std::string bookname = data.get_name();
+		booktext = Text(Text::Font::A10M, Text::Alignment::CENTER, Color::Name::WHITE, bookname);
+		booktext_pos = BOOK_NAME;
+
+		if (booktext.width() > BOOK_NAME_WIDTH)
+		{
+			booktext = Text(Text::Font::A10M, Text::Alignment::LEFT, Color::Name::WHITE);
+			booktext_pos = BOOK_NAME - Point<int16_t>(BOOK_NAME_LEFT, 0);
+
+			do
+			{
+				bookname.pop_back();
+				booktext.change_text(bookname + "..");
+			} while (!bookname.empty() && booktext.width() > BOOK_NAME_WIDTH);
+		}
 
 		for (int32_t skill_id : data.get_skills())
 		{
