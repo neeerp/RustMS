@@ -995,8 +995,10 @@ namespace ms
 		if (name.width() > NAME_WIDTH)
 			string_format::format_with_ellipsis(name, NAME_WIDTH);
 
-		// A prompt never scrolls (9a3d71).
-		show_slider = !has_field() && block + PADDING > MAX_HEIGHT;
+		// A prompt never scrolls (9a3d71). Text scrolls only once it spills
+		// out of the scrolling view; until then the box grows past
+		// MAX_HEIGHT, as v83's grows by up to 15 px before it scrolls (9acc20).
+		show_slider = !has_field() && block > SCROLL_LINES * LINE;
 
 		if (show_slider)
 		{
