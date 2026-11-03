@@ -100,7 +100,9 @@ namespace ms
 
 			// v83 checks Check/0/infoex too (FUN_00721163). Meren's classes
 			// read 6029's string, which the server keeps not; those are left
-			// to it, as their completion is.
+			// to it, as their completion is. Their digit in that string is
+			// what keeps a class from being taken again despite `interval 0`,
+			// so they are one-time, as on the server.
 			auto start_record = static_cast<int16_t>(start["infoNumber"].get_integer());
 
 			if (start_record != 0 && !root["QuestInfo.img"][std::to_string(start_record)])
@@ -110,6 +112,10 @@ namespace ms
 				for (auto entry : start["infoex"])
 					info.start_info.emplace_back(static_cast<int32_t>(entry["cond"].get_integer()),
 						entry["value"].get_string());
+			}
+			else if (start_record != 0)
+			{
+				info.repeat_interval = -1;
 			}
 
 			for (auto map : start["fieldEnter"])
