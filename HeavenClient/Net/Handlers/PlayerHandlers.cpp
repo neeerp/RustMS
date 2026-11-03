@@ -251,6 +251,7 @@ namespace ms
 		switch (stat)
 		{
 		case MapleStat::Id::JOB:
+		case MapleStat::Id::LEVEL:
 		case MapleStat::Id::SP:
 			return true;
 		default:

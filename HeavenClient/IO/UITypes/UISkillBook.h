@@ -130,8 +130,6 @@ namespace ms
 
 		void spend_sp(int32_t skill_id);
 
-		Job::Level joblevel_by_tab(uint16_t tab) const;
-
 		uint16_t tab_count() const;
 
 		// The visible row under a position relative to the window, or -1.
@@ -176,7 +174,8 @@ namespace ms
 		Text booktext;
 		Text splabel;
 
-		Job job;
+		// The job whose skills each tab shows.
+		std::vector<uint16_t> roots;
 		int16_t sp;
 		int16_t beginner_sp;
 

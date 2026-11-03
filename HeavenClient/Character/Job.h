@@ -22,6 +22,7 @@
 #include "Inventory/Weapon.h"
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace ms
 {
@@ -72,6 +73,11 @@ namespace ms
 
 		// A job's name as v83 shows it, or "" for a job it has no name for (or 800, whose name is Korean).
 		static std::string get_name(uint16_t id);
+
+		// The jobs whose skills the skill window's tabs show, first tab
+		// first (v83 0x8ad238): the job's beginner root, 1000 for a Cygnus
+		// Knight and 2000 for an Aran, then each advancement up to the job.
+		static std::vector<uint16_t> skill_roots(uint16_t id);
 
 	private:
 		std::string name;

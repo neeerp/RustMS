@@ -92,6 +92,34 @@ namespace ms
 		return 0;
 	}
 
+	std::vector<uint16_t> Job::skill_roots(uint16_t id)
+	{
+		// Evan's are 2001's, though K opens another window for him.
+		std::vector<uint16_t> roots = { static_cast<uint16_t>(id / 100 == 22 || id == 2001 ? 2001 : id / 1000 * 1000) };
+
+		// The advancements (0x4a8c4f): 100, 110, then 111 and 112.
+		uint16_t grade = id % 1000 / 100;
+
+		if (grade == 0)
+			return roots;
+
+		uint16_t root = (grade + id / 1000 * 10) * 100;
+		roots.push_back(root);
+
+		uint16_t branch = id % 100 / 10;
+
+		if (branch == 0)
+			return roots;
+
+		root += branch * 10;
+		roots.push_back(root);
+
+		for (uint16_t i = 1; i <= 8 && id % 10 >= i; i++)
+			roots.push_back(++root);
+
+		return roots;
+	}
+
 	const std::string &Job::get_name() const
 	{
 		return name;

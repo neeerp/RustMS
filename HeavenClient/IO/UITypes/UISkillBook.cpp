@@ -419,6 +419,7 @@ namespace ms
 			case MapleStat::Id::JOB:
 				change_job(value);
 				break;
+			case MapleStat::Id::LEVEL:
 			case MapleStat::Id::SP:
 				change_sp();
 				break;
@@ -442,7 +443,7 @@ namespace ms
 
 	void UISkillBook::change_job(uint16_t id)
 	{
-		job.change_job(id);
+		roots = Job::skill_roots(id);
 
 		for (uint16_t i = 0; i < TABS; i++)
 			buttons[Buttons::BT_TAB0 + i]->set_active(i < tab_count());
@@ -455,15 +456,18 @@ namespace ms
 		uint16_t level = stats.get_stat(MapleStat::Id::LEVEL);
 
 		// Beginner skills take the points of the first six levels, which the
-		// server doesn't count in SP.
+		// server doesn't count in SP. v83 takes off every beginner job's
+		// three (0x765e9e).
 		beginner_sp = std::min<int16_t>(level - 1, 6);
 
-		for (int32_t skill_id : { SkillId::Id::THREE_SNAILS, SkillId::Id::HEAL, SkillId::Id::FEATHER })
-			beginner_sp -= skillbook.get_level(skill_id);
+		for (int32_t root : { 0, 10000000, 20000000, 20010000 })
+			for (int32_t skill_id : { SkillId::Id::THREE_SNAILS, SkillId::Id::HEAL, SkillId::Id::FEATHER })
+				beginner_sp -= skillbook.get_level(root + skill_id);
 
 		sp = stats.get_stat(MapleStat::Id::SP);
 
-		if (joblevel_by_tab(tab) == Job::Level::BEGINNER)
+		// The first tab is the beginner's, whichever beginner (0x8ac38a).
+		if (tab == 0)
 			splabel.change_text(std::to_string(beginner_sp));
 		else
 			splabel.change_text(std::to_string(sp));
@@ -494,7 +498,7 @@ namespace ms
 	{
 		skills.clear();
 
-		uint16_t subid = job.get_subjob(joblevel_by_tab(tab));
+		uint16_t subid = roots[tab];
 		const JobData &data = JobData::get(subid);
 
 		bookicon = data.get_icon();
@@ -560,7 +564,7 @@ namespace ms
 
 	bool UISkillBook::can_raise(int32_t skill_id) const
 	{
-		if (joblevel_by_tab(tab) == Job::Level::BEGINNER)
+		if (tab == 0)
 		{
 			if (beginner_sp <= 0)
 				return false;
@@ -594,26 +598,9 @@ namespace ms
 		Stage::get().get_player().request(SpendSpPacket(skill_id), ExclRequest::WAIT);
 	}
 
-	Job::Level UISkillBook::joblevel_by_tab(uint16_t t) const
-	{
-		switch (t)
-		{
-			case 1:
-				return Job::Level::FIRST;
-			case 2:
-				return Job::Level::SECOND;
-			case 3:
-				return Job::Level::THIRD;
-			case 4:
-				return Job::Level::FOURTH;
-			default:
-				return Job::Level::BEGINNER;
-		}
-	}
-
 	uint16_t UISkillBook::tab_count() const
 	{
-		return job.get_level() - Job::Level::BEGINNER + 1;
+		return static_cast<uint16_t>(roots.size());
 	}
 
 	int16_t UISkillBook::row_by_position(Point<int16_t> cursorpos) const
