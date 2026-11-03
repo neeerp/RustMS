@@ -2429,6 +2429,8 @@ unsourced = [
     "sure_you_can_leave.blessing",
     "trash_can_mission.ask",
     "trash_can_mission.declined",
+    "trash_can_mission.subway",
+    "trash_can_mission.search",
     "kerning_trash_can.found",
     "kerning_trash_can.full",
     "kerning_trash_can.empty",

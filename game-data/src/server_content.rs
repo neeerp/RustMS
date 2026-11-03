@@ -1662,6 +1662,8 @@ pub mod keys {
     pub const SURE_YOU_CAN_LEAVE_BLESSING: &str = "sure_you_can_leave.blessing";
     pub const TRASH_CAN_MISSION_ASK: &str = "trash_can_mission.ask";
     pub const TRASH_CAN_MISSION_DECLINED: &str = "trash_can_mission.declined";
+    pub const TRASH_CAN_MISSION_SUBWAY: &str = "trash_can_mission.subway";
+    pub const TRASH_CAN_MISSION_SEARCH: &str = "trash_can_mission.search";
     pub const KERNING_TRASH_CAN_FOUND: &str = "kerning_trash_can.found";
     pub const KERNING_TRASH_CAN_FULL: &str = "kerning_trash_can.full";
     pub const KERNING_TRASH_CAN_EMPTY: &str = "kerning_trash_can.empty";
@@ -5272,6 +5274,8 @@ mod tests {
                 keys::SURE_YOU_CAN_LEAVE_BLESSING,
                 keys::TRASH_CAN_MISSION_ASK,
                 keys::TRASH_CAN_MISSION_DECLINED,
+                keys::TRASH_CAN_MISSION_SUBWAY,
+                keys::TRASH_CAN_MISSION_SEARCH,
                 keys::KERNING_TRASH_CAN_FOUND,
                 keys::KERNING_TRASH_CAN_FULL,
                 keys::KERNING_TRASH_CAN_EMPTY,

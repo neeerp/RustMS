@@ -3578,12 +3578,7 @@ impl NpcScript {
                 Some(keys::TRAINING_STILL_NEVER_ENDS_DECLINED),
             )),
             "q20700s" => Some(sure_you_can_leave()),
-            "q20710s" => Some(ask_start(
-                MATTHIAS,
-                HIDDEN_INSIDE_THE_TRASH_CAN,
-                keys::TRASH_CAN_MISSION_ASK,
-                Some(keys::TRASH_CAN_MISSION_DECLINED),
-            )),
+            "q20710s" => Some(trash_can_mission()),
             "q20720s" => Some(ask_start(
                 NEINHEART,
                 BEFORE_THE_MISSION_IN_PERION,
@@ -5820,6 +5815,22 @@ fn ask_start(npc: i32, quest: i16, key: &str, on_no: Option<&str>) -> NpcScript 
         on_no: on_no.map(text),
     };
     NpcScript::new(npc, vec![ask])
+}
+
+/// `q20710s`: Matthias sends a Knight to the subway's trash can. After the
+/// yes he says where to look, as Quest.nx has it (`Say.img/20710/0/yes`);
+/// this start is a script, so the client doesn't show those pages itself.
+fn trash_can_mission() -> NpcScript {
+    let pages = vec![
+        Page::Ask {
+            text: text(keys::TRASH_CAN_MISSION_ASK),
+            on_yes: vec![Effect::StartQuest(HIDDEN_INSIDE_THE_TRASH_CAN)],
+            on_no: Some(text(keys::TRASH_CAN_MISSION_DECLINED)),
+        },
+        Page::Say(text(keys::TRASH_CAN_MISSION_SUBWAY)),
+        Page::Say(text(keys::TRASH_CAN_MISSION_SEARCH)),
+    ];
+    NpcScript::new(MATTHIAS, pages)
 }
 
 /// `q20700s`: Neinheart keeps a new Knight-in-Training training, which
@@ -22693,6 +22704,14 @@ mod tests {
         let started = vec![Effect::StartQuest(HIDDEN_INSIDE_THE_TRASH_CAN)];
         let mission = NpcScript::for_quest("q20710s", &knight).unwrap();
         assert_eq!(yes_through(mission), (MATTHIAS, started));
+        // After the yes, the two pages of Say.img/20710/0/yes.
+        let mut mission = NpcScript::for_quest("q20710s", &knight).unwrap();
+        mission.begin();
+        let subway = mission.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(kind(&subway), Some(0));
+        let search = mission.respond(ScriptInput::Next).unwrap();
+        assert_eq!(kind(&search), Some(0));
+        assert_eq!(kind(&mission.respond(ScriptInput::Next).unwrap()), None);
         knight.quests.upsert(game::QuestRecord {
             quest_id: HIDDEN_INSIDE_THE_TRASH_CAN,
             status: QuestStatus::Started {
