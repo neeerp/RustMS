@@ -414,6 +414,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME fairy_blessing COMMAND fairy_blessing_tests)
     add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
     add_test(NAME map_tooltip_rules COMMAND map_tooltip_rules_tests)
+    add_executable(minimap_view_tests tests/minimap_view.cpp)
+    add_test(NAME minimap_view COMMAND minimap_view_tests)
     add_executable(screenshot_rules_tests tests/screenshot_rules.cpp)
     add_test(NAME screenshot_rules COMMAND screenshot_rules_tests)
     add_executable(key_repeat_rules_tests tests/key_repeat_rules.cpp)
@@ -793,6 +795,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapTooltipRules.h
     Gameplay/MapleMap/MapTooltips.cpp
     Gameplay/MapleMap/MapTooltips.h
+    Gameplay/MapleMap/MiniMapView.h
     Gameplay/MapleMap/MesoDrop.cpp
     Gameplay/MapleMap/MesoDrop.h
     Gameplay/MapleMap/MistLayout.h

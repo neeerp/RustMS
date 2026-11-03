@@ -85,6 +85,12 @@ namespace ms
 		// Where a point of the map shows in the window.
 		Point<int16_t> to_window(Point<int16_t> map_position) const;
 		int16_t top() const;
+		// The part of the window the canvas shows in, which v83 clips the
+		// markers to (0x5bdb5c).
+		Rectangle<int16_t> view_area() const;
+		// Draws the part of a texture inside the view, as it would be drawn
+		// at the given spot of the window.
+		void draw_in_view(const Texture& texture, Point<int16_t> at) const;
 
 		// Whether the server has the miniMapOnOff maps' minimaps on.
 		static bool switched_on;
@@ -107,7 +113,13 @@ namespace ms
 		// The folded bar's names.
 		Text min_street, min_name;
 		int16_t scale = 1;
+		int16_t mag = 0;
 		Point<int16_t> center_offset;
+		// The map's size in map pixels, the miniMap node's width and height.
+		Point<int16_t> map_size;
+		// How much of the canvas shows, and where that part starts on it.
+		Point<int16_t> view;
+		Point<int16_t> scroll;
 		int16_t width = MIN_WIDTH;
 		// The portals the minimap marks, the visible ones (types 2 and 7).
 		struct Portal
