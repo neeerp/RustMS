@@ -70,6 +70,9 @@ namespace ms
 
 		void apply_useeffects(Char &user) const override;
 
+		// As far as a Shockwave ran, with an effect node for each step.
+		void apply_wave_effects(Char &user, size_t steps) const;
+
 		std::string apply_actions(Char &user, Attack::Type type) const override;
 
 		void apply_stats(const Char &user, Attack &attack) const override;
