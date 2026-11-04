@@ -27,8 +27,9 @@ III's will, and four grave markers). Those say one line from
 Other NPCs have no `speak`, and Cosmic's script for them only says a line:
 the ships' attendants to and from Ereve and
 Rien, Andy, Asia, Sejan, Spindle, the Glimmer Man, Witch Malady, the Steward,
-the Haunted House's Maid, Happyville's Santa, and the townsfolk of Ariant,
-Magatia and the Ellin Forest. These say their own String.nx `d0`
+the Haunted House's Maid, Happyville's Santa, the Training Centers' Power B.
+Fore, King Pepe, Prince Giuseppe, and the townsfolk of Ariant, Magatia and
+the Ellin Forest. These say their own String.nx `d0`
 (`DEFAULT_LINE_NPCS` in `game-data`). `d0` and `d1` are for talking; `n0` and
 `n1` are the idle balloons. To find more, ask `NpcScript::for_npc` about every
 script in Cosmic's list, not only the NPCs with a script in Npc.nx.
