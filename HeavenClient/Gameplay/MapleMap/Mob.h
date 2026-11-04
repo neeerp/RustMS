@@ -245,8 +245,10 @@ namespace ms
 		int32_t shown_explosion(int32_t number) const;
 
 		// Apply damage to the mob, which flinches at its pushed, or at the share of it the player's Smart
-		// Knockback keeps. `thrown` is the attack that throws it instead of pushing it, if any.
-		void apply_damage(int32_t damage, bool toleft, int32_t smart, std::optional<mob_push::Hit> thrown = std::nullopt);
+		// Knockback keeps. `thrown` is the attack that throws it instead of pushing it, if any, and
+		// `again` whether the hit flinches it during a flinch.
+		void apply_damage(int32_t damage, bool toleft, int32_t smart, std::optional<mob_push::Hit> thrown = std::nullopt,
+						  bool again = false);
 
 		// End a controlled mob's chase, as a local Disorder or Hypnotize hit
 		// does (FUN_007f73d8 with 0).
@@ -297,6 +299,8 @@ namespace ms
 
 		// Whether the mob walks or flies.
 		bool can_move() const;
+		// Whether a toss threw this mob and it hasn't landed (0x953731).
+		bool in_toss() const;
 
 		// Return the head position.
 		Point<int16_t> get_head_position() const;
@@ -807,5 +811,8 @@ namespace ms
 
 		std::optional<Pull> pull;
 		std::optional<mob_push::Throw> throw_course;
+		// Whether Final Toss has thrown it. v83 only clears this with the RiseByToss status,
+		// which no server sends (mob+0x524).
+		bool tossed = false;
 	};
 }

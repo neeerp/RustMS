@@ -260,5 +260,9 @@ namespace ms
 		// Which of the skill's hit animations this hit shows, for those that
 		// choose by mob or hit.
 		uint8_t art = 0;
+		// The local player's job, or 0 for anyone else.
+		int32_t job = 0;
+		// Whether the map is under water, for what the local player hit.
+		bool underwater = false;
 	};
 }

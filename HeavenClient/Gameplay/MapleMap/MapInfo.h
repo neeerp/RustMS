@@ -83,6 +83,9 @@ namespace ms
 		// A map under water swims instead (0xa45c03).
 		bool is_flying() const;
 
+		// Whether the map is under water (info/swim, CField+0x158).
+		bool is_underwater() const;
+
 		// Whether a character with its feet there swims: the map is under
 		// water or the point is in its swimArea (IsSwimming FUN_007046ac).
 		bool is_swimming(Point<int16_t> position) const;

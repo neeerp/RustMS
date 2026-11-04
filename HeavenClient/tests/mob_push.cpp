@@ -97,12 +97,75 @@ static void steps()
 	require(std::abs(flier.speed - 700.0 / 9) < 0.001, "and slows again");
 }
 
+static void spins()
+{
+	require(kind(NINJA_STORM) == Kind::SPUN, "Ninja Storm");
+	require(kind(ROLLING_SPIN) == Kind::SPUN, "Rolling Spin");
+	require(kind(FINAL_TOSS) == Kind::TOSSED, "Final Toss");
+
+	// Range 110, a roll of 5, a mob 40 wide.
+	require(spun_offset(110, 40, 5, false) == 145, "spun to the right");
+	require(spun_offset(110, 40, 5, true) == -145, "spun to the left");
+
+	require(start_speed(Kind::SPUN, 0, 145, false) == 300.0, "toward the spot on the right");
+	require(start_speed(Kind::SPUN, 145, 145, false) == 300.0, "on the spot, to the right");
+	require(start_speed(Kind::SPUN, 200, 145, false) == 0.0, "past the spot on the right");
+	require(start_speed(Kind::SPUN, 0, -145, true) == -300.0, "toward the spot on the left");
+	require(start_speed(Kind::SPUN, -145, -145, true) == -300.0, "on the spot, to the left");
+	require(start_speed(Kind::SPUN, -200, -145, true) == 0.0, "past the spot on the left");
+
+	// 9 px a step until it is within 100 of the spot.
+	require(play(start(Kind::SPUN, 0, 120, false), 0, false, 5) == std::vector<int32_t>({ 9, 18, 27, 120, 120 }),
+			"a spun mob on the ground");
+
+	// Past the spot it stays, however near.
+	require(play(start(Kind::SPUN, 170, 145, false), 170, false, 3) == std::vector<int32_t>({ 170, 170, 170 }),
+			"a mob past the spot");
+
+	// A flier only slows within 40.
+	Throw flier = start(Kind::SPUN, 0, 120, false);
+	flier.air_near = SPIN_NEAR;
+	flier.step(50, true);
+	require(flier.speed == 300.0, "a spun flier 70 off keeps its speed");
+	flier.step(90, true);
+	require(flier.speed == 100.0, "and slows within 40");
+}
+
+static void moved()
+{
+	require(moves(Kind::AHEAD, true, 0, false, true), "Rush moves anything");
+
+	require(moves(Kind::SPUN, false, 1, false, false), "a spin moves what it hits");
+	require(!moves(Kind::SPUN, true, 1, true, false), "not a boss");
+	require(!moves(Kind::SPUN, false, 0, true, false), "not on a miss");
+
+	require(moves(Kind::TOSSED, false, 1, true, false), "a toss lifts a walker");
+	require(!moves(Kind::TOSSED, true, 1, true, false), "not a boss");
+	require(!moves(Kind::TOSSED, false, 0, true, false), "not on a miss");
+	require(!moves(Kind::TOSSED, false, 1, false, false), "not a flier or one that stays put");
+	require(!moves(Kind::TOSSED, false, 1, true, true), "not under water");
+}
+
+static void again()
+{
+	require(flinches_again(0, 2112), "a Lv 4 Aran");
+	require(flinches_again(0, 2000), "a Legend");
+	require(flinches_again(BARRAGE, 512), "Barrage");
+	require(flinches_again(BARRAGE_TB, 1511), "a Thunder Breaker's");
+	require(flinches_again(VAMPIRE, 1410), "Vampire");
+	require(!flinches_again(0, 112), "a Hero doesn't");
+	require(!flinches_again(5121001, 512), "nor another Buccaneer skill");
+}
+
 int main()
 {
 	kinds();
 	offsets();
 	speeds();
 	steps();
+	spins();
+	moved();
+	again();
 
 	std::cout << "ok\n";
 }

@@ -330,12 +330,15 @@ namespace ms
 			// Only what the local player's attacks hit is thrown (0x9520eb).
 			if (user.own && mob_push::kind(move.get_id()) != mob_push::Kind::NONE)
 			{
-				const Rectangle<int16_t> &area = SkillData::get(move.get_id()).get_stats(user.skilllevel).range;
+				const SkillData::Stats &stats = SkillData::get(move.get_id()).get_stats(user.skilllevel);
+				const Rectangle<int16_t> &area = stats.range;
 
-				thrown = mob_push::Hit{ move.get_id(), area.left(), area.right(), user.x };
+				thrown = mob_push::Hit{ move.get_id(), area.left(), area.right(), user.x, stats.shotrange,
+										user.underwater };
 			}
 
-			mob->apply_damage(damage, toleft, smart, thrown);
+			mob->apply_damage(damage, toleft, smart, thrown,
+							  user.own && mob_push::flinches_again(move.get_id(), user.job));
 
 			if (user.calms)
 				mob->calm();
@@ -459,6 +462,13 @@ namespace ms
 		Optional<const Mob> mob = mobs.get(oid);
 
 		return mob && mob->can_move();
+	}
+
+	bool MapMobs::in_toss(int32_t oid) const
+	{
+		Optional<const Mob> mob = mobs.get(oid);
+
+		return mob && mob->in_toss();
 	}
 
 	Point<int16_t> MapMobs::get_mob_position(int32_t oid) const

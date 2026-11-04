@@ -422,6 +422,18 @@ Backspin Blow, behind. The mob goes 700 px/s, or 300 from within 100 px, and on
 the ground it lands on the spot once it is within 100 px. A flier only slows to
 a third every step.
 
+Ninja Storm and Rolling Spin throw what they hit at 300 px/s to a spot on the
+mob's own side of the player: the skill's `range`, the mob's width and up to
+20 px, less 10. A mob already past the spot stays, and a flier slows within
+40 px of it. A boss or a line that does no damage isn't thrown. Each line lands
+only at the skill's `prop`, or does 0. Final Toss lifts a walker or jumper straight up at
+650 px/s unless it's a boss, the line did no damage or the map is under water.
+The mob then flinches only from another Final Toss until it lands, and casts
+nothing, and an Aran's swing whose first mob is still up takes no step. Only a
+plain hit has to reach the mob's `pushed`; a line that throws or tosses
+flinches it however small its damage. An Aran's hit, and Barrage's and Vampire's,
+flinch a mob again while it is still in its hit pose.
+
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.

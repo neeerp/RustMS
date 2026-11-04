@@ -703,14 +703,32 @@ namespace ms
 			pull = Pull{ *flinch->user, reach, magnet::start_speed(position.x(), flinch->user->x(), reach), 0 };
 			body.set_flag(PhysicsObject::Flag::NOFRICTION);
 			chase();
+		} else if (flinch->thrown && mob_push::kind(flinch->thrown->skill) == mob_push::Kind::TOSSED)
+		{
+			// Final Toss lifts it straight up off its foothold (0x66b9ec, 0x9becc1).
+			double toss = mob_push::TOSS * Constants::TIMESTEP / 1000.0;
+
+			Physics::jump(body, toss, 0);
+			body.hspeed = 0.0;
+			body.vspeed = -toss;
+			tossed = true;
 		} else if (canmove && flinch->thrown)
 		{
 			const mob_push::Hit &hit = *flinch->thrown;
+			mob_push::Kind kind = mob_push::kind(hit.skill);
+			bool spun = kind == mob_push::Kind::SPUN;
+			bool left = spun ? position.x() < hit.user_x : flinch->left;
 			int32_t roll = randomizer.next_int(mob_push::SPREAD);
-			int32_t target = hit.user_x + mob_push::offset(hit.skill, hit.lt, hit.rb, standwidth, roll, flinch->left);
+			int32_t offset = spun ? mob_push::spun_offset(hit.range, standwidth, roll, left)
+								  : mob_push::offset(hit.skill, hit.lt, hit.rb, standwidth, roll, left);
+			int32_t target = hit.user_x + offset;
 
 			throw_course = mob_push::Throw{ target, position.x() - target,
-				mob_push::start_speed(mob_push::kind(hit.skill), position.x(), target, flinch->left) };
+				mob_push::start_speed(kind, position.x(), target, left) };
+
+			if (spun)
+				throw_course->air_near = mob_push::SPIN_NEAR;
+
 			body.set_flag(PhysicsObject::Flag::NOFRICTION);
 		} else if (canmove)
 		{
@@ -991,6 +1009,10 @@ namespace ms
 	bool Mob::cast(const Physics &physics)
 	{
 		if (pendingskill == 0 || acting || attacking || casting || held())
+			return false;
+
+		// One Final Toss threw waits until it lands (0x667b86).
+		if (in_toss())
 			return false;
 
 		auto info = std::find_if(skills.begin(), skills.end(),
@@ -2563,6 +2585,11 @@ namespace ms
 		if (attack.skill == mob_tint::COMBO_TEMPEST && !boss)
 			return std::pair<int32_t, bool>(1, false);
 
+		// A line of Ninja Storm or Rolling Spin lands only at the skill's
+		// success rate (0x78e557).
+		if (mob_push::kind(attack.skill) == mob_push::Kind::SPUN && randomizer.next_real(1.0) >= blow.success)
+			return std::pair<int32_t, bool>(0, false);
+
 		// Snipe's shot neither misses nor meets defense or guards.
 		if (attack.skill == SkillId::SNIPE && attack.type == Attack::Type::RANGED)
 			return std::pair<int32_t, bool>(shot_path::snipe_damage(randomizer.next_real(10000.0)), true);
@@ -2680,7 +2707,7 @@ namespace ms
 		return finish(damage);
 	}
 
-	void Mob::apply_damage(int32_t damage, bool toleft, int32_t smart, std::optional<mob_push::Hit> thrown)
+	void Mob::apply_damage(int32_t damage, bool toleft, int32_t smart, std::optional<mob_push::Hit> thrown, bool again)
 	{
 		hitsound.play();
 
@@ -2691,8 +2718,29 @@ namespace ms
 		{
 			if (pending_hits == 0)
 				apply_death();
-		} else if (control && is_alive() && damage >= aran_combo::pushed(knockback, smart, boss) && !acting)
+		} else if (control && is_alive())
 		{
+			mob_push::Kind kind = thrown ? mob_push::kind(thrown->skill) : mob_push::Kind::NONE;
+			bool walker = (canmove || canjump) && !canfly;
+
+			if (thrown && !mob_push::moves(kind, boss, damage, walker, thrown->underwater))
+			{
+				thrown.reset();
+				kind = mob_push::Kind::NONE;
+			}
+
+			// Only a plain hit has to reach the mob's pushed (0x66b1e0).
+			if (!thrown && damage < aran_combo::pushed(knockback, smart, boss))
+				return;
+
+			// One Final Toss threw only flinches from another in the air, and
+			// a hit pose keeps out all but some hits (0x668d11).
+			if (in_toss() && kind != mob_push::Kind::TOSSED)
+				return;
+
+			if (acting && !again)
+				return;
+
 			// It shows the hit at once; the AI flinches next update.
 			show_stance(Stance::HIT, toleft);
 			attacking.reset();
@@ -2867,6 +2915,11 @@ namespace ms
 	bool Mob::can_move() const
 	{
 		return canmove;
+	}
+
+	bool Mob::in_toss() const
+	{
+		return tossed && !phobj.onground;
 	}
 
 	bool Mob::banishes_by_touch() const

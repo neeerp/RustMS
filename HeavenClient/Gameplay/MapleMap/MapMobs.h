@@ -145,6 +145,8 @@ namespace ms
 		// Return the position of a mob.
 		// Whether the mob has a way to move at all.
 		bool can_move(int32_t oid) const;
+		// Whether the mob was tossed and hasn't landed (0x953731).
+		bool in_toss(int32_t oid) const;
 
 		Point<int16_t> get_mob_position(int32_t oid) const;
 

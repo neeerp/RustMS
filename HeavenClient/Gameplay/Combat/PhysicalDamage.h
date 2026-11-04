@@ -714,6 +714,8 @@ namespace ms
 			int32_t berserk = 0;
 			// What Shadow Partner's hits do, in percent of the first set's.
 			int32_t partner = 0;
+			// How often a line of Ninja Storm or Rolling Spin lands, from 0 to 1.
+			float success = 1.0f;
 			// Whether the player is in Darkness.
 			bool blind = false;
 			// What Assassinate multiplies each line by, from how long the

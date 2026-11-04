@@ -62,7 +62,7 @@ namespace ms
 		};
 
 		// The Aran's attacks mark their steps in the path, and only move if the first mob isn't
-		// in the air from a hit, which HC's mobs never are (0x953731).
+		// in the air from a toss (0x953731).
 		inline bool marks_path(int32_t skill)
 		{
 			switch (skill)
