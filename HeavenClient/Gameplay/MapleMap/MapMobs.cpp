@@ -435,6 +435,13 @@ namespace ms
 			return {};
 	}
 
+	bool MapMobs::can_move(int32_t oid) const
+	{
+		Optional<const Mob> mob = mobs.get(oid);
+
+		return mob && mob->can_move();
+	}
+
 	Point<int16_t> MapMobs::get_mob_position(int32_t oid) const
 	{
 		if (auto mob = mobs.get(oid))

@@ -769,6 +769,31 @@ namespace ms
 		return ret;
 	}
 
+	std::optional<FootholdTree::Floor> FootholdTree::get_floor_near(double fx, double fy, int32_t reach) const
+	{
+		std::optional<Floor> best;
+		auto range = footholdsbyx.equal_range(static_cast<int16_t>(fx));
+
+		for (auto iter = range.first; iter != range.second; ++iter)
+		{
+			const Foothold &fh = footholds.at(iter->second);
+
+			if (fh.x1() >= fh.x2())
+				continue;
+
+			double y = fh.ground_below(fx);
+			double distance = std::abs(y - fy);
+
+			if (distance > reach)
+				continue;
+
+			if (!best || distance < std::abs(best->y - fy) || (distance == std::abs(best->y - fy) && y > best->y))
+				best = Floor{ fh.id(), y };
+		}
+
+		return best;
+	}
+
 	void FootholdTree::place_on_fh(PhysicsObject &phobj, uint16_t fhid) const
 	{
 		// v83 (FUN_007f13de) measures how far along the foothold the object

@@ -203,6 +203,7 @@ namespace ms
 		phobj.flydir = 0;
 		keysdown.clear();
 		attacking = false;
+		attack_course.stop();
 		ladder = nullptr;
 		set_chair(0);
 		phobj.wingsfall = 0.0;
@@ -513,6 +514,7 @@ namespace ms
 			phobj.walkdrag = grip;
 			phobj.swimspeed = phobj.walkspeed * swim / 100.0;
 			phobj.swimkick = phobj.walkspeed;
+			update_attack_course(physics);
 			pst->update(*this);
 
 			// v83 marks every knockback in the path as element 2 when it
@@ -684,6 +686,7 @@ namespace ms
 		if (dead != is_dead())
 		{
 			attacking = false;
+			attack_course.stop();
 			keysdown.clear();
 
 			if (dead)
@@ -1218,13 +1221,50 @@ namespace ms
 		return attack;
 	}
 
-	void Player::rush(double targetx)
+	void Player::start_attack_course(int32_t skill, std::vector<attack_dash::Step> steps)
 	{
-		if (phobj.onground)
+		attack_course.start(skill, std::move(steps));
+		attack_course_time = 0;
+
+		if (!attack_dash::marks_path(skill))
+			record_move(attack_dash::RUSH_MOVE);
+	}
+
+	bool Player::cannot_be_hit() const
+	{
+		return Char::is_invincible() || attack_course.running();
+	}
+
+	// Each step goes to the floor nearest where it lands and ends the course
+	// if there is none, as at a ledge; walls don't stop it (0x94e6d3).
+	void Player::update_attack_course(const Physics &physics)
+	{
+		if (!attack_course.running())
+			return;
+
+		for (attack_course_time += Constants::TIMESTEP; attack_course_time >= attack_dash::TICK;
+			 attack_course_time -= attack_dash::TICK)
 		{
-			uint16_t delay = get_attackdelay(1);
-			phobj.movexuntil(targetx, delay);
-			phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
+			std::optional<attack_dash::Move> move = attack_course.tick();
+
+			if (!move || is_climbing())
+				continue;
+
+			double x = phobj.get_x() + move->x;
+			auto floor = physics.get_fht().get_floor_near(x, phobj.get_y() - 1.0, move->reach);
+
+			if (!floor)
+			{
+				attack_course.stop();
+				return;
+			}
+
+			if (attack_dash::marks_path(attack_course.skill()))
+				record_move(attack_dash::ARAN_MOVE);
+
+			phobj.set_x(x);
+			phobj.set_y(floor->y);
+			phobj.fhid = floor->id;
 		}
 	}
 

@@ -415,7 +415,6 @@ namespace ms
 
 		void apply_result_movement(const SpecialMove &move, const AttackResult &result);
 
-		void apply_rush(const AttackResult &result);
 
 		void apply_bullet_effect(const Bullet &bullet);
 
@@ -620,6 +619,7 @@ namespace ms
 		int64_t last_rapidfire = INT32_MIN;
 		// When Energy Charge and Body Pressure may hit a touching mob again (0x95f2e6).
 		int64_t next_body_attack = 0;
+		int64_t attack_lock = 0;
 		int64_t next_body_pressure = 0;
 		// The attacks, and the skills that send where the player stands,
 		// counted from one spot (FUN_009536d0).

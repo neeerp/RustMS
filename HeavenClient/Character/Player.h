@@ -42,6 +42,7 @@
 #include "../Gameplay/MovePath.h"
 #include "../Gameplay/Playable.h"
 
+#include "../Gameplay/Combat/AttackDash.h"
 #include "../Gameplay/Combat/Skill.h"
 #include "../Gameplay/MapleMap/Layer.h"
 #include "../Gameplay/MapleMap/MapInfo.h"
@@ -165,8 +166,12 @@ namespace ms
 		// Whether Soul Arrow is on, so shots need no arrows.
 		bool soul_arrow() const;
 
-		// Execute a rush movement
-		void rush(double targetx);
+		// Sets the player off on the steps of an attack that hit.
+		void start_attack_course(int32_t skill, std::vector<attack_dash::Step> steps);
+
+		// Whether mobs and traps can't hit the player now, by the blink after
+		// a hit or an attack's steps.
+		bool cannot_be_hit() const;
 
 		// Handle an attack to the player.
 		MobAttackResult damage(const MobAttack &attack);
@@ -561,6 +566,9 @@ namespace ms
 		// Die when HP runs out, and get back up when it returns.
 		void update_death();
 
+		// Plays the ticks due of the attack's steps.
+		void update_attack_course(const Physics &physics);
+
 		// Send the first pet's potion request (FUN_00a0955c).
 		void give_potion(bool mp, int16_t slot, int32_t itemid);
 
@@ -617,6 +625,8 @@ namespace ms
 		// When Combat Step and Soul Rush may go again (+0x3158).
 		int64_t step_ready_at = 0;
 		int64_t rush_ready_at = 0;
+		attack_dash::Course attack_course;
+		int32_t attack_course_time = 0;
 		// How long Wings may still glide, in milliseconds (+0x3130).
 		int32_t wings_left = 0;
 		// The Energy Charge gauge, 0 to 10000.
