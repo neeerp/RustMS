@@ -50,6 +50,14 @@ namespace ms
 
 			return (dx * hspeed + dy * vspeed) / std::hypot(dx, dy);
 		}
+
+		// How much of a speed along a foothold is sideways.
+		double across(const Foothold &fh)
+		{
+			double dx = fh.x2() - fh.x1();
+
+			return dx / std::hypot(dx, double(fh.y2() - fh.y1()));
+		}
 	}
 
 	FootholdTree::FootholdTree(nl::node src, nl::node info)
@@ -234,13 +242,16 @@ namespace ms
 			double crnt_y = phobj.crnt_y();
 			double next_y = phobj.next_y();
 
-			if (uint16_t landing = phobj.onground ? 0 : get_landing(phobj, start_x))
+			double landspeed = 0.0;
+
+			if (uint16_t landing = phobj.onground ? 0 : get_landing(phobj, start_x, landspeed))
 			{
 				// The step may end past the floor it crossed; the object stops
 				// at that floor's end instead.
 				const Foothold &fh = get_fh(landing);
 				double x = std::clamp<double>(phobj.next_x(), fh.l(), fh.r());
 
+				phobj.land(landspeed * across(fh));
 				phobj.hspeed = x - phobj.crnt_x();
 				phobj.limity(fh.ground_below(x));
 				phobj.fhid = landing;
@@ -261,6 +272,13 @@ namespace ms
 
 			if (collision)
 			{
+				if (!phobj.onground)
+				{
+					const Foothold &fh = get_fh(phobj.fhid);
+
+					phobj.land(along(fh, phobj.hspeed, phobj.vspeed) * across(fh));
+				}
+
 				phobj.limity(ground.second());
 				// The object has landed. Keeping the old airborne flag until the
 				// next tick drops landing-time jump input and adds a friction-only
@@ -283,7 +301,7 @@ namespace ms
 	// one step starts where the last one ended and none can slip between two
 	// floors. Only a floor crossed from above stops it, the first one on the
 	// way, and the foothold it fell from lets it through for this step.
-	uint16_t FootholdTree::get_landing(const PhysicsObject &phobj, double start_x) const
+	uint16_t FootholdTree::get_landing(const PhysicsObject &phobj, double start_x, double &speed) const
 	{
 		int32_t xs = static_cast<int32_t>(std::round(start_x));
 		int32_t ys = static_cast<int32_t>(std::round(phobj.crnt_y()));
@@ -370,12 +388,24 @@ namespace ms
 
 		// At a joint, the foothold the object is moving left along, or else
 		// the one on the right. A wall there is left to the walls' own limit.
+		// Moving along neither, as into a valley, the object keeps no speed
+		// (0x9b3af8-0x9b3b54).
 		double hstep = phobj.next_x() - start_x;
-		bool leftwards = along(*right, hstep, phobj.vspeed) < 0.0 && along(*left, hstep, phobj.vspeed) < 0.0;
+		double rightspeed = along(*right, hstep, phobj.vspeed);
+		double leftspeed = along(*left, hstep, phobj.vspeed);
+		bool leftwards = rightspeed < 0.0 && leftspeed < 0.0;
 		const Foothold *landing = leftwards ? left : right;
 
+		if (right == left || (rightspeed > 0.0 && leftspeed > 0.0))
+			speed = rightspeed;
+		else
+			speed = leftwards ? leftspeed : 0.0;
+
 		if (landing->x1() >= landing->x2())
+		{
 			landing = landing == right ? left : right;
+			speed = 0.0;
+		}
 
 		return landing->id() == phobj.fallstart ? 0 : landing->id();
 	}
