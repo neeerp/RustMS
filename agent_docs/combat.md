@@ -240,6 +240,19 @@ first strike, allows it within a second of cancelling Dark Sight, caps a
 line at the most the time can multiply it by, and takes a second strike
 only on the first's mob within 2.5 s (`net::combat::second_strike`).
 Assaulter (4211002) strikes and dashes 200 px forward onto the nearest floor
+there: with no floor it isn't used, and a movement element 7 holds where it
+started, where others see the same two `BasicEff.img/Assaulter` effects. It,
+Energy Drain (5111004, 15111001) and Barrage (5121007, 15111004) do nothing
+at all with no mob in reach, where other swings hit the air.
+
+Boomerang Step (4221007) moves no one: the step out and back is its effect's
+art, which stands in for the user. For the 900 ms of its action `alert5` the
+user isn't drawn, nor their item effect, and mobs and traps can't hit them;
+others see them gone too (`boomerang_step`). It needs a floor 150 px ahead, half
+its `lt.x`, within 80 px of the user's height, and stays refused until 500 ms
+after the user is back, in both cases without a word. Bamboo Rain and Rage of
+Pharaoh keep harm off through their action in the same way
+(`pq_skills::keeps_harm_off`), but stay in sight.
 
 Shockwave (5111006, 15111003) runs along the floor the way the user faces, in
 up to five 55 px steps at the user's height (`shockwave::steps`, 0x96cb93). A
@@ -249,10 +262,7 @@ without a word. Its area ends 30 px past the wave, and the user sees an effect
 node for each step (`effect`, `effect0`..); others see all five.
 
 A melee attack's mobs are hit from the nearest along the way the user faces (`hit_art::sort_mobs`, 0x953760), which sets the order of the 70 ms steps and of Slash Blast's fall-off. Band of Thieves and Spark keep the search's order. Band of Thieves needs a mob in the swing's reach before it looks further into its area; its first mob is hit at once and the rest 280 ms later, a different thief on each (`hit_art::band`). Corkscrew Blow and Arrow Bomb show `hit/0` on the first mob and `hit/1` on the others, and Double Uppercut goes by hit, not by weapon (`ListedHitEffect`).
-there: with no floor it isn't used, and a movement element 7 holds where it
-started, where others see the same two `BasicEff.img/Assaulter` effects. It,
-Energy Drain (5111004, 15111001) and Barrage (5121007, 15111004) do nothing
-at all with no mob in reach, where other swings hit the air.
+
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills

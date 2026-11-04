@@ -169,8 +169,11 @@ namespace ms
 		// Sets the player off on the steps of an attack that hit.
 		void start_attack_course(int32_t skill, std::vector<attack_dash::Step> steps);
 
+		// Keeps mobs and traps off the player for a time.
+		void keep_from_harm(int64_t millis);
+
 		// Whether mobs and traps can't hit the player now, by the blink after
-		// a hit or an attack's steps.
+		// a hit, an attack's steps, or a skill that keeps them off.
 		bool cannot_be_hit() const;
 
 		// Handle an attack to the player.
@@ -626,6 +629,7 @@ namespace ms
 		int64_t step_ready_at = 0;
 		int64_t rush_ready_at = 0;
 		attack_dash::Course attack_course;
+		TimedBool out_of_harm;
 		int32_t attack_course_time = 0;
 		// How long Wings may still glide, in milliseconds (+0x3130).
 		int32_t wings_left = 0;

@@ -515,6 +515,7 @@ namespace ms
 			phobj.swimspeed = phobj.walkspeed * swim / 100.0;
 			phobj.swimkick = phobj.walkspeed;
 			update_attack_course(physics);
+			out_of_harm.update();
 			pst->update(*this);
 
 			// v83 marks every knockback in the path as element 2 when it
@@ -1230,9 +1231,14 @@ namespace ms
 			record_move(attack_dash::RUSH_MOVE);
 	}
 
+	void Player::keep_from_harm(int64_t millis)
+	{
+		out_of_harm.set_for(millis);
+	}
+
 	bool Player::cannot_be_hit() const
 	{
-		return Char::is_invincible() || attack_course.running();
+		return Char::is_invincible() || attack_course.running() || out_of_harm;
 	}
 
 	// Each step goes to the floor nearest where it lands and ends the course
