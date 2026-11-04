@@ -81,6 +81,13 @@ namespace ms
 		}
 	}
 
+	// A landing keeps half the speed along the floor, or none if the object
+	// is steering against it (0x9b3ddd).
+	double landing_speed(double speed, int8_t dir)
+	{
+		return dir * speed < 0.0 ? 0.0 : speed * 0.5;
+	}
+
 	// CVecCtrl's ground drag factor: the shoe's walkDrag clamped to
 	// Physics.img's minFriction and maxFriction, halved when below 1.
 	double ground_drag(double walkdrag)
@@ -416,11 +423,12 @@ namespace ms
 		bool hstep = phobj.hspeed != 0.0;
 		bool vstep = phobj.vspeed != 0.0;
 
+		phobj.landed = false;
 		fht.limit_movement(phobj);
 		phobj.move();
 
 		if (!hstep || phobj.hspeed != 0.0)
-			phobj.hspeed = hspeed * TICK;
+			phobj.hspeed = phobj.landed ? landing_speed(phobj.landspeed, dir) : hspeed * TICK;
 
 		if (!vstep || phobj.vspeed != 0.0)
 			phobj.vspeed = vspeed * TICK;

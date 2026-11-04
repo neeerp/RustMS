@@ -236,6 +236,10 @@ namespace ms
 		double walkforce = 1.0;
 		double walkdrag = 1.0;
 		int8_t walkdir = 0;
+		// Set by a landing in this step: the sideways speed it came in at,
+		// in pixels per tick, measured along the floor.
+		bool landed = false;
+		double landspeed = 0.0;
 		// A knockback queued for the next move, in pixels per second.
 		bool impact = false;
 		double impactx = 0.0;
@@ -243,6 +247,12 @@ namespace ms
 		// While Wings is on, how fast a shoe falls in the air, in pixels per
 		// second, in place of gravity; 0 when off.
 		double wingsfall = 0.0;
+
+		void land(double speed)
+		{
+			landed = true;
+			landspeed = speed;
+		}
 
 		// A shoe with a flyspeed flies through platforms, steered by walkdir
 		// and by flydir: -1 to glide down slowly, 0 to dive, 1 to drop.

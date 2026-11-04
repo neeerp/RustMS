@@ -538,9 +538,10 @@ void running_jump(const ms::Physics& physics)
 		{
 			// Without input the air barely slows the jump, at 1 px/s^2.
 			physics.move_object(player);
-			require(direction * player.hspeed <= direction * momentum && direction * (momentum - player.hspeed) < 0.6 / TICKS_PER_SECOND, "jump lost horizontal momentum");
+			require(player.onground || (direction * player.hspeed <= direction * momentum && direction * (momentum - player.hspeed) < 0.6 / TICKS_PER_SECOND), "jump lost horizontal momentum");
 		}
 		require(player.onground, "jump never landed");
+		require(std::abs(player.hspeed - momentum / 2) < 0.6 / TICKS_PER_SECOND, "a landing did not halve the speed");
 
 		// A jump requested immediately on landing must work without an
 		// extra settling tick.
@@ -1106,6 +1107,28 @@ void landings()
 		ms::PhysicsObject walled = falling(1122.08, 1437.88, -2.4, 5.36);
 		physics.move_object(walled);
 		require(walled.onground && walled.fhid == 8 && walled.crnt_x() == 1120, "a step into a wall went under the floor");
+
+		// A landing keeps half the speed along the floor, whether steered
+		// with it or not, and none steered against it (0x9b3ddd).
+		for (int8_t steer : {1, 0, -1})
+		{
+			ms::PhysicsObject lander = falling(850, 98, 1.0, 5.36);
+			lander.walkdir = steer;
+			physics.move_object(lander);
+			require(lander.onground && lander.fhid == 5, "a jump did not land on the flat floor");
+			require(std::abs(lander.hspeed - (steer < 0 ? 0.0 : 0.5)) < 0.01, "a landing kept the wrong speed");
+		}
+
+		// Falling straight onto a slope turns some of the fall into speed down it.
+		ms::PhysicsObject slope = falling(258, 1537, 0, 5.36);
+		physics.move_object(slope);
+		require(slope.onground && slope.fhid == 1, "a fall did not land on the slope");
+		require(std::abs(slope.hspeed - 0.5 * 5.36 * 24 * 19 / (24 * 24 + 19 * 19)) < 0.01, "a fall onto a slope kept the wrong speed");
+
+		// Into a valley's joint, down neither side, it keeps nothing.
+		ms::PhysicsObject stuck = falling(270, 1546, 0, 5.36);
+		physics.move_object(stuck);
+		require(stuck.onground && stuck.hspeed == 0.0, "a fall into a valley's joint kept speed");
 
 		// Taking off just past a joint starts from the floor there.
 		ms::PhysicsObject crossing;
