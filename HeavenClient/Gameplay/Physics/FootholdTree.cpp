@@ -23,6 +23,35 @@
 
 namespace ms
 {
+	namespace
+	{
+		// Above or below a foothold's line: positive is under one drawn left
+		// to right.
+		int32_t side(const Foothold &fh, int32_t x, int32_t y)
+		{
+			return (y - fh.y1()) * (fh.x2() - fh.x1()) - (x - fh.x1()) * (fh.y2() - fh.y1());
+		}
+
+		// Past the joint where left ends and right starts (0x9b3f1b): under
+		// both of a ridge, or under either of a valley.
+		bool under_joint(const Foothold &left, const Foothold &right, int32_t x, int32_t y)
+		{
+			bool underleft = side(left, x, y) > 0;
+			bool underright = side(right, x, y) > 0;
+
+			return side(left, right.x2(), right.y2()) > 0 ? underleft && underright : underleft || underright;
+		}
+
+		// How fast an object moves along a foothold, to the right.
+		double along(const Foothold &fh, double hspeed, double vspeed)
+		{
+			double dx = fh.x2() - fh.x1();
+			double dy = fh.y2() - fh.y1();
+
+			return (dx * hspeed + dy * vspeed) / std::hypot(dx, dy);
+		}
+	}
+
 	FootholdTree::FootholdTree(nl::node src, nl::node info)
 	{
 		int16_t leftw = 30000;
@@ -153,6 +182,8 @@ namespace ms
 
 	void FootholdTree::limit_movement(PhysicsObject &phobj) const
 	{
+		// A wall moves the object, but the step still started here.
+		double start_x = phobj.crnt_x();
 		bool jumper = phobj.is_flag_set(PhysicsObject::Flag::JUMPER) &&
 					  phobj.is_flag_set(PhysicsObject::Flag::TURNATEDGES);
 
@@ -203,6 +234,24 @@ namespace ms
 			double crnt_y = phobj.crnt_y();
 			double next_y = phobj.next_y();
 
+			if (uint16_t landing = phobj.onground ? 0 : get_landing(phobj, start_x))
+			{
+				// The step may end past the floor it crossed; the object stops
+				// at that floor's end instead.
+				const Foothold &fh = get_fh(landing);
+				double x = std::clamp<double>(phobj.next_x(), fh.l(), fh.r());
+
+				phobj.hspeed = x - phobj.crnt_x();
+				phobj.limity(fh.ground_below(x));
+				phobj.fhid = landing;
+				phobj.onground = true;
+				phobj.fallstart = 0;
+
+				limit_movement(phobj);
+
+				return;
+			}
+
 			auto ground = Range<double>(
 					get_fh(phobj.fhid).ground_below(phobj.crnt_x()),
 					get_fh(phobj.fhid).ground_below(phobj.next_x())
@@ -230,6 +279,107 @@ namespace ms
 		}
 	}
 
+	// CVecCtrl's landing test (0x9b34c8) follows the step in whole pixels, so
+	// one step starts where the last one ended and none can slip between two
+	// floors. Only a floor crossed from above stops it, the first one on the
+	// way, and the foothold it fell from lets it through for this step.
+	uint16_t FootholdTree::get_landing(const PhysicsObject &phobj, double start_x) const
+	{
+		int32_t xs = static_cast<int32_t>(std::round(start_x));
+		int32_t ys = static_cast<int32_t>(std::round(phobj.crnt_y()));
+		int32_t xe = static_cast<int32_t>(std::round(phobj.next_x()));
+		int32_t ye = static_cast<int32_t>(std::round(phobj.next_y()));
+		int32_t dx = xe - xs;
+		int32_t dy = ye - ys;
+
+		if (dx == 0 && dy == 0)
+			return 0;
+
+		// The first crossing so far as a fraction of the step. At a joint,
+		// the two footholds meeting there.
+		int64_t num = 2;
+		int64_t den = 1;
+		const Foothold *right = nullptr;
+		const Foothold *left = nullptr;
+
+		for (int32_t x = std::min(xs, xe); x <= std::max(xs, xe); x++)
+		{
+			auto range = footholdsbyx.equal_range(static_cast<int16_t>(x));
+
+			for (auto iter = range.first; iter != range.second; ++iter)
+			{
+				const Foothold &fh = footholds.at(iter->second);
+
+				if (fh.x1() >= fh.x2())
+					continue;
+
+				int32_t start = side(fh, xs, ys);
+				int32_t end = side(fh, xe, ye);
+
+				if (start > 0 || end < 0 || (start == 0 && end == 0))
+					continue;
+
+				// Which side of the step each end of the foothold is on.
+				int32_t first = (fh.y1() - ys) * dx - (fh.x1() - xs) * dy;
+				int32_t last = (fh.y2() - ys) * dx - (fh.x2() - xs) * dy;
+
+				if ((first < 0 && last < 0) || (first > 0 && last > 0))
+					continue;
+
+				const Foothold *crossedright = &fh;
+				const Foothold *crossedleft = &fh;
+
+				if (first == 0)
+				{
+					crossedleft = &get_fh(fh.prev());
+
+					if (crossedleft->id() == 0 || !under_joint(*crossedleft, fh, xe, ye))
+						continue;
+				} else if (last == 0)
+				{
+					crossedright = &get_fh(fh.next());
+
+					if (crossedright->id() == 0 || !under_joint(fh, *crossedright, xe, ye))
+						continue;
+				}
+
+				int64_t crossing = -static_cast<int64_t>(start);
+				int64_t length = static_cast<int64_t>(end) - start;
+				int64_t order = length * num - crossing * den;
+
+				if (order > 0)
+				{
+					num = crossing;
+					den = length;
+					right = crossedright;
+					left = crossedleft;
+				} else if (order == 0)
+				{
+					// At the same point, the higher of the two.
+					if (side(*right, crossedright->x1(), crossedright->y1()) < 0)
+						right = crossedright;
+
+					if (side(*left, crossedleft->x2(), crossedleft->y2()) < 0)
+						left = crossedleft;
+				}
+			}
+		}
+
+		if (!right)
+			return 0;
+
+		// At a joint, the foothold the object is moving left along, or else
+		// the one on the right. A wall there is left to the walls' own limit.
+		double hstep = phobj.next_x() - start_x;
+		bool leftwards = along(*right, hstep, phobj.vspeed) < 0.0 && along(*left, hstep, phobj.vspeed) < 0.0;
+		const Foothold *landing = leftwards ? left : right;
+
+		if (landing->x1() >= landing->x2())
+			landing = landing == right ? left : right;
+
+		return landing->id() == phobj.fallstart ? 0 : landing->id();
+	}
+
 	void FootholdTree::limit_flight(PhysicsObject &phobj) const
 	{
 		// FUN_007f9202 moves a flier back inside, leaving its speed alone.
@@ -250,9 +400,18 @@ namespace ms
 
 		if (phobj.onground)
 		{
-			if (std::floor(x) > curfh.r())
+			// The next floor takes over at the joint itself: on the old line
+			// past it, the object would take off from under the new floor.
+			auto floor = [this](uint16_t id)
+			{
+				const Foothold &fh = get_fh(id);
+
+				return fh.id() != 0 && fh.x1() < fh.x2();
+			};
+
+			if (floor(curfh.next()) ? x > curfh.r() : std::floor(x) > curfh.r())
 				phobj.fhid = curfh.next();
-			else if (std::ceil(x) < curfh.l())
+			else if (floor(curfh.prev()) ? x < curfh.l() : std::ceil(x) < curfh.l())
 				phobj.fhid = curfh.prev();
 
 			if (phobj.fhid == 0)
@@ -276,20 +435,11 @@ namespace ms
 			phobj.y = ground;
 		} else if (phobj.vspeed == 0.0 && checkslope)
 		{
-			double vdelta = abs(phobj.fhslope);
+			// However slowly it crosses the joint, it stays on the floor there.
+			bool sloped = curfh.slope() != 0.0 || nextfh.slope() != 0.0;
 
-			if (phobj.fhslope < 0.0)
-				vdelta *= (ground - y);
-			else if (phobj.fhslope > 0.0)
-				vdelta *= (y - ground);
-
-			if (curfh.slope() != 0.0 || nextfh.slope() != 0.0)
-			{
-				if (phobj.hspeed > 0.0 && vdelta <= phobj.hspeed)
-					phobj.y = ground;
-				else if (phobj.hspeed < 0.0 && vdelta >= phobj.hspeed)
-					phobj.y = ground;
-			}
+			if (sloped && (phobj.hspeed != 0.0 || !nextfh.is_wall()))
+				phobj.y = ground;
 		}
 
 		phobj.onground = phobj.y == ground;

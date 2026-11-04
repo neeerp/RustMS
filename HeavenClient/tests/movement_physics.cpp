@@ -1057,6 +1057,89 @@ void jumping_mobs(const ms::Physics& physics)
 	require(fht.get_wall_ahead(mob, 1) == WallAhead::AGAINST, "a mob at the wall was not against it");
 }
 
+// v83 tests a step through the air against every foothold it crosses
+// (0x9b34c8), so a step over a joint lands on one of the two floors there.
+void landings()
+{
+	auto path = foothold_map({
+		{0, 1, 246, 1531, 270, 1550, 0, 2}, {0, 2, 270, 1550, 292, 1546, 1, 0},
+		{1, 3, 500, 100, 520, 80, 0, 4}, {1, 4, 520, 80, 540, 100, 3, 0},
+		{2, 5, 800, 100, 900, 100, 0, 0}, {2, 6, 800, 200, 900, 200, 0, 0},
+		{3, 7, 1120, 1260, 1120, 1437, 0, 8}, {3, 8, 1120, 1437, 1125, 1441, 7, 9}, {3, 9, 1125, 1441, 1146, 1452, 8, 0},
+		{4, 10, 1360, 1550, 1382, 1546, 0, 11}, {4, 11, 1382, 1546, 1390, 1539, 10, 0},
+		{5, 12, 1612, 1536, 1633, 1549, 0, 13}, {5, 13, 1633, 1549, 1650, 1550, 12, 0}});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		auto falling = [](double x, double y, double hspeed, double vspeed)
+		{
+			ms::PhysicsObject object;
+			object.shoe = true;
+			object.set_x(x); object.set_y(y);
+			object.onground = false;
+			object.hspeed = hspeed;
+			object.vspeed = vspeed;
+			return object;
+		};
+
+		// The tick seen in Ant Tunnel II: over the bottom of a V, the step
+		// misses both lines as they run on past the joint.
+		ms::PhysicsObject valley = falling(269.6, 1544.92, 1.6, 5.36);
+		physics.move_object(valley);
+		require(valley.onground && valley.fhid == 2, "a step over a valley fell through the joint");
+		require(std::abs(valley.crnt_y() - (1550 - (valley.crnt_x() - 270) * 4 / 22)) < 0.001, "a landing in a valley left the floor");
+
+		ms::PhysicsObject ridge = falling(519.6, 76, 1.0, 5.36);
+		physics.move_object(ridge);
+		require(ridge.onground && ridge.fhid == 4, "a step onto a ridge did not land on the floor to the right");
+
+		// The floor it dropped from doesn't catch it.
+		ms::PhysicsObject dropping = falling(850, 98, 0, 5);
+		dropping.fallstart = 5;
+		physics.move_object(dropping);
+		require(!dropping.onground && dropping.crnt_y() > 100, "a down-jump landed on the floor it left");
+		for (int tick = 0; tick < 200 && !dropping.onground; ++tick)
+			physics.move_object(dropping);
+		require(dropping.onground && dropping.fhid == 6, "a down-jump did not land on the floor below");
+
+		// A wall stops the step, but it still crossed the floor rising to it.
+		ms::PhysicsObject walled = falling(1122.08, 1437.88, -2.4, 5.36);
+		physics.move_object(walled);
+		require(walled.onground && walled.fhid == 8 && walled.crnt_x() == 1120, "a step into a wall went under the floor");
+
+		// Taking off just past a joint starts from the floor there.
+		ms::PhysicsObject crossing;
+		crossing.shoe = true;
+		crossing.set_x(1381.1); crossing.set_y(1546.79);
+		crossing.fhid = 11;
+		crossing.onground = true;
+		crossing.hspeed = -0.3;
+		ms::Physics::knockback(crossing, -36, -30);
+		for (int tick = 0; tick < 200; ++tick)
+			physics.move_object(crossing);
+		require(crossing.onground && crossing.fhid == 10, "a takeoff past a joint fell through the floor");
+
+		// However slowly it crosses, it stays on the floor.
+		ms::PhysicsObject stopping;
+		stopping.shoe = true;
+		stopping.set_x(1634.007); stopping.set_y(1549.615);
+		stopping.fhid = 12;
+		stopping.onground = true;
+		physics.move_object(stopping);
+		require(stopping.onground && stopping.fhid == 13, "an object stopping past a joint fell off the floor");
+
+		// The next floor takes over at the joint, not a pixel past it.
+		ms::PhysicsObject handed;
+		handed.shoe = true;
+		handed.set_x(1633.5); handed.set_y(1549.3);
+		handed.fhid = 12;
+		handed.onground = true;
+		physics.move_object(handed);
+		require(handed.onground && handed.fhid == 13, "the next floor did not take over at the joint");
+	}
+	std::filesystem::remove(path);
+}
+
 int main()
 {
 	std::filesystem::path path;
@@ -1215,6 +1298,7 @@ int main()
 			require(fht.get_fh(2).length() == 100.0 && fht.get_fh(7).length() == 7000.0, "foothold lengths were wrong");
 		}
 		std::filesystem::remove(path);
+		landings();
 		std::cout << "Movement physics passed\n";
 		return 0;
 	}
