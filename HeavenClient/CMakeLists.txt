@@ -240,6 +240,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
 
     add_executable(mob_push_tests tests/mob_push.cpp)
     add_test(NAME mob_push COMMAND mob_push_tests)
+    add_executable(shockwave_tests tests/shockwave.cpp)
+    add_test(NAME shockwave COMMAND shockwave_tests)
     add_executable(hit_art_tests tests/hit_art.cpp)
     add_test(NAME hit_art COMMAND hit_art_tests)
     add_executable(assassinate_tests tests/assassinate.cpp)

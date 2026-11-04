@@ -33,6 +33,12 @@ namespace ms
 
 		virtual void apply(Char &target) const = 0;
 
+		// Only the first nodes, for an effect of several.
+		virtual void apply_first(Char &target, size_t) const
+		{
+			apply(target);
+		}
+
 	protected:
 		class Effect
 		{
@@ -97,6 +103,7 @@ namespace ms
 		MultiUseEffect(nl::node src);
 
 		void apply(Char &target) const override;
+		void apply_first(Char &target, size_t count) const override;
 
 	private:
 		std::vector<Effect> effects;

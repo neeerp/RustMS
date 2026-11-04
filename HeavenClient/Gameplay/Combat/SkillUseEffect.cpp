@@ -63,6 +63,12 @@ namespace ms
 			effect.apply(target);
 	}
 
+	void MultiUseEffect::apply_first(Char &target, size_t count) const
+	{
+		for (size_t i = 0; i < count && i < effects.size(); i++)
+			effects[i].apply(target);
+	}
+
 	ByLevelUseEffect::ByLevelUseEffect(nl::node src)
 	{
 		for (auto sub : src["CharLevel"])

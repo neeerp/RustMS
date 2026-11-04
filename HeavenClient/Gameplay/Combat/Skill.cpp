@@ -216,6 +216,13 @@ namespace ms
 		sound->play_use();
 	}
 
+	void Skill::apply_wave_effects(Char &user, size_t steps) const
+	{
+		useeffect->apply_first(user, steps);
+
+		sound->play_use();
+	}
+
 	void Skill::play_use() const
 	{
 		sound->play_use();

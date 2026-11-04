@@ -68,6 +68,12 @@ namespace ms
 		// if they are as near (FUN_00a45585, FUN_00a4549d).
 		std::optional<Floor> get_floor_near(double fx, double fy, int32_t reach) const;
 
+		// Whether a floor at x is at y or within reach below it (FUN_00a45585).
+		bool has_floor_under(int32_t x, int32_t y, int32_t reach) const;
+
+		// Whether one is at y or within reach above it (FUN_00a4549d).
+		bool has_floor_over(int32_t x, int32_t y, int32_t reach) const;
+
 		// Determine the point on the ground below the specified position.
 		int16_t get_y_below(Point<int16_t> position) const;
 
@@ -129,6 +135,8 @@ namespace ms
 		double get_edge(uint16_t fhid, bool left) const;
 
 		double get_walk_edge(uint16_t fhid, bool left) const;
+
+		bool has_floor_at(int32_t x, int32_t top, int32_t bottom) const;
 
 		std::unordered_map<uint16_t, Foothold> footholds;
 		std::unordered_multimap<int16_t, uint16_t> footholdsbyx;

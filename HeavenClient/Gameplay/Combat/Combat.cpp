@@ -40,6 +40,7 @@
 #include "RecoilShot.h"
 #include "RemoteShot.h"
 #include "RemoteSpell.h"
+#include "Shockwave.h"
 #include "ShotPath.h"
 #include "SoulArrow.h"
 
@@ -1317,6 +1318,23 @@ namespace ms
 					return false;
 			}
 
+			// Shockwave needs a floor to run along, and goes without a word
+			// if there's none (0x950da5).
+			int32_t wave = 0;
+
+			if (shockwave::is(move.get_id()))
+			{
+				const FootholdTree &floors = physics.get_fht();
+				Point<int16_t> at = player.get_position();
+				wave = shockwave::steps(
+						at.x(), at.y(), !player.getflip(),
+						[&](int32_t x, int32_t y, int32_t reach) { return floors.has_floor_under(x, y, reach); },
+						[&](int32_t x, int32_t y, int32_t reach) { return floors.has_floor_over(x, y, reach); });
+
+				if (!wave)
+					return false;
+			}
+
 			// These go only at a mob in reach (0x951342).
 			if (assaulter::needs_mob(move.get_id()))
 			{
@@ -1358,6 +1376,10 @@ namespace ms
 			{
 				show_player_special(assassinate::ID);
 				get_skill(assassinate::ID).play_use2();
+			} else if (wave)
+			{
+				// As many of its effects as it ran steps (0x9519fb).
+				get_skill(move.get_id()).apply_wave_effects(player, wave);
 			} else if (!held && !follow)
 			{
 				move.apply_useeffects(player);
@@ -1474,6 +1496,13 @@ namespace ms
 
 			Point<int16_t> origin = attack.origin;
 			Rectangle<int16_t> range = place_range(origin, attack.range, attack.hrange, attack.toleft);
+
+			if (wave)
+			{
+				int16_t end = static_cast<int16_t>(shockwave::far_side(player.get_position().x(), wave, attack.toleft));
+				range = Rectangle<int16_t>(attack.toleft ? end : range.left(), attack.toleft ? range.right() : end,
+										   range.top(), range.bottom());
+			}
 
 			// This approach should also make it easier to implement PvP
 			uint8_t mobcount = attack.mobcount;

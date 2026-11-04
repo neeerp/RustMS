@@ -794,6 +794,36 @@ namespace ms
 		return best;
 	}
 
+	bool FootholdTree::has_floor_at(int32_t x, int32_t top, int32_t bottom) const
+	{
+		auto range = footholdsbyx.equal_range(static_cast<int16_t>(x));
+
+		for (auto iter = range.first; iter != range.second; ++iter)
+		{
+			const Foothold &fh = footholds.at(iter->second);
+
+			if (fh.x1() >= fh.x2())
+				continue;
+
+			int32_t y = fh.y1() + (fh.y2() - fh.y1()) * (x - fh.x1()) / (fh.x2() - fh.x1());
+
+			if (y >= top && y <= bottom)
+				return true;
+		}
+
+		return false;
+	}
+
+	bool FootholdTree::has_floor_under(int32_t x, int32_t y, int32_t reach) const
+	{
+		return has_floor_at(x, y, y + reach - 1);
+	}
+
+	bool FootholdTree::has_floor_over(int32_t x, int32_t y, int32_t reach) const
+	{
+		return has_floor_at(x, y - reach + 1, y);
+	}
+
 	void FootholdTree::place_on_fh(PhysicsObject &phobj, uint16_t fhid) const
 	{
 		// v83 (FUN_007f13de) measures how far along the foothold the object
