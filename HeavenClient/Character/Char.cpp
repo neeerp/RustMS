@@ -1157,6 +1157,19 @@ namespace ms
 		return afterimage;
 	}
 
+	Rectangle<int16_t> Char::get_afterimage_range(int32_t skill_id, const std::string &action) const
+	{
+		int32_t weapon_id = look.get_equips().get_weapon();
+
+		if (weapon_id <= 0)
+			return {};
+
+		const WeaponData &weapon = WeaponData::get(weapon_id);
+		int16_t weapon_level = weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL);
+
+		return Afterimage(skill_id, weapon.get_afterimage(), action, action, weapon_level, 0).get_range();
+	}
+
 	Rectangle<int16_t> Char::get_afterimage_range(Stance::Id stance) const
 	{
 		int32_t weapon_id = look.get_equips().get_weapon();

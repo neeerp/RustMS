@@ -187,9 +187,10 @@ namespace ms
 		// door takes them up (0x959727, by the teleport a portal within the
 		// map uses, 0x957b74). Nothing if the map has no such portal.
 		void teleport_to_portal(uint8_t id);
-		// Move the player onto `spot` on the next update, as Assassinate's
-		// second strike does (0x952d7b).
-		void dash(teleport::Spot spot);
+		// Move the player onto `spot` on the next update, as Assaulter and
+		// Assassinate's second strike do (0x952d8f), with `command` marking
+		// the dash in the path.
+		void dash(teleport::Spot spot, uint8_t command);
 
 		// Returns the current map ID.
 		int32_t get_mapid();
@@ -273,6 +274,8 @@ namespace ms
 		// Leave a Flash Jump's `effect` where a player jumped, flipped when
 		// they face `right` (0x96c107, 0x97ffa4).
 		void show_flash_jump(const char *effect, Point<int16_t> position, bool right);
+		// What Assaulter leaves where its dash starts (0x952cb2).
+		void show_assault_trail(Point<int16_t> position, bool right);
 
 		// A user effect's path ("Effect/BasicEff.img/Event1/Best", "UI/tutorial.img/25"): the NX file it names first,
 		// then the node in it, also tried with the image's ".img" put back; null if there is none.

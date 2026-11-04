@@ -387,7 +387,7 @@ namespace ms
 
 		// Assassinate's dash shows its `special` where it starts.
 		for (const Movement &movement : movements)
-			if (movement.command == 8)
+			if (movement.command == assassinate::MOVE)
 				Stage::get().get_combat().show_special(cid, assassinate::ID);
 
 		Stage::get().get_chars().send_movement(cid, movements);

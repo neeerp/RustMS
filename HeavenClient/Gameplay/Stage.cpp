@@ -1077,11 +1077,11 @@ namespace ms
 		return state == State::ACTIVE;
 	}
 
-	void Stage::dash(teleport::Spot spot)
+	void Stage::dash(teleport::Spot spot, uint8_t command)
 	{
-		// Element 8 marks the dash in the path, from where the player
+		// Its element marks the dash in the path, from where the player
 		// stands until it lands on the next update.
-		player.record_move(8);
+		player.record_move(command);
 		pending_teleport = Teleport{ spot.position, spot.foothold };
 	}
 
@@ -1139,6 +1139,11 @@ namespace ms
 	void Stage::show_flash_jump(const char *effect, Point<int16_t> position, bool right)
 	{
 		ground_effects.add(nl::nx::effect["BasicEff.img"][effect], DrawArgument(position, right));
+	}
+
+	void Stage::show_assault_trail(Point<int16_t> position, bool right)
+	{
+		ground_effects.add(nl::nx::effect["BasicEff.img"]["Assaulter"]["remain"], DrawArgument(position, right));
 	}
 
 	nl::node Stage::effect_node(const std::string &path)

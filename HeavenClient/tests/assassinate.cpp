@@ -1,4 +1,5 @@
 #include "../Gameplay/Combat/Assassinate.h"
+#include "../Gameplay/Combat/Assaulter.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -24,6 +25,15 @@ int main()
 				"once more every 3 seconds");
 		require(multiplier(12000, 12) == 5 && multiplier(60000, 12) == 5, "up to the skill's time");
 		require(multiplier(60000, 6) == 3 && multiplier(60000, 9) == 4, "lower levels build up less");
+
+		using namespace ms;
+
+		require(assaulter::needs_mob(assaulter::ID), "Assaulter goes only at a mob");
+		require(assaulter::needs_mob(5111004) && assaulter::needs_mob(15111001), "so do the Energy Drains");
+		require(assaulter::needs_mob(5121007) && assaulter::needs_mob(15111004), "and the Barrages");
+		require(!assaulter::needs_mob(0) && !assaulter::needs_mob(4201005) && !assaulter::needs_mob(ID),
+				"the others swing at the air");
+		require(assaulter::MOVE != assassinate::MOVE, "others tell the two dashes apart");
 
 		std::cout << "assassinate tests passed\n";
 	}

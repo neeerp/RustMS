@@ -239,6 +239,11 @@ skill's `prop` and `criticalDamage`. The server takes MP once, for the
 first strike, allows it within a second of cancelling Dark Sight, caps a
 line at the most the time can multiply it by, and takes a second strike
 only on the first's mob within 2.5 s (`net::combat::second_strike`).
+Assaulter (4211002) strikes and dashes 200 px forward onto the nearest floor
+there: with no floor it isn't used, and a movement element 7 holds where it
+started, where others see the same two `BasicEff.img/Assaulter` effects. It,
+Energy Drain (5111004, 15111001) and Barrage (5121007, 15111004) do nothing
+at all with no mob in reach, where other swings hit the air.
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
