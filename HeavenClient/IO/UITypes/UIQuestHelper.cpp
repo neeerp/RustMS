@@ -307,7 +307,8 @@ namespace ms
 
 		if (dragged)
 		{
-			moved = true;
+			// A click that goes nowhere leaves it following the party list.
+			moved = moved || drag_moved();
 			leave_auto();
 
 			return state;
