@@ -313,5 +313,22 @@ namespace ms
 			set_y(py);
 			fhid = 0;
 		}
+
+		// A field makes its object anew, at rest and in the air, with no
+		// platform (CVecCtrl::Init 0x9b12a8): it lands where its fall first
+		// meets a floor, or on a fly map stays up.
+		void enter(double px, double py)
+		{
+			place(px, py);
+			onground = false;
+			fallstart = 0;
+			fhlayer = 0;
+			fhgroup = 0;
+			hspeed = 0.0;
+			vspeed = 0.0;
+			hforce = 0.0;
+			vforce = 0.0;
+			impact = false;
+		}
 	};
 }

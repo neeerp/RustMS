@@ -58,8 +58,14 @@ namespace ms
 		void ran_script(const Portal &portal);
 
 		Point<int16_t> get_portal_by_id(uint8_t id) const;
+		// Where a player entering the field by this portal starts.
+		Point<int16_t> get_start_point(uint8_t id) const;
 
 		bool has_portal(uint8_t id) const;
+
+		// v83 starts a player entering a field this far above their portal,
+		// or the point the server chases them to (CUserLocal::Init 0x949513).
+		static constexpr Point<int16_t> START_ABOVE = Point<int16_t>(0, 10);
 
 		// Where the `i`th of the town's door portals (type 6) stands, in id
 		// order, or the first if there are fewer (FUN_005377fa).

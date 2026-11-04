@@ -9,6 +9,13 @@ whose `tn` the target lacks: the Bart room's way out and Ardin's room's
 (926000000, `st00`) go to the target's default spawn instead of closing. The client skips portals without a
 travel destination when selecting an exit, including overlapping spawn points.
 
+A new field starts the player at rest in the air 10 pixels above the arrival
+portal or the server's chase point, with no floor search (`CUserLocal::Init`,
+report b109), so they land where the fall first meets a floor, or on a fly map
+stay up. A snap to the floor below would drop a flier on the arrival of
+`200090510` onto the `down` portals of its ground, and back to the station. A
+portal within the map still moves the player onto the foothold below its target.
+
 The ships between continents run on a timetable instead; see `ships.md`.
 
 ## Maple Island

@@ -213,6 +213,12 @@ namespace ms
 		stirred = now_ms();
 	}
 
+	void Player::enter_field(Point<int16_t> pos, bool uw)
+	{
+		phobj.enter(pos.x(), pos.y());
+		respawn(pos, uw);
+	}
+
 	void Player::send_action(KeyAction::Id action, bool down)
 	{
 		const PlayerState *pst = get_state(state);
