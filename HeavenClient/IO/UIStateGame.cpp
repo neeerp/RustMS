@@ -142,6 +142,8 @@ namespace ms
 					return Tooltip::Parent::USERLIST;
 				case UIElement::Type::CHATBAR:
 					return Tooltip::Parent::CHATBAR;
+				case UIElement::Type::QUESTHELPER:
+					return Tooltip::Parent::TEXT;
 				default:
 					return Tooltip::Parent::NONE;
 			}

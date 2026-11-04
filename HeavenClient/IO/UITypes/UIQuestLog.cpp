@@ -25,6 +25,7 @@
 
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
+#include "../Components/TextFit.h"
 
 #include "../../Constants.h"
 #include "../../Character/QuestRequirements.h"
@@ -133,28 +134,6 @@ namespace ms
 			auto name = names.find(area);
 
 			return name == names.end() ? "Etc." : name->second;
-		}
-
-		// `text` cut to `width`, with `tail` after it if cut.
-		std::string fit(Text::Font font, const std::string& text, int16_t width, const std::string& tail)
-		{
-			Text measure(font, Text::Alignment::LEFT, Color::Name::BLACK, text, 0, false);
-
-			if (measure.width() <= width)
-				return text;
-
-			std::string cut = text;
-
-			while (!cut.empty())
-			{
-				cut.pop_back();
-				measure.change_text(cut + tail);
-
-				if (measure.width() <= width)
-					break;
-			}
-
-			return cut + tail;
 		}
 
 		// A #j token (#jtry#, #jrank#...) from the quest's record beside the
@@ -525,9 +504,9 @@ namespace ms
 			{
 				Icon icon = tab == TAB0 ? Icon::AVAILABLE : tab == TAB1 ? progress_icon(id) : Icon::COMPLETE;
 				Text label(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
-					fit(Text::Font::A12M, name, LABEL_WIDTH, ""), 0, false);
+					fit_text(Text::Font::A12M, name, LABEL_WIDTH, ""), 0, false);
 				Text chosen(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
-					fit(Text::Font::A12M, name, CHOSEN_WIDTH, ".."), 0, false);
+					fit_text(Text::Font::A12M, name, CHOSEN_WIDTH, ".."), 0, false);
 
 				rows.push_back({ area, id, std::move(label), std::move(chosen), icon });
 			}
@@ -570,7 +549,7 @@ namespace ms
 		portrait = face.data_type() == nl::node::type::bitmap ? face : NxHelper::Npc::get_npc_node(start_npc)["stand"];
 
 		title = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE,
-			fit(Text::Font::A12B, info["name"], TITLE_WIDTH, ".."), 0, false);
+			fit_text(Text::Font::A12B, info["name"], TITLE_WIDTH, ".."), 0, false);
 
 		// The job ids in the data's order: by number, where the NX file sorts their names as text.
 		std::vector<std::pair<int32_t, int32_t>> allowed;
@@ -586,7 +565,7 @@ namespace ms
 			ids.push_back(job);
 
 		jobs = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
-			fit(Text::Font::A12M, QuestRequirements::jobs(ids), HEADER_WIDTH, ".."), 0, false);
+			fit_text(Text::Font::A12M, QuestRequirements::jobs(ids), HEADER_WIDTH, ".."), 0, false);
 
 		// An empty start check still counts (2049, 3240); only a missing one is "No limit".
 		levels = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,

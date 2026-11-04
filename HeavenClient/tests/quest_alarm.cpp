@@ -1,4 +1,5 @@
 #include "../Character/QuestAlarm.h"
+#include "../Character/QuestObjectives.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -33,6 +34,14 @@ int main()
 		require(manual_slot({ 10, 30, 20, 40 }, automatic) == 1, "by hand goes above the first automatic one");
 		require(manual_slot({ 10, 20 }, automatic) == 2, "or at the end");
 		require(manual_slot({}, automatic) == 0, "or first");
+
+		auto count = [](int32_t item) { return item == 4000 ? 25 : 0; };
+		std::vector<ms::QuestObjective> rows = ms::quest_helper_objectives(
+			{ { 100100, 10 } }, { { 4000, 20 }, { 4001, 1 }, { 4002, 0 } }, "012", count);
+		require(rows.size() == 3, "an item used up has no row");
+		require(!rows[0].mob && rows[0].id == 4000 && rows[0].have == 25, "items first, not capped");
+		require(!rows[1].mob && rows[1].id == 4001 && rows[1].have == 0, "in their order");
+		require(rows[2].mob && rows[2].have == 10, "then mobs, capped");
 	}
 	catch (const std::exception& e)
 	{

@@ -1,10 +1,12 @@
 #include "UIQuestHelper.h"
 #include "UIChatBar.h"
 #include "UIPartyHP.h"
+#include "UIQuestLog.h"
 
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
+#include "../Components/TextFit.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Character/Inventory/Inventory.h"
@@ -24,10 +26,16 @@ namespace ms
 	{
 		// Where the quest lines start, from footage.
 		constexpr int16_t TEXT_X = 9;
-		// Room left after a quest's name for its untrack button.
-		constexpr int16_t UNTRACK_ROOM = 24;
+		// A quest's name is cut to this, on one row (FUN_00885eb8).
+		constexpr int16_t NAME_WIDTH = 170;
+		// From the end of a quest's name to its untrack button.
+		constexpr int16_t UNTRACK_GAP = 6;
+		// A row's name and count fit in this, the gap between them aside.
+		constexpr int16_t ROW_WIDTH = 175;
 		// Between a requirement's name and its count.
-		constexpr int16_t COUNT_GAP = 12;
+		constexpr int16_t COUNT_GAP = 10;
+		// Where the double click on a quest's rows ends.
+		constexpr int16_t ROWS_RIGHT = 170;
 		// The original's windows drag by their top 25 pixels.
 		constexpr int16_t DRAG_HEIGHT = 25;
 		// What a quest's untrack button says in the chat log (0x1047, the
@@ -111,7 +119,7 @@ namespace ms
 					y += ROW;
 
 				entry.name.draw(position + Point<int16_t>(TEXT_X, y - 6));
-				y += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
+				y += ROW;
 
 				for (const auto& requirement : entry.requirements)
 				{
@@ -158,10 +166,11 @@ namespace ms
 
 			current.push_back({
 				id,
-				quest_objectives(quest->end_mobs, quest->end_items, progress->second,
+				quest_helper_objectives(quest->end_mobs, quest->end_items, progress->second,
 					[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); }),
 				quest->end_meso,
-				quest->end_meso != 0 ? inventory.get_meso() : 0
+				quest->end_meso != 0 ? inventory.get_meso() : 0,
+				quests.added_automatically(id)
 			});
 		}
 
@@ -186,6 +195,7 @@ namespace ms
 	void UIQuestHelper::set_minimized(bool folded)
 	{
 		minimized = folded;
+		leave_names();
 		buttons[MINIMIZE]->set_active(!minimized);
 		buttons[MAXIMIZE]->set_active(minimized);
 
@@ -200,42 +210,59 @@ namespace ms
 		title = Text(Text::A12M, Text::LEFT, Color::Name::BLACK,
 			"Quest Helper (" + std::to_string(shown.size()) + "/" + std::to_string(QuestLog::MAX_TRACKED) + ")");
 		entries.clear();
+		leave_names();
 
 		for (auto it = buttons.lower_bound(UNTRACK); it != buttons.end();)
 			it = buttons.erase(it);
 
 		int16_t y = TOP;
 
-		for (const auto& [id, objectives, meso_need, meso_have] : shown)
+		for (const auto& [id, objectives, meso_need, meso_have, automatic] : shown)
 		{
 			// As in the original (FUN_007052e6), a blank row separates quests.
 			if (!entries.empty())
 				y += ROW;
 
 			const QuestInfo* quest = QuestCatalog::get().find(id);
-			Entry entry { id, Text(Text::A12B, Text::LEFT, Color::Name::BLACK, quest ? quest->name : std::to_string(id),
-				WIDTH - TEXT_X - UNTRACK_ROOM) };
+			std::string name = quest ? quest->name : std::to_string(id);
+			std::string cut = fit_text(Text::A12B, name, NAME_WIDTH);
+			// A quest that came by itself is blue until it's done or kept
+			// (FUN_00885eb8); its meso doesn't count.
+			bool waiting = automatic &&
+				!std::all_of(objectives.begin(), objectives.end(), [](const QuestObjective& o) { return o.met(); });
+
+			Entry entry { id, Text(Text::A12B, Text::LEFT, waiting ? Color::Name::GIFTBLUE : Color::Name::BLACK, cut, 0, false) };
+			int16_t width = entry.name.width();
+
+			if (cut != name)
+				entry.full_name = name;
+
+			entry.name_area = Rectangle<int16_t>(TEXT_X, TEXT_X + width, y, y + ROW);
 
 			// The untrack button follows the name.
-			Point<int16_t> end = entry.name.endoffset();
 			uint16_t untrack = UNTRACK + static_cast<uint16_t>(entries.size());
 			buttons[untrack] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose2"],
-				Point<int16_t>(TEXT_X + end.x() + 4, y + end.y() - 2));
+				Point<int16_t>(TEXT_X + width + UNTRACK_GAP, y - 2));
 			buttons[untrack]->set_active(!minimized);
 
-			y += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
+			y += ROW;
+			int16_t rows_top = y;
 
 			for (const auto& objective : objectives)
 			{
-				std::string name = objective.mob
+				std::string wanted = objective.mob
 					? nl::nx::string["Mob.img"][std::to_string(objective.id)]["name"].get_string()
 					: ItemData::get(objective.id).get_name();
 
 				// Only the count you have is coloured.
+				Text have(Text::A12M, Text::LEFT, count_color(objective), std::to_string(objective.have));
+				Text need(Text::A12M, Text::LEFT, Color::Name::BLACK, "/" + std::to_string(objective.need));
+
+				// The name gives way, so the count stays in the window.
+				std::string fitted = fit_text(Text::A12M, wanted, ROW_WIDTH - have.width() - need.width());
+
 				entry.requirements.push_back({
-					Text(Text::A12M, Text::LEFT, Color::Name::BLACK, name),
-					Text(Text::A12M, Text::LEFT, count_color(objective), std::to_string(objective.have)),
-					Text(Text::A12M, Text::LEFT, Color::Name::BLACK, "/" + std::to_string(objective.need))
+					Text(Text::A12M, Text::LEFT, Color::Name::BLACK, fitted, 0, false), std::move(have), std::move(need)
 				});
 				y += ROW;
 			}
@@ -252,6 +279,7 @@ namespace ms
 				y += ROW;
 			}
 
+			entry.rows_area = Rectangle<int16_t>(TEXT_X, ROWS_RIGHT, rows_top, y);
 			entries.push_back(std::move(entry));
 		}
 
@@ -268,7 +296,7 @@ namespace ms
 
 		for (const auto& entry : entries)
 		{
-			rows += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
+			rows += ROW;
 			rows += static_cast<int16_t>(entry.requirements.size()) * ROW;
 
 			if (entry.meso)
@@ -310,19 +338,113 @@ namespace ms
 			// A click that goes nowhere leaves it following the party list.
 			moved = moved || drag_moved();
 			leave_auto();
+			leave_names();
 
 			return state;
 		}
 
 		Cursor::State auto_state = send_cursor_to_auto(clicked, cursorpos);
 
-		return auto_state != Cursor::State::IDLE ? auto_state : state;
+		if (auto_state != Cursor::State::IDLE)
+		{
+			leave_names();
+
+			return auto_state;
+		}
+
+		Cursor::State name_state = send_cursor_to_names(clicked, cursorpos);
+
+		return name_state != Cursor::State::IDLE ? name_state : state;
 	}
 
 	void UIQuestHelper::remove_cursor()
 	{
 		UIDragElement::remove_cursor();
 		leave_auto();
+		leave_names();
+	}
+
+	Cursor::State UIQuestHelper::send_cursor_to_names(bool clicked, Point<int16_t> cursorpos)
+	{
+		Point<int16_t> at = cursorpos - position;
+		auto entry = std::find_if(entries.begin(), entries.end(),
+			[&](const Entry& e) { return e.name_area.contains(at); });
+
+		if (minimized || entry == entries.end())
+		{
+			leave_names();
+
+			return Cursor::State::IDLE;
+		}
+
+		if (clicked && UI::get().is_cursor_press())
+		{
+			// The original's second click is a double click and not a press,
+			// so here the mark outlasts one more press.
+			if (quests.added_automatically(entry->id))
+			{
+				quests.keep_tracked(entry->id);
+				kept = entry->id;
+				kept_presses = 2;
+			}
+			else if (kept == entry->id && kept_presses > 0)
+			{
+				kept_presses--;
+			}
+		}
+
+		// The tip gives the whole name or, on a quest that may go, what a
+		// click does (0xb3aba4).
+		std::string tip = !entry->full_name.empty() ? entry->full_name
+			: quests.added_automatically(entry->id) ? "Register" : "";
+
+		if (tip.empty())
+		{
+			leave_names();
+		}
+		else
+		{
+			UI::get().show_text(Tooltip::Parent::TEXT, tip);
+			name_tip = true;
+		}
+
+		return clicked ? Cursor::State::CLICKING : Cursor::State::CANCLICK2;
+	}
+
+	void UIQuestHelper::leave_names()
+	{
+		if (name_tip)
+		{
+			name_tip = false;
+			UI::get().clear_tooltip(Tooltip::Parent::TEXT);
+		}
+	}
+
+	void UIQuestHelper::doubleclick(Point<int16_t> cursorpos)
+	{
+		Point<int16_t> at = cursorpos - position;
+		auto entry = std::find_if(entries.begin(), entries.end(),
+			[&](const Entry& e) { return e.name_area.contains(at) || e.rows_area.contains(at); });
+
+		if (minimized || entry == entries.end() || (entry->id == kept && kept_presses > 0))
+			return;
+
+		int16_t id = entry->id;
+		auto log = UI::get().get_element<UIQuestLog>();
+
+		// The quest already open closes the window (0x887c93).
+		if (log && log->is_active() && log->selected_quest() == id)
+		{
+			log->deactivate();
+
+			return;
+		}
+
+		if (!log || !log->is_active())
+			UI::get().emplace<UIQuestLog>(quests);
+
+		if (auto opened = UI::get().get_element<UIQuestLog>())
+			opened->show_quest(id);
 	}
 
 	bool UIQuestHelper::own_cursor(uint16_t buttonid) const

@@ -1390,7 +1390,17 @@ It sits flush with the top-right corner, below any party HP bars, even with
 nothing tracked (then it shows only its title bar), until it is dragged by its top 25 pixels (not its buttons),
 as the original's window base allows. From then on it stays where it was
 put, which is saved as `PosQUESTHELPER`. It
-lists up to five tracked quests with what each still needs ("Snail 3/10").
+lists up to five tracked quests with what each still needs ("Snail 3/10"),
+items first, then mobs, then meso; an item's count isn't capped at what it
+takes (`FUN_00885eb8`). Everything keeps to one row: a quest's name is cut with
+".." to 170 pixels, and a row's name gives way to its count, so the count stays
+in the window. A quest added automatically has a blue name until its items and
+mobs are met. Over a name the cursor changes and a tip shows the whole name
+if it was cut, or "Register" on an automatic quest. A click on an automatic
+quest's name keeps it: it turns black and no longer goes after ten minutes,
+and a double click right after doesn't count. A double click on a name or its
+rows opens the quest log on that quest, or closes the log if that quest is the
+one open (`FUN_00887bcd`, `FUN_00887c93`).
 As in the original's font choice (`FUN_00704c2c`), the count you have is red
 under a third of the way, pink under two thirds, orange until done, then
 green; the rest of the line is black. As in the original's layout

@@ -31,6 +31,7 @@ namespace ms
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void remove_cursor() override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
@@ -56,6 +57,10 @@ namespace ms
 		{
 			int16_t id;
 			Text name;
+			// The whole name when `name` is cut, for its tip.
+			std::string full_name;
+			// Over the window: the name, and the rows under it.
+			Rectangle<int16_t> name_area, rows_area;
 			std::vector<Requirement> requirements;
 			// The quest's end meso, last, when it asks for any.
 			bool meso = false;
@@ -70,11 +75,12 @@ namespace ms
 			// The meso held counts only when the quest asks for meso.
 			int32_t meso_need;
 			int64_t meso_have;
+			bool automatic;
 
 			bool operator==(const Shown& other) const
 			{
 				return id == other.id && objectives == other.objectives && meso_need == other.meso_need &&
-					meso_have == other.meso_have;
+					meso_have == other.meso_have && automatic == other.automatic;
 			}
 		};
 
@@ -90,6 +96,10 @@ namespace ms
 		Cursor::State send_cursor_to_auto(bool clicked, Point<int16_t> cursorpos);
 		Button::State auto_rest() const;
 		void leave_auto();
+		// A name shows a tip and takes a click, and the rows under it a
+		// double click (FUN_00887bcd, FUN_00887c93).
+		Cursor::State send_cursor_to_names(bool clicked, Point<int16_t> cursorpos);
+		void leave_names();
 
 		QuestLog& quests;
 		const Inventory& inventory;
@@ -101,6 +111,10 @@ namespace ms
 		bool moved;
 		bool auto_held = false;
 		bool auto_help = false;
+		bool name_tip = false;
+		// The click that keeps a quest isn't half of a double click on it.
+		int16_t kept = 0;
+		int16_t kept_presses = 0;
 
 		static constexpr int16_t WIDTH = 223, ROW = 18, TOP = 25, TOP_MINIMIZED = 20, BOTTOM = 5;
 	};
