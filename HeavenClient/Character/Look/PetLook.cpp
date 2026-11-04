@@ -206,7 +206,8 @@ namespace ms
 		}
 
 		Point<int16_t> curpos = phobj.get_position();
-		bool teleported = false;
+		bool teleported = called;
+		called = false;
 
 		switch (stance)
 		{
@@ -222,13 +223,7 @@ namespace ms
 				// it (FUN_009c4122), wide enough for a sweep.
 				if (!pickup::within_leash(curpos, charpos))
 				{
-					set_position(charpos.x(), charpos.y());
-					phobj.hspeed = 0.0;
-					phobj.vspeed = 0.0;
-					phobj.onground = false;
-					held = 0;
-					steer = 0;
-					lastx = charpos.x();
+					land_at(charpos);
 					teleported = true;
 				} else
 				{
@@ -491,6 +486,24 @@ namespace ms
 		}
 
 		effecting = true;
+	}
+
+	void PetLook::come_to(Point<int16_t> pos)
+	{
+		land_at(pos);
+		called = true;
+		show_effect(1);
+	}
+
+	void PetLook::land_at(Point<int16_t> pos)
+	{
+		set_position(pos.x(), pos.y());
+		phobj.hspeed = 0.0;
+		phobj.vspeed = 0.0;
+		phobj.onground = false;
+		held = 0;
+		steer = 0;
+		lastx = pos.x();
 	}
 
 	void PetLook::set_position(int16_t x, int16_t y)

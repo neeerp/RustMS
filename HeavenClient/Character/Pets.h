@@ -400,6 +400,15 @@ namespace ms
 		// None for an item that isn't pet equipment.
 		// The ability items that change what a pet picks up (FUN_00705e2c).
 		constexpr int32_t MESO_MAGNET = 1812000;
+		// The pet's skill bit that /petcome calls on, which Bartos's quest
+		// teaches (FUN_0052c40c): it comes to its owner wherever they are.
+		constexpr uint16_t COMES_WHEN_CALLED = 0x80;
+
+		inline bool comes_when_called(uint16_t skill)
+		{
+			return (skill & COMES_WHEN_CALLED) != 0;
+		}
+
 		constexpr int32_t ITEM_POUCH = 1812001;
 		constexpr int32_t SWEEPER = 1812004;
 		constexpr int32_t LONG_RANGE = 1812005;
