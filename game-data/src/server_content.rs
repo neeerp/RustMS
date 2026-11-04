@@ -199,6 +199,10 @@ pub mod keys {
     pub const CAMEL_CAB_ASK: &str = "camel_cab.ask";
     pub const CAMEL_CAB_DECLINE: &str = "camel_cab.decline";
     pub const CAMEL_CAB_SHORT: &str = "camel_cab.short";
+    pub const KARCASA_FLIGHT_INTRO: &str = "karcasa_flight.intro";
+    pub const KARCASA_FLIGHT_ASK: &str = "karcasa_flight.ask";
+    pub const KARCASA_FLIGHT_DECLINE: &str = "karcasa_flight.decline";
+    pub const KARCASA_FLIGHT_SHORT: &str = "karcasa_flight.short";
 
     /// The subway between Kerning City and New Leaf City: the ticket gates
     /// (`NLC_Move`), and Bell (`NLC_ticketing`), who sells tickets at each
@@ -4247,6 +4251,10 @@ mod tests {
             keys::CAMEL_CAB_ASK,
             keys::CAMEL_CAB_DECLINE,
             keys::CAMEL_CAB_SHORT,
+            keys::KARCASA_FLIGHT_INTRO,
+            keys::KARCASA_FLIGHT_ASK,
+            keys::KARCASA_FLIGHT_DECLINE,
+            keys::KARCASA_FLIGHT_SHORT,
             keys::SUBWAY_BOARD_ASK,
             keys::SUBWAY_BOARD_DECLINE,
             keys::SUBWAY_BOARD_NO_TICKET,

@@ -24,11 +24,14 @@ that the client still lets the player click (Ryko, Adonis, Chloe's
 document roll, a practice chart, the Sharenian knight armor and Sharen
 III's will, and four grave markers). Those say one line from
 `npc_line.*` in the content pack (`ONE_LINERS` in `net::npc_scripts`).
-A few NPCs have a script but no `speak`, and their script only says a line
-(Cosmic's say one): the ships' attendants to and from Ereve and Rien, Andy,
-Sejan, Spindle, the Glimmer Man, Witch Malady, the Steward, the Haunted
-House's Maid and Happyville's Santa. These say their own String.nx `d0`
-(`DEFAULT_LINE_NPCS` in `game-data`).
+Other NPCs have no `speak`, and Cosmic's script for them only says a line:
+the ships' attendants to and from Ereve and
+Rien, Andy, Asia, Sejan, Spindle, the Glimmer Man, Witch Malady, the Steward,
+the Haunted House's Maid, Happyville's Santa, and the townsfolk of Ariant,
+Magatia and the Ellin Forest. These say their own String.nx `d0`
+(`DEFAULT_LINE_NPCS` in `game-data`). `d0` and `d1` are for talking; `n0` and
+`n1` are the idle balloons. To find more, ask `NpcScript::for_npc` about every
+script in Cosmic's list, not only the NPCs with a script in Npc.nx.
 
 `Quest.nx` contains conversation text (`Say.img`), descriptions
 (`QuestInfo.img`), requirements (`Check.img`), and actions (`Act.img`). The
