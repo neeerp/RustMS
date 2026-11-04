@@ -1011,6 +1011,70 @@ mod tests {
     }
 
     #[test]
+    fn a_neo_city_trash_can_acts_on_its_fourth_hit_and_fills_again() {
+        let empties = |next| ReactorEvent {
+            kind: 0,
+            next: Some(next),
+            area: Some(((-30, -30), (30, 30))),
+            ..ReactorEvent::default()
+        };
+        let mut states: Vec<_> = (1..=4)
+            .map(|next| ReactorState {
+                events: vec![empties(next)],
+                ..ReactorState::default()
+            })
+            .collect();
+        states.push(ReactorState {
+            events: vec![ReactorEvent {
+                kind: 101,
+                next: Some(0),
+                ..ReactorEvent::default()
+            }],
+            time_out: Some(10_000),
+        });
+        let can = ReactorTemplate {
+            reactor_id: net::reactors::NEO_LAST_TRASH_CAN,
+            states,
+            action: Some("neoCityItem0".into()),
+            touch: false,
+        };
+        let spot = MapReactorTemplate {
+            reactor_id: can.reactor_id,
+            x: -338,
+            y: 116,
+            flip: false,
+            reactor_time: 1,
+            name: "".into(),
+        };
+        let mut reactors = ReactorSet::new([(spot, can)]);
+        let now = Instant::now();
+        let [can] = reactors.respawn(now)[..] else {
+            panic!("one reactor");
+        };
+        for round in 0..2u64 {
+            let at = now + Duration::from_secs(20 * round);
+            for state in 1..4 {
+                match reactors.hit(can, SWING, (-338, 116), at) {
+                    Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, state),
+                    other => panic!("round {round}, hit {state}: {other:?}"),
+                }
+            }
+            match reactors.hit(can, SWING, (-338, 116), at) {
+                Some(Hit::Acted { view, event: 0 }) => assert_eq!(view.state, 4),
+                other => panic!("round {round}: {other:?}"),
+            }
+            // Empty, it takes no hit until it has filled again.
+            assert!(reactors.hit(can, SWING, (-338, 116), at).is_none());
+            assert!(reactors
+                .revert(at + Duration::from_millis(9_999))
+                .is_empty());
+            let back = reactors.revert(at + Duration::from_secs(10));
+            assert_eq!(back.len(), 1);
+            assert_eq!((back[0].object_id, back[0].state), (can, 0));
+        }
+    }
+
+    #[test]
     fn another_reactor_reaching_a_state_with_a_time_out_only_moves() {
         let [(mut spot, mut pond), _] = pond_and_spine();
         spot.reactor_id = 3002001;
