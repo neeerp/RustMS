@@ -1749,7 +1749,11 @@ poison again (Cosmic refreshes no timeout in its end state, so its pond
 would stay full; the NX's 2-second `timeOut` back to state 0 is followed
 here). The forest's spine (`3009000`) stays in its last state and clears
 the stage there (`Action::DropsAndClears`), as Cosmic triggers an
-item-triggered reactor's last step rather than destroying it.
+item-triggered reactor's last step rather than destroying it. The Wild Bear
+Area's table (`2502002`, `250010301`) acts in a state that isn't an end state
+(`reactors::acts_in_every_state`): it takes Tae Soo's Peach or a Peach, drops
+Tae Roon's Note for 3839, and two seconds on takes a peach again. Cosmic's
+`hitReactor` wouldn't act there, but the quest can't be finished otherwise.
 
 What a broken reactor does is `net::reactors::action`, keyed by reactor id
 as Cosmic's scripts are: by default the breaker rolls its drops; the eggs
