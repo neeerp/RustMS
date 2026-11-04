@@ -1697,6 +1697,13 @@ pub mod keys {
     pub const SHADE_LAMP_ASK: &str = "shade_lamp.ask";
     pub const SHADE_LAMP_ON: &str = "shade_lamp.on";
     pub const SNOW_WITCH_ALTAR_LIT: &str = "snow_witch.altar_lit";
+    pub const LICH_TOMBSTONE_LIT: &str = "lich.tombstone_lit";
+    pub const JR_BOOGIES_GONE: &str = "jr_boogies.gone";
+    pub const GOBLIN_YELLOW_KING: &str = "goblin_house.yellow_king";
+    pub const GOBLIN_BLUE_KING: &str = "goblin_house.blue_king";
+    pub const GOBLIN_GREEN_KING: &str = "goblin_house.green_king";
+    pub const TOY_FACTORY_SECRET: &str = "toy_factory.secret";
+    pub const HALLOWEEN_BOX_OPENED: &str = "halloween.box_opened";
     pub const SCHOLAR_GHOST_APPEASED: &str = "scholar_ghost.appeased";
     pub const RURUMO_POISONED: &str = "rurumo.poisoned";
     pub const CONTROL_DEVICE_ASK: &str = "control_device.ask";
@@ -5331,6 +5338,13 @@ mod tests {
                 keys::SHADE_LAMP_ASK,
                 keys::SHADE_LAMP_ON,
                 keys::SNOW_WITCH_ALTAR_LIT,
+                keys::LICH_TOMBSTONE_LIT,
+                keys::JR_BOOGIES_GONE,
+                keys::GOBLIN_YELLOW_KING,
+                keys::GOBLIN_BLUE_KING,
+                keys::GOBLIN_GREEN_KING,
+                keys::TOY_FACTORY_SECRET,
+                keys::HALLOWEEN_BOX_OPENED,
                 keys::SCHOLAR_GHOST_APPEASED,
                 keys::RURUMO_POISONED,
                 keys::CONTROL_DEVICE_ASK,

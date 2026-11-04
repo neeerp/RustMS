@@ -4895,6 +4895,9 @@ impl FieldActor {
                     }
                     reactors::Action::Spear => self.spears_set(by),
                     reactors::Action::KingGate => self.king_gate_opened(by),
+                    reactors::Action::Tombstone if view.state == reactors::TOMBSTONE_LIT => {
+                        self.weaken(reactors::LICH, keys::LICH_TOMBSTONE_LIT)
+                    }
                     reactors::Action::Lever => {
                         let name = self.reactors.name(view.object_id);
                         if let Some(n) = name.and_then(|name| name.strip_prefix("lever")) {
@@ -5069,6 +5072,20 @@ impl FieldActor {
                 }
             }
             reactors::Action::Guardian => self.guardian_broke(view.object_id),
+            // Cosmic `killMonster` for each, then `playerMessage(6, ..)`.
+            reactors::Action::BoogieRock => {
+                let rock = view.reactor_id;
+                if self.reactors.live().all(|left| left.reactor_id != rock) {
+                    for mob_id in reactors::JR_BOOGIES {
+                        self.slay(mob_id);
+                    }
+                    let notice = net::content::text().get(keys::JR_BOOGIES_GONE, &[]);
+                    let packet = build_item_line(&notice, 0);
+                    if let (Some(occupant), Ok(packet)) = (self.occupants.get(&by), packet) {
+                        occupant.handle.send(ServerMessage::SendPacket(packet));
+                    }
+                }
+            }
             // A Nependeath grows out of it, or a Royal (Cosmic `2001000`).
             reactors::Action::Pot => {
                 if !self.papa_pixie {

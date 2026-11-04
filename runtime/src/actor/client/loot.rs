@@ -110,6 +110,10 @@ impl ClientActor {
             Action::WarpAnyOf(maps) => maps
                 .choose(&mut rand::thread_rng())
                 .map(|&map_id| (map_id, 0)),
+            Action::QuestWarp { quest, map_id } => {
+                let player = &self.in_game()?.player;
+                (player.quests.state(quest) == QuestState::Started).then_some((map_id, 0))
+            }
             _ => warp.map(Warp::to),
         };
         if let Some((map_id, portal)) = warp {

@@ -31,6 +31,16 @@ pub enum Action {
     /// state's time is up: the altars by the Snow Witch and the Scholar
     /// Ghost, which take an offering, and those by Rurumo, on their fifth hit.
     Weakens { mob_id: i32, notice: &'static str },
+    /// A tombstone by the Lich: taking its offering weakens the Lich as
+    /// `Weakens` does (Cosmic `2119000`'s `hit`, in state 0), but it can
+    /// then be struck on to its end, where it goes.
+    Tombstone,
+    /// A rock over the Jr. Boogies: when the last one here breaks, they go
+    /// (Cosmic `1029000`, `isAllReactorState`, `killMonster`).
+    BoogieRock,
+    /// Whoever broke it goes to `map_id` while quest `quest` is under way;
+    /// anyone else gets its loot (`QUESTIONS` b438).
+    QuestWarp { quest: i16, map_id: i32 },
     /// A Monster Carnival guardian: its side's mobs lose what it gave them
     /// (Cosmic `mcGuardian0`'s `dispelAllMonsters`).
     Guardian,
@@ -542,6 +552,42 @@ pub fn action(reactor_id: i32) -> Action {
             mob_id: RURUMO,
             notice: keys::RURUMO_POISONED,
         },
+        LICH_TOMBSTONE..=LICH_LAST_TOMBSTONE => Action::Tombstone,
+        JR_BOOGIE_ROCK => Action::BoogieRock,
+        // The gourds of Nolbu's and Hongbu's seeds (Cosmic `2221003`,
+        // `2221004`: `spawnMonster(9500400)`).
+        HONGBU_ROOF | NOLBU_ROOF => Action::BringOut(GOURD, 1),
+        // The Goblin House's rubble (`2221000` to `2221002`).
+        2221000 => Action::SpawnAt {
+            mob_id: 7130400,
+            at: (1286, 148),
+            notice: Some(keys::GOBLIN_YELLOW_KING),
+            music: None,
+        },
+        2221001 => Action::SpawnAt {
+            mob_id: 7130401,
+            at: (993, 148),
+            notice: Some(keys::GOBLIN_BLUE_KING),
+            music: None,
+        },
+        2221002 => Action::SpawnAt {
+            mob_id: 7130402,
+            at: (-340, 100),
+            notice: Some(keys::GOBLIN_GREEN_KING),
+            music: None,
+        },
+        // The Toy Factory's secret path, for Mac's manual (3238): the box
+        // on each of three floors that leads to it, the box inside that
+        // holds the toy horses, and every other box, which leads there for
+        // who is on the quest (`2200001`, `2201000`, `2202002`).
+        SECRET_FACTORY_BOX => Action::WarpAnyOf(&SECRET_FACTORIES),
+        SECRET_HORSE_BOX => Action::BringOut(SECRET_HORSE, 10),
+        LUDI_BOX => Action::QuestWarp {
+            quest: MANUAL_QUEST,
+            map_id: SECRET_FACTORIES[0],
+        },
+        // Cosmic `6829000`.
+        HALLOWEEN_BOX => Action::BringOut(HALLOWEEN_MOB, 10),
         // Neo City's trash cans (`2402007`, `2402008`: `dropItems(true, 2, 5,
         // 10, 1)`, whose second is a one in two chance of a pile, and one
         // if nothing else falls; here always the pile).
@@ -703,6 +749,40 @@ pub const RURUMO: i32 = 6090004;
 pub const RURUMO_POISON: i32 = 2619003;
 pub const RURUMO_LAST_POISON: i32 = 2619005;
 
+/// The Lich (6090000, 211041400), and the tombstones that take a Zombie's
+/// tooth on the four maps up to it.
+pub const LICH: i32 = 6090000;
+pub const LICH_TOMBSTONE: i32 = 2119000;
+pub const LICH_LAST_TOMBSTONE: i32 = 2119003;
+/// The state a tombstone reaches on taking the tooth.
+pub const TOMBSTONE_LIT: u8 = 1;
+
+/// The rocks over the Jr. Boogies (3230300, 3230301) in 101040001.
+pub const JR_BOOGIE_ROCK: i32 = 1029000;
+pub const JR_BOOGIES: [i32; 2] = [3230300, 3230301];
+
+/// The reactors on Hongbu's and Nolbu's roofs in Korean Folk Town
+/// (222000000), which take their seeds (4031244, 4031245), and the gourd
+/// they grow, which holds what 3607 and 3608 ask for.
+pub const HONGBU_ROOF: i32 = 2221003;
+pub const NOLBU_ROOF: i32 = 2221004;
+pub const GOURD: i32 = 9500400;
+
+/// Mac's lost manual (3238), and the way to the toy horses that hold it:
+/// the secret factories (Map.nx: 922000020 has the horses' boxes, its twin
+/// only the plain ones), the box that leads to them on 220030200 to
+/// 220030400, the boxes inside, and the Ludibrium boxes all these link to.
+pub const MANUAL_QUEST: i16 = 3238;
+pub const SECRET_FACTORIES: [i32; 2] = [922000020, 922000021];
+pub const SECRET_FACTORY_BOX: i32 = 2200001;
+pub const SECRET_HORSE_BOX: i32 = 2201000;
+pub const SECRET_HORSE: i32 = 9300011;
+pub const LUDI_BOX: i32 = 2202002;
+
+/// The box in 682000700 of the Haunted House, and what comes out of it.
+pub const HALLOWEEN_BOX: i32 = 6829000;
+pub const HALLOWEEN_MOB: i32 = 9400202;
+
 /// Neo City's trash cans, in <Year 2021>'s Average Town (240070100 to
 /// 240070102): the fourth hit empties one, which stays and fills again in
 /// its last state's 10 seconds (Reactor.nx). 3720's clue is in `2402008`s.
@@ -773,11 +853,14 @@ pub fn lost_link(map_id: i32, portal: &str) -> bool {
 }
 
 /// The pink line whoever broke reactor `reactor_id` reads first, if any
-/// (Cosmic `playerMessage(5, ..)`): the Dead Mine's.
+/// (Cosmic `playerMessage(5, ..)`): the Dead Mine's, the Toy Factory's
+/// secret box and the Haunted House's.
 pub fn breaker_notice(reactor_id: i32) -> Option<&'static str> {
     match reactor_id {
         ZPQ_TRAP => Some(keys::ZAKUM_MINE_UNKNOWN_FORCE),
         ZPQ_MIMIC_BOX => Some(keys::ZAKUM_MINE_MIMICS),
+        SECRET_FACTORY_BOX => Some(keys::TOY_FACTORY_SECRET),
+        HALLOWEEN_BOX => Some(keys::HALLOWEEN_BOX_OPENED),
         _ => None,
     }
 }
@@ -897,6 +980,18 @@ mod tests {
         // The Toy Factory's parts boxes and their empty look-alikes.
         assert!(shuffled(crate::events::PARTS_ROOM));
         assert_eq!(action(2202001), Action::Drops);
+        assert_eq!(
+            action(LUDI_BOX),
+            Action::QuestWarp {
+                quest: 3238,
+                map_id: 922000020
+            }
+        );
+        assert_eq!(action(SECRET_HORSE_BOX), Action::BringOut(9300011, 10));
+        assert_eq!(
+            breaker_notice(SECRET_FACTORY_BOX),
+            Some(keys::TOY_FACTORY_SECRET)
+        );
         assert_eq!(action(2208000), Action::Drops);
     }
 
@@ -1537,6 +1632,21 @@ mod tests {
             assert!(acts_staying(poison), "{poison}");
             assert!((1..5).all(|state| !reactor.acts_in(state, 0)), "{poison}");
             assert!(reactor.acts_in(5, 0), "{poison}");
+        }
+        // A tombstone moves on the tooth, and goes at the end of its hits.
+        for stone in LICH_TOMBSTONE..=LICH_LAST_TOMBSTONE {
+            let reactor = data.template(stone).unwrap().unwrap();
+            assert_eq!(action(stone), Action::Tombstone);
+            assert!(!stays(stone), "{stone}");
+            assert!(reactor.takes_items(0), "{stone}");
+            assert!(!reactor.takes_items(TOMBSTONE_LIT), "{stone}");
+            assert!(reactor.is_last(5), "{stone}");
+        }
+        // A seed's roof takes it and grows the gourd.
+        for roof in [HONGBU_ROOF, NOLBU_ROOF] {
+            let reactor = data.template(roof).unwrap().unwrap();
+            assert_eq!(action(roof), Action::BringOut(GOURD, 1));
+            assert!(reactor.takes_items(0) && reactor.is_last(1), "{roof}");
         }
         // The Wild Bear Area's table takes either peach, whichever event
         // that is, and is bare again after two seconds.
