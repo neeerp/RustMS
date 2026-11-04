@@ -351,16 +351,15 @@ namespace ms
 		else if (!ui_control::state().locked)
 			Music(mapinfo.get_bgm()).play(field_effect::BGM_FADE);
 
-		// A chased point is on the ground already, as a door is; look from
-		// just above it, since its rounded y may sit below a slope.
-		Point<int16_t> spawnpoint = chase ? *chase - Point<int16_t>(0, 5) : portals.get_portal_by_id(portalid);
-		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
+		// v83 looks for no floor here: the player starts in the air and
+		// lands, or on a fly map, whose floors lead back down, flies on.
+		Point<int16_t> startpos = chase ? *chase - MapPortals::START_ABOVE : portals.get_start_point(portalid);
 		combat.clear_prepare();
 		combat.clear_grenades();
 		combat.clear_final_attack();
 		combat.clear_spots();
 		player.set_flymap(mapinfo.is_flying());
-		player.respawn(startpos, mapinfo.is_swimming(startpos));
+		player.enter_field(startpos, mapinfo.is_swimming(startpos));
 		// v83 makes the user anew in each field: a revival or a portal just
 		// after a hit leaves no invincibility (0x92df81), and the orbs show
 		// as they are (FUN_0092e499).

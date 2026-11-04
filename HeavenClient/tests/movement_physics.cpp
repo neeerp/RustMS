@@ -309,6 +309,28 @@ void placed_on_another_floor()
 		for (int tick = 0; tick < 5; ++tick)
 			physics.move_object(player);
 		require(player.onground && player.fhid == 1 && player.crnt_y() == 0, "a player placed on the lower floor stayed on the upper one");
+
+		// Entering a field, the player is at rest in the air and lands on
+		// the first floor under the spot, however far down.
+		player.hspeed = 3.0;
+		player.vspeed = 5.0;
+		player.enter(0, -510);
+		require(!player.onground && player.fhid == 0 && player.hspeed == 0.0 && player.vspeed == 0.0, "a player did not enter at rest in the air");
+		for (int tick = 0; tick < 100; ++tick)
+			physics.move_object(player);
+		require(player.onground && player.fhid == 2 && player.crnt_y() == -500, "a player entering above the upper floor did not land on it");
+
+		player.enter(0, -300);
+		for (int tick = 0; tick < 300; ++tick)
+			physics.move_object(player);
+		require(player.onground && player.fhid == 1 && player.crnt_y() == 0, "a player entering between the floors did not fall to the lower one");
+
+		// On a fly map they stay up, sinking slowly.
+		player.flymap = true;
+		player.enter(0, -300);
+		for (int tick = 0; tick < 125; ++tick)
+			physics.move_object(player);
+		require(!player.onground && player.crnt_y() > -300 && player.crnt_y() < -285, "a flier entering a fly map dropped to its floor");
 	}
 	std::filesystem::remove(path);
 }
@@ -897,6 +919,15 @@ void fly_map(const ms::Physics& physics)
 	for (int tick = 0; tick < 600 && !player.onground; ++tick)
 		physics.move_object(player);
 	require(player.onground && player.crnt_y() == 100, "a diving flier did not land");
+
+	// Only sinking, it lands too, and stays there.
+	player = flier();
+	for (int tick = 0; tick < 4000 && !player.onground; ++tick)
+		physics.move_object(player);
+	require(player.onground && player.crnt_y() == 100, "a sinking flier did not land");
+	for (int tick = 0; tick < 100; ++tick)
+		physics.move_object(player);
+	require(player.onground && player.crnt_y() == 100, "a landed flier did not stay");
 
 	// A beat rises at 350 px/s, then slows at the drag and the sinking push
 	// together. Steering doubles the sideways speed, which then slows back

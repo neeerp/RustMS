@@ -185,6 +185,16 @@ namespace ms
 		}
 	}
 
+	Point<int16_t> MapPortals::get_start_point(uint8_t portal_id) const
+	{
+		auto iter = portals_by_id.find(portal_id);
+
+		if (iter == portals_by_id.end())
+			return {};
+
+		return iter->second.get_position() - START_ABOVE;
+	}
+
 	bool MapPortals::has_portal(uint8_t portal_id) const
 	{
 		return portals_by_id.count(portal_id) > 0;
