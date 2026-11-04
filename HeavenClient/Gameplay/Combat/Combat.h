@@ -221,6 +221,9 @@ namespace ms
 			// Where the ball leaves it, facing left.
 			Point<int16_t> sp;
 			Animation hit;
+			// The hit of the mobs after the first, for those with one
+			// (`hit_art::first_apart`).
+			Animation laterhit;
 		};
 
 		const SummonInfo &get_summon_info(int32_t skill);
@@ -240,9 +243,13 @@ namespace ms
 			int32_t damage;
 			bool toleft;
 			int32_t skill;
+			// Which of the attack's mobs this is.
+			size_t target;
 		};
 
 		void apply_summon_hit(const SummonHit &hit);
+		// A Phoenix's or Frostprey's tile under the first mob it hits.
+		void scorch(int32_t skill, Point<int16_t> summon, bool left, int32_t target);
 
 		// What the skill's packet carries besides it, or nothing if it isn't
 		// sent: Shadow Stars without its stars, or Resurrection with no one

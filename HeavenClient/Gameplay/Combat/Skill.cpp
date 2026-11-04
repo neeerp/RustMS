@@ -23,6 +23,8 @@
 #include "Prepare.h"
 #include "SkillWeapon.h"
 
+#include "../MapleMap/SummonRules.h"
+
 #include "../../Character/Char.h"
 #include "../../Character/SkillId.h"
 #include "../../Data/EquipData.h"
@@ -69,7 +71,8 @@ namespace ms
 		special = src["special"];
 		affected = { src["affected"], src["affected"]["z"] };
 
-		if (shot_rain::kind(skillid) != shot_rain::Kind::NONE || spell_area::kind(skillid) != spell_area::Kind::NONE)
+		if (shot_rain::kind(skillid) != shot_rain::Kind::NONE || spell_area::kind(skillid) != spell_area::Kind::NONE ||
+			summon_rules::scorches(skillid))
 		{
 			nl::node specialsrc = src["special"];
 			rain.params = {

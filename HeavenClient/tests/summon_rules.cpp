@@ -17,6 +17,13 @@ int main()
 	{
 		require(is_summon(3111005) && is_summon(1321007) && !is_summon(3111004), "summon skills are known");
 		require(spreads(GAVIOTA) && !spreads(3111005), "Gaviota spreads its hits");
+		require(scorches(3121006) && scorches(3221005) && !scorches(GAVIOTA) && !scorches(3111005),
+				"only Phoenix and Frostprey leave their tile");
+		{
+			ms::Rectangle<int16_t> area = scorched({ -100, 100, -60, 60 }, { 500, 200 });
+			require(area.left() == 400 && area.right() == 600 && area.top() == 140 && area.bottom() == 360,
+					"the tile covers their box around the hit, 100 px deeper");
+		}
 		require(!can_act(STATIONARY, 3111002), "a Puppet only stands there");
 		require(can_act(STATIONARY, OCTOPUS), "the Octopus stays put but shoots");
 		require(attack_interval(3111005) == 3000 && attack_interval(GAVIOTA) == 1500,

@@ -278,8 +278,7 @@ A melee attack's mobs are hit from the nearest along the way the user faces (`hi
 
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
-(`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
-that charge first (Big Bang, Hurricane, Corkscrew Blow) aren't supported. v83
+(`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. v83
 casts Three Snails as a spell; RustMS and HeavenClient treat it as a swing.
 The field shows
 the attack under its own opcode (with the skill id and level, so others see
@@ -1640,6 +1639,13 @@ HeavenClient's `MapSummons` (`Gameplay/MapleMap`) draws them and plays their
   arrives (`summon_rules::muzzle`, `ball_time`, `ball_angle`).
 - Another player's summon fires no ball. All of its hits land at
   `attackAfter` (FUN_007a6882).
+- Phoenix, Frostprey and Gaviota show `hit/0` on their first mob and
+  `hit/1` on the others (`hit_art::first_apart`).
+- Each attack of Phoenix and Frostprey, the owner's or another player's,
+  also leaves the skill's `tile` on the ground, as Inferno does: across
+  their `lt`/`rb` around where the first mob is hit, 100 px deeper, lit
+  200 ms after `attackAfter` for 500 ms (`summon_rules::scorched`, 0x7a53a4,
+  0x7a6d6b).
 
 A Puppet draws the mobs already chasing the owner to it for 180–240 s.
 A mob touching it hurts it by its attack squared, scaled by the Puppet's

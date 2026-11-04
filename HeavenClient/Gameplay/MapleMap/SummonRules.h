@@ -26,6 +26,7 @@
 #include <utility>
 
 #include "../../Template/Point.h"
+#include "../../Template/Rectangle.h"
 
 // How summons move, act, and hurt, without the map (v83 CSummoned and
 // CVecCtrlSummoned, report 158).
@@ -101,6 +102,24 @@ namespace ms::summon_rules
 	{
 		return skill == 3121006 || skill == 3221005 || skill == GAVIOTA || skill == 11001004 ||
 			   skill == 12001004 || skill == 13001004 || skill == 14001005 || skill == 15001004;
+	}
+
+	// Phoenix and Frostprey leave their `tile` on the ground at each attack,
+	// as Inferno does (0x7a53a4, and 0x7a6d6b for another player's).
+	inline bool scorches(int32_t skill)
+	{
+		return skill == 3121006 || skill == 3221005;
+	}
+
+	// The tile lights this long after the attack's attackAfter.
+	constexpr int32_t SCORCH_AFTER = 200;
+
+	// Where it lies: the summon's lt/rb around where the first mob is hit,
+	// reaching 100 px further down.
+	inline Rectangle<int16_t> scorched(Rectangle<int16_t> lt_rb, Point<int16_t> hit)
+	{
+		return { static_cast<int16_t>(hit.x() + lt_rb.left()), static_cast<int16_t>(hit.x() + lt_rb.right()),
+				 static_cast<int16_t>(hit.y() + lt_rb.top()), static_cast<int16_t>(hit.y() + lt_rb.bottom() + 100) };
 	}
 
 	// The Puppets: the only summons a mob can hurt, and that a mob turns
