@@ -1972,7 +1972,21 @@ controller's client plays the cast and the server applies it
   Pang Tail, the Scholar Ghost (6090003) when its altar (2229009) takes a
   Three-Tailed Foxtail, and Rurumo (6090004) on the fifth hit of one of
   its reactors (2619003 to 2619005). Each stays, and goes back when its
-  last state's `timeOut` is up.
+  last state's `timeOut` is up. The Lich (6090000) weakens when a tombstone
+  (2119000 to 2119003) takes a Zombie's tooth, with no line when no Lich
+  is out (`Action::Tombstone`); the tombstone can then be struck
+  until it goes, and comes back after its `reactorTime`.
+- **Reactors that only bring out or warp:** Hongbu's and Nolbu's roofs
+  (2221003, 2221004) take their seeds and grow the gourd (9500400) that
+  drops 3607's and 3608's items. The Goblin House's rubble (2221000 to
+  2221002) takes its food and brings out a King Goblin. Breaking both rocks
+  in 101040001 (1029000) kills the Jr. Boogies, who give nothing.
+  For 3238, the one box 2200001 on each of 220030200 to 220030400 leads to
+  a secret factory, either of 922000020 and 922000021. Only the first has
+  the boxes (2201000) with ten toy horses each, whose drop is the manual.
+  Any other Ludibrium box (2202002) takes a player on 3238 straight there,
+  and otherwise drops the pack's loot (Cosmic warps them to 922000009; see
+  QUESTIONS b438).
 
 ### Diseases
 
