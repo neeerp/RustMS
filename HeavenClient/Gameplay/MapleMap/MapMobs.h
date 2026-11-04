@@ -141,6 +141,9 @@ namespace ms
 		MobAttack create_attack(int32_t oid) const;
 
 		// Return the position of a mob.
+		// Whether the mob has a way to move at all.
+		bool can_move(int32_t oid) const;
+
 		Point<int16_t> get_mob_position(int32_t oid) const;
 
 		// Return the head position of a mob.

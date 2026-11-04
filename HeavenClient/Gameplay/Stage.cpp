@@ -654,7 +654,7 @@ namespace ms
 		// Dark Sight or not; the first takes the player's invincibility.
 		for (Mob::Landed &landed : mobs.take_attacks())
 		{
-			if (player.is_dead() || player.Char::is_invincible() || sheltered)
+			if (player.is_dead() || player.cannot_be_hit() || sheltered)
 				break;
 
 			MobAttackResult result = player.damage(landed.attack);
@@ -676,7 +676,7 @@ namespace ms
 				mobs.show_damage(result.oid, result.reflected);
 		}
 
-		if (player.is_dead() || player.Char::is_invincible() || sheltered)
+		if (player.is_dead() || player.cannot_be_hit() || sheltered)
 			return;
 
 		int32_t touching = mobs.find_colliding(player.get_phobj(), mapinfo.get_fieldlimit(),
@@ -780,7 +780,7 @@ namespace ms
 		uint16_t code = obstacle::code(damage, data);
 		damage = obstacle::forced(damage, player.get_stats().get_stat(MapleStat::Id::HP), data.force_hp);
 
-		if (damage > 0 && !player.Char::is_invincible())
+		if (damage > 0 && !player.cannot_be_hit())
 		{
 			obstacle::Vec push = trap->get_push();
 
@@ -829,7 +829,7 @@ namespace ms
 			if (!rules.snowman(lane).contains(position.x(), position.y()))
 				continue;
 
-			if (!player.is_dead() && !player.Char::is_invincible())
+			if (!player.is_dead() && !player.cannot_be_hit())
 			{
 				int32_t damage = snowball::touch_damage(std::rand());
 				auto [hp_loss, guarded] = player.damage_by_obstacle(damage, 270, -270);

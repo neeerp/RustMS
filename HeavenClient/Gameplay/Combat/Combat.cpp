@@ -21,6 +21,7 @@
 #include "Assassinate.h"
 #include "ChainLightning.h"
 #include "Combo.h"
+#include "AttackDash.h"
 #include "Dash.h"
 #include "DamageLayout.h"
 #include "EnergyCharge.h"
@@ -545,6 +546,10 @@ namespace ms
 			return false;
 
 		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
+			return false;
+
+		// Rush, Backspin Blow and Corkscrew Blow wait out the last of them (0x950d05, 0x96aa02).
+		if (attack_dash::lock(move.get_id()) > 0 && now < attack_lock)
 			return false;
 
 		// Rage of Pharaoh goes only with a use left, and says nothing (0x74d841).
@@ -2205,26 +2210,22 @@ namespace ms
 
 	void Combat::apply_result_movement(const SpecialMove &move, const AttackResult &result)
 	{
-		switch (move.get_id())
-		{
-			case SkillId::Id::RUSH_HERO:
-			case SkillId::Id::RUSH_PALADIN:
-			case SkillId::Id::RUSH_DK:
-				apply_rush(result);
-				break;
-			default:
-				break;
-		}
-	}
-
-	void Combat::apply_rush(const AttackResult &result)
-	{
+		// Only an attack that hit carries the player (0x952e2c).
 		if (result.mobcount == 0)
 			return;
 
-		Point<int16_t> mob_position = mobs.get_mob_position(result.last_oid);
-		int16_t targetx = mob_position.x();
-		player.rush(targetx);
+		int32_t skill = move.get_id();
+		int16_t area = SkillData::get(skill).get_stats(player.get_skills().get_level(skill)).range.left();
+		std::vector<attack_dash::Step> steps =
+			attack_dash::course(skill, !player.getflip(), area, mobs.can_move(result.first_oid));
+
+		if (steps.empty())
+			return;
+
+		player.start_attack_course(skill, std::move(steps));
+
+		if (int64_t lock = attack_dash::lock(skill))
+			attack_lock = now + lock;
 	}
 
 	void Combat::apply_bullet_effect(const Bullet &bullet)
@@ -3774,6 +3775,8 @@ namespace ms
 	{
 		attack_spot = same_spot::Limiter(same_spot::ATTACKS);
 		skill_spot = same_spot::Limiter(same_spot::SKILLS);
+		// The dash's lock is the user's too, made anew in each field.
+		attack_lock = 0;
 	}
 
 	const Skill &Combat::get_skill(int32_t skill_id)

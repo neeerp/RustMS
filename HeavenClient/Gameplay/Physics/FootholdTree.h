@@ -22,6 +22,7 @@
 #include "Foothold.h"
 #include "PhysicsObject.h"
 
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -40,6 +41,12 @@ namespace ms
 			AGAINST
 		};
 
+		struct Floor
+		{
+			uint16_t id;
+			double y;
+		};
+
 		// info is the map's info node, whose VRLimit can narrow the bounds.
 		FootholdTree(nl::node source, nl::node info = {});
 
@@ -56,6 +63,10 @@ namespace ms
 
 		// Puts a PhysicsObject on the platform the server says it stands on.
 		void place_on_fh(PhysicsObject &touse, uint16_t fhid) const;
+
+		// The nearest floor at fx within reach above or below fy, the lower one
+		// if they are as near (FUN_00a45585, FUN_00a4549d).
+		std::optional<Floor> get_floor_near(double fx, double fy, int32_t reach) const;
 
 		// Determine the point on the ground below the specified position.
 		int16_t get_y_below(Point<int16_t> position) const;

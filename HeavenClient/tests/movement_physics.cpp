@@ -988,6 +988,21 @@ void walk_jumper(const ms::Physics& physics, ms::PhysicsObject& mob, int8_t dire
 	}
 }
 
+// An attack's dash (0x94e6d3) lands on the floor nearest it, the lower of
+// two as near, and stops if none is within reach.
+void floors_near(const ms::Physics& physics)
+{
+	const ms::FootholdTree& fht = physics.get_fht();
+	auto near = fht.get_floor_near(0, 150, 60);
+	require(near && near->id == 1 && near->y == 100, "the nearest floor was not found");
+	near = fht.get_floor_near(0, 175, 75);
+	require(near && near->id == 2 && near->y == 250, "a tie did not go to the lower floor");
+	near = fht.get_floor_near(1500, 1200, 109);
+	require(near && near->id == 4 && near->y == 1300, "a floor only there was not found");
+	require(!fht.get_floor_near(0, 400, 100), "a floor out of reach was found");
+	require(!fht.get_floor_near(3000, 1300, 109), "a floor past the end of the map was found");
+}
+
 // v83 (FUN_007f8d64) keeps a jumping mob within its groups' reach and has
 // it stop to jump at loose ends and rising walls inside it.
 void jumping_mobs(const ms::Physics& physics)
@@ -1177,6 +1192,7 @@ int main()
 			// v83 keeps objects 30 px inside the outermost footholds.
 			auto walls = physics.get_fht().get_walls();
 			require(walls.first() == -1970 && walls.second() == 1970, "map walls are not 30 px inside the footholds");
+			floors_near(physics);
 			legacy_jumps_keep_momentum(physics);
 			walking(physics);
 			mob_walking(physics);
@@ -1315,6 +1331,7 @@ int main()
 			walls(physics);
 			// Fliers pick their idle waypoints from a group's footholds.
 			const ms::FootholdTree& fht = physics.get_fht();
+			require(fht.get_floor_near(2000, -60, 50)->id == 4, "a dash landed on a wall");
 			require(fht.get_groups() == std::vector<uint16_t>{1, 2, 3}, "foothold groups were not listed in load order");
 			require(fht.get_group_footholds(2) == std::vector<uint16_t>{4, 5, 6}, "a group's footholds were not listed");
 			require(fht.get_group_footholds(9).empty(), "a missing group had footholds");
