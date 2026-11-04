@@ -257,7 +257,9 @@ than five are in it on the channel (`Effect::RequireRoom`, as Cosmic's
 `maxp`); a full one is refused with a line, and a player of level 20 or
 more hears only that the Centers are for those under it. Cosmic's special
 Training Center for Evan quests 22515-22518 (`910060100`) is not in the
-v83 data. `power_b_fore.rs` checks the entry, a full room and the level
+v83 data. Inside, the instructors (`1012118`, `1022104`, `1032113`, `1052113`,
+`1095001`) have no script and only say their `d0`, though Cosmic gives them the
+entrance's menu. `power_b_fore.rs` checks the entry, a full room and the level
 through the network harness.
 
 ## Menu warps
