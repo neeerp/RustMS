@@ -2100,7 +2100,7 @@ namespace ms
 				if (pending_hits == 0)
 					apply_death();
 				else
-					death_timeout = 250; // 2 s
+					death_timeout = 375; // 3 s, past a slow Demolition's last hit
 
 				break;
 			case 3:

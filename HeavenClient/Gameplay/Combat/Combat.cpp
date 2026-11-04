@@ -2473,7 +2473,7 @@ namespace ms
 			// the user to where it crosses the first mob it hits in its path,
 			// or as far as it goes for a shot at an area or one that hit
 			// nothing. A spell flies one ball to each mob it hits. A mob's
-			// hits all land 1.5 ms per pixel it is away across, or along a
+			// first hit lands 1.5 ms per pixel it is away across, or along a
 			// spell's path, after the attack's hit frame, but for a few
 			// skills (0x954867). Energy Orb's ball instead jumps from 25 px
 			// ahead to the middle of each mob in turn, each hit when it gets
@@ -2554,7 +2554,7 @@ namespace ms
 					for (auto &number : numbers)
 					{
 						damageeffects.emplace(
-								delay + hit_delay,
+								delay + hit_delay + hit_timing::stagger(result.skill, i),
 								attackuser,
 								number,
 								line.second[i].first,
@@ -2576,9 +2576,9 @@ namespace ms
 						  user.get_position(), result.toleft, delay + first, *first_hit, bodies);
 		} else
 		{
-			// As in v83, every hit on a mob lands at once, at the frame the
-			// attack hits on, and each later target a little after. A
-			// grenade's land as it goes off.
+			// As in v83, a mob's first hit lands at the frame the attack hits
+			// on, each later target's a little after, and the rest one after
+			// another. A grenade's land as it goes off.
 			bool at_once = prepare::throws(result.skill) || energy::charges(result.skill) || hit_timing::at_once(result.skill);
 			uint16_t delay = at_once ? 0 : user.get_attackdelay(0);
 
@@ -2590,14 +2590,18 @@ namespace ms
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
-					uint16_t target_delay = hit_timing::target_delay(result.type, result.skill, target);
+					hit_timing::CloseAttack attack = {
+						result.skill, attackuser.own, user.is_twohanded(), delay,
+						hit_timing::target_delay(result.type, result.skill, target),
+						user.get_action_speed(), numbers.size()
+					};
 
 					size_t i = 0;
 
 					for (auto &number : numbers)
 					{
 						damageeffects.emplace(
-								delay + target_delay,
+								hit_timing::close_hit(attack, i),
 								attackuser,
 								number,
 								line.second[i].first,
@@ -2669,7 +2673,7 @@ namespace ms
 
 			for (size_t i = 0; i < shown; i++)
 				damageeffects.emplace(
-						hits_delay + flight,
+						hits_delay + flight + hit_timing::stagger(skill, i),
 						attackuser,
 						numbers[i],
 						line.second[i].first,
@@ -2816,7 +2820,7 @@ namespace ms
 
 			for (size_t i = 0; i < shown; i++)
 				damageeffects.emplace(
-						delay + hit,
+						delay + hit + hit_timing::stagger(skill, i),
 						attackuser,
 						numbers[i],
 						line.second[i].first,

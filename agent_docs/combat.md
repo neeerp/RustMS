@@ -363,12 +363,19 @@ that is spawned again under the same oid keeps its place. Ranged attacks take
 the closest mobs, which is what v83's outward sweep finds.
 
 `AttackResult::damagelines` keeps the targets in that order, and the attack
-packet lists them in it. Without a bullet, every hit on a mob lands at once,
-at the attack's first hit frame (`Char::get_attackdelay(0)`), and each later
-target lands a little after (`hit_timing::target_delay`): melee 70 ms per
-target up to 280 ms, the multi-target spells 50 ms, and Chain Lightning
-100 ms. Corkscrew Blow's hits land as it starts, on every mob at once
-(`hit_timing::at_once`), for it carries the player through them.
+packet lists them in it. Without a bullet, a mob's first hit lands at the
+attack's first hit frame (`Char::get_attackdelay(0)`), and each later target
+lands a little after (`hit_timing::target_delay`): melee 70 ms per target up
+to 280 ms, the multi-target spells 50 ms, and Chain Lightning 100 ms. Corkscrew
+Blow's hits land as it starts, on every mob at once (`hit_timing::at_once`), for
+it carries the player through them.
+
+A mob's other hits follow one by one, each with its number, sound and flinch:
+120 ms apart, or 60 ms for Strafe (`hit_timing::stagger`), on every kind of
+attack, the player's or another's. A few melee skills set their own times
+(`hit_timing::close_hit`): Double Uppercut, Barrage, Demolition, Shockwave,
+Assassinate, Boomerang Step and Brandish. Summons' hits don't stagger. A mob the
+server has killed waits for its last hit, for at most 3 s.
 
 The local player's Rush, Final Charge, Backspin Blow and Corkscrew Blow throw
 the mobs they flinch to a spot instead of pushing them (`mob_push`). The spot
