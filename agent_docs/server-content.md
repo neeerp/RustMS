@@ -18,7 +18,7 @@ tests.
 | `game-data/placeholder_text.toml` | yes | A placeholder for **every** text key, written by us |
 | `game-data/reward_overrides.toml` | yes | v83 corrections, e.g. quest drops |
 | `game-data/gachapon_placeholder.toml` | yes | Our stand-in Gachapon prizes, in the same shape |
-| `game-data/shop_additions.toml` | yes | Shops the pack lacks: rows of `[item, price]` per NPC id |
+| `game-data/shop_additions.toml` | yes | Shops the pack lacks, and rows its shops lack: `[item, price]` per NPC id |
 | `game-data/server_content.toml` | yes | Where the importer finds each key, plus its SHA-256 |
 
 `RUSTMS_SERVER_CONTENT_PATH` overrides the pack directory (default
@@ -51,12 +51,15 @@ tests.
   adding them if the pack lacks them. So Pio's materials for quest 1008 drop
   from the boxes even without a pack.
 - **Shops** (`ShopTable`): the pack (from Server.NX, a v95 dump) has no
-  shop for 13 v83 shopkeepers, among them Morgan in Nautilus Harbor, Mayoren
-  in Amoria, and the Singapore and Malaysia vendors. `shop_additions.toml`
-  gives them their item ids and prices, in shop order, as facts taken from
-  Cosmic's shop tables; a shop the pack has wins. Without `shops.json` only
-  these 13 keep a shop, and other shopkeepers fall back to their normal
-  speech.
+  shop for 19 v83 shopkeepers, among them Morgan in Nautilus Harbor, Mayoren
+  in Amoria, Ereve's and Rien's, and the Singapore and Malaysia vendors.
+  `shop_additions.toml` gives them their item ids and prices, in shop order,
+  as facts taken from Cosmic's shop tables; a shop the pack has wins. Its
+  `extras` go after the rows of a shop that is there: Bartos' Favorite Juice
+  (4031993, for his quests 4660 and 4661) at the five pet food merchants.
+  Without `shops.json` only these 19 keep a shop, and other shopkeepers fall
+  back to their normal speech. Inkwell (9000069) stays without one: Cosmic's
+  rows there are priced in Perfect Pitch, which `ShopEntry` has no field for.
 - **Gachapon prizes** (`GachaponTable`): v83 kept them on the server, and
   the pack has none. Without `gachapon.json` (or if it doesn't parse) every
   machine draws from `gachapon_placeholder.toml`, a few potions, ores,

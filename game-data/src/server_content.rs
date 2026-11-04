@@ -3976,6 +3976,7 @@ pub struct ShopEntry {
 
 /// NPC shops: the pack's `shops.json`, by NPC id, and the shopkeepers it
 /// lacks from `shop_additions.toml`. Without the pack only those keep one.
+/// The file's `extras` go after the rows of a shop that is there.
 #[derive(Debug, Default)]
 pub struct ShopTable {
     npcs: BTreeMap<i32, Vec<ShopEntry>>,
@@ -3999,6 +4000,7 @@ impl ShopTable {
         #[derive(Deserialize)]
         struct Additions {
             shops: BTreeMap<String, Vec<(i32, i32)>>,
+            extras: BTreeMap<String, Vec<(i32, i32)>>,
         }
         let additions: Additions = toml::from_str(SHOP_ADDITIONS)
             .map_err(|e| GameDataError::InvalidData(format!("shop_additions.toml: {e}")))?;
@@ -4011,6 +4013,17 @@ impl ShopTable {
                     .map(|(item, price)| ShopEntry { item, price })
                     .collect()
             });
+        }
+        for (npc, rows) in additions.extras {
+            let npc: i32 = npc.parse().map_err(|_| {
+                GameDataError::InvalidData(format!("shop_additions.toml: NPC id {npc}"))
+            })?;
+            if let Some(shop) = npcs.get_mut(&npc) {
+                shop.extend(
+                    rows.into_iter()
+                        .map(|(item, price)| ShopEntry { item, price }),
+                );
+            }
         }
         Ok(Self { npcs })
     }
@@ -6493,7 +6506,7 @@ mod tests {
     fn shops_come_from_the_pack() {
         // Without it, only the shopkeepers it lacks keep a shop.
         let additions = ShopTable::load(None).unwrap();
-        assert_eq!(additions.len(), 14);
+        assert_eq!(additions.len(), 19);
         assert_eq!(
             additions.shop(1091000).unwrap()[0],
             ShopEntry {
@@ -6502,6 +6515,10 @@ mod tests {
             }
         );
         assert!(additions.shop(1011100).is_none());
+        // Ereve's and Rien's are among them; an extra needs a shop to join.
+        assert_eq!(additions.shop(1100002).unwrap().len(), 24);
+        assert_eq!(additions.shop(1200001).unwrap().len(), 37);
+        assert!(additions.shop(1012004).is_none());
 
         let dir = std::env::temp_dir().join(format!("rustms-shops-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -6509,6 +6526,7 @@ mod tests {
             dir.join("shops.json"),
             r#"{"1011100": [{"item": 2000000, "price": 50, "stock": 100000},
                             {"item": 2070001, "stock": 100000, "unitPrice": 0.4}],
+                "1012004": [{"item": 2120000, "price": 30}],
                 "1091000": [{"item": 2000000, "price": 50}]}"#,
         )
         .unwrap();
@@ -6530,6 +6548,14 @@ mod tests {
         assert_eq!(shops.shop(1091000).unwrap().len(), 1);
         assert_eq!(shops.shop(9270021), additions.shop(9270021));
         assert!(shops.shop(11000).is_none());
+        // Bartos' juice goes after the pet food merchant's own rows.
+        assert_eq!(
+            shops.shop(1012004).unwrap()[1],
+            ShopEntry {
+                item: 4031993,
+                price: 100000
+            }
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 
