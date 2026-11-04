@@ -1156,7 +1156,8 @@ the three guides send a placeholder tip in pink (`black_road.tip.*`).
 `aranTutorLost` marks them all seen and plays `aranTutorial/ClickChild`.
 
 Entering the Ice Cave (`iceCave`) takes away the five tutorial skills
-(`Effect::ForgetSkill`, sent as level 0) and points at Lilin
+(`Effect::ForgetSkill`, sent as level -1: level 0 would keep their rows in
+the skill window) and points at Lilin
 (`aranTutorial/ClickLilin`). Lilin (1202000) wakes the hero the first time
 (record 21019 "helper" set to "clear"), then leads the way: the guide comes
 out (`Effect::SpawnGuide` with no line; the client picks Lilin's look for
