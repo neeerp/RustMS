@@ -158,18 +158,25 @@ pub struct StorageFees {
     pub get: i32,
 }
 
-/// NPCs with a script but no `info/speak`, whose script only says a line
-/// (as Cosmic's do), and so say their own String.nx `d0`: Kiruru, Kiru and
-/// the two Puros on board the ships to and from Ereve and Rien, Andy by the
-/// Tera Forest Time Gate, Sejan in Ariant, Spindle in Ludibrium, the
-/// Glimmer Man in New Leaf City, Witch Malady, the Steward and the Maid by
-/// and in the Haunted House, Santa in Happyville, Magatia's Carson and
-/// Humanoid A when not sending one on an errand, Shinsoo to anyone it
-/// doesn't bless, Pudin in Rien's hall of heroes, A Familiar Lady, and
-/// Cassandra in Henesys.
-pub const DEFAULT_LINE_NPCS: [i32; 18] = [
-    1100005, 1100006, 1101001, 1200005, 1200006, 1202010, 2071012, 2082004, 2101011, 2111000,
-    2111003, 2120003, 9010010, 9201082, 9201083, 9201142, 9201143, 9310058,
+/// NPCs with no `info/speak` whose script, when there is one, only says a
+/// line (as Cosmic's do), and so say their own String.nx `d0`: Kiruru, Kiru
+/// and the two Puros on board the ships to and from Ereve and Rien, Kiridu
+/// by the mounts, Shulynch, Jack and Bart in the Nautilus, Ghosthunter Bob
+/// and Karen in Ludibrium, Carta under Aqua Road, Andy by the Tera Forest
+/// Time Gate, Asia on the Air Battleship, Ariant's townsfolk, Keol and the
+/// rest of Magatia, Athena Pierce and her company in the Ellin Forest,
+/// Spindle in Ludibrium, the Glimmer Man in New Leaf City, Witch Malady, the
+/// Steward and the Maid by and in the Haunted House, Santa in Happyville,
+/// Magatia's Carson and Humanoid A when not sending one on an errand,
+/// Shinsoo to anyone it doesn't bless, Pudin in Rien's hall of heroes, A
+/// Familiar Lady, and Cassandra in Henesys.
+pub const DEFAULT_LINE_NPCS: [i32; 52] = [
+    1092008, 1092010, 1094000, 1100005, 1100006, 1101001, 1102002, 1200005, 1200006, 1202010,
+    2041026, 2041029, 2060100, 2071012, 2082004, 2082014, 2101000, 2101001, 2101002, 2101003,
+    2101004, 2101005, 2101006, 2101007, 2101008, 2101009, 2101010, 2101011, 2110002, 2111000,
+    2111001, 2111003, 2111004, 2111005, 2111006, 2111007, 2111008, 2111009, 2120003, 2131000,
+    2131002, 2131004, 2132000, 2132001, 2132002, 2132003, 9010010, 9201082, 9201083, 9201142,
+    9201143, 9310058,
 ];
 
 #[derive(Debug, Default)]
@@ -1785,6 +1792,8 @@ mod tests {
         assert!(spindle.contains("Spindle"));
         let maid = &data.dialogue(2120003).unwrap().pages[0];
         assert!(maid.contains("Master"));
+        let asia = &data.dialogue(2082014).unwrap().pages[0];
+        assert!(asia.contains("despair"));
     }
 
     #[test]
