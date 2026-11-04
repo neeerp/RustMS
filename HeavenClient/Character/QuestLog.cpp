@@ -125,6 +125,10 @@ namespace ms
 		++marker_revision;
 	}
 
+	bool QuestLog::added_automatically(int16_t id) const { return auto_since.count(id) != 0; }
+
+	void QuestLog::keep_tracked(int16_t id) { auto_since.erase(id); }
+
 	bool QuestLog::auto_tracks() const { return auto_track; }
 
 	void QuestLog::set_auto_track(bool on)

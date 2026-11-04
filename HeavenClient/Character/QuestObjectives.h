@@ -50,4 +50,22 @@ namespace ms
 
 		return result;
 	}
+
+	// The Quest Helper's rows: items first, then mobs, and an item's count
+	// goes past what it takes (FUN_00885eb8).
+	template<class Count>
+	std::vector<QuestObjective> quest_helper_objectives(const std::vector<std::pair<int32_t, int16_t>>& mobs,
+		const std::vector<std::pair<int32_t, int32_t>>& items, const std::string& progress, Count count)
+	{
+		std::vector<QuestObjective> result;
+
+		for (const auto& [item_id, need] : items)
+			if (need > 0)
+				result.push_back({ false, item_id, count(item_id), need });
+
+		for (const QuestObjective& mob : quest_objectives(mobs, {}, progress, count))
+			result.push_back(mob);
+
+		return result;
+	}
 }

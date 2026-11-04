@@ -53,6 +53,10 @@ namespace ms
 		// not started.
 		bool track(int16_t id);
 		void untrack(int16_t id);
+		// Whether a quest in the helper came by itself, and may still go.
+		bool added_automatically(int16_t id) const;
+		// Keep a quest that came by itself, as if added by hand (0x888f1a).
+		void keep_tracked(int16_t id);
 		// Whether quests that make progress are added automatically (AUTO).
 		bool auto_tracks() const;
 		void set_auto_track(bool on);

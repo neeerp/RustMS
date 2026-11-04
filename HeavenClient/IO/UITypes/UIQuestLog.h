@@ -88,6 +88,7 @@ namespace ms
 		// Open tab `tab` (0 Available, 1 In Progress, 2 Completed) and select
 		// quest `id` there, unfolding its area, if listed (FUN_00882b2e).
 		void show_quest(int16_t id, uint16_t tab = 1);
+		int16_t selected_quest() const { return selected; }
 
 		UIElement::Type get_type() const override;
 
