@@ -100,6 +100,20 @@ namespace ms
 	// few quests completed, which leaves by the same path (0x7225c6).
 	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET, BUFF, PARTY_RANK, COMPLETED };
 
+	// The quest items given at the start with fewer of them `held`, worn or
+	// not, than were given (FUN_00718b58).
+	template <typename Held, typename IsQuestItem>
+	std::vector<int32_t> lost_start_items(const QuestInfo& quest, Held held, IsQuestItem is_quest_item)
+	{
+		std::vector<int32_t> lost;
+
+		for (const auto& [item, count] : quest.start_items)
+			if (is_quest_item(item) && held(item) < count)
+				lost.push_back(item);
+
+		return lost;
+	}
+
 	// The first pet out: its item (0 for none), its closeness and its
 	// petSkill bits.
 	struct FirstPet

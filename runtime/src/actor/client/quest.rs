@@ -62,6 +62,7 @@ impl ClientActor {
                 (npc_id, quests::check_complete(template, npc_id, player))
             }
             QuestActionKind::Forfeit => return self.forfeit_quest(request.quest_id).await,
+            QuestActionKind::RestoreLostItems => return self.restore_lost_items(template).await,
             _ => {
                 debug!(quest_id = request.quest_id, ?request.kind, "Wrong quest action kind");
                 return Ok(());
@@ -133,7 +134,7 @@ impl ClientActor {
             QuestActionKind::ScriptEnd { .. } => {
                 self.run_quest_script(template.end_script.as_deref()).await
             }
-            QuestActionKind::Forfeit => Ok(()),
+            QuestActionKind::Forfeit | QuestActionKind::RestoreLostItems => Ok(()),
         }
     }
 
@@ -158,6 +159,24 @@ impl ClientActor {
             Some(script) => self.start_script(script).await,
             None => Ok(()),
         }
+    }
+
+    /// Give back the quest items a started quest gave that are gone. The
+    /// client asks wherever the player is told so: the packet names no NPC.
+    async fn restore_lost_items(
+        &mut self,
+        template: &'static QuestTemplate,
+    ) -> Result<(), RuntimeError> {
+        let mut next = self.in_game()?.player.clone();
+        let lost = quests::lost_items(template, &next);
+        if lost.is_empty() {
+            return Ok(());
+        }
+        let mut packets = Vec::new();
+        if self.give_quest_items(template.id, &lost, &mut next, &mut packets)? {
+            self.commit_player(next, None, &mut packets).await?;
+        }
+        self.send_all(&mut packets).await
     }
 
     async fn start_quest(
@@ -339,7 +358,19 @@ impl ClientActor {
                 return Ok(false);
             }
         };
-        let changes = match quests::apply_items(next, &picked, SystemTime::now()) {
+        self.give_quest_items(quest_id, &picked, next, packets)
+    }
+
+    /// Apply `items` as `quests::apply_items` takes them to `next`; `false`,
+    /// with the notice queued, if that can't be done.
+    fn give_quest_items(
+        &self,
+        quest_id: i16,
+        items: &[(i32, i32, Option<i32>)],
+        next: &mut Player,
+        packets: &mut Vec<Packet>,
+    ) -> Result<bool, RuntimeError> {
+        let changes = match quests::apply_items(next, items, SystemTime::now()) {
             Ok(changes) => changes,
             Err(rejection) => {
                 debug!(?rejection, "Quest items refused");
@@ -356,7 +387,7 @@ impl ClientActor {
         if !changes.is_empty() {
             packets.push(inventory::build_inventory_operation(true, &changes)?);
         }
-        for (item_id, count, _) in picked {
+        for &(item_id, count, _) in items {
             packets.push(inventory::build_item_gain_in_chat(item_id, count)?);
         }
         Ok(true)

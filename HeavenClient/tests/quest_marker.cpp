@@ -414,6 +414,16 @@ int main()
 		require(!ms::open_on(weekdays, 0) && ms::open_on(weekdays, 1) && ms::open_on(weekdays, 5) &&
 				!ms::open_on(weekdays, 6),
 			"one with it, only on its days");
+		// 3826 gives the Herb Pouch; a plain item given at the start isn't asked for again.
+		ms::QuestInfo pouch = quest(3826, 2091002, 2071006);
+		pouch.start_items = { { 4031555, 1 }, { 2000000, 5 }, { 4031556, 2 }, { 4031557, -1 } };
+		auto marked = [](int32_t item) { return item / 1000000 == 4; };
+		auto holding = [](int32_t held) { return [held](int32_t) { return held; }; };
+		require(ms::lost_start_items(pouch, holding(0), marked) == std::vector<int32_t>({ 4031555, 4031556 }),
+			"every quest item that was given and is gone");
+		require(ms::lost_start_items(pouch, holding(1), marked) == std::vector<int32_t>({ 4031556 }),
+			"one short of two is lost");
+		require(ms::lost_start_items(pouch, holding(2), marked).empty(), "nothing lost");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}
