@@ -391,12 +391,18 @@ namespace ms
 		{
 			body.clear_flag(PhysicsObject::Flag::NOFRICTION);
 
-			// Monster Magnet's pull ends with the flinch.
+			// Monster Magnet's pull ends with the flinch, as does a throw.
 			if (pull)
 			{
 				pull.reset();
 				body.hspeed = 0.0;
 				body.vspeed = 0.0;
+			}
+
+			if (throw_course)
+			{
+				throw_course.reset();
+				body.hspeed = 0.0;
 			}
 		}
 
@@ -696,6 +702,15 @@ namespace ms
 			pull = Pull{ *flinch->user, reach, magnet::start_speed(position.x(), flinch->user->x(), reach), 0 };
 			body.set_flag(PhysicsObject::Flag::NOFRICTION);
 			chase();
+		} else if (canmove && flinch->thrown)
+		{
+			const mob_push::Hit &hit = *flinch->thrown;
+			int32_t roll = randomizer.next_int(mob_push::SPREAD);
+			int32_t target = hit.user_x + mob_push::offset(hit.skill, hit.lt, hit.rb, standwidth, roll, flinch->left);
+
+			throw_course = mob_push::Throw{ target, position.x() - target,
+				mob_push::start_speed(mob_push::kind(hit.skill), position.x(), target, flinch->left) };
+			body.set_flag(PhysicsObject::Flag::NOFRICTION);
 		} else if (canmove)
 		{
 			// v83 pushes a flinching mob away from its attacker at 130 px/s.
@@ -1230,6 +1245,18 @@ namespace ms
 
 					if (canfly)
 						body.vspeed = magnet::fly_speed(position.y(), pull->user.y()) * Constants::TIMESTEP / 1000.0;
+				} else if (throw_course)
+				{
+					// Each 30 ms step of the throw (0x9bbdfd) sets how far the next goes.
+					throw_course->elapsed += Constants::TIMESTEP;
+
+					while (throw_course->elapsed >= mob_push::STEP)
+					{
+						throw_course->elapsed -= mob_push::STEP;
+						throw_course->step(body_position().x(), canfly);
+					}
+
+					body.hspeed = throw_course->distance * Constants::TIMESTEP / mob_push::STEP;
 				} else if (body.is_flag_set(PhysicsObject::Flag::NOFRICTION) && body.onground)
 				{
 					// v83 slows the push by 40000 / mass (100) px/s^2
@@ -2628,7 +2655,7 @@ namespace ms
 		return finish(damage);
 	}
 
-	void Mob::apply_damage(int32_t damage, bool toleft, int32_t smart)
+	void Mob::apply_damage(int32_t damage, bool toleft, int32_t smart, std::optional<mob_push::Hit> thrown)
 	{
 		hitsound.play();
 
@@ -2646,7 +2673,7 @@ namespace ms
 			attacking.reset();
 			casting.reset();
 			acting = true;
-			flinch = Flinch{ toleft, std::nullopt };
+			flinch = Flinch{ toleft, std::nullopt, thrown };
 		}
 	}
 
@@ -2660,7 +2687,7 @@ namespace ms
 		attacking.reset();
 		casting.reset();
 		acting = true;
-		flinch = Flinch{ false, user };
+		flinch = Flinch{ false, user, std::nullopt };
 	}
 
 	obstacle::Box Mob::trap_box() const

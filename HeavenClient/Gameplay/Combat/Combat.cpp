@@ -2458,7 +2458,8 @@ namespace ms
 				range,
 				physical_damage::charge_element(user.get_charge()),
 				&user == &player && !damage_layout::provokes(move.get_id()),
-				&user == &player
+				&user == &player,
+				user.get_position().x()
 		};
 
 		bool chain = chain_lightning::chains(result.skill);
@@ -2578,7 +2579,8 @@ namespace ms
 			// As in v83, every hit on a mob lands at once, at the frame the
 			// attack hits on, and each later target a little after. A
 			// grenade's land as it goes off.
-			uint16_t delay = prepare::throws(result.skill) || energy::charges(result.skill) ? 0 : user.get_attackdelay(0);
+			bool at_once = prepare::throws(result.skill) || energy::charges(result.skill) || hit_timing::at_once(result.skill);
+			uint16_t delay = at_once ? 0 : user.get_attackdelay(0);
 
 			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{

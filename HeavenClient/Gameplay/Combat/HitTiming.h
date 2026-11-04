@@ -10,6 +10,13 @@ namespace ms
 {
 	namespace hit_timing
 	{
+		// Whether a close attack's hits land as it starts: Corkscrew Blow's do, for it carries
+		// the player through the mobs (0x66b0ad).
+		inline bool at_once(int32_t skill)
+		{
+			return skill == 5101004 || skill == 15101003;
+		}
+
 		// How long after an attack's first hit its `target`th mob (in target
 		// order) is hit, as in the MapleRoyals client. Every hit on one mob
 		// lands at the same time.
@@ -19,7 +26,7 @@ namespace ms
 			{
 			case Attack::Type::CLOSE:
 				// Meso Explosion hits every mob at once (FUN_00980c90).
-				if (skill == 4211006)
+				if (skill == 4211006 || at_once(skill))
 					return 0;
 
 				// Each mob 70 ms after the last, up to 280 ms (FUN_00950921).

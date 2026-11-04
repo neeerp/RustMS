@@ -367,7 +367,16 @@ packet lists them in it. Without a bullet, every hit on a mob lands at once,
 at the attack's first hit frame (`Char::get_attackdelay(0)`), and each later
 target lands a little after (`hit_timing::target_delay`): melee 70 ms per
 target up to 280 ms, the multi-target spells 50 ms, and Chain Lightning
-100 ms.
+100 ms. Corkscrew Blow's hits land as it starts, on every mob at once
+(`hit_timing::at_once`), for it carries the player through them.
+
+The local player's Rush, Final Charge, Backspin Blow and Corkscrew Blow throw
+the mobs they flinch to a spot instead of pushing them (`mob_push`). The spot
+is past the edge of the skill's box by the mob's width and up to 20 px, from
+where the player stood when the attack went off, ahead of them or, for
+Backspin Blow, behind. The mob goes 700 px/s, or 300 from within 100 px, and on
+the ground it lands on the spot once it is within 100 px. A flier only slows to
+a third every step.
 
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
