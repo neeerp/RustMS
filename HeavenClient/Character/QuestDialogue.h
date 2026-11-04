@@ -97,6 +97,7 @@ namespace ms
 					this->script.pages.emplace_back();
 
 				enter_page(0);
+				read_to_end = finished();
 			}
 		}
 

@@ -7,6 +7,8 @@ use tracing::debug;
 /// `QUEST_ACTION`: action byte, quest id, then the NPC for every action but
 /// forfeit. The client may append its position, which is ignored. A
 /// completion ends with the picked reward, -1 for none (v83 FUN_00716fe1).
+/// Action 0 has a count and the lost items instead (0x719ab5); the server
+/// works out for itself what is lost, so they aren't read.
 pub struct QuestActionHandler;
 
 impl WorldHandler for QuestActionHandler {
@@ -16,6 +18,7 @@ impl WorldHandler for QuestActionHandler {
         let action = reader.read_byte()?;
         let quest_id = reader.read_short()?;
         let kind = match action {
+            0 => QuestActionKind::RestoreLostItems,
             1 => QuestActionKind::Start {
                 npc_id: reader.read_int()?,
             },
@@ -39,7 +42,6 @@ impl WorldHandler for QuestActionHandler {
                 npc_id: reader.read_int()?,
             },
             other => {
-                // 0 restores a lost quest item; there are none yet.
                 debug!(action = other, quest_id, "Ignoring quest action");
                 return Ok(HandlerResult::empty());
             }
@@ -123,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_forfeit_and_ignores_lost_item_restores() {
+    fn parses_forfeit_and_lost_item_restores() {
         let forfeit = parse(|p| {
             p.write_byte(3).unwrap();
             p.write_short(1031).unwrap();
@@ -132,9 +134,9 @@ mod tests {
         let restore = parse(|p| {
             p.write_byte(0).unwrap();
             p.write_short(1031).unwrap();
-            p.write_int(0).unwrap();
+            p.write_int(1).unwrap();
             p.write_int(4031003).unwrap();
         });
-        assert_eq!(restore, None);
+        assert_eq!(restore.unwrap().kind, QuestActionKind::RestoreLostItems);
     }
 }

@@ -1356,7 +1356,11 @@ the v83ref notes):
   `stop/<npc|item|quest|info|mob>`, else
   `stop/default`, else the NPC's own `String/Npc.img/<npc>/d0`, and sends
   nothing. At the wrong NPC, `lost` replaces `stop/npc` when a quest item
-  given at the start (`Act/0/item`) is no longer held or worn. Otherwise
+  given at the start (`Act/0/item`) is no longer held or worn, and OK on
+  the last page (of `stop/npc` or the rest, for a quest with no `lost`)
+  sends `QUEST_ACTION` 0 with those items: the server gives
+  back what a started quest gave and the player lacks, or says the
+  inventory is full. Closing the page sends nothing. Otherwise
   the pages play with Prev/Next; the last one has only OK, which sends
   complete (closing it sends nothing).
 - **Questions** (`ask` 1): every page but the last is a selection without

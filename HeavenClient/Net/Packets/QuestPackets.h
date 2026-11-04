@@ -5,6 +5,7 @@
 #include "../../Template/Point.h"
 
 #include <optional>
+#include <vector>
 
 namespace ms
 {
@@ -20,6 +21,7 @@ namespace ms
 	public:
 		enum Action : int8_t
 		{
+			RESTORE_LOST_ITEM = 0,
 			START = 1,
 			COMPLETE = 2,
 			FORFEIT = 3,
@@ -48,6 +50,19 @@ namespace ms
 				if (action == COMPLETE)
 					write_int(choice);
 			}
+		}
+
+		// The quest items given at the start that are gone, after the NPC
+		// has said so (0x719ab5).
+		QuestActionPacket(int16_t quest_id, const std::vector<int32_t>& lost_items) :
+			OutPacket(OutPacket::Opcode::QUEST_ACTION)
+		{
+			write_byte(RESTORE_LOST_ITEM);
+			write_short(quest_id);
+			write_int(static_cast<int32_t>(lost_items.size()));
+
+			for (int32_t item : lost_items)
+				write_int(item);
 		}
 	};
 }

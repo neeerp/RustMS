@@ -37,6 +37,8 @@ namespace ms
 				int32_t npc_id;
 				// Opens once the dialogue has been read to the end.
 				int16_t next_quest = 0;
+				// Asked for again once the dialogue has been read to the end.
+				std::vector<int32_t> lost_items = {};
 			};
 
 			std::optional<Active> active;
@@ -103,18 +105,16 @@ namespace ms
 				return stop;
 			}
 
-			// Whether a quest item given at the start is no longer held, worn
-			// or not (FUN_00718b58).
-			bool lost_start_items(const QuestInfo& quest)
+			std::vector<int32_t> lost_start_items(const QuestInfo& quest)
 			{
 				const Inventory& inventory = player().get_inventory();
 
-				return std::any_of(quest.start_items.begin(), quest.start_items.end(), [&](const auto& item)
+				return ms::lost_start_items(quest, [&](int32_t item)
 				{
-					int32_t held = inventory.get_total_item_count(item.first) +
-						inventory.count_slots(InventoryType::Id::EQUIPPED, item.first);
-
-					return ItemData::get(item.first).is_questitem() && held < item.second;
+					return inventory.get_total_item_count(item) + inventory.count_slots(InventoryType::Id::EQUIPPED, item);
+				}, [](int32_t item)
+				{
+					return ItemData::get(item).is_questitem();
 				});
 			}
 
@@ -220,6 +220,9 @@ namespace ms
 
 				if (!page)
 				{
+					if (active && active->dialogue.read() && !active->lost_items.empty())
+						QuestActionPacket(active->quest_id, active->lost_items).dispatch();
+
 					if (active && active->dialogue.read() && active->next_quest != 0)
 					{
 						int16_t next_quest = active->next_quest;
@@ -301,8 +304,12 @@ namespace ms
 
 			if (stop != QuestStop::NONE)
 			{
-				bool lost = stop == QuestStop::NPC && lost_start_items(*quest);
-				begin({ QuestDialogue::reading(stop_pages(script, stop, lost, npc_id)), quest_id, npc_id });
+				std::vector<int32_t> lost;
+
+				if (stop == QuestStop::NPC)
+					lost = lost_start_items(*quest);
+
+				begin({ QuestDialogue::reading(stop_pages(script, stop, !lost.empty(), npc_id)), quest_id, npc_id, 0, lost });
 				return;
 			}
 

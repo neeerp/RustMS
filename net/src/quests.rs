@@ -39,6 +39,8 @@ pub enum QuestActionKind {
         choice: i32,
     },
     Forfeit,
+    /// The NPC said a lost quest item would be made again.
+    RestoreLostItems,
     ScriptStart {
         npc_id: i32,
     },
@@ -683,6 +685,31 @@ pub fn pick_items(
         picked.push((chosen.item_id, chosen.count, chosen.period));
     }
     Ok(picked)
+}
+
+/// What a started quest's start gave that `player` no longer has, worn or
+/// not, in the form `apply_items` takes: quest items only (Cosmic's
+/// `restoreLostItem`), and only those every start gives this player.
+pub fn lost_items(quest: &QuestTemplate, player: &Player) -> Vec<(i32, i32, Option<i32>)> {
+    if player.quests.state(quest.id) != QuestState::Started {
+        return Vec::new();
+    }
+    let inventory = &player.inventory;
+    quest
+        .start_items
+        .iter()
+        .filter(|item| item.prop.is_none())
+        .filter(|item| item.applies_to(player.stats.job, player.stats.gender))
+        .filter(|item| crate::items::info(item.item_id).is_some_and(|info| info.quest))
+        .filter_map(|item| {
+            let worn = inventory
+                .equipped_ids()
+                .filter(|&(_, id)| id == item.item_id)
+                .count();
+            let held = inventory.count(item.item_id) + i32::try_from(worn).unwrap_or(i32::MAX);
+            (held < item.count).then(|| (item.item_id, item.count - held, item.period))
+        })
+        .collect()
 }
 
 /// Take, then give, `items` (negative counts take), a gift with minutes
@@ -1594,6 +1621,44 @@ mod tests {
             pick_items(&items, &warrior, 1, &mut rand::thread_rng()),
             Ok(vec![(4031223, -1, None), (1072303, 1, None)])
         );
+    }
+
+    #[test]
+    fn only_a_started_quests_missing_quest_items_are_lost() {
+        if crate::items::data().is_err() {
+            return;
+        }
+        const POUCH: i32 = 4031555;
+        const RED_POTION: i32 = 2000000;
+        let given = |item_id, count, prop| QuestItem {
+            item_id,
+            count,
+            job: 0,
+            gender: 2,
+            prop,
+            period: None,
+        };
+        let mut q = quest();
+        q.start_items = vec![
+            given(POUCH, 2, None),
+            given(RED_POTION, 5, None),
+            given(4031556, 1, Some(1)),
+            given(4031557, -1, None),
+        ];
+        let mut p = player(70, 0);
+        assert_eq!(lost_items(&q, &p), [], "not started");
+        p.quests.upsert(QuestRecord {
+            quest_id: q.id,
+            status: QuestStatus::Started {
+                kills: vec![],
+                info: None,
+            },
+        });
+        assert_eq!(lost_items(&q, &p), [(POUCH, 2, None)]);
+        p.inventory.add(game::Item::stack(POUCH, 1), 100).unwrap();
+        assert_eq!(lost_items(&q, &p), [(POUCH, 1, None)]);
+        p.inventory.add(game::Item::stack(POUCH, 1), 100).unwrap();
+        assert_eq!(lost_items(&q, &p), []);
     }
 
     #[test]
