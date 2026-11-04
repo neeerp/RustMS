@@ -37,6 +37,7 @@
 #include "../Combat/Attack.h"
 #include "../Combat/Bullet.h"
 #include "../Combat/MagicDamage.h"
+#include "../Combat/MobPush.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Character/Beacon.h"
@@ -242,8 +243,8 @@ namespace ms
 		int32_t shown_explosion(int32_t number) const;
 
 		// Apply damage to the mob, which flinches at its pushed, or at the share of it the player's Smart
-		// Knockback keeps.
-		void apply_damage(int32_t damage, bool toleft, int32_t smart);
+		// Knockback keeps. `thrown` is the attack that throws it instead of pushing it, if any.
+		void apply_damage(int32_t damage, bool toleft, int32_t smart, std::optional<mob_push::Hit> thrown = std::nullopt);
 
 		// End a controlled mob's chase, as a local Disorder or Hypnotize hit
 		// does (FUN_007f73d8 with 0).
@@ -747,6 +748,7 @@ namespace ms
 		{
 			bool left;
 			std::optional<Point<int16_t>> user;
+			std::optional<mob_push::Hit> thrown;
 		};
 
 		std::optional<Flinch> flinch;
@@ -800,5 +802,6 @@ namespace ms
 		};
 
 		std::optional<Pull> pull;
+		std::optional<mob_push::Throw> throw_course;
 	};
 }

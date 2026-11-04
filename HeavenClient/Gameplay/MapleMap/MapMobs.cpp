@@ -21,6 +21,7 @@
 #include "Mob.h"
 
 #include "../../Constants.h"
+#include "../../Data/SkillData.h"
 #include "../../Net/Packets/GameplayPackets.h"
 
 #include <algorithm>
@@ -316,7 +317,17 @@ namespace ms
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
 		{
-			mob->apply_damage(damage, toleft, smart);
+			std::optional<mob_push::Hit> thrown;
+
+			// Only what the local player's attacks hit is thrown (0x9520eb).
+			if (user.own && mob_push::kind(move.get_id()) != mob_push::Kind::NONE)
+			{
+				const Rectangle<int16_t> &area = SkillData::get(move.get_id()).get_stats(user.skilllevel).range;
+
+				thrown = mob_push::Hit{ move.get_id(), area.left(), area.right(), user.x };
+			}
+
+			mob->apply_damage(damage, toleft, smart, thrown);
 
 			if (user.calms)
 				mob->calm();

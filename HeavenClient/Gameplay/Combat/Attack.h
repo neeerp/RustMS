@@ -253,5 +253,7 @@ namespace ms
 		bool calms = false;
 		// Whether the local player attacked.
 		bool own = false;
+		// Where the local player stood when they did.
+		int16_t x = 0;
 	};
 }
