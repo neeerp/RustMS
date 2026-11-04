@@ -38,7 +38,7 @@ namespace ms
 			{
 				dragged = false;
 
-				Setting<T>::get().save(position);
+				save_if_moved();
 			}
 		}
 
@@ -59,6 +59,7 @@ namespace ms
 					if (!is_holding_button())
 					{
 						cursoroffset = cursorpos - position;
+						dragstart = position;
 						dragged = true;
 					}
 
@@ -70,7 +71,7 @@ namespace ms
 				{
 					dragged = false;
 
-					Setting<T>::get().save(position);
+					save_if_moved();
 				}
 			}
 
@@ -86,11 +87,25 @@ namespace ms
 			position = Setting<T>::get().load();
 		}
 
+		// Whether this drag has taken the window anywhere yet.
+		bool drag_moved() const
+		{
+			return dragged && position != dragstart;
+		}
+
 		bool dragged = false;
 		Point<int16_t> dragarea;
 		Point<int16_t> cursoroffset;
+		Point<int16_t> dragstart;
 
 	private:
+		// A click in the title bar that doesn't move the window keeps no place.
+		void save_if_moved()
+		{
+			if (position != dragstart)
+				Setting<T>::get().save(position);
+		}
+
 		virtual bool indragrange(Point<int16_t> cursorpos) const
 		{
 			auto bounds = Rectangle<int16_t>(position, position + dragarea);
