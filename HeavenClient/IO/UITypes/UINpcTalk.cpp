@@ -230,35 +230,41 @@ namespace ms
 
 			Point<int16_t> start = origin + choice.start;
 
-			if (!visible(start.y() - LINE - choice.rise + 4, start.y() + 4))
+			Point<int16_t> end = origin + choice.end;
+			int16_t top = start.y() - LINE - choice.rise + 4;
+			bool first_line = visible(top, start.y() + 4);
+
+			// A wrapped label may show only in part.
+			if (!first_line && (end.y() + 4 <= clip.first() || top >= clip.second()))
 				continue;
 
-			Point<int16_t> label_pos = start + Point<int16_t>(LABEL_X, -LINE - choice.rise);
+			Point<int16_t> label_pos(origin.x(), start.y() - LINE - choice.rise);
 
-			(i == selected ? dot_selected : dot).draw(start + Point<int16_t>(DOT_X, -8));
+			if (first_line)
+				(i == selected ? dot_selected : dot).draw(start + Point<int16_t>(DOT_X, -8));
 
 			for (const auto &image : choice.images)
-				image.texture.draw(label_pos + choice.label.box_position(image.box) + image.anchor);
+			{
+				Point<int16_t> box = label_pos + choice.label.box_position(image.box);
 
-			choice.label.draw(label_pos);
+				if (visible(box.y(), box.y() + image.size.y()))
+					image.texture.draw(box + image.anchor);
+			}
+
+			choice.label.draw(label_pos, clip);
 
 			if (i != selected)
 				continue;
 
 			// A label that wraps is underlined on its first and last lines.
-			Point<int16_t> end = origin + choice.end;
-			Color::Name color = choice.label.empty() ? Color::Name::BLUE : Color::Name::DUSKBLUE;
+			bool wrapped = end.y() != start.y();
 
-			if (end.y() == start.y())
-			{
-				dotted_line(start + Point<int16_t>(LABEL_X, 2), end.x(), color);
-			} else
-			{
-				dotted_line(start + Point<int16_t>(LABEL_X, 2), origin.x() + text.width(), color);
+			if (first_line)
+				dotted_line(start + Point<int16_t>(LABEL_X, 2),
+							wrapped ? origin.x() + choice.label.width() : end.x(), Color::Name::DUSKBLUE);
 
-				if (visible(end.y() - LINE + 4, end.y() + 4))
-					dotted_line(Point<int16_t>(origin.x(), end.y() + 2), end.x(), color);
-			}
+			if (wrapped && visible(end.y() - LINE + 4, end.y() + 4))
+				dotted_line(Point<int16_t>(origin.x(), end.y() + 2), end.x(), Color::Name::DUSKBLUE);
 		}
 
 		if (show_slider)
@@ -306,13 +312,21 @@ namespace ms
 			const Choice &choice = choices[i];
 			Point<int16_t> start = origin + choice.start;
 			Point<int16_t> end = origin + choice.end;
-			int16_t right = end.y() == start.y() ? end.x() : origin.x() + text.width();
+			int16_t widest = origin.x() + choice.label.width();
+			int16_t right = end.y() == start.y() ? end.x() : widest;
 
 			if (Rectangle<int16_t>(start.x(), right, start.y() - LINE - choice.rise + 4, start.y() + 4).contains(cursor))
 				return static_cast<int16_t>(i);
 
-			if (end.y() != start.y()
-				&& Rectangle<int16_t>(origin.x(), end.x(), start.y() + 4, end.y() + 4).contains(cursor))
+			if (end.y() == start.y())
+				continue;
+
+			// Every piece of a wrapped label answers (9abebd): the lines
+			// between its first and last run the label's width.
+			int16_t last_top = end.y() - LINE + 4;
+
+			if (Rectangle<int16_t>(origin.x(), widest, start.y() + 4, last_top).contains(cursor)
+				|| Rectangle<int16_t>(origin.x(), end.x(), last_top, end.y() + 4).contains(cursor))
 				return static_cast<int16_t>(i);
 		}
 
@@ -846,18 +860,31 @@ namespace ms
 				// standing on the text's baseline (FUN_0099dd54).
 				std::string plain = label;
 				plain.erase(std::remove(plain.begin(), plain.end(), Text::BOX), plain.end());
-				auto text_of = [&](const std::string &s)
+				// It flows as v83's link tokens do: the dot's slot, then text
+				// that wraps back to the text's left edge (9a21ad). A last box
+				// marks where it ends.
+				auto text_of = [&](const std::string &s, const std::vector<Point<int16_t>> &sizes)
 				{
-					return Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSKBLUE, colour + s, TEXT_WIDTH - LABEL_X);
+					Text text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSKBLUE,
+							  colour + Text::BOX + s + Text::BOX, TEXT_WIDTH);
+					text.set_boxes(sizes);
+					return text;
 				};
 				auto header = headers.find(id);
-				Choice choice { id, Point<int16_t>(static_cast<int16_t>(indent * space), 0), {}, text_of(label) };
-				std::vector<Point<int16_t>> boxes;
+				int16_t start_x = static_cast<int16_t>(indent * space);
+				Choice choice { id, Point<int16_t>(start_x, 0) };
+				std::vector<Point<int16_t>> boxes { Point<int16_t>(start_x + LABEL_X, 0) };
 
 				for (char c : label)
 				{
-					if (c != Text::BOX || next_image >= images.size())
+					if (c != Text::BOX)
 						continue;
+
+					if (next_image >= images.size())
+					{
+						boxes.emplace_back(0, 0);
+						continue;
+					}
 
 					InlineImage image = images[next_image++];
 					image.box = boxes.size();
@@ -865,9 +892,12 @@ namespace ms
 					choice.images.push_back(image);
 				}
 
-				choice.label.set_boxes(boxes);
-				// What a tall image adds to the row, above the text
-				choice.rise = std::max<int16_t>(0, choice.label.height() - text_of(plain).height());
+				boxes.emplace_back(0, 0);
+				choice.label = text_of(label, boxes);
+				choice.label_end = boxes.size() - 1;
+				// What a tall image adds to the row, above the first line
+				choice.rise = std::max<int16_t>(0, choice.label.box_position(0).y()
+					- text_of(plain, { boxes.front(), boxes.back() }).box_position(0).y());
 
 				if (header != headers.end())
 					choice.header = header->second;
@@ -953,8 +983,12 @@ namespace ms
 				}
 
 				choice.start.set_y(y + LINE + choice.rise);
-				choice.end = choice.start + Point<int16_t>(LABEL_X + choice.label.width(), 0);
-				y += ROW + choice.rise;
+
+				// Each line a label wraps to adds to its row.
+				Point<int16_t> label_end = choice.label.box_position(choice.label_end);
+				int16_t wrapped = label_end.y() - choice.label.box_position(0).y();
+				choice.end = Point<int16_t>(label_end.x(), choice.start.y() + wrapped);
+				y += ROW + choice.rise + wrapped;
 			}
 
 			block = y;

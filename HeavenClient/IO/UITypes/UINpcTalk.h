@@ -250,7 +250,10 @@ namespace ms
 			Point<int16_t> start;
 			Point<int16_t> end;
 			// Listed choices draw their own label, under an optional header.
+			// It holds the dot's slot as its first box, the images, and a last
+			// box where it ends.
 			Text label;
+			size_t label_end = 0;
 			Texture header;
 			int16_t header_y = 0;
 			// The label's images, and how far the tallest lifts the label
