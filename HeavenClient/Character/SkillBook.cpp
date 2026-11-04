@@ -25,7 +25,11 @@ namespace ms
 {
 	void SkillBook::set_skill(int32_t id, int32_t level, int32_t mlevel, int64_t expire)
 	{
-		skillentries[id] = {level, mlevel, expire};
+		// Below 0 the record goes, and the skill with it (FUN_00a1e48c).
+		if (level < 0)
+			skillentries.erase(id);
+		else
+			skillentries[id] = {level, mlevel, expire};
 	}
 
 	bool SkillBook::has_skill(int32_t id) const

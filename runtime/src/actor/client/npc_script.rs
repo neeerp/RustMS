@@ -625,11 +625,12 @@ impl ClientActor {
                     }
                     next.skills.remove(*skill_id);
                     changed = true;
-                    // Level 0 takes it out of the skill window, as a GM's
-                    // `!skill <id> 0` does.
+                    // Below 0 takes the record away (FUN_00a1e48c); level 0
+                    // would keep it in the skill window. Cosmic's
+                    // `iceCave.js` teaches -1 too.
                     packets.push(skill::build_update_skills(&[SkillRecord {
                         skill_id: *skill_id,
-                        level: 0,
+                        level: -1,
                         master_level: 0,
                         expiration: None,
                     }])?);

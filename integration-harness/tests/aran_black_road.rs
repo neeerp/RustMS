@@ -35,6 +35,7 @@ const MISSING_KID_1: i16 = 21000;
 const MISSING_KID_2: i16 = 21001;
 const ARK_REACHED: i16 = 21002;
 const LOST_CHILD: i32 = 4001271;
+const TUTORIAL_SKILLS: [i32; 5] = [20000014, 20000015, 20000016, 20000017, 20000018];
 /// FORCED_STAT_SET's body in the Burning Forests: STR, DEX, INT and LUK
 /// 999, attack 255, accuracy and avoid 999, speed 120, jump 140.
 const BURNING_FOREST: [u8; 20] = [
@@ -181,6 +182,9 @@ async fn the_black_road_leads_an_aran_from_the_ark_to_the_ice_cave() {
     }
     assert_eq!(t.states.get(&MISSING_KID_2), Some(&2), "{t:?}");
     assert_eq!(t.warps, [ICE_CAVE], "{t:?}");
+    for skill_id in TUTORIAL_SKILLS {
+        assert!(t.skills.contains(&(skill_id, -1)), "{t:?}");
+    }
     assert!(t.removed.contains(&(EQUIP, -11)), "{t:?}");
     assert!(t.items.contains(&(LOST_CHILD, -1)), "{t:?}");
 }
