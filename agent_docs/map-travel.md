@@ -60,6 +60,7 @@ nothing and shows the cab's "not enough mesos" line.
 | VIP Cab (`1002004`, `1032005`) | Lith Harbor, Ellinia | Ant Tunnel Park (`105070001`) for 10000 |
 | Danger Zone Taxi (`2023000`) | El Nath, Ludibrium, Omega Sector, Leafre | El Nath to `211040200` (10000), Ludibrium to `220050300` portal 1 (25000), Omega Sector to Ludibrium (25000), Leafre to `240030000` (65000) |
 | Camel Cab (`2110005`) | Outside Ariant and Magatia | The other end for 1500 |
+| Karcasa (`2101013`) | The Nihal Desert (`260010600`) | A random town of Lith Harbor, Henesys, Ellinia, Perion and Kerning City for 10000 |
 | NLC Taxi (`9201056`) | New Leaf City, the Haunted House's grounds (`682000000`) | The other end, portal 0, for 15000 |
 | Dolphin (`2060009`) | Aquarium, Herb Town pier | Menu: down to Sharp Unknown (`230030200` portal 2) for 1000 or one Dolphin Taxi Coupon (`4031242`), or across between the two for 10000 |
 
@@ -69,7 +70,7 @@ Dolphin ride warps at once; here each choice asks Yes or No, since a menu
 choice opens pages and cannot take mesos itself.
 
 Only the Regular Cab's text is in the content pack (`taxi.*`). The VIP Cab,
-Danger Zone Taxi, Camel Cab, Dolphin and NLC Taxi keys are `unsourced` and show
+Danger Zone Taxi, Camel Cab, Karcasa, Dolphin and NLC Taxi keys are `unsourced` and show
 placeholder text. `taxis.rs` checks a beginner's Regular Cab ride and the
 VIP Cab's fare through the network harness.
 `subway.rs` rides the subway to New Leaf City and back on a new

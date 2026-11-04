@@ -2583,6 +2583,9 @@ impl NpcScript {
         if npc_id == CHENG {
             return cheng(player, &mut rand::thread_rng());
         }
+        if npc_id == KARCASA {
+            return Some(karcasa_flight(player, &mut rand::thread_rng()));
+        }
         if npc_id == KENTA {
             return Some(kenta(player));
         }
@@ -8948,6 +8951,29 @@ fn yuletes_reward(player: &Player) -> NpcScript {
 const KARCASA: i32 = 2101013;
 const QUEENS_SILK_QUEST: i16 = 3941;
 const QUEENS_SILK: i32 = 4031571;
+/// Where his flight may land, and what it costs (Cosmic `2101013.js`).
+const KARCASA_TOWNS: [i32; 5] = [100000000, 101000000, 102000000, 103000000, 104000000];
+const KARCASA_FARE: i32 = 10000;
+
+/// Karcasa's flight home from the Nihal Desert, to a Victoria Island town
+/// he can't promise: `rng` picks it before the player gets on.
+fn karcasa_flight(player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let town = *KARCASA_TOWNS.choose(rng).expect("the towns aren't empty");
+    let price = KARCASA_FARE.to_string();
+    let ask = content::text().get(keys::KARCASA_FLIGHT_ASK, &[("price", &price)]);
+    let mut pages = vec![Page::Say(text(keys::KARCASA_FLIGHT_INTRO))];
+    pages.extend(ride(
+        ask,
+        Some(keys::KARCASA_FLIGHT_DECLINE),
+        keys::KARCASA_FLIGHT_SHORT,
+        KARCASA_FARE,
+        Effect::Warp(town),
+        player,
+    ));
+    let mut script = NpcScript::new(KARCASA, pages);
+    script.refused = Some(text(keys::KARCASA_FLIGHT_SHORT));
+    script
+}
 
 /// `q3941s` and `q3941e`: Karcasa takes a player disguised by Tigun's
 /// potion for Tigun, starts the quest and, at its end, hands over the
@@ -26052,6 +26078,18 @@ mod tests {
         taxi.begin();
         taxi.respond(ScriptInput::Next);
         assert!(taxi.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+
+        // Karcasa flies home to one of Victoria's towns, if it's paid for.
+        let mut flight = NpcScript::for_npc(KARCASA, &rider(200, 10000, 260010600)).unwrap();
+        assert_eq!(buttons(&flight.begin()), (false, true));
+        assert_eq!(kind(&flight.respond(ScriptInput::Next).unwrap()), Some(1));
+        let effects = flight.respond(ScriptInput::Yes).unwrap().effects;
+        assert_eq!(effects[0], Effect::SpendMeso(10000));
+        assert!(matches!(effects[1], Effect::Warp(to) if KARCASA_TOWNS.contains(&to)));
+        let mut flight = NpcScript::for_npc(KARCASA, &rider(200, 9999, 260010600)).unwrap();
+        flight.begin();
+        flight.respond(ScriptInput::Next);
+        assert!(flight.respond(ScriptInput::Yes).unwrap().effects.is_empty());
 
         // The Camel Cab goes to the town at the other end.
         for (from, to) in [(OUTSIDE_ARIANT, MAGATIA), (260020700, ARIANT)] {
