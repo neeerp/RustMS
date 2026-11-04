@@ -17,10 +17,13 @@ namespace ms
 		constexpr int32_t BAND_OF_THIEVES = 4211004;
 		constexpr int32_t DOUBLE_UPPERCUT = 5101003;
 
-		// The first mob's hit is hit/0 and the others' hit/1 (0x75a53b).
+		// The first mob's hit is hit/0 and the others' hit/1 (0x75a53b): for
+		// Corkscrew Blow, Arrow Bomb and three summons, Phoenix, Frostprey
+		// and Gaviota.
 		inline bool first_apart(int32_t skill)
 		{
-			return skill == 5101004 || skill == 15101003 || skill == 3101005;
+			return skill == 5101004 || skill == 15101003 || skill == 3101005 || skill == 3121006 ||
+				   skill == 3221005 || skill == 5211002;
 		}
 
 		// Whether the skill's art is chosen here, not by its weapon.

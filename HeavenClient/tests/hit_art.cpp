@@ -29,6 +29,9 @@ int main()
 		require(of(4211004, 1, 0, { 0, 3 }) == 3, "Band of Thieves's art goes by mob");
 		require(of(5101004, 0, 0, {}) == 0 && of(5101004, 2, 0, {}) == 1, "Corkscrew Blow's first mob apart");
 		require(of(3101005, 1, 0, {}) == 1, "Arrow Bomb's too");
+		require(of(3121006, 0, 0, {}) == 0 && of(3121006, 3, 0, {}) == 1, "Phoenix's too");
+		require(of(3221005, 1, 0, {}) == 1 && of(5211002, 1, 0, {}) == 1, "Frostprey's and Gaviota's too");
+		require(of(3111005, 1, 0, {}) == 0, "but not Silver Hawk's, which has only hit/0");
 		require(of(5101003, 0, 1, {}) == 1 && of(5101003, 0, 0, {}) == 0, "Double Uppercut's goes by hit");
 		require(!hit_art::listed(1001005), "others go by weapon");
 

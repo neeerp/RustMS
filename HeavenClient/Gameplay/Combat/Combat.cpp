@@ -851,7 +851,8 @@ namespace ms
 				info["ball"] ? std::optional<Animation>(info["ball"]) : std::nullopt,
 				static_cast<int16_t>(info["bulletSpeed"] ? info["bulletSpeed"].get_integer() : 100),
 				range["sp"],
-				Animation(hit)
+				Animation(hit),
+				Animation(src["hit"]["1"])
 		};
 
 		return summoninfos.emplace(skill, summon).first->second;
@@ -1024,9 +1025,10 @@ namespace ms
 				}
 
 				hits.push_back({ target, mobs.get_mob_id(target), at, at.x() > position.x(), delay, damage });
-				summonhits.push(delay, { target, damage, left, skill });
+				summonhits.push(delay, { target, damage, left, skill, i });
 			}
 
+			scorch(skill, position, left, targets[0]);
 			summon->set_left(left);
 			summon->play(static_cast<summon_rules::Action>(action));
 			summon->last_attack = now;
@@ -1106,8 +1108,25 @@ namespace ms
 
 		damagenumbers.emplace_back(DamageNumber::Type::NORMAL, hit.damage, damage_layout::mob_offset(0, false));
 		damagenumbers.back().set_anchor(mobs.get_mob_head_position(hit.oid));
-		mobs.apply_summon_damage(hit.oid, hit.damage, hit.toleft, get_summon_info(hit.skill).hit,
+
+		const SummonInfo &info = get_summon_info(hit.skill);
+		mobs.apply_summon_damage(hit.oid, hit.damage, hit.toleft,
+								 hit_art::of(hit.skill, hit.target, 0, {}) ? info.laterhit : info.hit,
 								 player.get_buff_value(Buffstat::Id::SMART_KNOCKBACK));
+	}
+
+	void Combat::scorch(int32_t skill, Point<int16_t> summon, bool left, int32_t target)
+	{
+		if (!summon_rules::scorches(skill) || !mobs.contains(target))
+			return;
+
+		const SummonInfo &info = get_summon_info(skill);
+		int16_t reach = info.reach > 0 ? info.reach : 300;
+		Point<int16_t> at = shot_path::hit_point(summon, static_cast<int16_t>(summon.x() + (left ? -reach : reach)),
+												 mobs.get_mob_body(target));
+
+		burn(get_skill(skill), summon_rules::scorched(info.area, at), info.attackafter + summon_rules::SCORCH_AFTER,
+			 shot_rain::BURN);
 	}
 
 	void Combat::show_summon_attack(int32_t oid, uint8_t action, const std::vector<std::pair<int32_t, int32_t>> &hits)
@@ -1124,8 +1143,11 @@ namespace ms
 
 		// Another player's summon fires no ball, and its hits all land
 		// after its attackAfter (FUN_007a6882).
-		for (const auto &[target, damage] : hits)
-			summonhits.push(info.attackafter, { target, damage, left, skill });
+		for (size_t i = 0; i < hits.size(); i++)
+			summonhits.push(info.attackafter, { hits[i].first, hits[i].second, left, skill, i });
+
+		if (!hits.empty())
+			scorch(skill, summon->get_position(), left, hits[0].first);
 	}
 
 	std::optional<UseSkillPacket::Reach> Combat::find_reach(int32_t skill, int32_t level)
