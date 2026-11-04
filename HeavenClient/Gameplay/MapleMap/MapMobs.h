@@ -72,6 +72,8 @@ namespace ms
 
 		// Whether a mob is a friendly, which mobs hurt rather than players.
 		bool is_friendly(int32_t oid) const;
+		// Whether Combo Tempest's ice holds the mob.
+		bool iced_by_tempest(int32_t oid) const;
 
 		// The server's word of a hit on a friendly mob, with its HP after.
 		void friendly_hit(int32_t oid, int32_t damage, int32_t hp, int32_t maxhp);

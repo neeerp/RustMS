@@ -473,6 +473,9 @@ pub struct Uses {
     pub hp: i32,
     /// The drops Meso Explosion sets off, and the damage each does.
     pub blast: Option<Blast>,
+    /// The mobs it hit past every cap, which only one iced by Combo Tempest
+    /// can be (`validate_iced`).
+    pub iced: Vec<i32>,
 }
 
 /// A shot fires the stack in the slot the client names, which the weapon
@@ -611,6 +614,26 @@ fn meso_cost(skill: &Learned, player: &Player) -> i32 {
 /// damage percent, or the mesos it throws. A spell must be a skill, and a
 /// shot needs ammo.
 pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejection> {
+    check(attack, player, false)
+}
+
+/// `validate`, but a physical hit past the cap passes as one on a mob iced
+/// by Combo Tempest, whose every line is its max HP (0x78e91e). Only the
+/// field knows the mob, so `Uses::iced` names those it must find iced.
+pub fn validate_iced(attack: &Attack, player: &Player) -> Result<Uses, AttackRejection> {
+    check(attack, player, true)
+}
+
+/// Whether `hit` could be on a mob iced by Combo Tempest: its lines all did
+/// the same, but those that missed.
+fn hits_like_ice(attack: &Attack, hit: &AttackHit) -> bool {
+    let mut lines = hit.damage.iter().filter(|&&damage| damage != 0);
+    let first = lines.next();
+    attack.kind != AttackKind::Magic
+        && first.is_some_and(|first| *first > 0 && lines.all(|line| line == first))
+}
+
+fn check(attack: &Attack, player: &Player, ice: bool) -> Result<Uses, AttackRejection> {
     if player.stats.hp <= 0 {
         return Err(AttackRejection::Dead);
     }
@@ -773,13 +796,17 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         return Err(AttackRejection::TooManyTargets);
     }
     // Bullseye raises every hit on its mark (FUN_0078dea6).
-    if attack.hits.iter().any(|hit| {
+    let mut iced = Vec::new();
+    for hit in attack.hits.iter().filter(|hit| {
         let percent = i64::from(beacon::damage_percent(player, hit.object_id));
         let cap = (i64::from(cap) * percent / 100).min(i64::from(i32::MAX)) as i32;
         (hit.damage.iter().enumerate())
             .any(|(line, &damage)| !(0..=barrage_cap(cap, attack.skill, line)).contains(&damage))
     }) {
-        return Err(AttackRejection::Damage);
+        if !ice || !hits_like_ice(attack, hit) {
+            return Err(AttackRejection::Damage);
+        }
+        iced.push(hit.object_id);
     }
     if let Some(sacrifice) = skill
         .as_ref()
@@ -798,6 +825,7 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         mesos,
         hp,
         blast,
+        iced,
     })
 }
 
@@ -1223,7 +1251,8 @@ mod tests {
                 ammo: None,
                 mesos: 0,
                 hp: 0,
-                blast: None
+                blast: None,
+                iced: Vec::new(),
             })
         );
         assert_eq!(
@@ -1236,6 +1265,28 @@ mod tests {
             validate(&parse_close_attack(&attack_packet(1, 1)).unwrap(), &dead),
             Err(AttackRejection::Dead)
         );
+    }
+
+    #[test]
+    fn a_hit_past_the_cap_passes_only_as_one_on_ice() {
+        let player = beginner_with_sword();
+        let mut swing = parse_close_attack(&attack_packet(1, 500)).unwrap();
+        let mob = swing.hits[0].object_id;
+        assert_eq!(validate(&swing, &player), Err(AttackRejection::Damage));
+        assert_eq!(validate_iced(&swing, &player).unwrap().iced, [mob]);
+        // Its lines all do the same, but for those that miss.
+        swing.hits[0].damage = vec![500, 0, 500];
+        assert_eq!(validate_iced(&swing, &player).unwrap().iced, [mob]);
+        swing.hits[0].damage = vec![500, 499];
+        assert_eq!(validate_iced(&swing, &player), Err(AttackRejection::Damage));
+        swing.hits[0].damage = vec![-500];
+        assert_eq!(validate_iced(&swing, &player), Err(AttackRejection::Damage));
+        // Within the cap it claims nothing, and a spell never can.
+        swing.hits[0].damage = vec![5];
+        assert!(validate_iced(&swing, &player).unwrap().iced.is_empty());
+        swing.kind = AttackKind::Magic;
+        swing.hits[0].damage = vec![500];
+        assert!(!hits_like_ice(&swing, &swing.hits[0]));
     }
 
     #[test]
@@ -2320,7 +2371,8 @@ mod tests {
                 }),
                 mesos: 0,
                 hp: 0,
-                blast: None
+                blast: None,
+                iced: Vec::new(),
             }
         );
         // Arrows don't fit a claw, and an empty slot holds nothing.

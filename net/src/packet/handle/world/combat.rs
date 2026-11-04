@@ -282,7 +282,7 @@ impl WorldHandler for AttackHandler {
             debug!(skill = attack.skill, "Rage of Pharaoh refused with no uses");
             return Ok(HandlerResult::empty());
         }
-        let uses = match combat::validate(&attack, ctx.player) {
+        let uses = match combat::validate_iced(&attack, ctx.player) {
             Ok(uses) => uses,
             Err(rejection) => {
                 debug!(?rejection, skill = attack.skill, "Attack refused");
@@ -384,6 +384,7 @@ impl WorldHandler for AttackHandler {
             takes,
             blast: uses.blast,
             pockets,
+            iced: uses.iced,
         }));
         if let Some(mist) = mist {
             result = result.with(WorldAction::Field(mist));

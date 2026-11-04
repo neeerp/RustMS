@@ -97,11 +97,11 @@ namespace ms
 		}
 
 		// Whether a hit by `skill` shows a number or a miss on the mob:
-		// Heaven's Hammer's and Hypnotize's show neither, whoever hits
-		// (0x5c9e7d).
+		// Heaven's Hammer's, Hypnotize's and Combo Tempest's show neither,
+		// whoever hits (0x5c9e7d, 0x668ded).
 		inline bool shows_number(int32_t skill)
 		{
-			return skill != 1221011 && skill != 5221009;
+			return skill != 1221011 && skill != 5221009 && skill != 21120006;
 		}
 
 		// Whether the local player's hit by `skill` (0: a plain attack)

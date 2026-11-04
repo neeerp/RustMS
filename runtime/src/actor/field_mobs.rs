@@ -250,6 +250,13 @@ fn mob_hit_cap(attack: i32, defense: i32) -> i64 {
 }
 
 impl LiveMob {
+    /// Whether Combo Tempest's ice holds it: a physical hit then does its
+    /// max HP (0x78e91e).
+    pub fn iced_by_tempest(&self) -> bool {
+        (self.statuses.get(&MobStat::Freeze))
+            .is_some_and(|status| status.skill_id == net::skills::COMBO_TEMPEST)
+    }
+
     /// Its physical attack at its strongest: the best of its own and its
     /// attacks', and what statuses add.
     fn pad(&self) -> i32 {
