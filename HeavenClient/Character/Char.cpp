@@ -142,7 +142,7 @@ namespace ms
 		item_effect.draw(true, absp, facepos, facing_right, view, alpha);
 		set_effect.draw(true, absp, facepos, facing_right, alpha);
 
-		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
+		afterimage.draw(look.get_afterimage_frame(afterimage.counts_action_frames()), DrawArgument(absp, facing_right), alpha);
 
 		if (ironbody)
 		{
@@ -449,7 +449,7 @@ namespace ms
 			stance_carry = 0.0f;
 		}
 
-		afterimage.update(look.get_frame(), stancespeed);
+		afterimage.update(look.get_afterimage_frame(afterimage.counts_action_frames()), stancespeed);
 
 		return look.update(stancespeed);
 	}
@@ -1149,7 +1149,7 @@ namespace ms
 		const std::string& ai_name = weapon.get_afterimage();
 
 		uint8_t charge = physical_damage::charge_element(get_charge());
-		afterimage = Afterimage(skill_id, ai_name, stance_name, weapon_level, charge);
+		afterimage = Afterimage(skill_id, ai_name, look.get_action_name(), stance_name, weapon_level, charge);
 	}
 
 	const Afterimage &Char::get_afterimage() const

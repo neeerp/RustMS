@@ -904,6 +904,11 @@ namespace ms
 		return stframe.get();
 	}
 
+	uint8_t CharLook::get_afterimage_frame(bool action_frames) const
+	{
+		return action && action_frames ? actframe : stframe.get();
+	}
+
 	Stance::Id CharLook::get_stance() const
 	{
 		return stance.get();

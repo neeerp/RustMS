@@ -128,6 +128,8 @@ namespace ms
 		uint16_t get_action_lock(const std::string &action) const;
 
 		uint8_t get_frame() const;
+		// An action's own afterimage counts the action's frames, not its stances'.
+		uint8_t get_afterimage_frame(bool action_frames) const;
 
 		Stance::Id get_stance() const;
 
