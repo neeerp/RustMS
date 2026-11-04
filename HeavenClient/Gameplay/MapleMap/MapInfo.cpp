@@ -101,6 +101,11 @@ namespace ms
 		return fly && !swim;
 	}
 
+	bool MapInfo::is_underwater() const
+	{
+		return swim;
+	}
+
 	bool MapInfo::is_swimming(Point<int16_t> position) const
 	{
 		return swim_area::swimming(swim, swim_areas, position.x(), position.y());

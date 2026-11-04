@@ -2363,6 +2363,10 @@ namespace ms
 			return;
 
 		int32_t skill = move.get_id();
+
+		if (attack_dash::marks_path(skill) && mobs.in_toss(result.first_oid))
+			return;
+
 		int16_t area = SkillData::get(skill).get_stats(player.get_skills().get_level(skill)).range.left();
 		std::vector<attack_dash::Step> steps =
 			attack_dash::course(skill, !player.getflip(), area, mobs.can_move(result.first_oid));
@@ -2613,6 +2617,12 @@ namespace ms
 				&user == &player,
 				user.get_position().x()
 		};
+
+		if (attackuser.own)
+		{
+			attackuser.job = player.get_stats().get_job().get_id();
+			attackuser.underwater = mapinfo.is_underwater();
+		}
 
 		bool chain = chain_lightning::chains(result.skill);
 

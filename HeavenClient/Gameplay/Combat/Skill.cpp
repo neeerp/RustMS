@@ -19,6 +19,7 @@
 
 #include "Heal.h"
 #include "HitArt.h"
+#include "MobPush.h"
 #include "Prepare.h"
 #include "SkillWeapon.h"
 
@@ -300,6 +301,9 @@ namespace ms
 			// Inferno's and Blizzard's element counts x percent.
 			if (skillid == 3111003 || skillid == 3211003)
 				attack.blow.amplify = stats.x;
+
+			if (mob_push::kind(skillid) == mob_push::Kind::SPUN)
+				attack.blow.success = stats.chance;
 
 			attack.damagetype = Attack::DMG_WEAPON;
 		}
