@@ -5118,6 +5118,8 @@ impl FieldActor {
                     }
                 }
             }
+            // Cosmic `weakenAreaBoss(.., ..)`.
+            reactors::Action::Weakens { mob_id, notice } => self.weaken(mob_id, notice),
             // Its `act` is empty: it dropped its loot as it was hit.
             reactors::Action::DropsOnHit => {}
             // Whoever broke it drops its loot or goes where it sends them.

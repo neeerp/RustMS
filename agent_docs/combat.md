@@ -1962,6 +1962,13 @@ controller's client plays the cast and the server applies it
   and the avoidability cut (155 level 2) for their `time`, given by no
   one, and the map reads the switch's line in blue
   (`Effect::WeakenMob`); with none out, nothing happens.
+- **Boss reactors:** three more bosses weaken the same way, by reactor
+  (`reactors::Action::Weakens`): the Snow Witch (6090001) when an altar
+  (2119004 to 2119006) takes a Jr. Yeti Skin, a Hector Tail or a White
+  Pang Tail, the Scholar Ghost (6090003) when its altar (2229009) takes a
+  Three-Tailed Foxtail, and Rurumo (6090004) on the fifth hit of one of
+  its reactors (2619003 to 2619005). Each stays, and goes back when its
+  last state's `timeOut` is up.
 
 ### Diseases
 

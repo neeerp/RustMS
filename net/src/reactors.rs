@@ -26,6 +26,11 @@ pub fn template(reactor_id: i32) -> Option<ReactorTemplate> {
 pub enum Action {
     /// Drop its loot (`reactor_drops`), as every reactor not listed does.
     Drops,
+    /// Weaken the first `mob_id` out here as a boss switch does, and those
+    /// here read `notice` (Cosmic `weakenAreaBoss`), staying until its
+    /// state's time is up: the altars by the Snow Witch and the Scholar
+    /// Ghost, which take an offering, and those by Rurumo, on their fifth hit.
+    Weakens { mob_id: i32, notice: &'static str },
     /// A Monster Carnival guardian: its side's mobs lose what it gave them
     /// (Cosmic `mcGuardian0`'s `dispelAllMonsters`).
     Guardian,
@@ -524,6 +529,19 @@ pub fn action(reactor_id: i32) -> Action {
             at_least: 15,
             mesos: (500, 1000),
         },
+        // Cosmic `2119004` to `2119006`, `2229009`, `2619003` to `2619005`.
+        SNOW_WITCH_ALTAR..=SNOW_WITCH_LAST_ALTAR => Action::Weakens {
+            mob_id: SNOW_WITCH,
+            notice: keys::SNOW_WITCH_ALTAR_LIT,
+        },
+        SCHOLAR_GHOST_ALTAR => Action::Weakens {
+            mob_id: SCHOLAR_GHOST,
+            notice: keys::SCHOLAR_GHOST_APPEASED,
+        },
+        RURUMO_POISON..=RURUMO_LAST_POISON => Action::Weakens {
+            mob_id: RURUMO,
+            notice: keys::RURUMO_POISONED,
+        },
         // Neo City's trash cans (`2402007`, `2402008`: `dropItems(true, 2, 5,
         // 10, 1)`, whose second is a one in two chance of a pile, and one
         // if nothing else falls; here always the pile).
@@ -672,6 +690,19 @@ pub const JONATHANS_COURT: i16 = 6400;
 pub const BART_RECORD: i16 = 6401;
 pub const BART_FOUND: &str = "q3";
 
+/// The reactors by three area bosses that weaken them (`Action::Weakens`):
+/// the Snow Witch's altars in 211010000, 211020000 and 211050000, the
+/// Scholar Ghost's in 222010300, and Rurumo's in 261020200, 261020400 and
+/// 261020600.
+pub const SNOW_WITCH: i32 = 6090001;
+pub const SNOW_WITCH_ALTAR: i32 = 2119004;
+pub const SNOW_WITCH_LAST_ALTAR: i32 = 2119006;
+pub const SCHOLAR_GHOST: i32 = 6090003;
+pub const SCHOLAR_GHOST_ALTAR: i32 = 2229009;
+pub const RURUMO: i32 = 6090004;
+pub const RURUMO_POISON: i32 = 2619003;
+pub const RURUMO_LAST_POISON: i32 = 2619005;
+
 /// Neo City's trash cans, in <Year 2021>'s Average Town (240070100 to
 /// 240070102): the fourth hit empties one, which stays and fills again in
 /// its last state's 10 seconds (Reactor.nx). 3720's clue is in `2402008`s.
@@ -778,14 +809,18 @@ pub fn stays(reactor_id: i32) -> bool {
 /// `ReactorTemplate::acts_in`), does what breaking would and stays: the
 /// item-triggered ones Cosmic's `hitReactor` triggers rather than destroys
 /// and whose script acts there, the Forest of Poison Haze's pond and spine
-/// and the Pirate Ship's seals, and Neo City's trash cans. Other reactors
-/// with such end states (in NX many, with no action here) only move.
+/// and the Pirate Ship's seals, Neo City's trash cans, and those that weaken
+/// an area boss. Other reactors with such end states (in NX many, with no
+/// action here) only move.
 pub fn acts_staying(reactor_id: i32) -> bool {
     matches!(
         reactor_id,
         ELLIN_POND | ELLIN_SPINE | PIRATE_SEAL..=PIRATE_LAST_SEAL
             | MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR
             | NEO_TRASH_CAN..=NEO_LAST_TRASH_CAN
+            | SNOW_WITCH_ALTAR..=SNOW_WITCH_LAST_ALTAR
+            | SCHOLAR_GHOST_ALTAR
+            | RURUMO_POISON..=RURUMO_LAST_POISON
     )
 }
 
@@ -1470,6 +1505,25 @@ mod tests {
             assert!(acts_staying(seal) && stays(seal), "{seal}");
         }
         let Ok(data) = data() else { return };
+        // An altar acts on any offering it takes, and Rurumo's on its fifth hit.
+        for altar in (SNOW_WITCH_ALTAR..=SNOW_WITCH_LAST_ALTAR).chain([SCHOLAR_GHOST_ALTAR]) {
+            let reactor = data.template(altar).unwrap().unwrap();
+            assert!(matches!(action(altar), Action::Weakens { .. }), "{altar}");
+            assert!(acts_staying(altar), "{altar}");
+            assert!(reactor.takes_items(0), "{altar}");
+            let offerings = reactor.states[0].events.len() as u8;
+            assert!(
+                (0..offerings).all(|event| reactor.acts_in(1, event)),
+                "{altar}"
+            );
+        }
+        for poison in RURUMO_POISON..=RURUMO_LAST_POISON {
+            let reactor = data.template(poison).unwrap().unwrap();
+            assert!(matches!(action(poison), Action::Weakens { .. }), "{poison}");
+            assert!(acts_staying(poison), "{poison}");
+            assert!((1..5).all(|state| !reactor.acts_in(state, 0)), "{poison}");
+            assert!(reactor.acts_in(5, 0), "{poison}");
+        }
         // A trash can's fourth hit empties it, and it fills again.
         for can in NEO_TRASH_CAN..=NEO_LAST_TRASH_CAN {
             let reactor = data.template(can).unwrap().unwrap();

@@ -1692,6 +1692,9 @@ pub mod keys {
     pub const HOTEL_SHORT: &str = "hotel.short";
     pub const SHADE_LAMP_ASK: &str = "shade_lamp.ask";
     pub const SHADE_LAMP_ON: &str = "shade_lamp.on";
+    pub const SNOW_WITCH_ALTAR_LIT: &str = "snow_witch.altar_lit";
+    pub const SCHOLAR_GHOST_APPEASED: &str = "scholar_ghost.appeased";
+    pub const RURUMO_POISONED: &str = "rurumo.poisoned";
     pub const CONTROL_DEVICE_ASK: &str = "control_device.ask";
     pub const CONTROL_DEVICE_OFF: &str = "control_device.off";
     pub const MAGIC_SQUARE_ASK: &str = "magic_square.ask";
@@ -5306,6 +5309,9 @@ mod tests {
                 keys::HOTEL_SHORT,
                 keys::SHADE_LAMP_ASK,
                 keys::SHADE_LAMP_ON,
+                keys::SNOW_WITCH_ALTAR_LIT,
+                keys::SCHOLAR_GHOST_APPEASED,
+                keys::RURUMO_POISONED,
                 keys::CONTROL_DEVICE_ASK,
                 keys::CONTROL_DEVICE_OFF,
                 keys::MAGIC_SQUARE_ASK,
