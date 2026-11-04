@@ -11,6 +11,8 @@ const LUDIBRIUM: i32 = 221000000;
 const SPINDLE: i32 = 9201082;
 const FOYER: i32 = 682000100;
 const MAID: i32 = 2120003;
+const AIR_BATTLESHIP_BOW: i32 = 240070600;
+const ASIA: i32 = 2082014;
 
 #[tokio::test]
 async fn spindle_says_the_default_line() {
@@ -31,4 +33,12 @@ async fn spindle_says_the_default_line() {
     let trace = told(&mut session, talk(FOYER, MAID)).await;
     assert_eq!(trace.prompts, [(MAID, 0)], "{trace:?}");
     assert!(trace.prompt_texts[0].contains("Master"), "{trace:?}");
+
+    // So does Asia on the Air Battleship, who has no script in the data.
+    let c = &mut session.connection;
+    let bow = AIR_BATTLESHIP_BOW;
+    assert_eq!(warp(c, bow, "", &mut seen).await, bow);
+    let trace = told(&mut session, talk(bow, ASIA)).await;
+    assert_eq!(trace.prompts, [(ASIA, 0)], "{trace:?}");
+    assert!(trace.prompt_texts[0].contains("despair"), "{trace:?}");
 }
