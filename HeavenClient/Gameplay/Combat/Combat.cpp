@@ -19,6 +19,7 @@
 
 #include "AranCombo.h"
 #include "Assassinate.h"
+#include "BoomerangStep.h"
 #include "Assaulter.h"
 #include "ChainLightning.h"
 #include "Combo.h"
@@ -1318,6 +1319,12 @@ namespace ms
 					return false;
 			}
 
+			// Boomerang Step rests after its user is back and needs a floor
+			// where it steps, and goes without a word if not (0x950d41, 0x950da5).
+			if (move.get_id() == boomerang_step::ID &&
+				(boomerang_step::resting(now, boomerang_back) || !find_dash(boomerang_step::REACH)))
+				return false;
+
 			// Shockwave needs a floor to run along, and goes without a word
 			// if there's none (0x950da5).
 			int32_t wave = 0;
@@ -1710,6 +1717,18 @@ namespace ms
 				Stage::get().black_out(blackout::layers(attack.skill, true));
 
 			AttackPacket(result, player.get_position()).dispatch();
+
+			// Bamboo Rain and Rage of Pharaoh keep harm off through their action (0x951876).
+			if (pq_skills::keeps_harm_off(attack.skill))
+				player.keep_from_harm(player.get_look().get_attack_length());
+
+			// Boomerang Step's effect takes the player's place (0x951857).
+			if (attack.skill == boomerang_step::ID)
+			{
+				boomerang_back = now + boomerang_step::GONE;
+				player.vanish_for(boomerang_step::GONE);
+				player.keep_from_harm(boomerang_step::GONE);
+			}
 
 			// Assaulter leaves its mark where it stood, and lands on the next
 			// update (0x952c6e, 0x952d8f).
@@ -2450,6 +2469,10 @@ namespace ms
 					user.attack(stance);
 				else
 					move.apply_actions(user, attack.type);
+
+				// Theirs takes them out of sight too (0x980f6a).
+				if (attack.skill == boomerang_step::ID)
+					user.vanish_for(boomerang_step::GONE);
 			}
 
 			user.set_afterimage(attack.skill);

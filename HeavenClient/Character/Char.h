@@ -174,6 +174,8 @@ namespace ms
 
 		// Set the afterimage for an attack.
 		void set_afterimage(int32_t skill_id);
+		// Takes the character and their item effect out of sight for a time.
+		void vanish_for(int64_t millis);
 
 		// Return the current afterimage.
 		const Afterimage &get_afterimage() const;
@@ -552,6 +554,7 @@ namespace ms
 		TimedBool invincible;
 		bool blinking = false;
 		TimedBool ironbody;
+		TimedBool vanished;
 		std::list<DamageNumber> damagenumbers;
 
 		// As v83 does it (FUN_0092fd5a): a dead character's tombstone drops 600 pixels onto it in 880 ms

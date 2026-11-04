@@ -97,6 +97,10 @@ namespace ms
 
 		color = color * Color(1.0f, 1.0f, 1.0f, barrel.alpha());
 
+		// The avatar's layers go clear and its item effect comes off (0x9325f2, 0x932253).
+		if (vanished)
+			color = color * Color(1.0f, 1.0f, 1.0f, 0.0f);
+
 		if (state == State::DIED)
 		{
 			// The ghost floats in front of its tombstone, circling it from the top.
@@ -135,11 +139,17 @@ namespace ms
 		// Behind the character, as v83 puts it under the avatar's layer (FUN_00707143).
 		set_effect.draw_pets(pet_feet, alpha);
 		set_effect.draw(false, absp, facepos, facing_right, alpha);
-		item_effect.draw(false, absp, facepos, facing_right, view, alpha);
+
+		if (!vanished)
+			item_effect.draw(false, absp, facepos, facing_right, view, alpha);
+
 		draw_chair(false);
 		look.draw(DrawArgument(absp, color), alpha);
 		draw_chair(true);
-		item_effect.draw(true, absp, facepos, facing_right, view, alpha);
+
+		if (!vanished)
+			item_effect.draw(true, absp, facepos, facing_right, view, alpha);
+
 		set_effect.draw(true, absp, facepos, facing_right, alpha);
 
 		afterimage.draw(look.get_afterimage_frame(afterimage.counts_action_frames()), DrawArgument(absp, facing_right), alpha);
@@ -379,6 +389,7 @@ namespace ms
 		combo_orbs.update(Constants::TIMESTEP);
 		invincible.update();
 		ironbody.update();
+		vanished.update();
 
 		if (state == State::DIED)
 		{
@@ -1080,6 +1091,11 @@ namespace ms
 	void Char::set_expression(Expression::Id expression, int32_t hold)
 	{
 		look.set_expression(expression, hold);
+	}
+
+	void Char::vanish_for(int64_t millis)
+	{
+		vanished.set_for(millis);
 	}
 
 	void Char::attack(const std::string &action)

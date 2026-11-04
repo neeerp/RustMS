@@ -625,6 +625,8 @@ namespace ms
 		// When Energy Charge and Body Pressure may hit a touching mob again (0x95f2e6).
 		int64_t next_body_attack = 0;
 		int64_t attack_lock = 0;
+		// When the player last came back from Boomerang Step, or 0.
+		int64_t boomerang_back = 0;
 		int64_t next_body_pressure = 0;
 		// The attacks, and the skills that send where the player stands,
 		// counted from one spot (FUN_009536d0).

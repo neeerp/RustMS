@@ -47,6 +47,14 @@ namespace ms
 			}
 		}
 
+		// Whether mobs and traps can't touch its user while its action lasts (0x951876, 0x958218).
+		inline bool keeps_harm_off(int32_t skill)
+		{
+			Kind which = kind(skill);
+
+			return which == Kind::BAMBOO_RAIN || which == Kind::RAGE_OF_PHARAOH;
+		}
+
 		// Whether it may be used on a map of this field type; any other skill may (FUN_00587f5f).
 		inline bool allowed(Kind kind, int32_t fieldtype)
 		{
