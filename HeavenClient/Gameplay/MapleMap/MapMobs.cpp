@@ -241,6 +241,14 @@ namespace ms
 		return false;
 	}
 
+	bool MapMobs::iced_by_tempest(int32_t oid) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->iced_by_tempest();
+
+		return false;
+	}
+
 	void MapMobs::friendly_hit(int32_t oid, int32_t damage, int32_t hp, int32_t maxhp)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))

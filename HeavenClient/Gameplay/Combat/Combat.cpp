@@ -1705,12 +1705,13 @@ namespace ms
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 
 			// After Slash Blast, each mob takes less than the one before it
-			// (0x951e63).
+			// (0x951e63), but for one iced by Combo Tempest (0x951f02).
 			if (attack.display & 1)
 			{
 				for (size_t target = 0; target < result.damagelines.size(); target++)
-					for (auto &line : result.damagelines[target].second)
-						line.first = final_attack::fall_off(line.first, target);
+					if (!mobs.iced_by_tempest(result.damagelines[target].first))
+						for (auto &line : result.damagelines[target].second)
+							line.first = final_attack::fall_off(line.first, target);
 			}
 
 			if (!result.damagelines.empty() && !result.damagelines[0].second.empty()

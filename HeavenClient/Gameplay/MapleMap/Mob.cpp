@@ -26,6 +26,7 @@
 #include "../Combat/Heal.h"
 #include "../Combat/HitPoint.h"
 #include "../Combat/MesoExplosion.h"
+#include "../Combat/MobTint.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/PqSkills.h"
 #include "../Combat/Prepare.h"
@@ -1678,15 +1679,22 @@ namespace ms
 			if (is_ally())
 				interopc *= 0.5f;
 
+			// A status's colour lies over all the mob's frames (0x66e9f7).
+			Color tint = status_tint(interopc);
+			auto tinted = [&](bool flipped)
+			{
+				return DrawArgument(absp, absp, Point<int16_t>(0, 0), flipped ? -1.0f : 1.0f, 1.0f, tint, 0.0f);
+			};
+
 			if (attacking)
-				attacks[*attacking].animation.draw(DrawArgument(absp, !attackleft, interopc), alpha);
+				attacks[*attacking].animation.draw(tinted(!attackleft), alpha);
 			else if (casting)
-				skillanimations.at(*casting).draw(DrawArgument(absp, !attackleft, interopc), alpha);
+				skillanimations.at(*casting).draw(tinted(!attackleft), alpha);
 			else if (blink && friendly::grey(*blink))
 				animations.at(stance).draw(DrawArgument(absp, absp, Point<int16_t>(0, 0), flip && !noflip ? -1.0f : 1.0f,
 														1.0f, Color(0.5f, 0.5f, 0.5f, interopc), 0.0f), alpha);
 			else
-				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
+				animations.at(stance).draw(tinted(flip && !noflip), alpha);
 
 			// A friendly's red gauge stays up while it lives, apart from the
 			// HP mobs show when hit (0x663407, 0x668748).
@@ -2500,6 +2508,9 @@ namespace ms
 			if (status_value(MobStatParser::DISABLE))
 				return std::pair<int32_t, bool>(0, false);
 
+			if (iced_by_tempest())
+				return std::pair<int32_t, bool>(blow_hits(attack) ? maxhp : 0, false);
+
 			if (status_value(MobStatParser::PIMMUNE) && !pierces(randomizer.next_int(100), 0))
 				return std::pair<int32_t, bool>(1, false);
 
@@ -2539,7 +2550,17 @@ namespace ms
 		if (status_value(MobStatParser::DISABLE))
 			return std::pair<int32_t, bool>(0, false);
 
+		// Combo Tempest's ice lets a blow past Physical Immunity, and one
+		// that lands does the mob's whole max HP (0x78e91e).
+		if (iced_by_tempest())
+			return std::pair<int32_t, bool>(blow_hits(attack) ? maxhp : 0, false);
+
 		if (status_value(MobStatParser::PIMMUNE) && !magic_damage::pierces(randomizer.next_int(100), 0))
+			return std::pair<int32_t, bool>(1, false);
+
+		// Combo Tempest itself only ices what isn't a boss, for 1 a line
+		// (0x78e4b0).
+		if (attack.skill == mob_tint::COMBO_TEMPEST && !boss)
 			return std::pair<int32_t, bool>(1, false);
 
 		// Snipe's shot neither misses nor meets defense or guards.
@@ -2753,6 +2774,24 @@ namespace ms
 		auto found = statuses.find(stat);
 
 		return found != statuses.end() ? static_cast<int32_t>(found->second.value) : 0;
+	}
+
+	bool Mob::iced_by_tempest() const
+	{
+		auto found = statuses.find(MobStatParser::FREEZE);
+
+		return found != statuses.end() && found->second.value != 0
+			&& found->second.reason == mob_tint::COMBO_TEMPEST;
+	}
+
+	Color Mob::status_tint(float opacity) const
+	{
+		uint32_t rgb = mob_tint::NONE;
+
+		for (const auto &status : statuses)
+			rgb = mob_tint::over(rgb, status.second.reason);
+
+		return Color(((rgb >> 16) & 0xFF) / 255.0f, ((rgb >> 8) & 0xFF) / 255.0f, (rgb & 0xFF) / 255.0f, opacity);
 	}
 
 	int32_t Mob::counter(bool magic) const

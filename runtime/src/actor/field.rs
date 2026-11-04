@@ -1161,21 +1161,27 @@ impl FieldActor {
                     takes,
                     blast,
                     pockets,
+                    iced,
                 } => {
                     let hits = match blast {
                         Some(blast) => self.set_off(from, &blast, hits),
                         None => hits,
                     };
-                    self.pick_pockets(from, pockets);
-                    self.handle_attack(
-                        from,
-                        Some(broadcast),
-                        Some(skill),
-                        Some((counter, lines)),
-                        hits,
-                        &inflicts,
-                        takes,
-                    )
+                    // A hit past every cap on a mob that's gone can't be
+                    // judged, so no one else is shown its number.
+                    let shown = iced.iter().all(|id| self.mobs.get(*id).is_some());
+                    if let Some(hits) = self.hits_on_ice(hits, &iced) {
+                        self.pick_pockets(from, pockets);
+                        self.handle_attack(
+                            from,
+                            shown.then_some(broadcast),
+                            Some(skill),
+                            Some((counter, lines)),
+                            hits,
+                            &inflicts,
+                            takes,
+                        )
+                    }
                 }
                 FieldRequest::Reflect {
                     object_id,
@@ -2117,6 +2123,21 @@ impl FieldActor {
         }
     }
 
+    /// An attack's `hits` with those past every cap (`iced`) cut to the
+    /// mob's max HP, or none if one of those mobs isn't iced by Combo
+    /// Tempest: the attack was too strong.
+    fn hits_on_ice(&self, mut hits: Vec<(i32, i64)>, iced: &[i32]) -> Option<Vec<(i32, i64)>> {
+        for (object_id, damage) in hits.iter_mut().filter(|(id, _)| iced.contains(id)) {
+            if let Some(mob) = self.mobs.get(*object_id) {
+                if !mob.iced_by_tempest() {
+                    return None;
+                }
+                *damage = (*damage).min(i64::from(mob.info.max_hp));
+            }
+        }
+        Some(hits)
+    }
+
     /// `from` attacked the mobs in `hits` with `skill`, showing the others
     /// `broadcast`; each one with the `counter` status hurts them back, once
     /// (v83 FUN_007937e3, rolled again here: its client only shows its own
@@ -2200,8 +2221,11 @@ impl FieldActor {
             } else {
                 mob.info.cp
             };
-            let immune =
-                counter.filter(|&(stat, _)| mob.statuses.contains_key(&immunity_against(stat)));
+            // Ice gets a physical hit past Physical Immunity (0x78e45a).
+            let immune = counter.filter(|&(stat, _)| {
+                mob.statuses.contains_key(&immunity_against(stat))
+                    && (stat != MobStat::PCounter || !mob.iced_by_tempest())
+            });
             let mut damage = match immune {
                 _ if !hurts => 0,
                 Some((_, lines)) => damage.min(i64::from(lines)),
@@ -7376,6 +7400,7 @@ mod tests {
                 takes,
                 blast: None,
                 pockets: Vec::new(),
+                iced: Vec::new(),
             },
         };
         // What it took back, and whether the snail died.
@@ -7412,6 +7437,155 @@ mod tests {
         tx.send(attack(1, blow)).await.unwrap();
         tokio::time::sleep(Duration::from_millis(50)).await;
         assert_eq!(outcome(&mut client_rx), (vec![(1, 0)], true));
+    }
+
+    #[tokio::test]
+    async fn a_hit_past_every_cap_on_a_gone_mob_is_shown_to_no_one() {
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            MobSet::new([]),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (handle, mut attacker_rx) = client(1);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        let (handle, mut onlooker_rx) = client(2);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(2, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        opcodes(&mut attacker_rx).await;
+        opcodes(&mut onlooker_rx).await;
+        let attack = |iced| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Attack {
+                broadcast: Packet::new_empty(),
+                skill: 0,
+                counter: game::MobStat::PCounter,
+                lines: 1,
+                hits: vec![(999, 9_999)],
+                inflicts: Vec::new(),
+                takes: Takes::default(),
+                blast: None,
+                pockets: Vec::new(),
+                iced,
+            },
+        };
+
+        tx.send(attack(vec![999])).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(onlooker_rx.try_recv().is_err());
+
+        // A plain hit on a mob that has just died is still seen.
+        tx.send(attack(Vec::new())).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(onlooker_rx.try_recv().is_ok());
+    }
+
+    #[tokio::test]
+    async fn only_a_mob_iced_by_combo_tempest_takes_a_hit_past_every_cap() {
+        let mut mobs = MobSet::new([mob(100, false)]);
+        let snail = mobs.spawn_all(Instant::now())[0];
+        let max_hp = i64::from(mobs.get(snail).unwrap().info.max_hp);
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (handle, mut client_rx) = client(1);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        opcodes(&mut client_rx).await;
+        let attack = |damage, inflicts, iced| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Attack {
+                broadcast: Packet::new_empty(),
+                skill: 0,
+                counter: game::MobStat::PCounter,
+                lines: 1,
+                hits: vec![(snail, damage)],
+                inflicts,
+                takes: Takes {
+                    hp: 100,
+                    ..Takes::default()
+                },
+                blast: None,
+                pockets: Vec::new(),
+                iced,
+            },
+        };
+        // What it dealt, and whether the snail died.
+        let outcome = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let (mut dealt, mut killed) = (Vec::new(), false);
+            while let Ok(message) = rx.try_recv() {
+                match message {
+                    ServerMessage::Absorbed { hp, .. } => dealt.push(i64::from(hp)),
+                    ServerMessage::SendPacket(packet) => {
+                        killed |= packet.opcode() == SendOpcode::KillMonster as i16
+                    }
+                    _ => {}
+                }
+            }
+            (dealt, killed)
+        };
+
+        // Not iced, the attack goes no further.
+        tx.send(attack(9_999, Vec::new(), vec![snail]))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![], false));
+
+        // Another skill's ice doesn't count.
+        let ice = |skill_id| Inflict {
+            skill_id,
+            prop: 100,
+            duration: Duration::from_secs(40),
+            statuses: vec![(MobStat::Freeze, net::skills::Amount::Value(1))],
+        };
+        tx.send(attack(1, vec![ice(2201004)], Vec::new()))
+            .await
+            .unwrap();
+        tx.send(attack(9_999, Vec::new(), vec![snail]))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![1], false));
+
+        // Tempest's does: the next hit takes the max HP and no more.
+        tx.send(attack(1, vec![ice(net::skills::COMBO_TEMPEST)], Vec::new()))
+            .await
+            .unwrap();
+        tx.send(attack(9_999, Vec::new(), vec![snail]))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![1, max_hp], true));
     }
 
     #[test]
@@ -7466,6 +7640,7 @@ mod tests {
                 takes: drain,
                 blast: None,
                 pockets: Vec::new(),
+                iced: Vec::new(),
             },
         };
         let dealt = |rx: &mut mpsc::Receiver<ServerMessage>| {
@@ -7555,6 +7730,7 @@ mod tests {
                     left: true,
                 }),
                 pockets: Vec::new(),
+                iced: Vec::new(),
             },
         };
         // What went off, when, and the snail's HP after.

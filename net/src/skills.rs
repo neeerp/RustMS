@@ -776,8 +776,10 @@ fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
         // Dragon Roar "stuns them" for its `y` seconds (it has no `time`).
         DRAGON_ROAR => one(MobStat::Stun),
         // Cold Beam, Ice Strike, Element Composition (I/L), Blizzard,
-        // Blizzard (crossbow), Ice Splitter, Paralyze.
-        2201004 | 2211002 | 2211006 | 2221007 | 3211003 | 5211005 | 2121006 => one(MobStat::Freeze),
+        // Blizzard (crossbow), Ice Splitter, Paralyze, Combo Tempest.
+        2201004 | 2211002 | 2211006 | 2221007 | 3211003 | 5211005 | 2121006 | COMBO_TEMPEST => {
+            one(MobStat::Freeze)
+        }
         // Poison Breath, Element Composition (F/P), Fire Demon, Ice Demon,
         // Flamethrower. The demons' reason also turns the mob's element
         // weakness on the client (0x78c7ab).
@@ -851,6 +853,9 @@ const ARMED: [(i32, BuffStat, MobStat); 2] = [
 /// The Aran's Snow Charge, an ice charge that also slows the mobs it hits
 /// by its `x` for `y` seconds.
 pub const SNOW_CHARGE: i32 = 21111005;
+/// Ices what it hits, and the next physical hit on a mob so iced does its
+/// whole max HP (0x78e91e).
+pub const COMBO_TEMPEST: i32 = 21120006;
 
 /// What an attack puts on each mob it hits, besides its damage: its
 /// skill's status, Hamstring's or Blind's `x` by their `prop` for `y`

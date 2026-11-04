@@ -182,6 +182,8 @@ namespace ms
 		// Whether mobs hurt it rather than players (damagedByMob), as they
 		// do Henesys's Moon Bunny.
 		bool is_friendly() const;
+		// Whether Combo Tempest's ice holds it (0x78e91e).
+		bool iced_by_tempest() const;
 
 		// Whether it is on the player's side in the Monster Carnival, so the
 		// player neither hits it nor is hurt by it (FUN_00670c06).
@@ -387,6 +389,8 @@ namespace ms
 
 		// The value of a status on the mob, or 0.
 		int32_t status_value(uint8_t stat) const;
+		// The colour its statuses lay over it, at `opacity` (0x66e9f7).
+		Color status_tint(float opacity) const;
 
 		// The ground within 100 px up or down of (x, y), if any.
 		std::optional<int16_t> ground_below(const Physics &physics, int16_t x, int16_t y) const;

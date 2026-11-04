@@ -850,7 +850,14 @@ A few skills do more than buff:
   them spends the whole count, with a CANCEL_BUFF of stat 68. Combo Drain
   (21100005, stat 69) heals its `x` percent of each weapon hit (`skills::takes`),
   and Combo Barrier (21120007, stat 70, reaching the party) keeps its `x`
-  per mille of a hit after Achilles (`combat::taken`). Body Pressure
+  per mille of a hit after Achilles (`combat::taken`). Combo Tempest
+  (21120006) ices what it hits and shows no number: it does 1 a line to
+  anything but a boss, and a boss takes it as a normal hit and no ice. The
+  next physical hit that lands on a mob so iced, by anyone, does the mob's
+  whole max HP past Physical Immunity (0x78e91e), so such a hit is past
+  every cap (`combat::validate_iced`, `Uses::iced`); the field refuses the
+  attack if that mob isn't iced by Tempest, and caps the hit at its max HP.
+  Body Pressure
   (21101003, stat 71) lets the client hit one touching mob a second with
   TOUCH_MONSTER_ATTACK, which is refused without the buff. Smart Knockback
   (21111001, stat 72) is the client's alone. None of the five is shown to
@@ -1435,7 +1442,11 @@ carry the statuses a mob has. Entries come in the client's decode order
 
 HeavenClient keeps a mob's statuses (`MobStatParser`): Slow feeds its speed,
 Doom shows it as a Blue Snail, Stun, Freeze and Web hold it, and the
-reason skill's `mob` effect plays. The formulas for poison, Venom and Ambush
+reason skill's `mob` effect plays. A status's reason can tint the whole
+mob (`Gameplay/Combat/MobTint.h`, 0x66e9f7): ice light blue, Fire Demon
+and Flamethrower red, poison green, Ice Demon a stronger blue, Paralyze
+grey. v83 lets the last reason in its list win; HeavenClient keeps
+statuses by stat, so it is the highest stat's. The formulas for poison, Venom and Ambush
 come from OdinMS-family servers; `v83ref` report 157 has the detail.
 
 ### Mists
