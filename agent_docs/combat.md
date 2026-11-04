@@ -240,6 +240,8 @@ first strike, allows it within a second of cancelling Dark Sight, caps a
 line at the most the time can multiply it by, and takes a second strike
 only on the first's mob within 2.5 s (`net::combat::second_strike`).
 Assaulter (4211002) strikes and dashes 200 px forward onto the nearest floor
+
+A melee attack's mobs are hit from the nearest along the way the user faces (`hit_art::sort_mobs`, 0x953760), which sets the order of the 70 ms steps and of Slash Blast's fall-off. Band of Thieves and Spark keep the search's order. Band of Thieves needs a mob in the swing's reach before it looks further into its area; its first mob is hit at once and the rest 280 ms later, a different thief on each (`hit_art::band`). Corkscrew Blow and Arrow Bomb show `hit/0` on the first mob and `hit/1` on the others, and Double Uppercut goes by hit, not by weapon (`ListedHitEffect`).
 there: with no floor it isn't used, and a movement element 7 holds where it
 started, where others see the same two `BasicEff.img/Assaulter` effects. It,
 Energy Drain (5111004, 15111001) and Barrage (5121007, 15111004) do nothing

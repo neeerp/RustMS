@@ -28,6 +28,10 @@ namespace ms
 				if (skill == 4211006 || at_once(skill))
 					return 0;
 
+				// Band of Thieves's mob at once and the others together (0x9520a8).
+				if (skill == 4211004)
+					return target ? 280 : 0;
+
 				// Each mob 70 ms after the last, up to 280 ms (FUN_00950921).
 				return static_cast<uint16_t>(std::min<size_t>(target * 70, 280));
 			case Attack::Type::MAGIC:

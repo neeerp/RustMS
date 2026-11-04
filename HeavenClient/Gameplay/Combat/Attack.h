@@ -255,5 +255,8 @@ namespace ms
 		bool own = false;
 		// Where the local player stood when they did.
 		int16_t x = 0;
+		// Which of the skill's hit animations this hit shows, for those that
+		// choose by mob or hit.
+		uint8_t art = 0;
 	};
 }

@@ -18,6 +18,7 @@
 #include "Skill.h"
 
 #include "Heal.h"
+#include "HitArt.h"
 #include "Prepare.h"
 #include "SkillWeapon.h"
 
@@ -136,6 +137,9 @@ namespace ms
 		{
 			// Their hit/0 has an animation for each charge element.
 			hiteffect = std::make_unique<ByChargeHitEffect>(src);
+		} else if (hit_art::listed(skillid))
+		{
+			hiteffect = std::make_unique<ListedHitEffect>(src);
 		} else if (bylevelhit)
 		{
 			if (hashit0 && hashit1)

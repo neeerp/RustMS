@@ -27,6 +27,7 @@
 #include "DamageLayout.h"
 #include "EnergyCharge.h"
 #include "Heal.h"
+#include "HitArt.h"
 #include "HitTiming.h"
 #include "Massacre.h"
 #include "MagicDamage.h"
@@ -1604,9 +1605,33 @@ namespace ms
 					for (int32_t oid : find_targets(mob_objs, range, origin, UINT8_MAX, false))
 						if (oid == *again)
 							mob_targets.push_back(oid);
+				} else if (attack.skill == hit_art::BAND_OF_THIEVES)
+				{
+					// It needs a mob in its swing's reach, and only then
+					// finds the others in its area (0x951243).
+					Rectangle<int16_t> swing = place_range(origin, player.get_afterimage().get_range(), 1.0f, attack.toleft);
+					mob_targets = find_targets(mob_objs, swing, origin, 1, false);
+
+					if (!mob_targets.empty())
+						for (int32_t oid : find_targets(mob_objs, range, origin, mobcount, false))
+							if (oid != mob_targets[0] && mob_targets.size() < mobcount)
+								mob_targets.push_back(oid);
 				} else
 				{
 					mob_targets = find_targets(mob_objs, range, origin, mobcount, closest_first);
+				}
+
+				if (attack.type == Attack::Type::CLOSE && hit_art::sorts_mobs(attack.skill))
+				{
+					std::vector<std::pair<int32_t, int32_t>> order;
+
+					for (int32_t oid : mob_targets)
+						order.emplace_back(shot_path::hit_point(range, mobs.get_mob_body(oid)).x(), oid);
+
+					hit_art::sort_mobs(order, !attack.toleft);
+
+					for (size_t i = 0; i < order.size(); i++)
+						mob_targets[i] = order[i].second;
 				}
 			}
 
@@ -2596,6 +2621,8 @@ namespace ms
 
 					for (auto &number : numbers)
 					{
+						attackuser.art = hit_art::of(result.skill, target, i, {});
+
 						damageeffects.emplace(
 								delay + hit_delay + hit_timing::stagger(result.skill, i),
 								attackuser,
@@ -2625,6 +2652,20 @@ namespace ms
 			bool at_once = prepare::throws(result.skill) || energy::charges(result.skill) || hit_timing::at_once(result.skill);
 			uint16_t delay = at_once ? 0 : user.get_attackdelay(0);
 
+			std::vector<uint8_t> band_arts;
+
+			if (result.skill == hit_art::BAND_OF_THIEVES)
+			{
+				Randomizer random;
+				std::vector<int32_t> rolls;
+
+				for (size_t target = 0; target < result.damagelines.size(); target++)
+					rolls.push_back(random.next_int(INT32_MAX));
+
+				const SkillData::Stats &stats = SkillData::get(result.skill).get_stats(attackuser.skilllevel);
+				band_arts = hit_art::band(result.damagelines.size(), stats.x, rolls);
+			}
+
 			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
 				auto &line = result.damagelines[target];
@@ -2643,6 +2684,8 @@ namespace ms
 
 					for (auto &number : numbers)
 					{
+						attackuser.art = hit_art::of(result.skill, target, i, band_arts);
+
 						damageeffects.emplace(
 								hit_timing::close_hit(attack, i),
 								attackuser,
@@ -2862,6 +2905,9 @@ namespace ms
 			size_t shown = remote_shot::shown_hits(numbers.size(), sets * bullets, attacks);
 
 			for (size_t i = 0; i < shown; i++)
+			{
+				attackuser.art = hit_art::of(skill, target, i, {});
+
 				damageeffects.emplace(
 						delay + hit + hit_timing::stagger(skill, i),
 						attackuser,
@@ -2871,6 +2917,7 @@ namespace ms
 						oid,
 						move.get_id()
 				);
+			}
 
 			if (shown < numbers.size())
 				mobs.expect_hits(oid, -static_cast<int32_t>(numbers.size() - shown));
