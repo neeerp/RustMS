@@ -91,6 +91,9 @@ namespace ms
 		// Return the skill whose clone Shadow Partner draws, or 0 without the buff.
 		int32_t get_shadow_partner() const override;
 
+		// Whether the character shows Dark Sight or Wind Walk.
+		bool is_stealthed() const override;
+
 	private:
 		// The effect of getting on or off `mount` (FUN_00936859).
 		void show_mount_effect(int32_t mount, bool boarding);

@@ -1335,6 +1335,8 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         3121008 => vec![(BuffStat::Concentrate, effect.x)],
         3121002 | 3221002 => vec![(BuffStat::SharpEyes, effect.x << 8 | effect.y)],
         4001003 | 14001003 => vec![(BuffStat::DarkSight, effect.x)],
+        12101005 => vec![(BuffStat::ElementalReset, effect.x)],
+        13101006 => vec![(BuffStat::WindWalk, effect.x)],
         4111001 => vec![(BuffStat::MesoUp, effect.x)],
         4111002 | 14111000 => vec![(BuffStat::ShadowPartner, effect.x)],
         4211003 => vec![(BuffStat::PickPocket, effect.x)],
@@ -1529,6 +1531,11 @@ mod tests {
         assert_eq!(stats(21001003, 20), [(BuffStat::Booster, -3)]);
         assert_eq!(stats(12001001, 10), [(BuffStat::MagicGuard, 80)]);
         assert_eq!(stats(14001003, 10), [(BuffStat::DarkSight, 1)]);
+        assert_eq!(stats(12101005, 10), [(BuffStat::ElementalReset, 50)]);
+        assert_eq!(
+            stats(13101006, 1),
+            [(BuffStat::Speed, -18), (BuffStat::WindWalk, 1)]
+        );
         assert_eq!(stats(11111001, 20), [(BuffStat::Combo, 1)]);
         for charge in [11111007, 15101006, SNOW_CHARGE] {
             assert_eq!(stats(charge, 20), [(BuffStat::WeaponCharge, 1)]);

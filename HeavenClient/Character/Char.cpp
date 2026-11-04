@@ -95,6 +95,10 @@ namespace ms
 			color = Color::Code::CWHITE;
 		}
 
+		// Dark Sight and Wind Walk draw the body at half, blinking or not (0x9325b7).
+		if (is_stealthed())
+			color = Color(1.0f, 1.0f, 1.0f, 0.5f);
+
 		color = color * Color(1.0f, 1.0f, 1.0f, barrel.alpha());
 
 		// The avatar's layers go clear and its item effect comes off (0x9325f2, 0x932253).
@@ -1286,6 +1290,11 @@ namespace ms
 	int32_t Char::get_shadow_partner() const
 	{
 		return 0;
+	}
+
+	bool Char::is_stealthed() const
+	{
+		return false;
 	}
 
 	bool Char::is_sitting() const

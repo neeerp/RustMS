@@ -233,6 +233,21 @@ namespace ms
 		}
 	}
 
+	bool Combat::has_vanish() const
+	{
+		return player.get_skills().get_level(assassinate::VANISH) > 0;
+	}
+
+	int32_t Combat::unseen_damage(Buffstat::Id stat, int32_t skill) const
+	{
+		int32_t level = player.get_skills().get_level(skill);
+
+		if (!level || !player.has_buff(stat))
+			return 0;
+
+		return static_cast<int32_t>(std::lround(SkillData::get(skill).get_stats(level).damage * 100));
+	}
+
 	bool Combat::use_move(int32_t move_id)
 	{
 		move_id = beacon::cast(move_id, player.get_skills().get_level(beacon::BULLSEYE));
@@ -254,6 +269,17 @@ namespace ms
 		// the server refuses.
 		if (player.ghost_refuses() || player.morph_refuses())
 			return false;
+
+		// In Dark Sight the attack key shows it going and ends it, and that's all (FUN_0094e256).
+		if (move_id == 0 && assassinate::attack_ends(player.has_buff(Buffstat::Id::DARKSIGHT), has_vanish()))
+		{
+			int32_t sight = assassinate::dark_sight(player.get_stats().get_job().get_id());
+
+			get_skill(sight).apply_useeffects(player);
+			CancelBuffPacket(sight).dispatch();
+
+			return false;
+		}
 
 		// The Maker opens its window, with the skill learnt, and sends nothing (FUN_00966f7a).
 		if (maker::is_maker(move_id))
@@ -568,7 +594,10 @@ namespace ms
 		if (pq_skills::strike(pq, 0, false) >= 0 && !player.get_phobj().onground)
 			return false;
 
-		if (assassinate::refused(move.get_id(), player.has_buff(Buffstat::Id::DARKSIGHT)))
+		if (assassinate::refused(move.get_id(), player.has_buff(Buffstat::Id::DARKSIGHT), has_vanish()))
+			return false;
+
+		if (assassinate::recast(move.get_id(), player.has_buff(Buffstat::Id::WIND_WALK)))
 			return false;
 
 		SpecialMove::ForbidReason reason = player.can_use(move);
@@ -1425,6 +1454,8 @@ namespace ms
 				flags = point_blank::MORTAL_BLOW_FLAG;
 
 			attack.display |= flags;
+			attack.blow.unseen = assassinate::unseen(unseen_damage(Buffstat::Id::WIND_WALK, assassinate::WIND_WALK),
+													 unseen_damage(Buffstat::Id::DARKSIGHT, assassinate::VANISH));
 
 			// Both strikes build up in Dark Sight; the second hits once, and
 			// crits with the skill's rate and damage (0x790100).

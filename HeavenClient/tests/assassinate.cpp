@@ -18,6 +18,16 @@ int main()
 		require(refused(ID, false) && !refused(ID, true), "Assassinate goes only from Dark Sight");
 		require(refused(DARK_SIGHT, true) && refused(4201005, true), "in Dark Sight nothing else goes");
 		require(!refused(4201005, false) && !refused(0, true), "a regular attack always goes");
+		require(!refused(14111002, true, true) && refused(NIGHT_SIGHT, true, true),
+				"Vanish's owner uses anything in Dark Sight but Dark Sight");
+		require(dark_sight(1411) == NIGHT_SIGHT && dark_sight(421) == DARK_SIGHT && dark_sight(900) == DARK_SIGHT,
+				"the attack key cancels the job's Dark Sight");
+		require(attack_ends(true, false) && !attack_ends(true, true) && !attack_ends(false, false),
+				"the attack key ends Dark Sight, unless the player owns Vanish");
+		require(recast(WIND_WALK, true) && !recast(WIND_WALK, false) && !recast(DARK_SIGHT, true),
+				"Wind Walk isn't cast over itself");
+		require(unseen(0, 0) == 100 && unseen(130, 0) == 130 && unseen(0, 103) == 103,
+				"Wind Walk and Vanish make each line their percent");
 
 		require(multiplier(-1, 12) == 0, "never in Dark Sight, nothing");
 		require(multiplier(0, 12) == 1 && multiplier(2999, 12) == 1, "under 3 seconds, once");

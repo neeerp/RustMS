@@ -298,6 +298,11 @@ namespace ms
 		return get_buff(Buffstat::Id::WK_CHARGE).value_or(0);
 	}
 
+	bool OtherChar::is_stealthed() const
+	{
+		return get_buff(Buffstat::Id::DARKSIGHT) || get_buff(Buffstat::Id::WIND_WALK);
+	}
+
 	int32_t OtherChar::get_shadow_partner() const
 	{
 		return get_buff(Buffstat::Id::SHADOWPARTNER) ? shadow_partner::skill_for(job) : 0;

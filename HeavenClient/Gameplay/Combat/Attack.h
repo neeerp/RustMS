@@ -66,6 +66,8 @@ namespace ms
 		int32_t luck = 0;
 		int32_t mastery = 0;
 		int32_t amplify = 100;
+		// Elemental Reset's percent, or 0.
+		int32_t reset = 0;
 		uint8_t element = 0;
 		// The weapon's percent for that element (an Elemental Wand or Staff).
 		int32_t elemboost = 100;

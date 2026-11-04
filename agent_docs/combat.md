@@ -228,8 +228,21 @@ player's Slash Blast does (`skills::slash_blast`). The Dawn Warrior's and
 the Wind Archer's (11101002, 13101002) are cast first as buffs, temp-stat
 bits 63 and 64 (`BuffStat::DawnFinalAttack`, `WindFinalAttack`), and the
 client rolls their swing or shot only while that buff is on.
+Dark Sight (bit 10) and Wind Walk (13101006, bit 66, with its slower speed)
+draw the body at half alpha, for others too, keep mobs' touches and physical
+attacks off, and refuse pickup, the item keys, and double clicks in the USE
+and ETC tabs, all silently; the pet's potions wait as well. In Dark Sight the
+attack key shows the skill's effect and sends CANCEL_BUFF, and that press does
+nothing more. Vanish (14100005) keeps that from happening: its owner attacks
+and uses any skill from Dark Sight but Dark Sight itself. Wind Walk leaves
+attacks alone and can't be cast over itself. Wind Walk's `damage`, and Vanish's
+in Dark Sight, make each line of a physical attack that percent, after
+Assassinate's multiplier. The client ends neither on an attack; the server does
+(`end_stealth` in `net::packet::handle::world::combat`), once it has taken a
+regular attack. Elemental Reset (12101005, bit 65) takes its percent off what a
+mob's attribute does to the caster's spells.
 Assassinate (4221001) goes only from Dark Sight, and in Dark Sight nothing
-else goes. The client sends CANCEL_BUFF for Dark Sight, then a 3-line
+else goes but for Vanish's owner. The client sends CANCEL_BUFF for Dark Sight, then a 3-line
 strike; an attack delay later, if that found a mob, it strikes that mob
 again with one line, bit 0x20 of the attack's flags set, and dashes 100 px
 forward (a movement element 8 holds where it started). Every line of both

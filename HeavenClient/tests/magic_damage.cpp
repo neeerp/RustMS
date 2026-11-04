@@ -24,6 +24,12 @@ int main()
 		require(mob[2] == STRONG && mob[1] == WEAK, "fire is strong and ice weak against F2I3");
 		require(mob[0] == NORMAL && mob[3] == NORMAL, "other elements are normal");
 		require(attributes("H3")[5] == WEAK, "H is holy");
+
+		// Elemental Reset takes its percent off an attribute's effect.
+		require(attribute(1000.0, IMMUNE, 50) == 500.0 && attribute(1000.0, STRONG, 50) == 750.0 &&
+				attribute(1000.0, WEAK, 50) == 1250.0, "half of an attribute's effect at 50%");
+		require(attribute(1000.0, IMMUNE) == 0.0 && attribute(1000.0, WEAK) == 1500.0, "all of it otherwise");
+		require(attribute(1000.0, NORMAL, 50) == 1000.0, "an element nothing is said of hits as ever");
 		require(element('f') == 2 && element('S') == 4 && element('d') == 6, "skills name elements in lower case");
 
 		// Magic is INT plus magic attack, at most 1999.

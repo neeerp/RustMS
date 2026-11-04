@@ -11,6 +11,9 @@ namespace ms
 	{
 		constexpr int32_t ID = 4221001;
 		constexpr int32_t DARK_SIGHT = 4001003;
+		constexpr int32_t NIGHT_SIGHT = 14001003;
+		constexpr int32_t VANISH = 14100005;
+		constexpr int32_t WIND_WALK = 13101006;
 
 		// The second strike's mark in the attack's display byte (0x952956).
 		constexpr uint8_t SECOND_STRIKE = 0x20;
@@ -22,13 +25,49 @@ namespace ms
 		constexpr uint8_t MOVE = 8;
 
 		// Whether Dark Sight refuses a skill: in it only Assassinate goes, and Assassinate only from it
-		// (0x96705f, 0x9694ef).
-		inline bool refused(int32_t skill, bool hidden)
+		// (0x96705f, 0x9694ef). The owner of Vanish may use anything in it but a Night Walker's Dark Sight.
+		inline bool refused(int32_t skill, bool hidden, bool vanish = false)
 		{
 			if (skill == 0)
 				return false;
 
-			return hidden ? skill != ID : skill == ID;
+			if (!hidden)
+				return skill == ID;
+
+			return vanish ? skill == NIGHT_SIGHT : skill != ID;
+		}
+
+		// The Dark Sight of the job, which the attack key cancels (0x94e366).
+		constexpr int32_t dark_sight(int32_t job)
+		{
+			return job / 1000 == 1 ? NIGHT_SIGHT : DARK_SIGHT;
+		}
+
+		// Whether the attack key only ends Dark Sight, which it does without Vanish (0x94e32c, 0x957279).
+		constexpr bool attack_ends(bool hidden, bool vanish)
+		{
+			return hidden && !vanish;
+		}
+
+		// Wind Walk on already, casting it does nothing (0x96a0e1).
+		constexpr bool recast(int32_t skill, bool walking)
+		{
+			return skill == WIND_WALK && walking;
+		}
+
+		// What a line of a physical attack is made, in percent, by the `damage` of Wind Walk while it is on and
+		// of Vanish while in Dark Sight; 0 for a skill that doesn't apply (0x790315, 0x790376).
+		constexpr int32_t unseen(int32_t wind_walk, int32_t vanish)
+		{
+			int32_t percent = 100;
+
+			if (wind_walk)
+				percent = percent * wind_walk / 100;
+
+			if (vanish)
+				percent = percent * vanish / 100;
+
+			return percent;
 		}
 
 		// What both strikes multiply their damage by: one more for every 3 whole seconds since Dark Sight

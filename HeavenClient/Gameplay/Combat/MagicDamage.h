@@ -119,17 +119,20 @@ namespace ms
 		}
 
 		// A hit of an element on a monster with the given attribute
-		// (FUN_00790782).
-		inline double attribute(double damage, uint8_t attribute)
+		// (FUN_00790782). Elemental Reset takes its percent off what the
+		// attribute does, for and against (0x7927e8).
+		inline double attribute(double damage, uint8_t attribute, int32_t reset = 0)
 		{
+			double effect = 1.0 - reset * 0.01;
+
 			switch (attribute)
 			{
 			case IMMUNE:
-				return 0.0;
+				return damage * (1.0 - effect);
 			case STRONG:
-				return damage * 0.5;
+				return damage * (1.0 - effect * 0.5);
 			case WEAK:
-				return damage * 1.5 < 199999.0 ? damage * 1.5 : 199999.0;
+				return damage * (1.0 + effect * 0.5) < 199999.0 ? damage * (1.0 + effect * 0.5) : 199999.0;
 			default:
 				return damage;
 			}
@@ -137,16 +140,17 @@ namespace ms
 
 		// A skill's hit after the monster's attributes (FUN_00790660). Element
 		// Composition hits with half its damage in each of its two elements.
-		inline double elemental(double damage, int32_t skill, uint8_t element, const Attributes &attributes)
+		inline double elemental(double damage, int32_t skill, uint8_t element, const Attributes &attributes,
+								int32_t reset = 0)
 		{
 			switch (skill)
 			{
 			case 2111006:
-				return attribute(damage * 0.5, attributes[4]) + attribute(damage * 0.5, attributes[2]);
+				return attribute(damage * 0.5, attributes[4], reset) + attribute(damage * 0.5, attributes[2], reset);
 			case 2211006:
-				return attribute(damage * 0.5, attributes[3]) + attribute(damage * 0.5, attributes[1]);
+				return attribute(damage * 0.5, attributes[3], reset) + attribute(damage * 0.5, attributes[1], reset);
 			default:
-				return attribute(damage, attributes[element % ELEMENTS]);
+				return attribute(damage, attributes[element % ELEMENTS], reset);
 			}
 		}
 
