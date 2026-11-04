@@ -389,6 +389,15 @@ void item_search()
 		require(!searchable(id), "families the search leaves out");
 }
 
+static void petcome_skill()
+{
+	// Bartos's quest 4660 sets the bit; 0x100 alone is speaking up.
+	require(ms::pets::comes_when_called(0x80), "the taught pet comes");
+	require(ms::pets::comes_when_called(0x181), "whatever else it knows");
+	require(!ms::pets::comes_when_called(0x100), "one that only speaks up doesn't");
+	require(!ms::pets::comes_when_called(0), "nor does an untaught one");
+}
+
 int main()
 {
 	try
@@ -407,6 +416,7 @@ int main()
 		info_page();
 		exception_list();
 		item_search();
+		petcome_skill();
 
 		std::cout << "Pets passed\n";
 		return 0;

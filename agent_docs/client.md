@@ -698,7 +698,7 @@ doc named on its row.
 | Mini-games (`UIMiniGameCreate`, `UIOmok`, `UIMatchCards`) | Omok and match cards, opened from an Etc game set; see `agent_docs/mini-games.md` |
 | Notes (`UIMemo`, `UIMemoSend`, `UIMemoNotice`) | Implemented; see `notes.md` |
 | Reactors | Spawning, swings, skills, touch, hits and breaking; a swing at a reactor whose `info/quest` isn't in progress is skipped; see `combat.md` |
-| Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food, hunger, name tags, equipment, looting, the exception list and auto potions; see `pets.md` |
+| Pets | Summoning, following, others' pets, map changes, chat commands, `/petcome`, idle actions, level-up effect, food, cash food, hunger, name tags, equipment, looting, the exception list and auto potions; see `pets.md` |
 | Mounts, summons | Riding, with the mount's effects (`Player::change_ride`), and summons (`MapSummons`); see "Mounts" and "Summons" in `combat.md` |
 | Party quests, the Guild Quest, bosses, events | See the docs for each in the index of `AGENTS.md` |
 | MTS | Absent, client and server |

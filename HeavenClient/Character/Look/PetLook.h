@@ -74,6 +74,10 @@ namespace ms
 
 		void update_standing();
 
+		// Appear at `pos`, called by its owner: it plays the Teleport effect
+		// and the next path it sends says so.
+		void come_to(Point<int16_t> pos);
+
 		// Follow the owner at `charpos`, facing left if `owner_left`,
 		// returning a path to send once there is one, or play the paths
 		// received.
@@ -214,6 +218,11 @@ namespace ms
 		int32_t lastx = 0;
 		int32_t ran = -1;
 		int32_t bonus = 0;
+		// Called to its owner since the last update.
+		bool called = false;
+
+		// Stand at `pos` with nothing carried over from walking there.
+		void land_at(Point<int16_t> pos);
 
 		EnumMap<Stance, Animation> animations;
 		PhysicsObject phobj;

@@ -415,6 +415,10 @@ namespace ms
 		// their slang if the curse filter `censored` it (FUN_0052c40c).
 		void pets_say(const std::string &text, bool censored);
 
+		// `/petcome`: the pets out that have learned it come to the player
+		// (FUN_0052c40c).
+		void pets_come();
+
 		// Give the pet food in USE slot `slot` to the pets (FUN_00a09905).
 		void feed_pets(int16_t slot, int32_t itemid);
 

@@ -2348,6 +2348,20 @@ namespace ms
 		}
 	}
 
+	void Player::pets_come()
+	{
+		for (PetLook &pet : pets)
+		{
+			if (!pet.get_itemid())
+				break;
+
+			Optional<const Pet> item = inventory.get_pet(pet.get_serial());
+
+			if (item && pets::comes_when_called(item->get_skill()))
+				pet.come_to(get_position());
+		}
+	}
+
 	void Player::feed_pets(int16_t slot, int32_t itemid)
 	{
 		// Whether a pet is out is the server's to check.

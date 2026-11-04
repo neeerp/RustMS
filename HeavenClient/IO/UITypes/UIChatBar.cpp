@@ -414,6 +414,10 @@ namespace ms
 							// server's commands (such as Coconut Season's /start).
 							else if (msg[0] == '/')
 							{
+								// v83 goes on down its commands after calling the pets.
+								if (is_command(msg, "/petcome"))
+									Stage::get().get_player().pets_come();
+
 								if (!face_word(msg) && Configuration::get().get_admin())
 									GeneralChatPacket(msg, false).dispatch();
 							}

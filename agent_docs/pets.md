@@ -246,6 +246,11 @@ beside it.
 - `Stage::clear` drops the player's pets on a map change; the server sends
   them again.
 - `PetParser` reads the 168 body and the SPAWN_PLAYER list.
+- **`/petcome`** (`Player::pets_come`, FUN_0052c40c): each pet out, in list
+  order, whose skill bits hold `0x80` (Bartos's quest 4660 teaches it) appears
+  at the player with the Teleport effect. Its next path carries a type 4
+  element, so there's no packet of its own, and the line isn't chat. A GM's
+  line still goes to the server, as any unknown command does.
 - **Commands.** Every chat line the flood guard lets through goes to
   `Player::command_pets` first. `pets::hear` follows v83: the line is
   trimmed; a renamed pet whose name starts it has the name and any `!`,
