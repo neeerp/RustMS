@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "../MapleMap/Mob.h"
 #include "../../Template/BoolPair.h"
@@ -89,6 +90,18 @@ namespace ms
 
 	private:
 		BoolPair<Effect> effects;
+	};
+
+	// A list of animations, one chosen for each hit (0x75a4d3)
+	class ListedHitEffect : public SkillHitEffect
+	{
+	public:
+		ListedHitEffect(nl::node src);
+
+		void apply(const AttackUser &user, Mob &target) const override;
+
+	private:
+		std::vector<Effect> effects;
 	};
 
 	// The animation changes with the character level

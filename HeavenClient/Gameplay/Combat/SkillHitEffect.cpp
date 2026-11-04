@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SkillHitEffect.h"
 
+#include <algorithm>
+#include <string>
+
 #include "../../Util/Misc.h"
 
 namespace ms
@@ -34,6 +37,18 @@ namespace ms
 	void TwoHandedHitEffect::apply(const AttackUser& user, Mob& target) const
 	{
 		effects[user.secondweapon].apply(target, user);
+	}
+
+	ListedHitEffect::ListedHitEffect(nl::node src)
+	{
+		for (uint16_t i = 0; src["hit"][std::to_string(i)].size() > 0; i++)
+			effects.emplace_back(src["hit"][std::to_string(i)]);
+	}
+
+	void ListedHitEffect::apply(const AttackUser &user, Mob &target) const
+	{
+		if (!effects.empty())
+			effects[std::min<size_t>(user.art, effects.size() - 1)].apply(target, user);
 	}
 
 	ByLevelHitEffect::ByLevelHitEffect(nl::node src)
