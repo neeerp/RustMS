@@ -30,7 +30,9 @@ namespace ms
 	{
 	public:
 		// A charged weapon (charge, its element) swings the charge's set.
-		Afterimage(int32_t skill_id, const std::string &name, const std::string &stance, int16_t level, uint8_t charge = 0);
+		// The action's own afterimage comes first, then its stance's.
+		Afterimage(int32_t skill_id, const std::string &name, const std::string &action, const std::string &stance,
+				   int16_t level, uint8_t charge = 0);
 
 		Afterimage();
 
@@ -42,10 +44,16 @@ namespace ms
 
 		Rectangle<int16_t> get_range() const;
 
+		// Whether it was found by the action's name and counts the action's frames.
+		bool counts_action_frames() const;
+
 	private:
+		static constexpr int32_t BLAST = 1221009;
+
 		Animation animation;
 		Rectangle<int16_t> range;
 		uint8_t firstframe;
 		bool displayed;
+		bool action_frames;
 	};
 }

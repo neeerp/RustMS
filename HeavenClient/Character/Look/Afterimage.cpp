@@ -23,25 +23,39 @@
 
 namespace ms
 {
-	Afterimage::Afterimage(int32_t skill_id, const std::string &name, const std::string &stance_name, int16_t level, uint8_t charge)
+	Afterimage::Afterimage(int32_t skill_id, const std::string &name, const std::string &action,
+						   const std::string &stance_name, int16_t level, uint8_t charge)
 	{
-		nl::node src;
-
-		if (skill_id > 0)
-		{
-			std::string strid = string_format::extend_id(skill_id, 7);
-			src = nl::nx::skill[string_format::skill_img(skill_id)]["skill"][strid]["afterimage"][name][stance_name];
-		}
-
 		nl::node set = nl::nx::character["Afterimage"][name + ".img"];
 
-		if (!src && charge > 0)
-			src = set["charge"][std::to_string(charge)][stance_name];
+		auto find = [&](const std::string &key)
+		{
+			nl::node found;
+
+			if (skill_id > 0)
+			{
+				std::string strid = string_format::extend_id(skill_id, 7);
+				found = nl::nx::skill[string_format::skill_img(skill_id)]["skill"][strid]["afterimage"][name][key];
+			}
+
+			if (!found && charge > 0)
+				found = set["charge"][std::to_string(charge)][key];
+
+			if (!found)
+				found = set[level / 10][key];
+
+			return found;
+		};
+
+		// Blast plays its own action and reaches as stabO2 (0x9513b6).
+		nl::node src = find(skill_id == BLAST ? "stabO2" : action);
+		action_frames = src && skill_id != BLAST;
 
 		if (!src)
-			src = set[level / 10][stance_name];
+			src = find(stance_name);
 
-		range = src;
+		// Savage Blow's action has no afterimage, only this reach (0x414456).
+		range = action == "savage" ? Rectangle<int16_t>(-88, -18, -62, -6) : Rectangle<int16_t>(src);
 		firstframe = 0;
 		displayed = false;
 
@@ -61,6 +75,7 @@ namespace ms
 	{
 		firstframe = 0;
 		displayed = true;
+		action_frames = false;
 	}
 
 	void Afterimage::draw(uint8_t stframe, const DrawArgument &args, float alpha) const
@@ -83,5 +98,10 @@ namespace ms
 	Rectangle<int16_t> Afterimage::get_range() const
 	{
 		return range;
+	}
+
+	bool Afterimage::counts_action_frames() const
+	{
+		return action_frames;
 	}
 }

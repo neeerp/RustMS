@@ -310,8 +310,12 @@ namespace ms
 				break;
 		}
 
+		// A swing with no area of its own reaches as its afterimage does
+		// (0x951143), not as far as a shot.
 		if (!stats.range.empty())
 			attack.range = stats.range;
+		else if (attack.type == Attack::CLOSE && !projectile)
+			attack.range = user.get_afterimage().get_range();
 
 		if (projectile && !attack.bullet)
 		{
