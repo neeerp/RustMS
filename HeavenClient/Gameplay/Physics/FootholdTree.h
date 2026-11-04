@@ -108,6 +108,8 @@ namespace ms
 		bool limit_jumper(PhysicsObject &phobj) const;
 
 		uint16_t get_fhid_below(double fx, double fy, uint16_t ignore = 0) const;
+		// The floor a step through the air lands on, or 0.
+		uint16_t get_landing(const PhysicsObject &phobj, double start_x) const;
 
 		bool can_jump_down(uint16_t fhid, double fx, double fy) const;
 
