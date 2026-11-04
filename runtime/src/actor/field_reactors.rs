@@ -530,7 +530,8 @@ impl ReactorSet {
         reactor.state = next;
         let last = spot.data.is_last(next);
         let ends = spot.data.acts_in(next, event);
-        let acts = net::reactors::acts_staying(reactor.reactor_id) && (ends || last);
+        let acts = net::reactors::acts_staying(reactor.reactor_id)
+            && (ends || last || net::reactors::acts_in_every_state(reactor.reactor_id));
         reactor.revert = (spot.data.time_out(next))
             .filter(|_| acts || !ends)
             .map(|(ms, to)| (now + Duration::from_millis(ms.into()), to));
@@ -981,6 +982,64 @@ mod tests {
             (spot(3002000, 1057, ""), pond),
             (spot(net::reactors::ELLIN_SPINE, 2331, "spine"), spine),
         ]
+    }
+
+    #[test]
+    fn the_wild_bear_table_acts_on_the_peach_though_its_state_leads_on() {
+        let takes = |item_id, next, area| ReactorEvent {
+            kind: ITEM_DROPPED,
+            next: Some(next),
+            item: Some((item_id, 1)),
+            area: Some(area),
+            skills: Vec::new(),
+        };
+        let spot = MapReactorTemplate {
+            reactor_id: net::reactors::WILD_BEAR_TABLE,
+            x: 889,
+            y: -59,
+            flip: false,
+            reactor_time: 0,
+            name: String::new(),
+        };
+        let area = ((-43, -74), (57, 4));
+        let table = ReactorTemplate {
+            reactor_id: net::reactors::WILD_BEAR_TABLE,
+            states: vec![
+                ReactorState {
+                    events: vec![takes(4031794, 1, area)],
+                    ..ReactorState::default()
+                },
+                ReactorState {
+                    events: vec![
+                        takes(4031700, 2, ((-3, -237), (-2, -236))),
+                        ReactorEvent {
+                            kind: 101,
+                            next: Some(0),
+                            ..ReactorEvent::default()
+                        },
+                    ],
+                    time_out: Some(2000),
+                },
+                ReactorState::default(),
+            ],
+            action: Some("muruengItem2".into()),
+            touch: false,
+        };
+        let mut reactors = ReactorSet::new([(spot, table)]);
+        let now = Instant::now();
+        let [table] = reactors.respawn(now)[..] else {
+            panic!("one reactor");
+        };
+        for round in 0..2u64 {
+            let at = now + Duration::from_secs(10 * round);
+            match reactors.take_item(table, 4031794, 1, (889, -60), at) {
+                Some(Hit::Acted { view, event: 0 }) => assert_eq!(view.state, 1),
+                other => panic!("round {round}: {other:?}"),
+            }
+            let back = reactors.revert(at + Duration::from_millis(2000));
+            assert_eq!(back.len(), 1);
+            assert_eq!(back[0].state, 0);
+        }
     }
 
     #[test]

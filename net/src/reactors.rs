@@ -714,6 +714,10 @@ pub const NEO_LAST_TRASH_CAN: i32 = 2402008;
 /// fills again; its spine takes four Diluted Poisons and, staying, clears
 /// the stage (`3009000`, `showClearEffect` in state 4).
 pub const ELLIN_POND: i32 = 3002000;
+/// The rock table in the Wild Bear Area (`250010301`): takes Tae Soo's Peach
+/// (`4031794`, Tae Soo's Reward, 3839) or a plain Peach, drops Tae
+/// Roon's Note, and two seconds on is bare again.
+pub const WILD_BEAR_TABLE: i32 = 2502002;
 pub const ELLIN_SPINE: i32 = 3009000;
 /// Its fifth stage's box with the Purple Stone of Magic, among eight empty
 /// ones, and its sixth's altar, which brings out the Poison Golem.
@@ -821,7 +825,17 @@ pub fn acts_staying(reactor_id: i32) -> bool {
             | SNOW_WITCH_ALTAR..=SNOW_WITCH_LAST_ALTAR
             | SCHOLAR_GHOST_ALTAR
             | RURUMO_POISON..=RURUMO_LAST_POISON
+            | WILD_BEAR_TABLE
     )
+}
+
+/// Whether a reactor that acts staying does so in any state it reaches, not
+/// only an end state. The Wild Bear Area's table has to: its state 1 leads
+/// on, by event 0, to a state nothing can reach (an item in a 1-pixel area),
+/// so taking the peach by event 0 isn't an end state, and Cosmic's
+/// `hitReactor`, going by that, never drops the note 3839 asks for.
+pub fn acts_in_every_state(reactor_id: i32) -> bool {
+    reactor_id == WILD_BEAR_TABLE
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
@@ -1524,6 +1538,15 @@ mod tests {
             assert!((1..5).all(|state| !reactor.acts_in(state, 0)), "{poison}");
             assert!(reactor.acts_in(5, 0), "{poison}");
         }
+        // The Wild Bear Area's table takes either peach, whichever event
+        // that is, and is bare again after two seconds.
+        let table = data.template(WILD_BEAR_TABLE).unwrap().unwrap();
+        assert!(acts_staying(WILD_BEAR_TABLE) && acts_in_every_state(WILD_BEAR_TABLE));
+        assert_eq!(action(WILD_BEAR_TABLE), Action::Drops);
+        assert_eq!(table.item_dropped(0, 4031794, 1, (0, 0)), Some((0, 1)));
+        assert_eq!(table.item_dropped(0, 2022116, 1, (0, 0)), Some((1, 1)));
+        assert_eq!(table.time_out(1), Some((2000, 0)));
+        assert!(!table.acts_in(1, 0));
         // A trash can's fourth hit empties it, and it fills again.
         for can in NEO_TRASH_CAN..=NEO_LAST_TRASH_CAN {
             let reactor = data.template(can).unwrap().unwrap();

@@ -298,6 +298,13 @@ quest_items = { 4031092 = 3239 }
 # for 6002).
 replace = [{ item = 4031508, prob = 1.0, quest = 6002 }]
 
+[reactors.2502002]
+# The rock table in the Wild Bear Area (Map.nx 250010301; Reactor.nx 2502002,
+# `muruengItem2`) drops Tae Roon's Note 2022252, which Tae Soo's Reward
+# (3839) checks for, when it takes a peach (Cosmic's reactor drops: every
+# time, for anyone).
+replace = [{ item = 2022252, prob = 1.0 }]
+
 [reactors.2612005]
 # Yulete's Lab 1's beaker (Map.nx 926130101; Reactor.nx 2612005, five
 # liquids dropped on it in turn, red to purple) drops the Finished Reagent
