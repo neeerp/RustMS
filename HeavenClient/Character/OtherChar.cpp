@@ -22,6 +22,7 @@
 
 #include "../Audio/Audio.h"
 #include "../Constants.h"
+#include "../Gameplay/Combat/Assaulter.h"
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Combat/PqSkills.h"
@@ -85,6 +86,10 @@ namespace ms
 		// And a Combat Step (0x980308).
 		if (arrived & (1u << combat_step::MOVE))
 			Stage::get().get_combat().show_combat_step(*this);
+
+		// And an Assaulter (0x9801e6).
+		if (arrived & (1u << assaulter::MOVE))
+			Stage::get().get_combat().show_assault(*this);
 
 		// Wings' glide shows while the path glides down (0x9b17ec).
 		glide(wings::gliding(path.command() == wings::GLIDE, now.vy), now.fh > 0);

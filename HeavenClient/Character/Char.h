@@ -180,6 +180,8 @@ namespace ms
 
 		// Return the range of a regular attack's afterimage in a stance.
 		Rectangle<int16_t> get_afterimage_range(Stance::Id stance) const;
+		// And of a skill's swing in an action.
+		Rectangle<int16_t> get_afterimage_range(int32_t skill_id, const std::string &action) const;
 
 		// Display an animation as an effect with the character
 		void show_attack_effect(Animation animation, int8_t z);

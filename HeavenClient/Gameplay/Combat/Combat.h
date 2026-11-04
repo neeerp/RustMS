@@ -123,6 +123,9 @@ namespace ms
 
 		// Likewise Combat Step's, when the path shows its slide (0x980308).
 		void show_combat_step(Char &user);
+		// Assaulter's dash: a mark left where the user stands, and one that
+		// goes with them (0x952c7b, 0x9801e6).
+		void show_assault(Char &user);
 
 		// Show a skill's `special` animation on a user or the player (0x936528): the skill that
 		// dodged a hit, Guardian or Shadow Shifter, or Dragon Blood drinking HP (user effect 5).
@@ -403,6 +406,8 @@ namespace ms
 
 		// The platforms a Teleport might land on.
 		std::vector<teleport::Floor> find_floors() const;
+		// Where a dash of `distance` forward lands, if it may go at all.
+		std::optional<teleport::Spot> find_dash(int32_t distance) const;
 
 		// The platforms a shot from `from` to `to` could run into.
 		std::vector<shot_path::Platform> find_platforms(Point<int16_t> from, Point<int16_t> to) const;

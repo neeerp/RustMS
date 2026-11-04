@@ -19,6 +19,7 @@
 
 #include "AranCombo.h"
 #include "Assassinate.h"
+#include "Assaulter.h"
 #include "ChainLightning.h"
 #include "Combo.h"
 #include "AttackDash.h"
@@ -1303,6 +1304,35 @@ namespace ms
 				!player.soul_arrow() && player.shadow_star_lost())
 				return false;
 
+			// Assaulter needs a floor to land on, and goes without a word if
+			// there's none (0x950d83).
+			std::optional<teleport::Spot> landing;
+
+			if (move.get_id() == assaulter::ID)
+			{
+				landing = find_dash(assaulter::DASH);
+
+				if (!landing)
+					return false;
+			}
+
+			// These go only at a mob in reach (0x951342).
+			if (assaulter::needs_mob(move.get_id()))
+			{
+				Attack aim = attack;
+				move.apply_stats(player, aim);
+
+				// Barrage has no area of its own, and the swing to come isn't
+				// the player's last.
+				if (move.get_id() == attack_dash::BARRAGE || move.get_id() == attack_dash::BARRAGE_TB)
+					aim.range = player.get_afterimage_range(move.get_id(), assaulter::BARRAGE_ACTION);
+
+				Rectangle<int16_t> reach_area = place_range(aim.origin, aim.range, aim.hrange, aim.toleft);
+
+				if (find_targets(mobs.get_mobs(), reach_area, aim.origin, 1, false).empty())
+					return false;
+			}
+
 			// Past the spot's limit a swing does nothing at all (0x951382).
 			// A shot or a spell still plays out, but isn't sent, below.
 			bool close = attack.type == Attack::Type::CLOSE || whack != Stance::Id::NONE;
@@ -1627,6 +1657,14 @@ namespace ms
 
 			AttackPacket(result, player.get_position()).dispatch();
 
+			// Assaulter leaves its mark where it stood, and lands on the next
+			// update (0x952c6e, 0x952d8f).
+			if (landing)
+			{
+				show_assault(player);
+				Stage::get().dash(*landing, assaulter::MOVE);
+			}
+
 			// The first strike strikes again an attack delay later if it found
 			// a mob (0x952bda).
 			if (assassinates && !again)
@@ -1801,10 +1839,21 @@ namespace ms
 		if (final_attack::weapon_type(weapon) != due.weapon || player.get_skills().get_level(assassinate::ID) <= 0)
 			return;
 
-		if (!player.can_attack(true) || !Stage::get().may_dash())
+		std::optional<teleport::Spot> spot = find_dash(assassinate::DASH);
+
+		if (!spot)
 			return;
 
-		// It dashes its `lt.x` forward, onto the nearest floor.
+		apply_move(get_skill(assassinate::ID), 0, false, nullptr, due.oid);
+		Stage::get().dash(*spot, assassinate::MOVE);
+	}
+
+	std::optional<teleport::Spot> Combat::find_dash(int32_t distance) const
+	{
+		if (!player.can_attack(true) || !Stage::get().may_dash())
+			return std::nullopt;
+
+		// It dashes its `lt.x` forward, onto the nearest floor (0x96cb93).
 		const PhysicsObject &phobj = player.get_phobj();
 		uint16_t group = phobj.fhgroup;
 		auto clear = [&](Point<int16_t> from, Point<int16_t> to)
@@ -1813,14 +1862,8 @@ namespace ms
 		};
 
 		int32_t dx = player.getflip() ? 1 : -1;
-		std::optional<teleport::Spot> spot = teleport::destination(player.get_position(), phobj.fhid, dx, 0,
-																	 assassinate::DASH, find_floors(), clear);
 
-		if (!spot)
-			return;
-
-		apply_move(get_skill(assassinate::ID), 0, false, nullptr, due.oid);
-		Stage::get().dash(*spot);
+		return teleport::destination(player.get_position(), phobj.fhid, dx, 0, distance, find_floors(), clear);
 	}
 
 	std::optional<Combat::Swing> Combat::aim_swing()
@@ -3181,6 +3224,12 @@ namespace ms
 	void Combat::show_combat_step(Char &user)
 	{
 		get_move(combat_step::ID).apply_useeffects(user);
+	}
+
+	void Combat::show_assault(Char &user)
+	{
+		Stage::get().show_assault_trail(user.get_position(), user.getflip());
+		user.show_user_effect(nl::nx::effect["BasicEff.img"]["Assaulter"]["effect"], 0);
 	}
 
 	void Combat::show_player_affected(int32_t skillid)

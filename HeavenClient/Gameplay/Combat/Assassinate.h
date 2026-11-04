@@ -18,6 +18,9 @@ namespace ms
 		// How far forward the second strike dashes, its `lt.x` (0x950da5).
 		constexpr int32_t DASH = 100;
 
+		// The dash's element in the movement path (0x952dff).
+		constexpr uint8_t MOVE = 8;
+
 		// Whether Dark Sight refuses a skill: in it only Assassinate goes, and Assassinate only from it
 		// (0x96705f, 0x9694ef).
 		inline bool refused(int32_t skill, bool hidden)
