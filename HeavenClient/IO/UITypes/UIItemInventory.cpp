@@ -1449,6 +1449,10 @@ namespace ms
 
 						break;
 					case InventoryType::Id::USE:
+						// Unseen, nothing happens (0x4f030a).
+						if (Stage::get().get_player().is_stealthed())
+							break;
+
 						// v83 0x4f033e: before any kind of USE item does anything.
 						if (inventory.is_sealed(tab, slot))
 							UI::get().emplace<UIOk>(item_drop::SEALED, [](bool)
@@ -1594,6 +1598,10 @@ namespace ms
 
 						break;
 					case InventoryType::Id::ETC:
+						// Nor here (0x4eff13).
+						if (Stage::get().get_player().is_stealthed())
+							break;
+
 						if (item_id / 10000 == 429)
 							Stage::get().use_item_effect(item_id);
 						else if (marriage::is_invitation(item_id))

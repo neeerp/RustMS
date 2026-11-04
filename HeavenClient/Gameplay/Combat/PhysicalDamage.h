@@ -719,6 +719,9 @@ namespace ms
 			// What Assassinate multiplies each line by, from how long the
 			// player was in Dark Sight; 1 for anything else.
 			int32_t stealth = 1;
+			// What Wind Walk, or Vanish in Dark Sight, makes each line, in
+			// percent.
+			int32_t unseen = 100;
 		};
 
 		// A hit from its raw value, before the monster's guards, with a

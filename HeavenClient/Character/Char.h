@@ -116,6 +116,9 @@ namespace ms
 		// Return the skill whose clone Shadow Partner draws behind the character, or 0 without the buff.
 		virtual int32_t get_shadow_partner() const;
 
+		// Whether Dark Sight or Wind Walk is on the character.
+		virtual bool is_stealthed() const;
+
 		// Return the character's base attacking speed.
 		virtual int8_t get_integer_attackspeed() const = 0;
 

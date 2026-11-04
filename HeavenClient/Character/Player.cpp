@@ -416,6 +416,10 @@ namespace ms
 
 	void Player::use_item(int32_t itemid)
 	{
+		// Unseen, the item key does nothing (0x94f6a4).
+		if (is_stealthed())
+			return;
+
 		InventoryType::Id type = InventoryType::by_item_id(itemid);
 
 		if (int16_t slot = inventory.find_unsealed(type, itemid))
@@ -1145,6 +1149,7 @@ namespace ms
 		attack.luck = stats.get_total(EquipStat::Id::LUK);
 		attack.magic = magic_damage::magic(attack.intelligence, stats.get_total(EquipStat::Id::MAGIC));
 		attack.amplify = amplification(skillbook, stats.get_job().get_id());
+		attack.reset = get_buff_value(Buffstat::Id::ELEMENTAL_RESET);
 		attack.range = stats.get_range();
 		attack.origin = get_position();
 		attack.toleft = !facing_right;
@@ -1796,6 +1801,11 @@ namespace ms
 		return has_buff(Buffstat::Id::WK_CHARGE) ? buffs[Buffstat::Id::WK_CHARGE].skillid : 0;
 	}
 
+	bool Player::is_stealthed() const
+	{
+		return has_buff(Buffstat::Id::DARKSIGHT) || has_buff(Buffstat::Id::WIND_WALK);
+	}
+
 	int32_t Player::get_shadow_partner() const
 	{
 		return has_buff(Buffstat::Id::SHADOWPARTNER) ? shadow_partner::skill_for(stats.get_job().get_id()) : 0;
@@ -2409,7 +2419,7 @@ namespace ms
 	{
 		int32_t itemid = auto_potions[0];
 
-		if (itemid && wears_pouch(false) && !get_diseases().seduced &&
+		if (itemid && wears_pouch(false) && !get_diseases().seduced && !is_stealthed() &&
 			auto_potion::below(stats.get_stat(MapleStat::Id::HP), hp_loss, stats.get_total(EquipStat::Id::HP),
 							   Setting<HPAlert>::get().percent()))
 		{
@@ -2441,7 +2451,7 @@ namespace ms
 	{
 		int32_t itemid = auto_potions[1];
 
-		if (!auto_mp_armed || !itemid || !wears_pouch(true) || get_diseases().seduced ||
+		if (!auto_mp_armed || !itemid || !wears_pouch(true) || get_diseases().seduced || is_stealthed() ||
 			!auto_potion::below(stats.get_stat(MapleStat::Id::MP), 0, stats.get_total(EquipStat::Id::MP),
 								Setting<MPAlert>::get().percent()))
 			return;

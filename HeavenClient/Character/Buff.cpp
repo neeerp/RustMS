@@ -81,6 +81,8 @@ namespace ms
 			case 60: return DIVINE_BODY;
 			case 63: return FINALATTACK;
 			case 64: return WIND_FINALATTACK;
+			case 65: return ELEMENTAL_RESET;
+			case 66: return WIND_WALK;
 			case 68: return ARAN_COMBO;
 			case 69: return COMBO_DRAIN;
 			case 70: return COMBO_BARRIER;

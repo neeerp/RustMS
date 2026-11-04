@@ -2597,6 +2597,10 @@ namespace ms
 		// Assassinate builds up in Dark Sight (0x79028f).
 		damage *= blow.stealth;
 
+		// Wind Walk and Vanish add theirs after it (0x790315, 0x790376).
+		if (blow.unseen != 100)
+			damage = blow.unseen * damage * 0.01;
+
 		// A held skill hits harder the longer it was charged (0x79048c).
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
 
@@ -2638,7 +2642,7 @@ namespace ms
 				? heal::base(attack.heal, attack.magic, attack.intelligence, attack.luck, attack.healed, roll)
 				: base(attack.magic, attack.intelligence, attack.mastery, attack.matk, roll);
 		damage = damage * attack.amplify * 0.01;
-		damage = elemental(damage, attack.skill, attack.element, elements);
+		damage = elemental(damage, attack.skill, attack.element, elements, attack.reset);
 		damage = defend(damage, mdef + status_value(MobStatParser::MDR), randomizer.next_real(1.0));
 		damage = guarded(damage, status_value(MobStatParser::MGUARD_UP));
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;

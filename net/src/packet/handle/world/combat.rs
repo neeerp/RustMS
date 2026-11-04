@@ -293,6 +293,7 @@ impl WorldHandler for AttackHandler {
             debug!(skill = attack.skill, "Body attack refused within a second");
             return Ok(HandlerResult::empty());
         }
+        let body = attack.kind == AttackKind::Body;
         let fills = attack.mob_count > 0 && dojo::in_dojo(ctx.player.stats.map_id);
         let mut result = HandlerResult::empty();
         let mut skill_level = 0;
@@ -419,6 +420,9 @@ impl WorldHandler for AttackHandler {
             ctx.player.pyramid_rage -= 1;
             result = result.with(WorldAction::Event(EventCommand::Rage));
         }
+        if !body {
+            result = end_stealth(ctx.player, result)?;
+        }
         Ok(result)
     }
 }
@@ -497,6 +501,19 @@ fn end_charge(
             player.id(),
             &ended,
         )?)))
+}
+
+/// An attack ends Wind Walk, and Dark Sight for the owner of Vanish, whose
+/// client attacks from it. The client ends neither itself (only the damage
+/// at 0x790315 and 0x790376 looks at them); Cosmic ends both here.
+fn end_stealth(player: &mut Player, result: HandlerResult<WorldAction>) -> WorldResult {
+    let hiding = (player.buffs.active().iter())
+        .find(|buff| matches!(buff.stat, BuffStat::DarkSight | BuffStat::WindWalk))
+        .map(|buff| buff.skill_id);
+    match hiding {
+        Some(skill_id) => end_charge(player, skill_id, result),
+        None => Ok(result),
+    }
 }
 
 /// Energy Charge's gauge filled to `value`: the player's gauge shows it,
@@ -1131,6 +1148,28 @@ mod tests {
     use super::*;
     use crate::packet::op::RecvOpcode;
     use packet::io::write::PktWrite;
+
+    #[test]
+    fn an_attack_ends_wind_walk_and_dark_sight() {
+        let now = Instant::now();
+        for (skill, stat) in [
+            (13101006, BuffStat::WindWalk),
+            (14001003, BuffStat::DarkSight),
+        ] {
+            let mut player = crate::codec::stats::sample_player();
+            let long = Duration::from_secs(60);
+            (player.buffs).give(Buff::new(skill, stat, 1, now, long));
+            (player.buffs).give(Buff::new(skill, BuffStat::Speed, -18, now, long));
+            (player.buffs).give(Buff::new(2301004, BuffStat::Acc, 20, now, long));
+            let result = end_stealth(&mut player, HandlerResult::empty()).unwrap();
+            assert!(!player.buffs.has(stat) && !player.buffs.has(BuffStat::Speed));
+            assert!(player.buffs.has(BuffStat::Acc), "other buffs stay");
+            assert_eq!(result.actions.len(), 2, "the reply and the others' news");
+        }
+        let mut player = crate::codec::stats::sample_player();
+        let result = end_stealth(&mut player, HandlerResult::empty()).unwrap();
+        assert!(result.actions.is_empty());
+    }
 
     #[test]
     fn a_hit_knocks_out_what_its_rolls_bring_but_no_more_than_is_held() {

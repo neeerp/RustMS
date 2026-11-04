@@ -48,6 +48,7 @@ namespace ms
 			// The Dawn Warrior's and the Wind Archer's Final Attacks, rolled only under these.
 			FINALATTACK,
 			WIND_FINALATTACK,
+			WIND_WALK,
 			BATTLESHIP,
 			WATK,
 			WDEF,

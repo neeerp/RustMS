@@ -118,6 +118,12 @@ pub enum BuffStat {
     DawnFinalAttack = 63,
     /// The Wind Archer's Final Attack (13101002), the same for its shot.
     WindFinalAttack = 64,
+    /// Elemental Reset: its percent off what a monster's element does to
+    /// the caster's spells (0x7927e8).
+    ElementalReset = 65,
+    /// Wind Walk: unseen by monsters as Dark Sight is, until an attack ends
+    /// it (0x4f0d64).
+    WindWalk = 66,
     /// The Aran's combo, the count of hits their polearm has landed: Combo
     /// Ability adds to attack, and Combo Critical to criticals, for every
     /// ten (0x77df48, report b360). Never shown to others.
@@ -186,7 +192,7 @@ impl BuffStat {
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 24] = [
+    pub const SHOWN: [BuffStat; 25] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -211,6 +217,7 @@ impl BuffStat {
         BuffStat::Fear,
         BuffStat::DojangBerserk,
         BuffStat::DivineBody,
+        BuffStat::WindWalk,
     ];
 
     pub const DISEASES: [BuffStat; 13] = [

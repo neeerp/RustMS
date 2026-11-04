@@ -24,6 +24,7 @@
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
+#include "Combat/Assassinate.h"
 #include "Combat/CombatStep.h"
 #include "Combat/FlashJump.h"
 #include "Combat/Massacre.h"
@@ -594,7 +595,7 @@ namespace ms
 		bool reporter = friendly::reports(player.get_party().is_leader(player.get_oid()), chars.size());
 
 		mobs.update(physics, { player.get_oid(), playerpos, playerbody, player.get_phobj().onground,
-							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT), player.is_barrelled(),
+							   player.is_dead(), player.is_stealthed(), player.is_barrelled(),
 							   player.get_beacon() }, reporter);
 		mobs.hit_traps(tilesobjs);
 		chars.update(physics);
@@ -678,8 +679,7 @@ namespace ms
 		if (player.is_dead() || player.cannot_be_hit() || sheltered)
 			return;
 
-		int32_t touching = mobs.find_colliding(player.get_phobj(), mapinfo.get_fieldlimit(),
-				player.has_buff(Buffstat::Id::DARKSIGHT));
+		int32_t touching = mobs.find_colliding(player.get_phobj(), mapinfo.get_fieldlimit(), player.is_stealthed());
 
 		if (touching)
 		{
@@ -1256,6 +1256,10 @@ namespace ms
 
 	void Stage::check_drops()
 	{
+		// Unseen, the player picks nothing up (0x94f604, 0xa0913f).
+		if (player.is_stealthed())
+			return;
+
 		// The v83 client looks for a drop only when it may ask for one.
 		if (!player.can_request(ExclRequest::PICKUP_WAIT))
 			return;
@@ -1611,11 +1615,10 @@ namespace ms
 
 	bool Stage::try_macro_step(const skill_macro::Step& step)
 	{
-		// In Dark Sight only Assassinate goes. (v83 lets Vanish's owner use
-		// any skill; there is no Vanish here.)
-		constexpr int32_t ASSASSINATE = 4221001;
-
-		if (player.has_buff(Buffstat::Id::DARKSIGHT) && step.skill != ASSASSINATE)
+		// In Dark Sight only Assassinate goes, and whatever Vanish's owner
+		// likes (0x631998).
+		if (assassinate::refused(step.skill, player.has_buff(Buffstat::Id::DARKSIGHT),
+								 player.get_skills().get_level(assassinate::VANISH) > 0))
 			return false;
 
 		// Nor does anything while a dialog is open (FUN_0063196b).

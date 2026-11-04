@@ -270,6 +270,9 @@ namespace ms
 		// Return the skill whose clone Shadow Partner draws, or 0 without the buff.
 		int32_t get_shadow_partner() const override;
 
+		// Whether Dark Sight or Wind Walk is on the player.
+		bool is_stealthed() const override;
+
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 

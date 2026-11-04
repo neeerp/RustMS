@@ -161,6 +161,10 @@ namespace ms
 		void show_summon_attack(int32_t oid, uint8_t action, const std::vector<std::pair<int32_t, int32_t>> &hits);
 
 	private:
+		// Whether the player owns Vanish.
+		bool has_vanish() const;
+		// The `damage` of `skill` while `stat` is on, 0 otherwise.
+		int32_t unseen_damage(Buffstat::Id stat, int32_t skill) const;
 		// One line of `skill`'s damage on the touching mob `oid`, if `next` allows.
 		void body_attack(int32_t oid, int32_t skill, int64_t &next);
 
