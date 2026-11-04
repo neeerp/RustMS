@@ -524,6 +524,13 @@ pub fn action(reactor_id: i32) -> Action {
             at_least: 15,
             mesos: (500, 1000),
         },
+        // Neo City's trash cans (`2402007`, `2402008`: `dropItems(true, 2, 5,
+        // 10, 1)`, whose second is a one in two chance of a pile, and one
+        // if nothing else falls; here always the pile).
+        NEO_TRASH_CAN..=NEO_LAST_TRASH_CAN => Action::Spray {
+            at_least: 1,
+            mesos: (5, 10),
+        },
         OPQ_LEVER => Action::Lever,
         // The jails' boxes (`2002017`, `2002018`: `sprayItems(true, 1, 100,
         // 400, 15)`).
@@ -665,6 +672,12 @@ pub const JONATHANS_COURT: i16 = 6400;
 pub const BART_RECORD: i16 = 6401;
 pub const BART_FOUND: &str = "q3";
 
+/// Neo City's trash cans, in <Year 2021>'s Average Town (240070100 to
+/// 240070102): the fourth hit empties one, which stays and fills again in
+/// its last state's 10 seconds (Reactor.nx). 3720's clue is in `2402008`s.
+pub const NEO_TRASH_CAN: i32 = 2402007;
+pub const NEO_LAST_TRASH_CAN: i32 = 2402008;
+
 /// The Forest of Poison Haze's second stage: its pond (Cosmic `3002000`,
 /// `dropItems`) takes a Concentrated Poison, drops a Diluted Poison, and
 /// fills again; its spine takes four Diluted Poisons and, staying, clears
@@ -765,13 +778,14 @@ pub fn stays(reactor_id: i32) -> bool {
 /// `ReactorTemplate::acts_in`), does what breaking would and stays: the
 /// item-triggered ones Cosmic's `hitReactor` triggers rather than destroys
 /// and whose script acts there, the Forest of Poison Haze's pond and spine
-/// and the Pirate Ship's seals. Other reactors with such end states (in NX
-/// many, with no action here) only move.
+/// and the Pirate Ship's seals, and Neo City's trash cans. Other reactors
+/// with such end states (in NX many, with no action here) only move.
 pub fn acts_staying(reactor_id: i32) -> bool {
     matches!(
         reactor_id,
         ELLIN_POND | ELLIN_SPINE | PIRATE_SEAL..=PIRATE_LAST_SEAL
             | MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR
+            | NEO_TRASH_CAN..=NEO_LAST_TRASH_CAN
     )
 }
 
@@ -1456,6 +1470,14 @@ mod tests {
             assert!(acts_staying(seal) && stays(seal), "{seal}");
         }
         let Ok(data) = data() else { return };
+        // A trash can's fourth hit empties it, and it fills again.
+        for can in NEO_TRASH_CAN..=NEO_LAST_TRASH_CAN {
+            let reactor = data.template(can).unwrap().unwrap();
+            assert!(acts_staying(can) && stays(can), "{can}");
+            assert!((1..4).all(|state| !reactor.acts_in(state, 0)), "{can}");
+            assert!(reactor.acts_in(4, 0), "{can}");
+            assert_eq!(reactor.time_out(4), Some((10_000, 0)), "{can}");
+        }
         for box_id in [PIRATE_MOB_BOX, PIRATE_ITEM_BOX, PIRATE_DECK_BOX] {
             let reactor = data.template(box_id).unwrap().unwrap();
             assert!((0..4).all(|state| !reactor.is_last(state)), "{box_id}");
