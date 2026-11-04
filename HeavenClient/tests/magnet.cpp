@@ -1,4 +1,5 @@
 #include "../Gameplay/Combat/MonsterMagnet.h"
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 
@@ -41,6 +42,33 @@ int main()
 	{
 		std::cerr << error.what() << '\n';
 		return 1;
+	}
+
+	{
+		using namespace ms::magnet;
+
+		// Snatch's pull goes against the way the attacker faces.
+		require(start_speed(300, 100, 90, false) == -PULL_SPEED, "facing right, in from the right");
+		require(start_speed(-100, 100, 90, true) == PULL_SPEED, "facing left, in from the left");
+		require(start_speed(150, 100, 90, false) == 0.0, "already within reach");
+		require(start_speed(0, 100, 90, false) == -PULL_SPEED, "behind the attacker it goes on away");
+
+		// Far off, a plain step; near, a third as fast and right onto its reach.
+		double speed = -PULL_SPEED;
+		require(step_distance(speed, 400, 100, 90, false) == -30.0, "30 ms at 1000 px/s");
+		require(speed == -PULL_SPEED, "at full speed");
+		require(step_distance(speed, 220, 100, 90, false) == -30.0, "lands on reach");
+		require(speed == -PULL_SPEED / 3, "a third as fast");
+
+		speed = PULL_SPEED;
+		require(step_distance(speed, -20, 100, 90, false) == 30.0, "likewise from the left");
+
+		speed = 0.0;
+		require(step_distance(speed, 150, 100, 90, false) == 0.0, "a mob within reach stays");
+
+		// A flier only slows.
+		speed = -PULL_SPEED;
+		require(std::abs(step_distance(speed, 220, 100, 90, true) + 10.0) < 0.001, "a third of the step");
 	}
 
 	std::cout << "magnet tests passed\n";

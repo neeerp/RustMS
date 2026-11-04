@@ -26,6 +26,13 @@ namespace ms
 				   skill == 3221005 || skill == 5211002;
 		}
 
+		// Barrage shows its hit, hit0 and hit1 together at every hit, hit1 above the others
+		// (0x6682ca).
+		inline bool layered(int32_t skill)
+		{
+			return skill == 5121007 || skill == 15111004;
+		}
+
 		// Whether the skill's art is chosen here, not by its weapon.
 		inline bool listed(int32_t skill)
 		{

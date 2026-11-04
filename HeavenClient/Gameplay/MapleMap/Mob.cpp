@@ -695,12 +695,20 @@ namespace ms
 		flyx = 0;
 		flyy = 0;
 
+		// A hit that comes again in the hit pose replaces what the last one started.
+		if (pull && canfly)
+			body.vspeed = 0.0;
+
+		pull.reset();
+		throw_course.reset();
+
 		if (flinch->user)
 		{
 			// Monster Magnet pulls it in, then it chases the user (0x66b562).
 			int16_t reach = standwidth + magnet::REACH;
 
-			pull = Pull{ *flinch->user, reach, magnet::start_speed(position.x(), flinch->user->x(), reach), 0 };
+			pull = Pull{ *flinch->user, reach, magnet::start_speed(position.x(), flinch->user->x(), reach),
+						 magnet::STEP };
 			body.set_flag(PhysicsObject::Flag::NOFRICTION);
 			chase();
 		} else if (flinch->thrown && mob_push::kind(flinch->thrown->skill) == mob_push::Kind::TOSSED)
@@ -716,18 +724,34 @@ namespace ms
 		{
 			const mob_push::Hit &hit = *flinch->thrown;
 			mob_push::Kind kind = mob_push::kind(hit.skill);
-			bool spun = kind == mob_push::Kind::SPUN;
-			bool left = spun ? position.x() < hit.user_x : flinch->left;
-			int32_t roll = randomizer.next_int(mob_push::SPREAD);
-			int32_t offset = spun ? mob_push::spun_offset(hit.range, standwidth, roll, left)
-								  : mob_push::offset(hit.skill, hit.lt, hit.rb, standwidth, roll, left);
-			int32_t target = hit.user_x + offset;
 
-			throw_course = mob_push::Throw{ target, position.x() - target,
-				mob_push::start_speed(kind, position.x(), target, left) };
+			if (kind == mob_push::Kind::PULLED)
+			{
+				int16_t reach = standwidth + magnet::REACH;
 
-			if (spun)
-				throw_course->air_near = mob_push::SPIN_NEAR;
+				pull = Pull{ { hit.user_x, hit.user_y }, reach,
+							 magnet::start_speed(position.x(), hit.user_x, reach, flinch->left), magnet::STEP };
+			} else if (kind == mob_push::Kind::NUDGED)
+			{
+				// Barrage leaves a flier where it is (0x9bc5dc).
+				throw_course = mob_push::Throw{ position.x(), 0, 0.0 };
+				throw_course->nudged = true;
+				throw_course->nudge = canfly ? 0 : mob_push::nudge(hit.index, flinch->left);
+			} else
+			{
+				bool spun = kind == mob_push::Kind::SPUN;
+				bool left = spun ? position.x() < hit.user_x : flinch->left;
+				int32_t roll = randomizer.next_int(mob_push::SPREAD);
+				int32_t offset = spun ? mob_push::spun_offset(hit.range, standwidth, roll, left)
+									  : mob_push::offset(hit.skill, hit.lt, hit.rb, standwidth, roll, left);
+				int32_t target = hit.user_x + offset;
+
+				throw_course = mob_push::Throw{ target, position.x() - target,
+					mob_push::start_speed(kind, position.x(), target, left) };
+
+				if (spun)
+					throw_course->air_near = mob_push::SPIN_NEAR;
+			}
 
 			body.set_flag(PhysicsObject::Flag::NOFRICTION);
 		} else if (canmove)
@@ -1249,11 +1273,14 @@ namespace ms
 
 				break;
 			case Stance::HIT:
-				if (pull)
+				if ((pull || throw_course) && !canfly && !body.onground)
 				{
-					// Monster Magnet's pull (0x9bbdfd) slows each 30 ms
-					// step once the mob nears the user, and a flier rises
-					// or sinks toward them too.
+					// Off the ground only a flier is steered (0x9bc58d); the rest just fall.
+				} else if (pull)
+				{
+					// Monster Magnet's and Snatch's pull (0x9bbdfd) slows
+					// each 30 ms step once the mob nears the user, and a
+					// flier rises or sinks toward them too.
 					Point<int16_t> position = body_position();
 
 					pull->elapsed += Constants::TIMESTEP;
@@ -1261,13 +1288,18 @@ namespace ms
 					while (pull->elapsed >= magnet::STEP)
 					{
 						pull->elapsed -= magnet::STEP;
-						pull->speed = magnet::step_speed(pull->speed, position.x(), pull->user.x(), pull->reach);
+						pull->distance = magnet::step_distance(pull->speed, position.x(), pull->user.x(), pull->reach,
+															   canfly);
 					}
 
-					body.hspeed = pull->speed * Constants::TIMESTEP / 1000.0;
+					body.hspeed = pull->distance * Constants::TIMESTEP / magnet::STEP;
 
 					if (canfly)
 						body.vspeed = magnet::fly_speed(position.y(), pull->user.y()) * Constants::TIMESTEP / 1000.0;
+				} else if (throw_course && throw_course->nudged)
+				{
+					// A nudge is one step's jump, not a speed (0x9bbf41).
+					body.hspeed = throw_course->take_nudge();
 				} else if (throw_course)
 				{
 					// Each 30 ms step of the throw (0x9bbdfd) sets how far the next goes.

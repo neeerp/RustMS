@@ -433,6 +433,16 @@ plain hit has to reach the mob's `pushed`; a line that throws or tosses
 flinches it however small its damage. An Aran's hit, and Barrage's and Vampire's,
 flinch a mob again while it is still in its hit pose.
 
+Snatch pulls what it hits in as Monster Magnet does: 1000 px/s against the way
+the attacker faces, down to a third each step within 40 px of the mob's width
+plus 45, where a mob on the ground lands on that distance at once and a flier
+slows while it rises or sinks to the user's height at 100 px/s. Each of
+Barrage's six hits moves a mob on the ground 17, 6, 6, 6, 6 and 27 px the way
+the attacker faces, all in one step, and leaves a flier be. Neither checks for
+a boss or a miss. Off the ground only a flier is steered: a walker or jumper in
+the air just falls, whatever hit it (0x9bc58d). Each Barrage hit shows the skill's `hit`, `hit0` and `hit1`
+art together, `hit1` above the others.
+
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.

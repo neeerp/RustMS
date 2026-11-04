@@ -59,6 +59,16 @@ namespace ms
 			return user_x < x ? -PULL_SPEED : PULL_SPEED;
 		}
 
+		// Snatch pulls as it does, but against the way the attacker faces, on
+		// whichever side the mob is (0x66ba6f).
+		inline double start_speed(int16_t x, int16_t user_x, int16_t reach, bool left)
+		{
+			if (std::abs(x - user_x) < reach)
+				return 0.0;
+
+			return left ? PULL_SPEED : -PULL_SPEED;
+		}
+
 		// Its speed for the next step: a third as fast once it nears the
 		// user.
 		inline double step_speed(double speed, int16_t x, int16_t user_x, int16_t reach)
@@ -67,6 +77,23 @@ namespace ms
 				return speed / 3;
 
 			return speed;
+		}
+
+		// Start the next step for a mob at `x`, and say how far it goes in px. Near the user a
+		// mob on the ground lands on `reach` at once (0x9bbf95), and a flier only slows (0x9bc762).
+		inline double step_distance(double &speed, int16_t x, int16_t user_x, int16_t reach, bool flying)
+		{
+			speed = step_speed(speed, x, user_x, reach);
+
+			int32_t apart = std::abs(x - user_x);
+
+			if (flying || apart >= reach + SLOW_MARGIN)
+				return speed * STEP / 1000.0;
+
+			if (speed == 0.0)
+				return 0.0;
+
+			return speed < 0.0 ? reach - apart : apart - reach;
 		}
 
 		// A flier rises or sinks toward the user as well.

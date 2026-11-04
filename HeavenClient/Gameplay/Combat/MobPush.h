@@ -2,8 +2,10 @@
 
 #include "AttackDash.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <iterator>
 
 namespace ms
 {
@@ -18,6 +20,7 @@ namespace ms
 		constexpr int32_t BARRAGE = 5121007;
 		constexpr int32_t BARRAGE_TB = 15111004;
 		constexpr int32_t VAMPIRE = 14101006;
+		constexpr int32_t SNATCH = 5121005;
 
 		// How often a throw changes its speed, in ms.
 		constexpr int16_t STEP = 30;
@@ -52,7 +55,11 @@ namespace ms
 			// (type 6).
 			SPUN,
 			// Straight up (type 0xa).
-			TOSSED
+			TOSSED,
+			// In to the attacker, as Monster Magnet pulls (type 3).
+			PULLED,
+			// A few px the way the attacker faces, each hit (type 9).
+			NUDGED
 		};
 
 		inline Kind kind(int32_t skill)
@@ -74,6 +81,11 @@ namespace ms
 					return Kind::SPUN;
 				case FINAL_TOSS:
 					return Kind::TOSSED;
+				case SNATCH:
+					return Kind::PULLED;
+				case BARRAGE:
+				case BARRAGE_TB:
+					return Kind::NUDGED;
 				default:
 					return Kind::NONE;
 			}
@@ -125,6 +137,16 @@ namespace ms
 			return left ? -speed : speed;
 		}
 
+		// How far the `hit`th hit of Barrage moves a mob on the ground (0x952425).
+		inline int16_t nudge(size_t hit, bool left)
+		{
+			constexpr int16_t NUDGES[] = { 17, 6, 6, 6, 6, 27 };
+
+			int16_t reach = hit < std::size(NUDGES) ? NUDGES[hit] : 0;
+
+			return left ? -reach : reach;
+		}
+
 		// Whether a hit of `kind` moves the mob it hits at all: a hit that doesn't flinches
 		// it as a plain hit does, if it reaches its pushed. Ninja Storm and Rolling Spin leave
 		// a boss and a miss be, and Final Toss all but a walker or jumper on land too.
@@ -149,7 +171,8 @@ namespace ms
 		}
 
 		// The attack that throws a mob: its skill, the x of its lt and rb, where its user
-		// stood, how far it reaches by its `range`, and whether the map is under water.
+		// stood, how far it reaches by its `range`, whether the map is under water, and
+		// which of its hits this is.
 		struct Hit
 		{
 			int32_t skill;
@@ -158,6 +181,8 @@ namespace ms
 			int16_t user_x;
 			int16_t range = 0;
 			bool underwater = false;
+			int16_t user_y = 0;
+			uint8_t index = 0;
 		};
 
 		// A mob's throw: where to, where it started from relative to that, how fast it goes in
@@ -172,6 +197,19 @@ namespace ms
 			double distance = 0.0;
 			// Within this of the spot a flier slows.
 			int16_t air_near = NEAR;
+			// Whether it is a nudge, and how far that takes the mob, all at once (0x9bbf41).
+			bool nudged = false;
+			int16_t nudge = 0;
+
+			// What is left of the nudge: all of it the first time, then nothing.
+			int16_t take_nudge()
+			{
+				int16_t distance = nudge;
+
+				nudge = 0;
+
+				return distance;
+			}
 
 			// Start the next step for a mob at `x`, on the ground or in the air.
 			void step(int32_t x, bool flying)

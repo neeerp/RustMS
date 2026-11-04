@@ -2644,6 +2644,7 @@ namespace ms
 		{
 			attackuser.job = player.get_stats().get_job().get_id();
 			attackuser.underwater = mapinfo.is_underwater();
+			attackuser.y = user.get_position().y();
 		}
 
 		bool chain = chain_lightning::chains(result.skill);
@@ -2801,6 +2802,7 @@ namespace ms
 					for (auto &number : numbers)
 					{
 						attackuser.art = hit_art::of(result.skill, target, i, band_arts);
+						attackuser.hit = static_cast<uint8_t>(i);
 
 						damageeffects.emplace(
 								hit_timing::close_hit(attack, i),

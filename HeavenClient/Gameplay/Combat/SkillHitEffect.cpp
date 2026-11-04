@@ -32,6 +32,19 @@ namespace ms
 		effect.apply(target, user);
 	}
 
+	LayeredHitEffect::LayeredHitEffect(nl::node src)
+	{
+		effects.emplace_back(src["hit"]["0"]);
+		effects.emplace_back(src["hit0"]["0"]);
+		effects.emplace_back(src["hit1"]["0"], 1);
+	}
+
+	void LayeredHitEffect::apply(const AttackUser &user, Mob &target) const
+	{
+		for (const Effect &effect : effects)
+			effect.apply(target, user);
+	}
+
 	TwoHandedHitEffect::TwoHandedHitEffect(nl::node src) : effects(src["hit"]["0"], src["hit"]["1"]) {}
 
 	void TwoHandedHitEffect::apply(const AttackUser& user, Mob& target) const
