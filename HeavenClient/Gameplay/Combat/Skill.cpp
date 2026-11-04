@@ -141,6 +141,9 @@ namespace ms
 		{
 			// Their hit/0 has an animation for each charge element.
 			hiteffect = std::make_unique<ByChargeHitEffect>(src);
+		} else if (hit_art::layered(skillid))
+		{
+			hiteffect = std::make_unique<LayeredHitEffect>(src);
 		} else if (hit_art::listed(skillid))
 		{
 			hiteffect = std::make_unique<ListedHitEffect>(src);

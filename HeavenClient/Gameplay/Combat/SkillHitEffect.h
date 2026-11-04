@@ -38,13 +38,13 @@ namespace ms
 		class Effect
 		{
 		public:
-			Effect(nl::node src)
+			Effect(nl::node src, int8_t above = 0)
 			{
 				animation = src;
 				pos = src["pos"];
 				// As in the MapleRoyals client, above the mob unless the
 				// node says otherwise (0x669773).
-				z = src["z"].data_type() == nl::node::type::integer ? static_cast<int8_t>(src["z"]) : 1;
+				z = src["z"].data_type() == nl::node::type::integer ? static_cast<int8_t>(src["z"]) : 1 + above;
 			}
 
 			// Flipped when the attacker faces right.
@@ -97,6 +97,18 @@ namespace ms
 	{
 	public:
 		ListedHitEffect(nl::node src);
+
+		void apply(const AttackUser &user, Mob &target) const override;
+
+	private:
+		std::vector<Effect> effects;
+	};
+
+	// Three animations together on every hit (0x6682ca)
+	class LayeredHitEffect : public SkillHitEffect
+	{
+	public:
+		LayeredHitEffect(nl::node src);
 
 		void apply(const AttackUser &user, Mob &target) const override;
 

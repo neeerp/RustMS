@@ -807,6 +807,8 @@ namespace ms
 			int16_t reach;
 			double speed;
 			int16_t elapsed;
+			// How far this step takes the mob, in px.
+			double distance = 0.0;
 		};
 
 		std::optional<Pull> pull;

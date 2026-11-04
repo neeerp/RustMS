@@ -264,5 +264,9 @@ namespace ms
 		int32_t job = 0;
 		// Whether the map is under water, for what the local player hit.
 		bool underwater = false;
+		// Where the local player stood when they attacked, up and down.
+		int16_t y = 0;
+		// Which of the attack's hits on its mob this is, in a melee attack.
+		uint8_t hit = 0;
 	};
 }

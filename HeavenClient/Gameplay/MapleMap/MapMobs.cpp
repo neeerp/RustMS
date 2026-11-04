@@ -334,7 +334,7 @@ namespace ms
 				const Rectangle<int16_t> &area = stats.range;
 
 				thrown = mob_push::Hit{ move.get_id(), area.left(), area.right(), user.x, stats.shotrange,
-										user.underwater };
+										user.underwater, user.y, user.hit };
 			}
 
 			mob->apply_damage(damage, toleft, smart, thrown,

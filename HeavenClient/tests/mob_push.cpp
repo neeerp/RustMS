@@ -42,7 +42,6 @@ static void kinds()
 	require(kind(dash::BACKSPIN_BLOW) == Kind::BEHIND, "Backspin Blow");
 	require(kind(dash::CORKSCREW_BLOW) == Kind::DRIVEN, "Corkscrew Blow");
 	require(kind(dash::CORKSCREW_BLOW_TB) == Kind::DRIVEN, "Thunder Breaker's");
-	require(kind(dash::BARRAGE) == Kind::NONE, "Barrage is another kind of throw");
 	require(kind(1001004) == Kind::NONE, "a plain attack");
 }
 
@@ -146,6 +145,24 @@ static void moved()
 	require(!moves(Kind::TOSSED, false, 1, true, true), "not under water");
 }
 
+static void barrage()
+{
+	require(kind(SNATCH) == Kind::PULLED, "Snatch pulls");
+	require(kind(BARRAGE) == Kind::NUDGED && kind(BARRAGE_TB) == Kind::NUDGED, "Barrage nudges");
+	require(moves(Kind::PULLED, true, 0, false, false), "whatever it hits");
+	require(moves(Kind::NUDGED, true, 0, false, false), "likewise");
+
+	require(nudge(0, false) == 17 && nudge(1, false) == 6 && nudge(4, false) == 6, "the first hit goes furthest but the last");
+	require(nudge(5, false) == 27 && nudge(5, true) == -27, "the last, the way the attacker faces");
+	require(nudge(6, false) == 0, "and nothing past the table");
+
+	Throw course{ 500, 0, 0.0 };
+	course.nudged = true;
+	course.nudge = nudge(0, true);
+	require(course.take_nudge() == -17, "all at once");
+	require(course.take_nudge() == 0, "and no more");
+}
+
 static void again()
 {
 	require(flinches_again(0, 2112), "a Lv 4 Aran");
@@ -165,6 +182,7 @@ int main()
 	steps();
 	spins();
 	moved();
+	barrage();
 	again();
 
 	std::cout << "ok\n";
