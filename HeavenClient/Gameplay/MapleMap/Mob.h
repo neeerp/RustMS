@@ -427,8 +427,7 @@ namespace ms
 		bool dazzled() const;
 
 		// Show a status's skill on the mob: its `mob` effect once, or for
-		// as long as the status lasts if it repeats, and its `mob0` for as
-		// long as the status lasts.
+		// as long as the status lasts if it repeats.
 		void show_status(int32_t reason, bool effects);
 
 		// Show mob `mobid`'s look in place of its own, or its own again
@@ -680,7 +679,6 @@ namespace ms
 		struct StatusEffect
 		{
 			int32_t reason;
-			uint8_t part;
 			Animation animation;
 			int8_t pos;
 		};

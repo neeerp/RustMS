@@ -96,6 +96,11 @@ namespace ms
 		// with it held.
 		bool is_cursor_press() const;
 
+		// Whether the last press of the left button was a double click's
+		// second, which v83 sends as 0x203 in place of 0x201.
+		void set_double_press(bool second);
+		bool is_double_press() const;
+
 		void send_focus(int focused);
 
 		void send_scroll(double yoffset);
@@ -206,6 +211,7 @@ namespace ms
 
 		bool enabled;
 		bool pressing = false;
+		bool double_press = false;
 		bool quitted;
 		bool caps_lock_enabled = false;
 		Screenshot::Throttle screenshots;

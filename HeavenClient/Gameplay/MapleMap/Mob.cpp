@@ -2390,35 +2390,29 @@ namespace ms
 			src = nl::nx::skill["MobSkill.img"][string_format::extend_id(reason & 0xFFFF, 3)]["level"]
 			[std::to_string(reason >> 16)];
 
-		// Which of the `mob` effects repeat comes from the data (the draw
-		// code wasn't traced).
-		for (uint8_t part = 0; part < 2; part++)
+		// v83 reads only `mob` (0x75dc24, 0x762eea): the data's `mob0`, the
+		// big orb of the guard skills, is never drawn. Which of the `mob`
+		// effects repeat comes from the data (the draw code wasn't traced).
+		nl::node effect = src["mob"];
+
+		if (effect.size() == 0)
+			return;
+
+		auto pos = static_cast<int8_t>(effect["pos"].get_integer());
+
+		if (!effect["repeat"].get_bool())
 		{
-			nl::node effect = src[part == 0 ? "mob" : "mob0"];
+			if (effects)
+				show_effect(effect, pos, 0, flip, get_body());
 
-			if (effect.size() == 0)
-				continue;
-
-			auto pos = static_cast<int8_t>(effect["pos"].get_integer());
-			bool lasts = part == 1 || effect["repeat"].get_bool();
-
-			if (!lasts)
-			{
-				if (effects)
-					show_effect(effect, pos, 0, flip, get_body());
-
-				continue;
-			}
-
-			bool shown = std::any_of(statuseffects.begin(), statuseffects.end(),
-									 [reason, part](const StatusEffect &other)
-									 {
-										 return other.reason == reason && other.part == part;
-									 });
-
-			if (!shown)
-				statuseffects.push_back({ reason, part, effect, pos });
+			return;
 		}
+
+		bool shown = std::any_of(statuseffects.begin(), statuseffects.end(),
+								 [reason](const StatusEffect &other) { return other.reason == reason; });
+
+		if (!shown)
+			statuseffects.push_back({ reason, effect, pos });
 	}
 
 	void Mob::show_look(int32_t mobid)

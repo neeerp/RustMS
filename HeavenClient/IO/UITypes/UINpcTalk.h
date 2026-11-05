@@ -160,6 +160,7 @@ namespace ms
 
 		// The choice under a point relative to the window, or -1.
 		int16_t choice_at(Point<int16_t> cursor) const;
+		bool over_button(Point<int16_t> cursorpos) const;
 
 		// Selects a choice and scrolls it into view.
 		void select(size_t choice);

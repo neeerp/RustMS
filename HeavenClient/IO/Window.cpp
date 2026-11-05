@@ -21,10 +21,11 @@
 
 #include "../Configuration.h"
 #include "../Constants.h"
-#include "../Timer.h"
+#include "DoublePress.h"
 #include "ScreenshotRules.h"
 #include "UiControl.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
@@ -71,10 +72,7 @@ namespace ms
 		UI::get().send_window_key(key, action);
 	}
 
-	std::chrono::time_point<std::chrono::steady_clock> start = ContinuousTimer::get().start();
-	// Where the last click came up; a double click is two in one place, as
-	// Windows counts it (SM_CXDOUBLECLK, 4 pixels).
-	double last_x = -100.0, last_y = -100.0;
+	DoublePress double_press;
 
 	void mousekey_callback(GLFWwindow *window, int button, int action, int)
 	{
@@ -84,20 +82,24 @@ namespace ms
 				switch (action)
 				{
 					case GLFW_PRESS:
-						UI::get().send_cursor(true);
-						break;
-					case GLFW_RELEASE:
 					{
-						auto diff_ms = ContinuousTimer::get().stop(start) / 1000;
-						start = ContinuousTimer::get().start();
+						auto now = std::chrono::steady_clock::now().time_since_epoch();
+						auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
 
 						double x, y;
 						glfwGetCursorPos(window, &x, &y);
-						bool same_place = std::abs(x - last_x) <= 2.0 && std::abs(y - last_y) <= 2.0;
-						last_x = x;
-						last_y = y;
 
-						if (diff_ms > 10 && diff_ms < 200 && same_place)
+						UI::get().set_double_press(double_press.press(now_ms, x, y));
+						UI::get().send_cursor(true);
+					}
+						break;
+					case GLFW_RELEASE:
+					{
+						double x, y;
+						glfwGetCursorPos(window, &x, &y);
+
+						// A press dragged away is no double click.
+						if (UI::get().is_double_press() && double_press.at_first(x, y))
 							UI::get().doubleclick();
 
 						UI::get().send_cursor(false);

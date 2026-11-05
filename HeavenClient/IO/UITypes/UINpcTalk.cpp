@@ -586,16 +586,26 @@ namespace ms
 			if (Cursor::State fstate = field.send_cursor(cursorpos, clicked); fstate != Cursor::State::IDLE)
 				return fstate;
 
+		// A press in the dialog shows the rest of the text at once, and on a
+		// choice answers with it (9abde5). Its controls keep their presses, and
+		// a double click's second press is neither (0x203, 59ad9d): the one
+		// that opened this dialog over an NPC picks nothing.
+		bool press = clicked && UI::get().is_cursor_press() && !UI::get().is_double_press();
+
+		bool over_field = has_field() && field.get_bounds().contains(cursorpos);
+
+		if (press && is_in_range(cursorpos) && !over_button(cursorpos) && !over_field)
+			draw_text = false;
+
 		if (show_slider && slider.isenabled())
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
 
-		// Clicking a choice answers with it.
 		int16_t choice = choice_at(cursor_relative);
 
 		if (choice >= 0)
 		{
-			if (clicked)
+			if (press)
 			{
 				selected = choice;
 				answer_choice();
@@ -604,9 +614,16 @@ namespace ms
 			return Cursor::State::CANCLICK;
 		}
 
-		// A click doesn't hurry the text, which v83 types out to the end
-		// (9a4eca); nothing in its dialog skips it.
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	bool UINpcTalk::over_button(Point<int16_t> cursorpos) const
+	{
+		for (const auto &button : buttons)
+			if (button_under(button.first, cursorpos))
+				return true;
+
+		return false;
 	}
 
 	void UINpcTalk::send_key(int32_t keycode, bool pressed, bool escape)
