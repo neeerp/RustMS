@@ -228,6 +228,26 @@ mod tests {
     }
 
     #[test]
+    fn a_body_attack_lands_through_stun_seduce_and_seal() {
+        if skills::info(ENERGY_CHARGE).is_none() {
+            return;
+        }
+        let now = Instant::now();
+        let touch = Attack {
+            skill: ENERGY_CHARGE,
+            ..attack(AttackKind::Body, 1)
+        };
+        for stat in [BuffStat::Stun, BuffStat::Seduce, BuffStat::Seal] {
+            let mut player = brawler(40);
+            charge(&mut player, 10000, now);
+            player
+                .buffs
+                .give(game::Buff::new(-123, stat, 1, now, Duration::from_secs(60)));
+            assert_eq!(combat::validate(&touch, &player).err(), None, "{stat:?}");
+        }
+    }
+
+    #[test]
     fn a_full_gauge_empties_after_the_skills_time() {
         if skills::info(ENERGY_CHARGE).is_none() {
             return;

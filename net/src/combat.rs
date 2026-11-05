@@ -638,11 +638,14 @@ fn check(attack: &Attack, player: &Player, ice: bool) -> Result<Uses, AttackReje
         return Err(AttackRejection::Dead);
     }
     // v83 attacks only without Stun or Seduce, and skills fail under Seal
-    // (FUN_0094be52, FUN_00966f7a).
+    // (FUN_0094be52, FUN_00966f7a). The body attack asks neither: the touch
+    // alone sends it (FUN_0094a144, FUN_0095f135), and Cosmic's
+    // TouchMonsterDamageHandler doesn't look either.
     let buffs = &player.buffs;
-    if buffs.has(BuffStat::Stun)
-        || buffs.has(BuffStat::Seduce)
-        || (attack.skill != 0 && buffs.has(BuffStat::Seal))
+    if attack.kind != AttackKind::Body
+        && (buffs.has(BuffStat::Stun)
+            || buffs.has(BuffStat::Seduce)
+            || (attack.skill != 0 && buffs.has(BuffStat::Seal)))
     {
         return Err(AttackRejection::Diseased);
     }

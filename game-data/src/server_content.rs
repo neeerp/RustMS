@@ -6277,6 +6277,16 @@ mod tests {
     }
 
     #[test]
+    fn each_twisted_master_drops_five_things_and_all_share_the_mark() {
+        let table = RewardTable::load(None).unwrap();
+        for mob in 9400590..=9400593 {
+            let drops = table.drops(mob);
+            assert_eq!(drops.len(), 5, "{mob}");
+            assert_eq!((drops[0].item, drops[0].prob), (Some(1122059), 0.008));
+        }
+    }
+
+    #[test]
     fn manon_and_griffey_add_the_pirates_pentagon_and_star() {
         let pirate = |item| RewardEntry {
             prob: 0.4,

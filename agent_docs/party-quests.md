@@ -1725,6 +1725,8 @@ host's lines follow it and the stage's live mobs (`events::cwk_host`,
   bringing out the four Twisted Masters (9400590 to 9400593,
   `CWK_MASTERS`, at their Cosmic spots) and a line (`cwk.masters.out`).
   While any mob lives, the host says so (`cwk.host.masters_escorting`).
+  The pack has no drops for them, so theirs are Cosmic's, in
+  `reward_overrides.toml`.
 - **Beaten (phase 2):** with them gone, one page that wins the Keep
   (`EventActor::win`): the stage clears for all with its EXP and mesos,
   everyone on the stage hears in pink that the way on is open
