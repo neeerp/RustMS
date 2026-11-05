@@ -1160,3 +1160,8 @@ These were corrected:
     at a fixed index; v83's list closes up. See `pets.md`.
 14. The client read the stat change's SKIN as a short; v83 reads a byte
     (FUN_004e2fba), as the server writes it.
+15. The client read a character's level byte as signed, in the character data,
+    the Cash Shop's copy of it and the stat change. From level 128 up the level
+    came out negative in the hit roll (-128 for 128), so every mob counted as
+    far above the player and strikes kept missing, and the EXP gauge indexed
+    before the start of the EXP table.

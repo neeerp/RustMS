@@ -134,7 +134,7 @@ namespace ms
 		for (size_t i = 0; i < 3; i++)
 			statsentry.petids.push_back(recv.read_long());
 
-		statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte(); // TODO: Change to recv.read_short(); to increase level cap
+		statsentry.stats[MapleStat::Id::LEVEL] = static_cast<uint8_t>(recv.read_byte()); // TODO: Change to recv.read_short(); to increase level cap
 		statsentry.stats[MapleStat::Id::JOB] = recv.read_short();
 		statsentry.stats[MapleStat::Id::STR] = recv.read_short();
 		statsentry.stats[MapleStat::Id::DEX] = recv.read_short();
