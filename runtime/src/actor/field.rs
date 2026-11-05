@@ -4983,7 +4983,7 @@ impl FieldActor {
             let notice = net::content::text().get(notice, &[]);
             let packet = build_broadcast(Broadcast::Pink, &notice);
             if let (Some(occupant), Ok(packet)) = (self.occupants.get(&by), packet) {
-                occupant.handle.send(ServerMessage::SendPacket(packet));
+                occupant.handle.send_packet(packet);
             }
         }
         match reactors::action(view.reactor_id) {
@@ -5108,7 +5108,7 @@ impl FieldActor {
                     let notice = net::content::text().get(keys::JR_BOOGIES_GONE, &[]);
                     let packet = build_item_line(&notice, 0);
                     if let (Some(occupant), Ok(packet)) = (self.occupants.get(&by), packet) {
-                        occupant.handle.send(ServerMessage::SendPacket(packet));
+                        occupant.handle.send_packet(packet);
                     }
                 }
             }
@@ -5218,6 +5218,7 @@ impl FieldActor {
 
     fn handle_join(&mut self, handle: ClientHandle, mut avatar: FieldAvatar, party: Option<i32>) {
         let client_id = handle.client_id;
+        let handle = handle.on_field(self.key);
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
         for touch in self.reactors.step_off(client_id) {
@@ -6629,7 +6630,7 @@ mod tests {
             .unwrap()
             .unwrap()
         {
-            ServerMessage::SendPacket(packet) => packet,
+            ServerMessage::SendPacket(packet) | ServerMessage::FieldPacket { packet, .. } => packet,
             other => panic!("expected a packet, got {other:?}"),
         }
     }
@@ -6689,7 +6690,9 @@ mod tests {
     fn sent(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<Packet> {
         let mut packets = Vec::new();
         while let Ok(message) = rx.try_recv() {
-            if let ServerMessage::SendPacket(packet) = message {
+            if let ServerMessage::SendPacket(packet) | ServerMessage::FieldPacket { packet, .. } =
+                message
+            {
                 packets.push(packet);
             }
         }
@@ -7311,7 +7314,9 @@ mod tests {
     async fn opcodes(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<i16> {
         let mut opcodes = Vec::new();
         while let Ok(Some(message)) = timeout(Duration::from_millis(100), rx.recv()).await {
-            if let ServerMessage::SendPacket(packet) = message {
+            if let ServerMessage::SendPacket(packet) | ServerMessage::FieldPacket { packet, .. } =
+                message
+            {
                 opcodes.push(packet.opcode());
             }
         }
@@ -7413,7 +7418,8 @@ mod tests {
             while let Ok(message) = rx.try_recv() {
                 match message {
                     ServerMessage::Absorbed { hp, mp, .. } => taken.push((hp, mp)),
-                    ServerMessage::SendPacket(packet) => {
+                    ServerMessage::SendPacket(packet)
+                    | ServerMessage::FieldPacket { packet, .. } => {
                         killed |= packet.opcode() == SendOpcode::KillMonster as i16
                     }
                     _ => {}
@@ -7549,7 +7555,8 @@ mod tests {
             while let Ok(message) = rx.try_recv() {
                 match message {
                     ServerMessage::Absorbed { hp, .. } => dealt.push(i64::from(hp)),
-                    ServerMessage::SendPacket(packet) => {
+                    ServerMessage::SendPacket(packet)
+                    | ServerMessage::FieldPacket { packet, .. } => {
                         killed |= packet.opcode() == SendOpcode::KillMonster as i16
                     }
                     _ => {}
@@ -7741,7 +7748,10 @@ mod tests {
         let outcome = |rx: &mut mpsc::Receiver<ServerMessage>| {
             use packet::io::read::PktRead;
             let (mut exploded, mut hp) = (Vec::new(), None);
-            while let Ok(ServerMessage::SendPacket(packet)) = rx.try_recv() {
+            while let Ok(
+                ServerMessage::SendPacket(packet) | ServerMessage::FieldPacket { packet, .. },
+            ) = rx.try_recv()
+            {
                 let mut r = std::io::Cursor::new(&packet.bytes[2..]);
                 if packet.opcode() == SendOpcode::RemoveItemFromMap as i16 {
                     assert_eq!(r.read_byte().unwrap(), 4);
@@ -7904,6 +7914,49 @@ mod tests {
         });
         assert!(players(sent(&mut late_rx)).is_empty());
         assert_eq!(players(sent(&mut other_gm_rx)), [remove]);
+    }
+
+    /// The controller's leave can hand its mobs to a player whose own map
+    /// change is under way; that player's client actor can only tell those
+    /// packets are stale if they name the field.
+    #[test]
+    fn mobs_handed_on_name_their_field() {
+        let mut mobs = MobSet::new([mob(100, false)]);
+        mobs.spawn_all(Instant::now());
+        let (_tx, rx) = mpsc::channel(16);
+        let key = FieldKey::new(0, 100000000);
+        let mut actor = FieldActor::new(
+            key,
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        let (first, _first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            actor.handle_message(FieldMessage::Join {
+                handle,
+                avatar: avatar(id, 0, 0),
+                party: None,
+            });
+        }
+        sent(&mut second_rx);
+        actor.handle_message(FieldMessage::Leave {
+            client_id: 1,
+            staying: false,
+        });
+        let mut control = 0;
+        while let Ok(message) = second_rx.try_recv() {
+            let ServerMessage::FieldPacket { field, packet } = message else {
+                panic!("expected a field's packet, got {message:?}");
+            };
+            assert_eq!(field, key);
+            control += i32::from(packet.opcode() == SendOpcode::SpawnMonsterControl as i16);
+        }
+        assert_eq!(control, 1);
     }
 
     #[test]
@@ -8175,7 +8228,7 @@ mod tests {
                     ServerMessage::QuestNpcChecked { request_id, nearby } => {
                         return (request_id, nearby)
                     }
-                    ServerMessage::SendPacket(_) => continue,
+                    ServerMessage::SendPacket(_) | ServerMessage::FieldPacket { .. } => continue,
                     other => panic!("unexpected {other:?}"),
                 }
             }
@@ -8487,7 +8540,9 @@ mod tests {
         let mut broken = false;
         while let Ok(Some(message)) = timeout(Duration::from_millis(100), rx.recv()).await {
             match message {
-                ServerMessage::SendPacket(packet) => seen.push(packet.opcode()),
+                ServerMessage::SendPacket(packet) | ServerMessage::FieldPacket { packet, .. } => {
+                    seen.push(packet.opcode())
+                }
                 ServerMessage::ReactorBroken { reactor_id, .. } => broken = reactor_id == 2302003,
                 _ => {}
             }
@@ -8616,7 +8671,9 @@ mod tests {
         let mut broken = false;
         while let Ok(Some(message)) = timeout(Duration::from_millis(100), rx.recv()).await {
             match message {
-                ServerMessage::SendPacket(packet) => seen.push(packet.opcode()),
+                ServerMessage::SendPacket(packet) | ServerMessage::FieldPacket { packet, .. } => {
+                    seen.push(packet.opcode())
+                }
                 ServerMessage::ReactorBroken { reactor_id, .. } => {
                     broken = reactor_id == reactors::ZENUMIST_PILLAR
                 }

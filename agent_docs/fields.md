@@ -324,6 +324,16 @@ Field packets are built in `net/src/packet/build/world/field.rs`
 `FacialExpression`) and `npc.rs` (`SpawnNpc`). `SpawnPlayer` encodes the
 avatar's real equipment through `net::codec::encode_avatar_look`.
 
+An occupant's handle (`ClientHandle::on_field`) names its field on every
+`send_packet`, as `ServerMessage::FieldPacket`, and the client actor drops one
+from a field the player has left. A map change writes SET_FIELD before the old
+field hears of the `Leave` and before the client actor reads its queue, so
+without this a party warped together would get the old map's packets on the
+new map: the leader's leave hands its mobs to the next member, whose client
+then draws them in the new room. Trades, shops, mini-games and merchants send
+`SendPacket` themselves, and a reply through a `requester` or `giver` handle
+is dropped with the rest if that player has moved on.
+
 Emotes (F1-F7) arrive as `FACE_EXPRESSION`; `FaceExpressionHandler` shows
 the others a `FacialExpression` through `FieldRequest::Broadcast`. The sender
 has already changed its own face. Emotes above 7 need an emotion cash item

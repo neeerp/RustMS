@@ -557,6 +557,13 @@ pub enum ServerMessage {
         clock: tokio::time::Instant,
     },
     SendPacket(Packet),
+    /// A packet from `field`, which the client actor drops if its player has
+    /// left that field: its queue can outlast a SET_FIELD already sent, and
+    /// the client would take the old map's mobs for the new map's.
+    FieldPacket {
+        field: FieldKey,
+        packet: Packet,
+    },
     /// A packet for everyone in the world, sent on by this player's client
     /// (a field has no way to the directory).
     Announce(Packet),
@@ -599,6 +606,8 @@ pub struct ClientHandle {
     pub connection_id: u64,
     tx: mpsc::Sender<ServerMessage>,
     kill: CancellationToken,
+    /// The field whose occupant this is, which `send_packet` names.
+    field: Option<FieldKey>,
 }
 
 impl ClientHandle {
@@ -613,7 +622,15 @@ impl ClientHandle {
             connection_id,
             tx,
             kill,
+            field: None,
         }
+    }
+
+    /// This handle as `field` keeps it for its occupant: what it sends with
+    /// `send_packet` is for that field alone.
+    pub fn on_field(mut self, field: FieldKey) -> Self {
+        self.field = Some(field);
+        self
     }
 
     /// Queue a message without waiting. A full queue means the client is not
@@ -635,7 +652,10 @@ impl ClientHandle {
     }
 
     pub fn send_packet(&self, packet: Packet) -> bool {
-        self.send(ServerMessage::SendPacket(packet))
+        self.send(match self.field {
+            Some(field) => ServerMessage::FieldPacket { field, packet },
+            None => ServerMessage::SendPacket(packet),
+        })
     }
 
     /// Ask the client actor to disconnect.

@@ -2204,6 +2204,11 @@ impl ClientActor {
                 self.merchant_event(owner, event).await?
             }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
+            ServerMessage::FieldPacket { field, mut packet } => {
+                if self.still_showing(field) {
+                    self.send(&mut packet).await?
+                }
+            }
             ServerMessage::Announce(packet) => {
                 self.apply(WorldAction::Broadcast {
                     scope: net::BroadcastScope::World,
@@ -2268,6 +2273,15 @@ impl ClientActor {
     }
 
     /// Send to the current field, restarting it once if its actor died.
+    /// Whether the client is still showing `field`.
+    fn still_showing(&self, field: FieldKey) -> bool {
+        !self.in_cash_shop
+            && self
+                .game
+                .as_ref()
+                .is_some_and(|game| game.field.key == field)
+    }
+
     async fn send_to_field(&mut self, message: FieldMessage) -> Result<(), RuntimeError> {
         let Some(game) = self.game.as_ref() else {
             return Ok(());
