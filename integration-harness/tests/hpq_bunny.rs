@@ -90,7 +90,7 @@ async fn mobs_hurt_the_moon_bunny_until_it_goes_and_the_party_fails() {
     assert_eq!(traces[0].item_lines[1], (cake, 0));
 
     // A mob its controller walks into it hurts it, a hit at a time,
-    // until it goes home, without dying.
+    // until it goes, playing its death.
     let (controller, attacker) = traces
         .iter()
         .enumerate()
@@ -113,7 +113,7 @@ async fn mobs_hurt_the_moon_bunny_until_it_goes_and_the_party_fails() {
     }
     assert!(t.field.killed.contains(&bunny), "{t:?}");
     let gone = Instant::now();
-    assert_eq!(t.field.leave_types[&bunny], 0);
+    assert_eq!(t.field.leave_types[&bunny], 1);
     let hits: Vec<_> = t
         .field
         .mobs_hurt

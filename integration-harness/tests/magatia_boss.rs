@@ -358,7 +358,7 @@ async fn juliet_fainting_costs_the_run_its_gifts_and_some_exp() {
         read_for(c, &mut seen, 20).await;
     }
     until(c, &mut seen, |t| t.item_lines.contains(&fainted)).await;
-    assert_eq!(seen.field.leave_types[&escort], 0);
+    assert_eq!(seen.field.leave_types[&escort], 1);
 
     beat_the_frankenroid(&mut team, side, &mut seen, 90_000).await;
 

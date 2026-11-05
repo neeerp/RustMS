@@ -244,7 +244,7 @@ async fn willi_goes() -> bool {
         return false;
     }
     assert!(t.field.killed.contains(&willi), "{t:?}");
-    assert_eq!(t.field.leave_types[&willi], 0);
+    assert_eq!(t.field.leave_types[&willi], 1);
 
     // The party has lost: everyone goes back to Looking for Delli 3.
     for (player, trace) in team.iter_mut().zip(traces.iter_mut()) {
