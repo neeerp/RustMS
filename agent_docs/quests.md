@@ -886,7 +886,7 @@ room if nobody is in it (`scripts::SOLO_MAPS`) for two minutes
 (`npc_scripts::time_limit`), after which the map's `forcedReturn` takes them
 back. Bart and his nine look-alikes (1200000, which do nothing) break in one
 hit and are shuffled on each fill. The room's way out names a spawn portal
-the Navigation Room lacks, so `reactors::lost_link` sends it to the map's
+the Navigation Room lacks, so `map_rules::lost_link` sends it to the map's
 default spawn instead of closing it. Cosmic asks a riddle before the test;
 its text has no source, so it is left out. His lines are placeholders
 (`jonathan.*`).

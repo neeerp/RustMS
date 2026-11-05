@@ -23176,7 +23176,7 @@ mod tests {
         assert_eq!(field.mob_spawns[0].mob_id, 9100013);
         assert_eq!(field.mob_spawns[0].mob_time, -1);
         // Its way out names a portal Ardin's house lacks: the default spawn.
-        assert!(crate::reactors::lost_link(room, "st00"));
+        assert!(crate::map_rules::lost_link(room, "st00"));
         let out = field.portal_by_name("st00").unwrap();
         let house = maps.field(out.to_map.unwrap()).unwrap();
         assert!(house.resolve_spawn_portal(&out.to_name).is_none());

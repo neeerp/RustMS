@@ -36,7 +36,11 @@ tests.
   `add = [...]` appends to them; both are facts from our own assets, e.g.
   Tutorial Jr. Sentinel → 4031802 for quest 1035 (`Check.img/1035/1/item`),
   since the imported v95 data names another item, and Manon/Griffey add the
-  pirates' 4031860/4031861 for 6944, which the pack lacks.
+  pirates' 4031860/4031861 for 6944, which the pack lacks. The block at the
+  file's end, and the rows beside an item's name above it, give quest items
+  to mobs the pack has no table or no such row for, at Cosmic's rates: only
+  what a quest or Joko's exchange asks for, not the mobs' other loot
+  (QUESTIONS b428, b440).
   `quest = <id>` limits a drop to players with that quest started, and
   `quest = 0` makes a quest item an ordinary drop (MV's Lair's chests'
   Persimmons and Chestnuts, which only a dated-out quest asks for). Premium
