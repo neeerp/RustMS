@@ -2467,3 +2467,44 @@ add = [
     { item = 4000375, prob = 0.3 },  # Tires
     { item = 4000376, prob = 0.3 },  # Batteries
 ]
+
+[mobs.9400590]
+# The four Twisted Masters of the Crimsonwood Keep's last stage (9400590 to
+# 9400593): the pack has no drops for them, so they fell with nothing. These
+# are Cosmic's five rows each (152-drop-data), as with the other bosses the
+# pack lacks (v83ref/lanes/QUESTIONS.md b443); it doesn't answer b428 for
+# ordinary mobs. Every item is in our String.nx and its own data file.
+replace = [
+    { item = 1122059, prob = 0.008 },
+    { item = 1012076, prob = 0.02 },
+    { item = 2290088, prob = 0.015 },
+    { item = 2290125, prob = 0.015 },
+    { item = 2290135, prob = 0.045 },
+]
+
+[mobs.9400591]
+replace = [
+    { item = 1122059, prob = 0.008 },
+    { item = 1412040, prob = 0.02 },
+    { item = 2290074, prob = 0.015 },
+    { item = 2290039, prob = 0.015 },
+    { item = 2290113, prob = 0.015 },
+]
+
+[mobs.9400592]
+replace = [
+    { item = 1122059, prob = 0.008 },
+    { item = 1022082, prob = 0.02 },
+    { item = 2290123, prob = 0.015 },
+    { item = 2290047, prob = 0.015 },
+    { item = 2290131, prob = 0.045 },
+]
+
+[mobs.9400593]
+replace = [
+    { item = 1122059, prob = 0.008 },
+    { item = 1122015, prob = 0.02 },
+    { item = 2290069, prob = 0.015 },
+    { item = 2290093, prob = 0.015 },
+    { item = 2290138, prob = 0.045 },
+]

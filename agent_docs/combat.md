@@ -822,7 +822,8 @@ A few skills do more than buff:
   takes a body attack first: the client sends TOUCH_MONSTER_ATTACK (0x2F),
   a close attack of Energy Charge on that one mob with one line of the
   skill's damage, at most once a second, off ropes and ladders and not
-  on a tamed monster (FUN_0095f135). Neither side plays an action or an
+  on a tamed monster (FUN_0095f135), and through Stun, Seduce and Seal,
+  which neither the touch nor the sender looks at. Neither side plays an action or an
   effect of the attacker's, only the skill's `hit` on the mob. Others see
   the attacker's action cut short and any skill they were preparing ended
   (0x98044f), as for any attack but the shots of Hurricane and Rapid Fire
