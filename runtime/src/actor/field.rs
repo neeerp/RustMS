@@ -987,13 +987,7 @@ impl FieldActor {
                     .send(arena.map_or((0, false), |arena| (arena.snowman.form, arena.scrooge)));
             }
             FieldMessage::ReclaimDrops { from, reply } => {
-                let drops = self.drops.take_owned(from);
-                for drop in &drops {
-                    if let Ok(packet) = build_remove_drop(drop.object_id, Some(from)) {
-                        self.send_drop_packet(packet);
-                    }
-                }
-                let _ = reply.send(drops);
+                let _ = reply.send(self.drops.take_owned(from));
             }
             FieldMessage::DropCount { reply } => {
                 let _ = reply.send(self.drops.all().count());
@@ -1368,12 +1362,19 @@ impl FieldActor {
                     self.send_drop_packet(packet);
                 }
             }
-            FieldMessage::ReturnDrop { drop } => {
-                let now = Instant::now();
-                if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {
-                    self.show_drop(&drop, packet);
+            FieldMessage::Looted {
+                looter,
+                drop,
+                taken,
+            } => {
+                // Everyone still sees it, as nothing was said until now: a
+                // drop sent back while the client flew it to the player
+                // would only finish its flight there.
+                if !taken {
+                    self.drops.restore(drop);
+                } else if let Ok(packet) = build_remove_drop(drop.object_id, Some(looter)) {
+                    self.send_drop_packet(packet);
                 }
-                self.drops.restore(drop);
             }
             FieldMessage::OpenDoor { owner, at } => {
                 self.doors.insert(owner, at);
@@ -2066,9 +2067,6 @@ impl FieldActor {
             .take(from, occupant.party, object_id, x, y, Instant::now(), needs)
         {
             Ok(drop) => {
-                if let Ok(packet) = build_remove_drop(object_id, Some(from)) {
-                    self.send_drop_packet(packet);
-                }
                 handle.send(ServerMessage::PickedUp { drop });
             }
             Err(_) => {
@@ -8501,6 +8499,70 @@ mod tests {
             staying: false,
         });
         assert_eq!(state(&actor), Some(0));
+    }
+
+    #[tokio::test]
+    async fn a_drop_stays_on_show_until_the_player_has_room_for_it() {
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        let (handle, mut rx) = client(1);
+        actor.handle_message(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        });
+        opcodes(&mut rx).await;
+        let loot = Loot::Dropped(game::Item::stack(2000000, 1));
+        let object_id = actor.drops.throw(loot, 1, 0, 0, Instant::now()).object_id;
+        let pickup = || FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Pickup {
+                object_id,
+                x: 0,
+                y: 0,
+                needs: Default::default(),
+            },
+        };
+        let removed = SendOpcode::RemoveItemFromMap as i16;
+
+        // A full bag: nobody is told it went, and it can be tried again.
+        actor.handle_message(pickup());
+        let Ok(Some(ServerMessage::PickedUp { drop })) =
+            timeout(Duration::from_millis(100), rx.recv()).await
+        else {
+            panic!("the player gets the drop");
+        };
+        assert_eq!(actor.drops.all().count(), 0, "nobody else can take it");
+        actor.handle_message(FieldMessage::Looted {
+            looter: 1,
+            drop,
+            taken: false,
+        });
+        assert_eq!(actor.drops.all().count(), 1);
+        assert!(!opcodes(&mut rx).await.contains(&removed));
+
+        // With room it goes, to the player.
+        actor.handle_message(pickup());
+        let Ok(Some(ServerMessage::PickedUp { drop })) =
+            timeout(Duration::from_millis(100), rx.recv()).await
+        else {
+            panic!("the player gets the drop again");
+        };
+        actor.handle_message(FieldMessage::Looted {
+            looter: 1,
+            drop,
+            taken: true,
+        });
+        assert!(opcodes(&mut rx).await.contains(&removed));
+        assert_eq!(actor.drops.all().count(), 0);
     }
 
     #[tokio::test]

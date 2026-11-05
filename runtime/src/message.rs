@@ -699,9 +699,12 @@ pub enum FieldMessage {
         y: i16,
         dropper: i32,
     },
-    /// The client couldn't take the drop (full inventory); put it back.
-    ReturnDrop {
+    /// `looter` took the drop they were given, or with `taken` false had
+    /// no room, and it stays where it lies.
+    Looted {
+        looter: ClientId,
         drop: crate::actor::field_drops::Drop,
+        taken: bool,
     },
     /// The pet at `pet` of `looter` took the drop it was given, or with
     /// `taken` false left it where it lies.

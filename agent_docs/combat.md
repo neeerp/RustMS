@@ -1330,11 +1330,13 @@ six ticks. An expiring drop (mode 0) fades out where it is. Mode 4 sets
 mesos off for Meso Explosion (see "Meso Explosion" above).
 
 ITEM_PICKUP (`0xCA`) needs the player within 800×600 of the drop. The field
-removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the
-client actor, which adds mesos (MESO stat update, "You have gained mesos")
-or the item (INVENTORY_OPERATION, "You have gained an item"). If the item
-doesn't fit, the player sees "You can't get anymore items." and the drop goes
-back on the ground. Equipment a mob or reactor dropped comes with its stats
+hands it to the client actor, which adds mesos (MESO stat update, "You have
+gained mesos") or the item (INVENTORY_OPERATION, "You have gained an item"),
+and tells the field (`FieldMessage::Looted`), which only then sends
+REMOVE_ITEM_FROM_MAP 2 with the looter. If the item doesn't fit, the player
+sees "You can't get anymore items." and the drop lies where it was, as nobody
+was told it went: HeavenClient flies a removed drop to the player whatever
+comes next, and a drop sent again in that flight is lost. Equipment a mob or reactor dropped comes with its stats
 varied (`net::items::give_dropped`, Cosmic's `randomizeStats`): each stat it
 has moves up to a tenth of itself either way, at most 5, or 10 for defense,
 HP and MP. Equipment a player threw down keeps its stats.
