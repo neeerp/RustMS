@@ -351,7 +351,10 @@ impl WorldHandler for AttackHandler {
             result = result.with_reply(inventory::build_inventory_operation(false, &changes)?);
             projectile = ammo.item_id;
         }
-        let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
+        let marked = (uses.plain_most)
+            .map(|most| combat::mark_criticals(&attack, ctx.player, most, &uses.iced));
+        let shown = marked.as_ref().unwrap_or(&attack);
+        let broadcast = combat::build_attack(ctx.player.id(), shown, skill_level, projectile)?;
         let combo = combo::after_attack(ctx.player, &attack, rand::random());
         let energy = energy::after_attack(ctx.player, &attack);
         let spent = charge::after_attack(ctx.player, &attack, rand::random());
