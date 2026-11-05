@@ -106,19 +106,17 @@ namespace ms
 		totalstats[EquipStat::Id::ACC] += secondary_stat::base_accuracy(id, dex, luk);
 		totalstats[EquipStat::Id::AVOID] += secondary_stat::base_avoid(id, dex, luk);
 
-		// The rest of what is pinned takes the place of its total, within v83's bounds (FUN_0077f4c9).
-		if (forced_stat::any(forced))
-		{
-			constexpr std::pair<forced_stat::Slot, EquipStat::Id> SECONDARY[] = {
-				{ forced_stat::PAD, EquipStat::Id::WATK }, { forced_stat::PDD, EquipStat::Id::WDEF },
-				{ forced_stat::MAD, EquipStat::Id::MAGIC }, { forced_stat::MDD, EquipStat::Id::MDEF },
-				{ forced_stat::ACC, EquipStat::Id::ACC }, { forced_stat::EVA, EquipStat::Id::AVOID },
-				{ forced_stat::SPEED, EquipStat::Id::SPEED }, { forced_stat::JUMP, EquipStat::Id::JUMP }
-			};
+		// The rest of what is pinned takes the place of its total, and pinned or not each total
+		// ends within v83's bounds (FUN_0077f4c9).
+		constexpr std::pair<forced_stat::Slot, EquipStat::Id> SECONDARY[] = {
+			{ forced_stat::PAD, EquipStat::Id::WATK }, { forced_stat::PDD, EquipStat::Id::WDEF },
+			{ forced_stat::MAD, EquipStat::Id::MAGIC }, { forced_stat::MDD, EquipStat::Id::MDEF },
+			{ forced_stat::ACC, EquipStat::Id::ACC }, { forced_stat::EVA, EquipStat::Id::AVOID },
+			{ forced_stat::SPEED, EquipStat::Id::SPEED }, { forced_stat::JUMP, EquipStat::Id::JUMP }
+		};
 
-			for (auto [slot, stat] : SECONDARY)
-				totalstats[stat] = forced_stat::secondary(slot, totalstats[stat], forced);
-		}
+		for (auto [slot, stat] : SECONDARY)
+			totalstats[stat] = forced_stat::secondary(slot, totalstats[stat], forced);
 
 		// The window's range (FUN_008c2870): the least roll of a stab, and
 		// the whole of a swing, between 1 and 199999.

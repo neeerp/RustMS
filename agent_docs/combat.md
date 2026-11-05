@@ -1251,7 +1251,10 @@ so every request is answered, refusals with an empty STAT_CHANGED.
 
 - **AP** (`Player::spend_ap`): SPEND_AP names the stat by its STAT_CHANGED
   bit: STR, DEX, INT, LUK, MaxHP (0x800), or MaxMP (0x2000). Base stats stop
-  at 999 and max HP/MP at 30,000. One AP adds the job's growth (see EXP
+  at 999 and max HP/MP at 30,000, but the client doesn't bound the totals
+  with equipment (FUN_0077ec9f). It holds attack, magic and both defences to
+  1999, accuracy and avoid to 999, speed to 100-140 and jump to 100-123
+  (FUN_0077f4c9). One AP adds the job's growth (see EXP
   above; a beginner gets +8-12 HP or +6-8 MP). As in v83, the client
   only asks for MaxHP or MaxMP from level 20, and then only after the player
   confirms a warning that it may leave the character weaker.

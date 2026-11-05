@@ -29,6 +29,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -483,6 +485,10 @@ namespace ms
 	{
 		int32_t total = stats.get_total(stat) + extra;
 		int32_t delta = stats.get_buffdelta(stat);
+
+		// v83 seeds both totals with INT before they stop at 1999 (0x77f52a, 0x77f542).
+		if (stat == EquipStat::Id::MAGIC || stat == EquipStat::Id::MDEF)
+			total = std::min(total, 1999);
 
 		std::string stattext = std::to_string(total);
 		Color::Name color = Color::Name::BLACK;
