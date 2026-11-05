@@ -2356,13 +2356,17 @@ impl NpcScript {
     /// Ludibrium, Minerva's in the Tower of Goddess, Rolly's in the
     /// Ludibrium Maze's clear room, Konpei's in Showa's arena, Mu Young's
     /// in the Balrog's tomb, Bob's in the ghost ship's Engine Room, Aldol's
-    /// in the Spooky World, the Temple Keeper's at Pink Bean.
+    /// in the Spooky World, the Temple Keeper's at Pink Bean, Amon's on
+    /// Zakum's altar once it's won.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
             TOMMY => tommy(player, leader, won),
             TORY => tory_after(player, won),
             PINK_BALLOON => pink_balloon(player),
+            AMON if won && player.stats.map_id == ZAKUM_ALTAR => {
+                Some(amon_asks(player, keys::ZAKUM_AMON_WON))
+            }
             ARTURO if won => arturo(player, &mut rand::thread_rng()),
             MINERVA if won => minerva(player, &mut rand::thread_rng()),
             ROLLY_PRESENT if won => maze_present(player, &mut rand::thread_rng()),
@@ -15084,6 +15088,10 @@ fn lira() -> NpcScript {
 
 /// Amon, a way out of the Breath of Lava, and of Zakum's altar.
 fn amon(player: &Player) -> NpcScript {
+    amon_asks(player, keys::ZAKUM_AMON_LEAVE)
+}
+
+fn amon_asks(player: &Player, ask: &str) -> NpcScript {
     let out = if player.stats.map_id == ZAKUM_ALTAR {
         ENTRANCE_TO_ZAKUM
     } else {
@@ -15092,7 +15100,7 @@ fn amon(player: &Player) -> NpcScript {
     NpcScript::new(
         AMON,
         vec![Page::Ask {
-            text: text(keys::ZAKUM_AMON_LEAVE),
+            text: text(ask),
             on_yes: vec![Effect::Warp(out)],
             on_no: None,
         }],
@@ -27804,6 +27812,16 @@ mod tests {
                 [Effect::Warp(to)]
             );
         }
+        // Only after the win does he speak of it, on the altar alone.
+        assert!(NpcScript::in_event(AMON, &out, false, false).is_none());
+        let mut amon = NpcScript::in_event(AMON, &out, false, true).unwrap();
+        assert_eq!(kind(&amon.begin()), Some(1));
+        assert_eq!(
+            amon.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(ENTRANCE_TO_ZAKUM)]
+        );
+        out.stats.map_id = BREATH_OF_LAVA;
+        assert!(NpcScript::in_event(AMON, &out, false, true).is_none());
 
         // The gate wants the approval, the trials and an Eye of Fire.
         let gate = |items: &[(i32, i16)], markers: &[i16]| {

@@ -1042,6 +1042,7 @@ unsourced = [
     "zakum.lira.go",
     "zakum.lira.full",
     "zakum.amon.leave",
+    "zakum.amon.won",
     "zakum.gate.unapproved",
     "zakum.gate.trials",
     "zakum.gate.no_eye",

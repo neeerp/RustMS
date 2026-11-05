@@ -2390,6 +2390,7 @@ pub mod keys {
     pub const ZAKUM_LIRA_GO: &str = "zakum.lira.go";
     pub const ZAKUM_LIRA_FULL: &str = "zakum.lira.full";
     pub const ZAKUM_AMON_LEAVE: &str = "zakum.amon.leave";
+    pub const ZAKUM_AMON_WON: &str = "zakum.amon.won";
     pub const ZAKUM_GATE_UNAPPROVED: &str = "zakum.gate.unapproved";
     pub const ZAKUM_GATE_TRIALS: &str = "zakum.gate.trials";
     pub const ZAKUM_GATE_NO_EYE: &str = "zakum.gate.no_eye";
@@ -2574,7 +2575,7 @@ pub mod keys {
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
-    pub const ZAKUM: [&str; 59] = [
+    pub const ZAKUM: [&str; 60] = [
         ZAKUM_CHIEF_MENU,
         ZAKUM_CHIEF_THIRD_JOB,
         ZAKUM_CHIEF_ZAKUM,
@@ -2595,6 +2596,7 @@ pub mod keys {
         ZAKUM_LIRA_GO,
         ZAKUM_LIRA_FULL,
         ZAKUM_AMON_LEAVE,
+        ZAKUM_AMON_WON,
         ZAKUM_GATE_UNAPPROVED,
         ZAKUM_GATE_TRIALS,
         ZAKUM_GATE_NO_EYE,

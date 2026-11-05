@@ -4013,11 +4013,15 @@ impl FieldActor {
     /// Zakum's altar took the Eye of Fire: its music plays, and its body
     /// comes out on the ground below `(x, y)`, trembling in, not yet real
     /// (no controller, and its arms shield it), then its arms with it.
+    /// Cosmic's `getGroundBelow` looks for the body's ground from 14 higher.
     fn bring_out_zakum(&mut self, (x, y): (i16, i16)) {
         if let Ok(packet) = build_field_music(reactors::ZAKUM_MUSIC) {
             self.broadcast(None, packet);
         }
-        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        let ground = self
+            .drops
+            .ground_below(x, y.saturating_sub(14))
+            .unwrap_or(y);
         let at = (x, ground.saturating_sub(1));
         if let Some(info) = net::mobs::info(net::mobs::ZAKUM_BODY) {
             let object_id = self.mobs.place(info, at, 5, None, Instant::now());
@@ -5130,7 +5134,9 @@ impl FieldActor {
             }
             // Cosmic `changeMusic`, `spawnFakeMonster` (the body first),
             // `spawnMonster` for each arm, then `mapMessage(5, ..)`.
-            reactors::Action::Zakum => self.bring_out_zakum((view.x, view.y)),
+            reactors::Action::Zakum => {
+                self.bring_out_zakum((view.x, view.y.saturating_sub(10)));
+            }
             // Cosmic `changeMusic`, `spawnHorntailOnGroundBelow` and
             // `restartEventTimer` unless the intro is out, then
             // `mapMessage(6, ..)`.

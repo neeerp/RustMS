@@ -1822,6 +1822,7 @@
 "zakum.lira.go" = "[placeholder] Now I'll send you back to the Door to Zakum."
 "zakum.lira.full" = "[placeholder] Make room in your Etc. inventory for the Breath of Fire."
 "zakum.amon.leave" = "[placeholder] Leave? You'll have to start over. Are you sure?"
+"zakum.amon.won" = "[placeholder] Zakum has fallen to you, and well done! Will you leave now?"
 "zakum.gate.unapproved" = "[placeholder] You need a chief's approval to face Zakum."
 "zakum.gate.trials" = "[placeholder] You haven't finished the trials yet."
 "zakum.gate.no_eye" = "[placeholder] You need an Eye of Fire to face Zakum."
