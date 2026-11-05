@@ -287,6 +287,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME same_spot COMMAND same_spot_tests)
     add_executable(magnet_tests tests/magnet.cpp)
     add_test(NAME magnet COMMAND magnet_tests)
+    add_executable(double_press_tests tests/double_press.cpp)
+    add_test(NAME double_press COMMAND double_press_tests)
     add_executable(auto_potions_tests tests/auto_potions.cpp)
     add_test(NAME auto_potions COMMAND auto_potions_tests)
     add_executable(meso_explosion_tests tests/meso_explosion.cpp)
@@ -1221,6 +1223,7 @@ add_executable(HeavenClient
     IO/GuildCommands.h
     IO/ChatCommand.h
     IO/KeyRepeatRules.h
+    IO/DoublePress.h
     IO/ScreenshotRules.h
     IO/UI.cpp
     IO/UI.h

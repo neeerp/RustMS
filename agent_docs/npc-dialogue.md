@@ -246,12 +246,16 @@ sit on the bottom bar. A server menu's `#L` choices stay in the text where
 the script puts them, each with a dot. The client's own quest menus list
 their choices in 32 px rows under the question instead (`UINpcTalk::Menu`).
 The text types out at about 35 characters a second, but a menu's choices
-show at once, as in footage. As in v83, whose dialog adds a character a
-tick until the text ends (0x9a4eca), a click doesn't hurry it.
+show at once, as in footage. A press anywhere in the dialog but on its
+buttons or a prompt's field shows the rest at once (v83 sets its typing line
+to the end, 0x9abde5).
 
 The first choice starts selected (red arrow, dotted underline), and Up and
 Down move the selection. Clicking a choice or pressing Enter answers with
-it. A server menu has no NEXT, as in v83 footage; a quest list keeps NEXT,
+it. The second press of a double click does neither this nor the showing
+above: v83 makes it a 0x203, which the dialog ignores, so double-clicking an
+NPC doesn't pick the line that opens under the pointer. A double click is
+two presses within 500 ms and 4 pixels (`DoublePress`). A server menu has no NEXT, as in v83 footage; a quest list keeps NEXT,
 which also answers. On YES/NO and ACCEPT/DECLINE pages, the first Left or
 Right outlines YES or ACCEPT with its `keyFocused` frame, as in the original;
 then Left and Right move the outline, and Enter presses it. With

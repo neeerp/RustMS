@@ -294,6 +294,16 @@ namespace ms
 		return pressing;
 	}
 
+	void UI::set_double_press(bool second)
+	{
+		double_press = second;
+	}
+
+	bool UI::is_double_press() const
+	{
+		return double_press;
+	}
+
 	void UI::rightclick()
 	{
 		Point<int16_t> pos = cursor.get_position();
