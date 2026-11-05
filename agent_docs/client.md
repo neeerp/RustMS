@@ -738,6 +738,12 @@ force-and-friction model (`move_normal`).
   that. `phobj.flydir` -1 glides down at 0.3 of its top speed, and 0 dives at
   1200 px/s². `Physics::fly_jump` beats up at its full top speed. Fliers are
   drawn on the top layer.
+- **Walls in the air.** On the ground only walls joined to the floor's chain
+  stop a walker. In the air CVecCtrl's step (0x9b34c8) tests every line, so
+  `FootholdTree::get_wall_crossed` stops anything but a flier at a wall on its
+  layer or the lowest one with footholds, even one standing alone. A wall
+  faces one way: drawn upward it stops what moves right, drawn downward what
+  moves left. Like v83 the test is in whole pixels. Ceilings aren't tested.
 - **Fly maps.** A map with `info/fly` (and no `info/swim`, which wins) lets
   the player fly whenever they are off a platform (r25 0x9b2ef8, report b108):
   `MapInfo::is_flying` sets `phobj.flymap`, and `Player::is_afloat` puts them

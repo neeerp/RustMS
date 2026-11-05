@@ -136,10 +136,15 @@ namespace ms
 
 		double get_walk_edge(uint16_t fhid, bool left) const;
 
+		// The first wall an airborne object's next step runs into, if any.
+		std::optional<int16_t> get_wall_crossed(const PhysicsObject &phobj) const;
+
 		bool has_floor_at(int32_t x, int32_t top, int32_t bottom) const;
 
 		std::unordered_map<uint16_t, Foothold> footholds;
 		std::unordered_multimap<int16_t, uint16_t> footholdsbyx;
+		std::unordered_multimap<int16_t, uint16_t> wallsbyx;
+		uint8_t baselayer = 255;
 		std::unordered_map<uint16_t, Range<int16_t>> groups;
 		std::vector<uint16_t> grouporder;
 		std::unordered_map<uint16_t, std::vector<uint16_t>> groupfootholds;

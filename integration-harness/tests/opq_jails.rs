@@ -221,10 +221,12 @@ async fn the_jails_levers_drop_spears_on_the_lucidas_and_open_the_way_on() {
         })
         .await;
     }
+    // Of its 15 drops or more, the Diary of the Goddess shows only to those
+    // on quest 3099.
     send(c, hit_reactor(critical.object_id)).await;
     until(c, &mut room, |t| {
         let gone = t.field.reactors_removed.iter();
-        gone.clone().any(|&(oid, _)| oid == critical.object_id) && t.field.drops.len() >= 15
+        gone.clone().any(|&(oid, _)| oid == critical.object_id) && t.field.drops.len() >= 14
     })
     .await;
 }
