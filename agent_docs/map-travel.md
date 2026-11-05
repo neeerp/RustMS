@@ -4,9 +4,13 @@ Ordinary exits use `Map.nx/Map/Map*/<id>.img/portal`: `pn` identifies
 the source portal, `tm` the destination map, and `tn` the arrival portal.
 The server resolves these links; no handwritten map connection table exists.
 A nonempty `tn` must match an actual destination portal. Only an empty `tn`
-may use the map's default spawn point. The exceptions are `reactors::lost_link`'s exits,
-whose `tn` the target lacks: the Bart room's way out and Ardin's room's
-(926000000, `st00`) go to the target's default spawn instead of closing. The client skips portals without a
+may use the map's default spawn point. The exceptions are `map_rules::lost_link`'s
+exits, whose `tn` the target lacks: they go to the target's default spawn, as
+Cosmic's `GenericPortal` does, instead of closing. It lists rooms' ways out
+(the Bart room's, Ardin's, `910300000`'s, `923000000`'s and more), walks such
+as the Phantom Forest's back to the Haunted House (`610010000` `U1_3`), the
+Haunted House's rooms and the Highlands' floor (`600010600` `go*`). A
+lost link that isn't listed stays closed (QUESTIONS b441). The client skips portals without a
 travel destination when selecting an exit, including overlapping spawn points.
 
 A new field starts the player at rest in the air 10 pixels above the arrival

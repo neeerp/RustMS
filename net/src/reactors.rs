@@ -841,17 +841,6 @@ pub const PIRATE_SEAL: i32 = 2519000;
 pub const PIRATE_LAST_SEAL: i32 = 2519003;
 pub const PIRATE_SEAL_NAMES: [&str; 4] = ["sMob1", "sMob2", "sMob3", "sMob4"];
 
-/// Portals whose target spawn portal the target map lacks, so the target's
-/// default spawn stands in: the Bart room's way out names "ao00", which
-/// Nautilus' Navigation Room (120000102) has no portal by, and the way out
-/// of Ardin's room names "st00", which Ardin's house (260000200) lacks.
-const LOST_LINKS: [(i32, &str); 2] = [(BART_ROOM, "ntq00"), (crate::scripts::ARDINS_ROOM, "st00")];
-
-/// Whether `map_id`'s `portal` leads to the target map's default spawn.
-pub fn lost_link(map_id: i32, portal: &str) -> bool {
-    LOST_LINKS.contains(&(map_id, portal))
-}
-
 /// The pink line whoever broke reactor `reactor_id` reads first, if any
 /// (Cosmic `playerMessage(5, ..)`): the Dead Mine's, the Toy Factory's
 /// secret box and the Haunted House's.
@@ -1543,7 +1532,10 @@ mod tests {
         );
         assert_eq!(action(1200000), Action::Drops);
         assert!(shuffled(BART_ROOM));
-        assert!(lost_link(BART_ROOM, "ntq00") && !lost_link(BART_ROOM, "sp"));
+        assert!(
+            crate::map_rules::lost_link(BART_ROOM, "ntq00")
+                && !crate::map_rules::lost_link(BART_ROOM, "sp")
+        );
         let Ok(maps) = crate::game_data::get() else {
             return;
         };

@@ -95,13 +95,22 @@ add = [{ item = 4000538, prob = 0.4, quest = 2288 }]
 # teas (3400000) to the Greatest Oldies (4300010) carry them while it is
 # under way; the pack has no drops for them, and the rate is the community
 # servers'.
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4000539, prob = 0.2 },  # Cherry Bubble
+]
 
 [mobs.3400001]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4000541, prob = 0.6 },  # Mango Bubble
+]
 
 [mobs.3400002]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4000540, prob = 0.2 },  # Melon Bubble
+]
 
 [mobs.3400003]
 add = [
@@ -152,25 +161,34 @@ add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
 add = [
     { item = 4032521, prob = 0.12, quest = 2291 },
     { item = 4032506, prob = 0.08, quest = 2277 },  # Marshall's Refusal
+    { item = 4000525, prob = 0.6 },  # Kid Mannequin's Bunny Suit
 ]
 
 [mobs.4300007]
 add = [
     { item = 4032521, prob = 0.12, quest = 2291 },
     { item = 4032506, prob = 0.08, quest = 2277 },  # Marshall's Refusal
+    { item = 4000526, prob = 0.6 },  # Female Mannequin's Wig
 ]
 
 [mobs.4300008]
 add = [
     { item = 4032521, prob = 0.12, quest = 2291 },
     { item = 4032506, prob = 0.08, quest = 2277 },  # Marshall's Refusal
+    { item = 4000527, prob = 0.4 },  # Male Mannequin's Fedora
 ]
 
 [mobs.4300009]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4000528, prob = 0.6 },  # Latest Hits Compilation
+]
 
 [mobs.4300010]
-add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+add = [
+    { item = 4032521, prob = 0.12, quest = 2291 },
+    { item = 4000529, prob = 0.6 },  # Greatest Oldies
+]
 
 [mobs.8180000]
 # Manon (Leafre): the pack has the Explorer lines' Pentagon-style items
@@ -206,7 +224,10 @@ add = [
 
 [mobs.7110300]
 # D. Roy drops its Magic Stone of Trust 4031741, likewise.
-add = [{ item = 4031741, prob = 0.04, quest = 3345 }]
+add = [
+    { item = 4031741, prob = 0.04, quest = 3345 },
+    { item = 4000362, prob = 0.6 },  # Broken Mechanical Heart
+]
 
 [mobs.9300171]
 add = [{ item = 4001156, prob = 1.0 }]
@@ -1393,6 +1414,7 @@ add = [
     { item = 4032374, prob = 0.08, quest = 2405 },  # The Lost Letter of Commendation
     { item = 4032376, prob = 0.08, quest = 2406 },  # The Lost Letter of Commendation
     { item = 4001356, prob = 0.07 },  # Flint, for 28214 and 28246
+    { item = 4001344, prob = 0.07 },  # Dark Wooden Board
 ]
 
 [mobs.1120100]
@@ -1441,7 +1463,10 @@ add = [
 ]
 
 [mobs.2100103]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4000330, prob = 0.6 },  # Cactus Thorn
+]
 
 [mobs.2110200]
 add = [
@@ -1508,7 +1533,10 @@ add = [{ item = 4030009, prob = 0.028 }]
 add = [{ item = 4030009, prob = 0.028 }]
 
 [mobs.4110300]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4000357, prob = 0.6 },  # Piece of Steel
+]
 
 [mobs.4130101]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1766,13 +1794,20 @@ add = [{ item = 4030012, prob = 0.125 }]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.9400583]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4032031, prob = 0.08 },  # Lucky Charm
+]
 
 [mobs.9400644]
 add = [{ item = 4030012, prob = 0.125 }]
 
 [mobs.9420500]
-add = [{ item = 4030012, prob = 0.125 }]
+add = [
+    { item = 4030012, prob = 0.125 },
+    { item = 4000369, prob = 0.3 },  # Stop Sign
+    { item = 4000370, prob = 0.3 },  # Metal Pole
+]
 
 [mobs.9420501]
 add = [{ item = 4030012, prob = 0.125 }]
@@ -1992,7 +2027,10 @@ add = [
 
 [mobs.2100108]
 # Meerkat.
-add = [{ item = 4031568, prob = 0.08, quest = 3911 }]  # Making the Fancy Sword
+add = [
+    { item = 4031568, prob = 0.08, quest = 3911 },  # Making the Fancy Sword
+    { item = 4000333, prob = 0.6 },  # Telescope
+]
 
 [mobs.2110300]
 # Sand Rat.
@@ -2000,13 +2038,17 @@ add = [{ item = 4032402, prob = 0.1, quest = 2263 }]  # Camel's Training Session
 
 [mobs.2110301]
 # Scorpion.
-add = [{ item = 4032401, prob = 0.1, quest = 2261 }]  # Camel's Training Session 1 (Repeatable)
+add = [
+    { item = 4032401, prob = 0.1, quest = 2261 },  # Camel's Training Session 1 (Repeatable)
+    { item = 4000351, prob = 0.6 },  # Scorpion Sting
+]
 
 [mobs.2130100]
 # Dark Axe Stump.
 add = [
     { item = 4031773, prob = 0.2, quest = 2145 },  # Stump Research
     { item = 4001367, prob = 0.04, quest = 28257 },  # Who Broke the Seal of Andras?
+    { item = 4001344, prob = 0.07 },  # Dark Wooden Board
 ]
 
 [mobs.2230102]
@@ -2027,7 +2069,10 @@ add = [{ item = 4031694, prob = 0.1, quest = 3312 }]  # Russellon's Items for Ex
 
 [mobs.3300003]
 # Helmet Pepe.
-add = [{ item = 4001317, prob = 0.02, quest = 2326 }]  # James's Whereabouts (2)
+add = [
+    { item = 4001317, prob = 0.02, quest = 2326 },  # James's Whereabouts (2)
+    { item = 4000502, prob = 0.6 },  # Destroyed Helmet
+]
 
 [mobs.4230117]
 # Zeta Gray.
@@ -2059,27 +2104,45 @@ add = [{ item = 4031991, prob = 1.0, quest = 3248 }]  # Operation Strategy 1 : C
 
 [mobs.6110301]
 # Saitie.
-add = [{ item = 4031745, prob = 0.005, quest = 3358 }]  # Parwen's Pass
+add = [
+    { item = 4031745, prob = 0.005, quest = 3358 },  # Parwen's Pass
+    { item = 4000363, prob = 0.6 },  # Entry Pass
+]
 
 [mobs.7120103]
 # Red Slime.
-add = [{ item = 4032513, prob = 0.2, quest = 3722 }]  # The Crying Girl's Sketchbook
+add = [
+    { item = 4032513, prob = 0.2, quest = 3722 },  # The Crying Girl's Sketchbook
+    { item = 4000545, prob = 0.2 },  # Red Squishy Liquid
+]
 
 [mobs.7120104]
 # Silver Slime.
-add = [{ item = 4032513, prob = 0.2, quest = 3722 }]  # The Crying Girl's Sketchbook
+add = [
+    { item = 4032513, prob = 0.2, quest = 3722 },  # The Crying Girl's Sketchbook
+    { item = 4000546, prob = 0.2 },  # Silver Squishy Liquid
+]
 
 [mobs.7120105]
 # Gold Slime.
-add = [{ item = 4032513, prob = 0.2, quest = 3722 }]  # The Crying Girl's Sketchbook
+add = [
+    { item = 4032513, prob = 0.2, quest = 3722 },  # The Crying Girl's Sketchbook
+    { item = 4000547, prob = 0.2 },  # Gold Squishy Liquid
+]
 
 [mobs.7120106]
 # Overlord A.
-add = [{ item = 4032514, prob = 0.06, quest = 3727 }]  # The Shelter Key
+add = [
+    { item = 4032514, prob = 0.06, quest = 3727 },  # The Shelter Key
+    { item = 4000548, prob = 0.2 },  # Overlord A Radar Device
+]
 
 [mobs.7120107]
 # Overlord B.
-add = [{ item = 4032514, prob = 0.06, quest = 3727 }]  # The Shelter Key
+add = [
+    { item = 4032514, prob = 0.06, quest = 3727 },  # The Shelter Key
+    { item = 4000549, prob = 0.2 },  # Overlord B Radar Device
+]
 
 [mobs.7130004]
 # Hankie.
@@ -2250,4 +2313,157 @@ add = [{ item = 4001346, prob = 0.333333, quest = 28225 }]
 add = [
     { item = 4001346, prob = 0.333333, quest = 28225 },
     { item = 4032494, prob = 1.0, quest = 28255 },
+]
+
+[mobs.2100101]
+# Mobs with no table in the pack, each with what a quest's Check.img or Joko's
+# exchange asks of it and nothing else (QUESTIONS b440): the rows below and
+# the rows beside an item's name in the sections above. The rates are Cosmic's
+# (152-drop-data), which has no quest gate on them. A quest item only one quest
+# asks for is still held to that quest by `net::loot`. Their other loot is not
+# here yet.
+add = [{ item = 4000325, prob = 0.6 }]  # Carrot
+
+[mobs.2100102]
+add = [{ item = 4000329, prob = 0.6 }]  # Cactus Stem
+
+[mobs.2100104]
+add = [{ item = 4000331, prob = 0.6 }]  # Cactus' Flower
+
+[mobs.2100105]
+add = [{ item = 4000328, prob = 0.6 }]  # Snake Rattle
+
+[mobs.2100106]
+add = [{ item = 4000326, prob = 0.6 }]  # Earmuff
+
+[mobs.2100107]
+add = [{ item = 4000327, prob = 0.6 }]  # Ragged Scarf
+
+[mobs.3110300]
+add = [{ item = 4000353, prob = 0.6 }]  # Gelatin
+
+[mobs.3110301]
+add = [{ item = 4000352, prob = 0.6 }]  # Flaming Desert
+
+[mobs.3220001]
+add = [
+    { item = 4000329, prob = 0.6 },  # Cactus Stem
+    { item = 4000330, prob = 0.6 },  # Cactus Thorn
+    { item = 4000331, prob = 0.6 },  # Cactus' Flower
+]
+
+[mobs.3300000]
+add = [{ item = 4000499, prob = 0.6 }]  # Mutated Spore
+
+[mobs.3300001]
+add = [{ item = 4000500, prob = 0.6 }]  # Poison Mushroom Cap
+
+[mobs.3300002]
+add = [{ item = 4000501, prob = 0.6 }]  # Intoxicated Pig Tail
+
+[mobs.3300004]
+add = [{ item = 4000503, prob = 0.6 }]  # Broken Spear
+
+[mobs.4110301]
+add = [{ item = 4000358, prob = 0.6 }]  # Hardened Piece of Steel
+
+[mobs.4110302]
+add = [{ item = 4000359, prob = 0.6 }]  # Piece of Mithril
+
+[mobs.4230600]
+add = [{ item = 4000332, prob = 0.6 }]  # Sand
+
+[mobs.4300014]
+add = [{ item = 4000529, prob = 0.2 }]  # Greatest Oldies
+
+[mobs.5110301]
+add = [{ item = 4000364, prob = 0.6 }]  # Wires
+
+[mobs.5110302]
+add = [{ item = 4000365, prob = 0.6 }]  # Plug
+
+[mobs.7110301]
+add = [{ item = 4000361, prob = 0.6 }]  # May Mist
+
+[mobs.8200001]
+add = [{ item = 4000446, prob = 0.01 }]  # Smiley Mask
+
+[mobs.8200002]
+add = [{ item = 4000446, prob = 0.01 }]  # Smiley Mask
+
+[mobs.8200005]
+add = [{ item = 4000451, prob = 0.01 }]  # Neutral Mask
+
+[mobs.8200006]
+add = [{ item = 4000451, prob = 0.01 }]  # Neutral Mask
+
+[mobs.8200009]
+add = [{ item = 4000456, prob = 0.01 }]  # Frowny Mask
+
+[mobs.8200010]
+add = [{ item = 4000456, prob = 0.01 }]  # Frowny Mask
+
+[mobs.8220002]
+add = [
+    { item = 4000364, prob = 0.6 },  # Wires
+    { item = 4000365, prob = 0.6 },  # Plug
+]
+
+[mobs.8220004]
+add = [{ item = 4000460, prob = 0.6 }]  # Whale's Helmet
+
+[mobs.8220005]
+add = [{ item = 4000461, prob = 0.6 }]  # Knight's Mask
+
+[mobs.8220006]
+add = [{ item = 4000462, prob = 0.6 }]  # Guardian's Horn
+
+[mobs.9400573]
+add = [{ item = 4032005, prob = 0.2 }]  # Typhon Feather
+
+[mobs.9400574]
+add = [{ item = 4032005, prob = 0.2 }]  # Typhon Feather
+
+[mobs.9400575]
+add = [{ item = 4032013, prob = 0.1 }]  # Bigfoot's Toe
+
+[mobs.9400576]
+add = [{ item = 4032007, prob = 0.2 }]  # Windraider Badge
+
+[mobs.9400578]
+add = [{ item = 4032008, prob = 0.2 }]  # Firebrand Badge
+
+[mobs.9400579]
+add = [{ item = 4032009, prob = 0.2 }]  # Nightshadow Badge
+
+[mobs.9400580]
+add = [
+    { item = 4032010, prob = 0.2 },  # Elder Ashes
+    { item = 4032011, prob = 0.08 },  # Soiled Rags
+]
+
+[mobs.9400581]
+add = [{ item = 4032006, prob = 0.2 }]  # Stormbreaker Badge
+
+[mobs.9400588]
+add = [{ item = 4032003, prob = 0.15 }]  # Phantom Seed
+
+[mobs.9420502]
+add = [
+    { item = 4000366, prob = 0.3 },  # Waste Paper
+    { item = 4000367, prob = 0.3 },  # Recycle Water Bottle
+]
+
+[mobs.9420503]
+add = [
+    { item = 4000370, prob = 0.3 },  # Metal Pole
+    { item = 4000371, prob = 0.3 },  # Speed Limit Sign
+]
+
+[mobs.9420507]
+add = [
+    { item = 4000364, prob = 0.2 },  # Wires
+    { item = 4000374, prob = 0.3 },  # Headlight
+    { item = 4000375, prob = 0.3 },  # Tires
+    { item = 4000376, prob = 0.3 },  # Batteries
 ]

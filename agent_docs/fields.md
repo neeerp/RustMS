@@ -121,7 +121,8 @@ answers too. v83 has two refusal packets, each a reason byte
 `BLOCKED_SERVER` (0x84) for channel, cash shop and trade shop moves.
 HeavenClient shows the reason in chat or as a notice. The server sends
 `BLOCKED_MAP` 1 ("The portal is closed for now.") for a portal to a map or spawn
-portal it doesn't have. It sends `BLOCKED_SERVER` 1 for a change to the
+portal it doesn't have, except the links `map_rules::lost_link` lists (see
+`map-travel.md`). It sends `BLOCKED_SERVER` 1 for a change to the
 player's own channel or to a missing channel, and 2 when a dead player tries
 to enter the Cash Shop.
 
