@@ -21,6 +21,9 @@ const EYE_OF_FIRE: i32 = 4001017;
 const BODY: i32 = 8800000;
 const ARMS: std::ops::RangeInclusive<i32> = 8800003..=8800010;
 const PINK: u8 = 5;
+/// Just over the floor under the altar. The reactor sits lower than that,
+/// with nothing under it: arms sent there fall out of reach.
+const FLOOR: i16 = -216;
 /// Under the most a level-1 character with 32000 STR and a 1999-attack
 /// sword may hit for.
 const HIT: i32 = 5_000_000;
@@ -82,6 +85,9 @@ async fn the_eye_of_fire_brings_out_zakum_whose_arms_shield_its_body() {
     // The body first, trembling in, then the arms.
     let ids: Vec<i32> = wt.field.mobs.iter().map(|&(_, id)| id).collect();
     assert_eq!(ids, [BODY].into_iter().chain(ARMS).collect::<Vec<_>>());
+    for (oid, _) in &wt.field.mobs {
+        assert_eq!(wt.field.mob_positions[oid], (altar.x, FLOOR));
+    }
     let body = wt.field.mobs[0].0;
     assert_eq!(wt.field.appearances[&body], -4);
     let arms: Vec<i32> = wt.field.mobs[1..].iter().map(|&(oid, _)| oid).collect();

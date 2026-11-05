@@ -53,7 +53,8 @@ At the far end of the Breath of Lava (280020001), Lira (2032003) gives the
 Breath of Fire and 10,000 EXP and sends the player back to the Door to
 Zakum. Amon (2030010) asks before taking players out: to the Door to Zakum
 from the Breath of Lava, and to the Entrance to Zakum (211042400) from the
-altar (280030000).
+altar (280030000). Once the expedition has won, Amon's question on the altar
+is another one (`zakum.amon.won`), as in Cosmic's script.
 
 Where this differs from Cosmic:
 
@@ -152,7 +153,11 @@ script). The field (`bring_out_zakum`) then does the following, in order:
 - It plays Zakum's music to the map (FIELD_EFFECT 6, `Bgm06/FinalFight`).
 - It brings out the body (8800000) on the ground below the altar. The body
   trembles in (SPAWN_MONSTER appearance -4, `MobView::fake`), and the v83
-  client shakes the screen for it.
+  client shakes the screen for it. The reactor itself sits at y -204, under
+  the floor at -215, with no foothold below it, so the spot is lifted by 10
+  as for every reactor's spawn (Cosmic's `getPosition`), and the body's
+  ground is looked for from 14 higher (`getGroundBelow`). Sent lower, the
+  arms fall under their controller's physics, out of everyone's reach.
 - It brings out the eight arms (8800003-8800010) on the same spot, under the
   first player.
 - It sends a pink line to the map (placeholder `zakum.altar.summoned`).
