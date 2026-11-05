@@ -192,13 +192,16 @@ impl ClientActor {
         .await
     }
 
-    /// The field handed over a drop: put it in the inventory, or give it back
-    /// if it doesn't fit.
+    /// The field handed over a drop it still shows: put it in the inventory,
+    /// and have the field show it taken or leave it lying.
     pub(super) async fn picked_up(&mut self, drop: Drop) -> Result<(), RuntimeError> {
-        if !self.take_loot(&drop).await? {
-            return self.send_to_field(FieldMessage::ReturnDrop { drop }).await;
-        }
-        Ok(())
+        let taken = self.take_loot(&drop).await?;
+        self.send_to_field(FieldMessage::Looted {
+            looter: self.client_id,
+            drop,
+            taken,
+        })
+        .await
     }
 
     /// Take back everything this player dropped on their map; what doesn't

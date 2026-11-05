@@ -103,7 +103,7 @@ An item with `info/only` comes alone, and not to someone holding one, worn
 or not (`net::items::refuses_only`). Each way in refuses it differently, as
 v83 has no single code (report c005):
 - Pickup: SHOW_STATUS_INFO mode 0, -2 ("This item is unavailable for the
-  pick-up.") plus the unlock, and the drop goes back on the ground.
+  pick-up.") plus the unlock, and the drop stays on the ground.
 - Quest reward: UPDATE_QUEST_INFO mode 14.
 - NPC shop: result 3 (inventory full).
 - Script `GiveItem`: the effect isn't applied.

@@ -381,7 +381,6 @@ impl DropSet {
         self.drops.remove(&object_id)
     }
 
-    /// Put back a drop that couldn't be picked up (a full inventory).
     /// Take every drop `owner` owns off the map.
     pub fn take_owned(&mut self, owner: ClientId) -> Vec<Drop> {
         let ids: Vec<i32> = (self.drops.values())
@@ -391,6 +390,7 @@ impl DropSet {
         ids.iter().filter_map(|id| self.drops.remove(id)).collect()
     }
 
+    /// Put back a drop that couldn't be picked up (a full inventory).
     pub fn restore(&mut self, drop: Drop) {
         self.drops.insert(drop.object_id, drop);
     }

@@ -96,7 +96,8 @@ namespace ms
 
 		count_backgrd.draw(position + COUNT);
 
-		std::array<int32_t, 3> counts = { state.hit, state.miss, state.cool };
+		// The rows as the panel's art labels them: 0x560c22 draws hit, cool, then miss.
+		std::array<int32_t, 3> counts = { state.hit, state.cool, state.miss };
 
 		for (size_t i = 0; i < counts.size(); i++)
 		{
