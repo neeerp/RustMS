@@ -91,6 +91,9 @@ pub struct SkillLevel {
     /// for one without.
     pub lt: (i32, i32),
     pub rb: (i32, i32),
+    /// Whether the skill carries an element (`elemAttr`, on the skill, not
+    /// the level), which a monster can be weak to.
+    pub elemental: bool,
 }
 
 /// One level of a mob skill (`MobSkill.img/<id>/level/<n>`).
@@ -162,6 +165,9 @@ impl SkillData {
         let Some(skill) = nx.child_by_name(skills, &format!("{skill_id:07}"))? else {
             return Ok(None);
         };
+        let elemental = nx
+            .string_child(skill, "elemAttr")?
+            .is_some_and(|element| !element.is_empty());
         let mut levels = Vec::new();
         if let Some(level_nodes) = nx.child_by_name(skill, "level")? {
             for n in 1..=nx.node_at(level_nodes)?.child_count {
@@ -204,6 +210,7 @@ impl SkillData {
                     morph: int("morph")?,
                     lt: nx.vector_child(level, "lt")?.unwrap_or_default(),
                     rb: nx.vector_child(level, "rb")?.unwrap_or_default(),
+                    elemental,
                 });
             }
         }

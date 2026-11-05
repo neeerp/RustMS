@@ -367,7 +367,13 @@ misses as a blow does but ignores the mob's defense. Snipe's shot never
 misses and meets neither defense nor guards: 199,999 less a roll from 0 to
 10,000 (`shot_path::snipe_damage`, 0x78e4d6), always shown as a critical
 (FUN_00668b83). Another player's attack shows a hit as a critical when its
-damage has the top bit set (0x980620); RustMS sets it only for Snipe.
+damage has the top bit set (0x980620). RustMS sets it for Snipe, and, as the
+client's attack packet doesn't say which hits were critical, for a line past
+the most a hit can do without one (`combat::mark_criticals`, as Cosmic does).
+So a critical held under that mark by the mob's defense or a low roll stays
+plain for others. Only a player with a source of criticals is marked, and not
+for a skill with an element or under a charge, as a weakness would look the
+same.
 
 HeavenClient rolls every other blow as v83's PDamage does (`Mob::next_blow`,
 `Gameplay/Combat/PhysicalDamage.h`, FUN_0078df87). The weapon, not the job,

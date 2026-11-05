@@ -476,6 +476,9 @@ pub struct Uses {
     /// The mobs it hit past every cap, which only one iced by Combo Tempest
     /// can be (`validate_iced`).
     pub iced: Vec<i32>,
+    /// The most a hit can do without a critical, if a line past it can only
+    /// be one (`mark_criticals`).
+    pub plain_most: Option<i32>,
 }
 
 /// A shot fires the stack in the slot the client names, which the weapon
@@ -701,12 +704,24 @@ fn check(attack: &Attack, player: &Player, ice: bool) -> Result<Uses, AttackReje
             .clamp(10, i64::from(i32::MAX)) as i32
     };
     let base_cap = cap_for(100);
+    // The same without the critical or the doubling. A weakness to the
+    // element of a skill or a charge raises a hit as well, so neither says.
+    // Rounding gets a point in a hundred.
+    let plain_for = |percent: i32| {
+        (critical > 0 && charged == 100).then(|| {
+            let most =
+                base * (i64::from(percent) * combo / 100) / 100 * berserk / 100 * explosion / 100;
+            (most + most / 100 + 1).min(i64::from(i32::MAX)) as i32
+        })
+    };
+    let mut plain_most = None;
     let mut mesos = 0;
     let mut hp = 0;
     let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
         if attack.kind == AttackKind::Magic {
             return Err(AttackRejection::Skill);
         }
+        plain_most = plain_for(100);
         (
             None,
             crate::aran_combo::plain_mob_count(player),
@@ -753,6 +768,9 @@ fn check(attack: &Attack, player: &Player, ice: bool) -> Result<Uses, AttackReje
             charge::blow_percent(player, &skill).or_else(|| damage_percent(&skill))
         {
             let boost = skills::elemental_boost(player, skill.skill_id);
+            if !effect.elemental {
+                plain_most = plain_for(percent);
+            }
             cap_for(percent + boost.map_or(0, |boost| boost.effect.damage))
         } else {
             return Err(AttackRejection::Skill);
@@ -829,7 +847,27 @@ fn check(attack: &Attack, player: &Player, ice: bool) -> Result<Uses, AttackReje
         hp,
         blast,
         iced,
+        plain_most,
     })
+}
+
+/// `attack` with bit 31 set on the lines past `plain_most`, which other
+/// players see as criticals (v83 0x980620). The real server works out each
+/// hit itself; this client says nothing of them, so a critical that defence
+/// or a low roll keeps under the mark stays plain, as in Cosmic
+/// (AbstractDealDamageHandler). A mob in `iced` took its blow from the ice.
+pub fn mark_criticals(attack: &Attack, player: &Player, plain_most: i32, iced: &[i32]) -> Attack {
+    let mut marked = attack.clone();
+    for hit in (marked.hits.iter_mut()).filter(|hit| !iced.contains(&hit.object_id)) {
+        let percent = i64::from(beacon::damage_percent(player, hit.object_id));
+        let most = (i64::from(plain_most) * percent / 100).min(i64::from(i32::MAX)) as i32;
+        for (line, damage) in hit.damage.iter_mut().enumerate() {
+            if *damage > barrage_cap(most, attack.skill, line) {
+                *damage |= i32::MIN;
+            }
+        }
+    }
+    marked
 }
 
 /// Barrage's fifth line does twice the others and its sixth four times
@@ -1256,6 +1294,7 @@ mod tests {
                 hp: 0,
                 blast: None,
                 iced: Vec::new(),
+                plain_most: None,
             })
         );
         assert_eq!(
@@ -2302,6 +2341,29 @@ mod tests {
         assert_eq!(damage, 150_000 | i32::MIN);
     }
 
+    #[test]
+    fn others_see_a_hit_past_the_plain_most_as_critical() {
+        let mut player = beginner_with_sword();
+        let attack = parse_close_attack(&attack_packet(1, 15)).unwrap();
+        assert_eq!(validate(&attack, &player).unwrap().plain_most, None);
+        // Sharp Eyes gives a sword its criticals; the base here is 10.
+        player.buffs.give(game::Buff::new(
+            3121002,
+            BuffStat::SharpEyes,
+            (30 << 8 | 140) as i16,
+            std::time::Instant::now(),
+            std::time::Duration::from_secs(60),
+        ));
+        let most = validate(&attack, &player).unwrap().plain_most.unwrap();
+        assert_eq!(most, 11);
+        let marked = mark_criticals(&attack, &player, most, &[]);
+        assert_eq!(marked.hits[0].damage, vec![15 | i32::MIN]);
+        let iced = [attack.hits[0].object_id];
+        assert_eq!(mark_criticals(&attack, &player, most, &iced), attack);
+        let plain = parse_close_attack(&attack_packet(1, 11)).unwrap();
+        assert_eq!(mark_criticals(&plain, &player, most, &[]), plain);
+    }
+
     fn rogue_with_stars(stars: i16) -> Player {
         let mut player = beginner_with_sword();
         player.inventory.insert(
@@ -2376,6 +2438,7 @@ mod tests {
                 hp: 0,
                 blast: None,
                 iced: Vec::new(),
+                plain_most: None,
             }
         );
         // Arrows don't fit a claw, and an empty slot holds nothing.
