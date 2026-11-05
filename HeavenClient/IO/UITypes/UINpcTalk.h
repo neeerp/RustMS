@@ -115,6 +115,10 @@ namespace ms
 		// Whether the client answers the dialogue shown, not the server.
 		bool is_local() const;
 
+		// A script's dialogue ends with its field and sends nothing (v83:
+		// result 3 from 0x7465bf). The client's own pages stay.
+		void leave_field();
+
 		// What the text markup names: the player, NPCs, items, mobs and maps.
 		static NpcTextMarkup::Lookups markup_lookups();
 
