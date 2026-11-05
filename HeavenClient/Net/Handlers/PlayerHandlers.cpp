@@ -185,7 +185,7 @@ namespace ms
 			player.change_look(stat, recv.read_int());
 			break;
 		case MapleStat::Id::LEVEL:
-			player.change_level(recv.read_byte());
+			player.change_level(static_cast<uint8_t>(recv.read_byte()));
 			break;
 		case MapleStat::Id::JOB:
 			player.change_job(recv.read_short());
