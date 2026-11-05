@@ -140,8 +140,13 @@ namespace ms
 					if (foothold.t() < topb)
 						topb = foothold.t();
 
+					baselayer = std::min(baselayer, layer);
+
 					if (foothold.is_wall())
+					{
+						wallsbyx.emplace(foothold.l(), id);
 						continue;
+					}
 
 					int16_t start = foothold.l();
 					int16_t end = foothold.r();
@@ -203,6 +208,17 @@ namespace ms
 			bool left = phobj.hspeed < 0.0f;
 			double wall = get_wall(phobj.fhid, left, phobj.next_y());
 			bool collision = left ? crnt_x >= wall && next_x <= wall : crnt_x <= wall && next_x >= wall;
+
+			if (!phobj.onground && phobj.type != PhysicsObject::Type::FLYING)
+			{
+				std::optional<int16_t> crossed = get_wall_crossed(phobj);
+
+				if (crossed && (!collision || (left ? *crossed > wall : *crossed < wall)))
+				{
+					wall = *crossed;
+					collision = true;
+				}
+			}
 
 			if (!collision && phobj.is_flag_set(PhysicsObject::Flag::TURNATEDGES) && !jumper)
 			{
@@ -295,6 +311,68 @@ namespace ms
 					phobj.limity(borders.second());
 			}
 		}
+	}
+
+	// In the air CVecCtrl's step (0x9b34c8) meets a wall like any other line,
+	// whether or not it joins the floor below. A wall stops what comes from
+	// the side it was drawn to face, if it is on the object's layer or the
+	// lowest one with footholds.
+	std::optional<int16_t> FootholdTree::get_wall_crossed(const PhysicsObject &phobj) const
+	{
+		int32_t xs = static_cast<int32_t>(std::round(phobj.crnt_x()));
+		int32_t ys = static_cast<int32_t>(std::round(phobj.crnt_y()));
+		int32_t xe = static_cast<int32_t>(std::round(phobj.next_x()));
+		int32_t ye = static_cast<int32_t>(std::round(phobj.next_y()));
+		int32_t dx = xe - xs;
+		int32_t dy = ye - ys;
+
+		if (dx == 0)
+			return std::nullopt;
+
+		int32_t step = dx > 0 ? 1 : -1;
+
+		for (int32_t x = xs; x != xe + step; x += step)
+		{
+			auto range = wallsbyx.equal_range(static_cast<int16_t>(x));
+
+			for (auto iter = range.first; iter != range.second; ++iter)
+			{
+				const Foothold &fh = footholds.at(iter->second);
+
+				if (fh.layer() != phobj.fhlayer && fh.layer() != baselayer)
+					continue;
+
+				int32_t start = side(fh, xs, ys);
+				int32_t end = side(fh, xe, ye);
+
+				if (start > 0 || end < 0 || (start == 0 && end == 0))
+					continue;
+
+				int32_t first = (fh.y1() - ys) * dx - (fh.x1() - xs) * dy;
+				int32_t last = (fh.y2() - ys) * dx - (fh.x2() - xs) * dy;
+
+				if ((first < 0 && last < 0) || (first > 0 && last > 0))
+					continue;
+
+				if (first == 0)
+				{
+					const Foothold &prev = get_fh(fh.prev());
+
+					if (prev.id() == 0 || !under_joint(prev, fh, xe, ye))
+						continue;
+				} else if (last == 0)
+				{
+					const Foothold &next = get_fh(fh.next());
+
+					if (next.id() == 0 || !under_joint(fh, next, xe, ye))
+						continue;
+				}
+
+				return static_cast<int16_t>(x);
+			}
+		}
+
+		return std::nullopt;
 	}
 
 	// CVecCtrl's landing test (0x9b34c8) follows the step in whole pixels, so

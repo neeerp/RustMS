@@ -1008,6 +1008,75 @@ ms::PhysicsObject jumper_at(const ms::Physics& physics, double x, double y, uint
 	return mob;
 }
 
+// A floor that ends before a tower's inner wall, which it doesn't join, as on
+// Tower's Trap's -2354 floor, and a second wall that faces the other way.
+void walls_in_the_air()
+{
+	auto path = foothold_map({
+		{1, 1, 100, 0, 300, 0, 0, 0},
+		{2, 2, 400, 500, 400, -500, 0, 0},
+		{2, 3, 450, -500, 450, 500, 0, 0},
+		{3, 4, 0, 400, 400, 400, 0, 0},
+		{3, 7, 401, 600, 1000, 600, 0, 0},
+		{4, 5, -2000, 900, -1500, 900, 0, 0},
+		{4, 6, 1500, 900, 2000, 900, 0, 0}});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		auto flying = [&](double x, double y, double hspeed)
+		{
+			ms::PhysicsObject object;
+			object.shoe = true;
+			object.set_x(x); object.set_y(y);
+			object.onground = false;
+			object.fhid = 4;
+			object.hspeed = hspeed;
+			return object;
+		};
+
+		// Off the floor's end at speed: stopped by the wall, then down it to
+		// the floor below.
+		ms::PhysicsObject player = flying(301, -1, 3.0);
+		bool stopped = false;
+		for (int tick = 0; tick < 400 && !player.onground; ++tick)
+		{
+			double hspeed = player.hspeed;
+			physics.move_object(player);
+			require(player.crnt_x() <= 400, "an object in the air went through a wall");
+			require(player.crnt_x() >= 300, "an object in the air was thrown back");
+			stopped = stopped || (player.crnt_x() == 400 && hspeed > 0.0);
+		}
+		require(stopped && player.onground && player.fhid == 4 && player.crnt_x() == 400,
+			"an object in the air did not slide down a wall to the floor");
+
+		// A wall stops what comes from the side it faces only.
+		ms::PhysicsObject out = flying(402, 100, -3.0);
+		physics.move_object(out);
+		require(out.crnt_x() < 400, "a wall stopped an object from its back");
+
+		// Drawn downwards, it faces the other way.
+		ms::PhysicsObject back = flying(452, 100, -3.0);
+		physics.move_object(back);
+		require(back.crnt_x() == 450, "a wall drawn downwards did not stop an object from its right");
+
+		ms::PhysicsObject on = flying(448, 100, 3.0);
+		physics.move_object(on);
+		require(on.crnt_x() > 450, "a wall drawn downwards stopped an object from its left");
+
+		// Past its end, a step goes by.
+		ms::PhysicsObject over = flying(398, -520, 5.0);
+		physics.move_object(over);
+		require(over.crnt_x() > 400, "a step over a wall's end was stopped");
+
+		// A flier isn't held by it.
+		ms::PhysicsObject flier = flying(398, 100, 5.0);
+		flier.type = ms::PhysicsObject::Type::FLYING;
+		physics.move_object(flier);
+		require(flier.crnt_x() > 400, "a wall in the air stopped a flier");
+	}
+	std::filesystem::remove(path);
+}
+
 // Walks a jumper until it asks to jump, turns, or leaves the ground.
 void walk_jumper(const ms::Physics& physics, ms::PhysicsObject& mob, int8_t direction)
 {
@@ -1370,6 +1439,7 @@ int main()
 		}
 		std::filesystem::remove(path);
 		landings();
+		walls_in_the_air();
 		std::cout << "Movement physics passed\n";
 		return 0;
 	}
