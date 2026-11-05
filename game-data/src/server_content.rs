@@ -3295,6 +3295,7 @@ pub mod keys {
     pub const REFINER_FIONA_FORGE: &str = "refiner.fiona.forge";
     pub const REFINER_FIONA_UPGRADE: &str = "refiner.fiona.upgrade";
     pub const REFINER_FIONA_NOT_YET: &str = "refiner.fiona.not_yet";
+    pub const MO_NOT_YET: &str = "mo.not_yet";
     pub const ELLIN_MENU: &str = "ellin.menu";
     pub const ELLIN_ENTER: &str = "ellin.enter";
     pub const ELLIN_ABOUT: &str = "ellin.about";
@@ -5643,6 +5644,7 @@ mod tests {
                 keys::REFINER_FIONA_FORGE,
                 keys::REFINER_FIONA_UPGRADE,
                 keys::REFINER_FIONA_NOT_YET,
+                keys::MO_NOT_YET,
                 keys::ELLIN_MENU,
                 keys::ELLIN_ENTER,
                 keys::ELLIN_ABOUT,

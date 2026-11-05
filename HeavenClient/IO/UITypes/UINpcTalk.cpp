@@ -261,7 +261,7 @@ namespace ms
 
 			if (first_line)
 				dotted_line(start + Point<int16_t>(LABEL_X, 2),
-							wrapped ? origin.x() + choice.label.width() : end.x(), Color::Name::DUSKBLUE);
+							wrapped ? origin.x() + widest(choice) : end.x(), Color::Name::DUSKBLUE);
 
 			if (wrapped && visible(end.y() - LINE + 4, end.y() + 4))
 				dotted_line(Point<int16_t>(origin.x(), end.y() + 2), end.x(), Color::Name::DUSKBLUE);
@@ -299,6 +299,12 @@ namespace ms
 		return draw_text ? formatted_text_pos : formatted_text.size();
 	}
 
+	int16_t UINpcTalk::widest(const Choice &choice) const
+	{
+		// An inline choice is part of the text and has no label of its own.
+		return menu_kind == Menu::LIST ? choice.label.width() : text.width();
+	}
+
 	int16_t UINpcTalk::choice_at(Point<int16_t> cursor) const
 	{
 		Point<int16_t> origin = text_origin();
@@ -312,8 +318,8 @@ namespace ms
 			const Choice &choice = choices[i];
 			Point<int16_t> start = origin + choice.start;
 			Point<int16_t> end = origin + choice.end;
-			int16_t widest = origin.x() + choice.label.width();
-			int16_t right = end.y() == start.y() ? end.x() : widest;
+			int16_t full = origin.x() + widest(choice);
+			int16_t right = end.y() == start.y() ? end.x() : full;
 
 			if (Rectangle<int16_t>(start.x(), right, start.y() - LINE - choice.rise + 4, start.y() + 4).contains(cursor))
 				return static_cast<int16_t>(i);
@@ -325,7 +331,7 @@ namespace ms
 			// between its first and last run the label's width.
 			int16_t last_top = end.y() - LINE + 4;
 
-			if (Rectangle<int16_t>(origin.x(), widest, start.y() + 4, last_top).contains(cursor)
+			if (Rectangle<int16_t>(origin.x(), full, start.y() + 4, last_top).contains(cursor)
 				|| Rectangle<int16_t>(origin.x(), end.x(), last_top, end.y() + 4).contains(cursor))
 				return static_cast<int16_t>(i);
 		}
@@ -925,6 +931,7 @@ namespace ms
 		// layout: a choice's start leaves room for its dot, its end takes none.
 		std::vector<Point<int16_t>> boxes;
 		std::vector<std::pair<size_t, size_t>> marks;
+		std::vector<size_t> mark_ends;
 		size_t next_image = 0;
 
 		for (size_t i = 0; i < formatted_text.size(); i++)
@@ -945,6 +952,7 @@ namespace ms
 				if (instant_text.size() < marks.size())
 					instant_text.emplace_back(marks.back().second, i + 1);
 
+				mark_ends.push_back(boxes.size());
 				boxes.emplace_back(0, 0);
 				c = Text::BOX;
 			}
@@ -960,8 +968,17 @@ namespace ms
 
 		int16_t block = text.height();
 
-		for (size_t i = 0; i < marks.size() && i < inline_ids.size(); i++)
-			choices.push_back({ inline_ids[i], text.box_position(marks[i].first), text.box_position(marks[i].first + 1) });
+		for (size_t i = 0; i < mark_ends.size() && i < inline_ids.size(); i++)
+		{
+			Choice choice { inline_ids[i], text.box_position(marks[i].first), text.box_position(mark_ends[i]) };
+
+			// Every token of a link answers, its images too (99e4e3, 9abf29):
+			// a tall one on the first line lifts the row's top.
+			for (size_t box = marks[i].first + 1; box < mark_ends[i]; box++)
+				choice.rise = std::max<int16_t>(choice.rise, choice.start.y() - text.box_position(box).y() - LINE);
+
+			choices.push_back(std::move(choice));
+		}
 
 		// Listed choices: 32 px rows under the question, a header above the
 		// first of each group.

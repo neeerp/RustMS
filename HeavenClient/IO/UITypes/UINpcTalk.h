@@ -262,6 +262,9 @@ namespace ms
 			int16_t rise = 0;
 		};
 
+		// How far a wrapped choice's full lines run, from the text's left edge.
+		int16_t widest(const Choice &choice) const;
+
 		std::vector<Choice> choices;
 		// Text that shows at once while the rest types out, in order: inline
 		// choices, as in footage, and what v83 puts between #w marks.
