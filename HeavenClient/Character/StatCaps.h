@@ -23,19 +23,17 @@
 
 namespace ms
 {
-	// Externalising this for easier configurability.
+	// v83's bounds on the totals: attack and defence at 1999, accuracy and
+	// avoid at 999 (FUN_0077f4c9), max HP and MP at 30000. STR, DEX, INT and
+	// LUK have none (FUN_0077ec9f).
 	const std::unordered_map<EquipStat::Id, int32_t> EQSTAT_CAPS =
 			{
-					{EquipStat::Id::STR,   999},
-					{EquipStat::Id::DEX,   999},
-					{EquipStat::Id::INT,   999},
-					{EquipStat::Id::LUK,   999},
 					{EquipStat::Id::HP,    30000},
 					{EquipStat::Id::MP,    30000},
-					{EquipStat::Id::WATK,  999},
-					{EquipStat::Id::MAGIC, 2000},
-					{EquipStat::Id::WDEF,  999},
-					{EquipStat::Id::MDEF,  999},
+					{EquipStat::Id::WATK,  1999},
+					{EquipStat::Id::MAGIC, 1999},
+					{EquipStat::Id::WDEF,  1999},
+					{EquipStat::Id::MDEF,  1999},
 					{EquipStat::Id::ACC,   999},
 					{EquipStat::Id::AVOID, 999},
 					{EquipStat::Id::HANDS, 999},
