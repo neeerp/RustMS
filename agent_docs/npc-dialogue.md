@@ -288,6 +288,9 @@ and awaits database work on the blocking pool, serializing reward updates with
 other character operations. A new click replaces the conversation. Finishing,
 cancellation, invalid responses, map changes, channel changes, and disconnects
 clear transient state. Responses without an active conversation are ignored.
+The client closes a script's dialogue at a map change as well, without
+answering (v83: `0x7465bf` ends it with result 3), so a timer that moves the
+player mid-talk leaves nothing open in the new field.
 
 ## Wire format and client
 

@@ -480,6 +480,15 @@ namespace ms
 		respond(local_responder ? -1 : npc_input::close_answer(message_type));
 	}
 
+	void UINpcTalk::leave_field()
+	{
+		if (local_responder)
+			return;
+
+		release_field();
+		deactivate();
+	}
+
 	bool UINpcTalk::has_field() const
 	{
 		return type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER || type == TalkType::SENDBOXTEXT;

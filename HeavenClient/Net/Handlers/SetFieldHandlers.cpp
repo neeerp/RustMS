@@ -284,6 +284,10 @@ namespace ms
 		if (auto storage = UI::get().get_element<UIStorage>(); storage && storage->is_active())
 			storage->leave_field();
 
+		// An NPC's dialogue too: the server forgets the script with the field.
+		if (auto talk = UI::get().get_element<UINpcTalk>(); talk && talk->is_active())
+			talk->leave_field();
+
 		// And the wedding's wishlist and gift windows: the server forgets the
 		// open window when we leave the field.
 		UI::get().remove(UIElement::Type::WISHLISTINPUT);
