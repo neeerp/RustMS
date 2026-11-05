@@ -3228,6 +3228,9 @@ impl NpcScript {
                 FIONA,
                 vec![Page::Say(text(keys::REFINER_FIONA_NOT_YET))],
             )),
+            MO if player.quests.state(FALLEN_WOODS) != QuestState::Completed => {
+                Some(NpcScript::new(MO, vec![Page::Say(text(keys::MO_NOT_YET))]))
+            }
             VICIOUS => Some(refiner(&VICIOUS_REFINER)),
             JM => Some(refiner(&JM_REFINER)),
             id if refiners::PITCH_TRADERS.iter().any(|&(npc, _)| npc == id) => {
@@ -19009,6 +19012,12 @@ const SMITH_REFINER: Refiner = Refiner {
 /// The Right Path (8225).
 pub const FIONA: i32 = 9201095;
 
+/// Mo (Cosmic `9201099`) in Dead Man's Gorge opens the supply tent for those
+/// who finished The Fallen Woods (8224), as Taggrin's last page says. Npc.nx
+/// gives Mo the script `MoStore`.
+pub const MO: i32 = 9201099;
+const FALLEN_WOODS: i16 = 8224;
+
 const FIONA_REFINER: Refiner = Refiner {
     npc: FIONA,
     hello: keys::REFINER_FIONA_HELLO,
@@ -28229,6 +28238,22 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn mo_opens_the_supply_tent_after_the_fallen_woods() {
+        let mut mo = NpcScript::for_npc(MO, &player(90)).unwrap();
+        assert_eq!(page_text(&mo.begin()), text(keys::MO_NOT_YET));
+
+        let mut partner = player(90);
+        partner.quests.upsert(game::QuestRecord {
+            quest_id: FALLEN_WOODS,
+            status: game::QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        // No script: the talk falls through to the shop.
+        assert!(NpcScript::for_npc(MO, &partner).is_none());
     }
 
     #[test]

@@ -1410,6 +1410,9 @@ talks to another NPC, or changes maps. Rows whose item our v83 data lacks are
 dropped, as are price-0 rows other than throwing stars and bullets, which a
 shop lists only to recharge.
 
+A script goes first, so a shop can be closed by one: Mo (9201099, Dead Man's
+Gorge) only opens once The Fallen Woods (8224) is complete, and says so before.
+
 OPEN_NPC_SHOP (`0x131`): NPC id, row count, then per row the item id, price,
 three zero ints (token price, period, unused), and either a bundle size of 1
 or, for stars and bullets (`207xxxx`, `233xxxx`), the item's `unitPrice` as an
