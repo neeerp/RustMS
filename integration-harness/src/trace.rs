@@ -1032,16 +1032,27 @@ pub async fn read_for(c: &mut MapleTestConnection, trace: &mut Trace, ms: u64) {
 
 /// Wait for our own chat line to come back, recording packets on the way.
 /// The field relays it only after earlier work for this client completed.
+/// A field's packets stop at a client that has moved on, so a line said as
+/// a warp lands may never come back: a warp means saying another, new one
+/// (so that the first, if it does come, can't end a later barrier early).
 pub async fn barrier(c: &mut MapleTestConnection, marker: &str, trace: &mut Trace) {
-    send(c, build_all_chat(marker, 0).unwrap()).await;
+    let mut line = marker.to_string();
+    let mut warps = trace.warps.len();
+    send(c, build_all_chat(&line, 0).unwrap()).await;
     loop {
         let p = read(c, trace).await;
+        if trace.warps.len() > warps {
+            warps = trace.warps.len();
+            line.push('.');
+            send(c, build_all_chat(&line, 0).unwrap()).await;
+            continue;
+        }
         if p.opcode() == SendOpcode::ChatText as i16 {
             let mut r = Cursor::new(&p.bytes);
             r.read_short().unwrap();
             r.read_int().unwrap();
             r.read_byte().unwrap();
-            if r.read_str_with_length().unwrap() == marker {
+            if r.read_str_with_length().unwrap() == line {
                 return;
             }
         }

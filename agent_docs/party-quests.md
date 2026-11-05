@@ -396,8 +396,8 @@ drops every mob shares (`loot::roll_friendly`), owned by the party of a player t
 hears `hpq.bunny.cake` with the count. 20 s is a recommended default in
 `v83ref/lanes/QUESTIONS.md` (row 180).
 
-When its HP runs out it goes home rather than dying (KILL_MONSTER 0, no
-drops, no EXP) and the map hears `hpq.bunny.gone`. In an event's copy, 5
+When its HP runs out it plays its `die1`, the same for every friendly mob
+(KILL_MONSTER 1, no drops, no EXP), and the map hears `hpq.bunny.gone`. In an event's copy, 5
 seconds later (shortened like events' time) everyone there gets a pink
 `hpq.bunny.lost` (BROADCAST_MSG 5) and their clients tell the event it
 failed (`ServerMessage::EventFailed`, `EventCommand::Fail`), which ends it

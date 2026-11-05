@@ -4252,8 +4252,9 @@ impl FieldActor {
             }
             return;
         }
-        // It goes home rather than dying (Cosmic's `killFriendlies`).
-        if let Ok(packet) = build_kill_mob(victim, 0) {
+        // Its `die1` plays, without drops or EXP (Cosmic's `killFriendlies`:
+        // the 0 there is a drop delay, and the animation is 1).
+        if let Ok(packet) = build_kill_mob(victim, 1) {
             self.broadcast(None, packet);
         }
         if bunny {
