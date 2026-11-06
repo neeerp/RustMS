@@ -60,6 +60,24 @@ int main()
 		alice.place({ 3, 3, 1 });
 		require(alice.can_ask_tie(), "and again next turn");
 
+		// A request waits for its answer, however the turn goes.
+		alice.ask_tie();
+		alice.turn(0);
+		alice.place({ 5, 5, 1 });
+		require(!alice.can_ask_tie(), "a tie still waiting stays asked");
+		alice.tie_denied();
+		require(alice.can_ask_tie(), "until the other player answers");
+
+		Omok carol(0);
+		carol.start(1);
+		carol.place({ 6, 6, carol.my_color });
+		carol.ask_undo();
+		carol.turn(1);
+		carol.place({ 7, 7, 2 });
+		require(carol.can_ask_undo() == Omok::Undo::NO, "an undo still waiting stays asked");
+		carol.undo_refused();
+		require(carol.can_ask_undo() == Omok::Undo::ASK, "until the other player answers it too");
+
 		// The timer runs out once, for whoever moves.
 		bob.turn(1);
 		require(!bob.tick(29000) && bob.seconds_left() == 1, "a second left");

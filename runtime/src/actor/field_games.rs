@@ -88,12 +88,15 @@ struct Play {
     turn: u8,
     /// Who moved first, with Omok's black stones (color 1).
     first: u8,
-    /// Who asked for a tie, and whether anyone did this turn: v83 asks
-    /// once a turn (report 164 §4, +0x73c).
-    tie_asked: Option<u8>,
-    tie_used: bool,
-    /// Omok: who asked to take a stone back, and who already did.
-    undo_asked: Option<u8>,
+    /// Who has a tie request waiting, and who asked this turn: v83 asks
+    /// once a turn (report 164 §4, +0x73c). The client keeps its button
+    /// shut until it hears back (+0x738 clears only on 0x33), so a request
+    /// outlives the turn it was made in, here and for an undo.
+    tie_asked: [bool; 2],
+    tie_used: [bool; 2],
+    /// Omok: who has a request to take a stone back waiting (+0x740 clears
+    /// only on 0x37), and who already took one.
+    undo_asked: [bool; 2],
     undone: [bool; 2],
     /// When the turn began. Both clients send a skip once its time runs
     /// out (report 164 §4), so only the first after `Play::skip_after` counts.
@@ -131,9 +134,7 @@ impl Play {
     /// The player in `slot` moves next, with a fresh turn.
     fn give_turn(&mut self, slot: u8) {
         self.turn = slot;
-        self.tie_asked = None;
-        self.tie_used = false;
-        self.undo_asked = None;
+        self.tie_used = [false; 2];
         self.turn_since = Instant::now();
     }
 }
@@ -404,18 +405,24 @@ impl Games {
                 game.tell_all(&mut out, || build_game_message(message, &name));
             }
             MiniGameRequest::AskTie => {
-                let Some(play) = game.play.as_mut().filter(|p| !p.tie_used) else {
+                let asker = usize::from(slot);
+                let Some(play) = game
+                    .play
+                    .as_mut()
+                    .filter(|p| !p.tie_asked[asker] && !p.tie_used[asker])
+                else {
                     return out;
                 };
-                play.tie_asked = Some(slot);
-                play.tie_used = true;
+                play.tie_asked[asker] = true;
+                play.tie_used[asker] = true;
                 game.tell(&mut out, other, build_tie_asked());
             }
             MiniGameRequest::AnswerTie(accept) => {
-                let Some(play) = game.play.as_mut().filter(|p| p.tie_asked == Some(other)) else {
+                let asker = usize::from(other);
+                let Some(play) = game.play.as_mut().filter(|p| p.tie_asked[asker]) else {
                     return out;
                 };
-                play.tie_asked = None;
+                play.tie_asked[asker] = false;
                 if accept {
                     return self.finish(id, None, game_result::TIE);
                 }
@@ -436,20 +443,21 @@ impl Games {
                 let Board::Omok(board) = &play.board else {
                     return out;
                 };
-                if play.undo_asked.is_some()
+                if play.undo_asked[usize::from(slot)]
                     || play.undone[usize::from(slot)]
                     || !board.has_stones(color)
                 {
                     return out;
                 }
-                play.undo_asked = Some(slot);
+                play.undo_asked[usize::from(slot)] = true;
                 game.tell(&mut out, other, build_undo_asked());
             }
             MiniGameRequest::AnswerUndo(accept) => {
-                let Some(play) = game.play.as_mut().filter(|p| p.undo_asked == Some(other)) else {
+                let asker = usize::from(other);
+                let Some(play) = game.play.as_mut().filter(|p| p.undo_asked[asker]) else {
                     return out;
                 };
-                play.undo_asked = None;
+                play.undo_asked[asker] = false;
                 if !accept {
                     game.tell(&mut out, other, build_undo_result(None));
                     return out;
@@ -605,9 +613,9 @@ impl Games {
             board,
             turn: 1 - waits,
             first: 1 - waits,
-            tie_asked: None,
-            tie_used: false,
-            undo_asked: None,
+            tie_asked: [false; 2],
+            tie_used: [false; 2],
+            undo_asked: [false; 2],
             undone: [false; 2],
             turn_since: Instant::now(),
         });
@@ -1044,8 +1052,8 @@ mod tests {
             summary(&games.play(BOB, MiniGameRequest::AnswerTie(false))),
             vec![s(ALICE, "0x33")]
         );
-        // Still once per turn, whoever asks; the next turn may.
-        assert!(summary(&games.play(BOB, MiniGameRequest::AskTie)).is_empty());
+        // Still once per turn for her; the next turn may. Bob has his own.
+        assert!(summary(&games.play(ALICE, MiniGameRequest::AskTie)).is_empty());
         games.play(BOB, stone(0, 0, 1));
         games.play(BOB, MiniGameRequest::AskTie);
         let out = games.play(ALICE, MiniGameRequest::AnswerTie(true));
@@ -1059,6 +1067,40 @@ mod tests {
             ]
         );
         assert_eq!(games.rooms[&ROOM].owner.record.ties, 1);
+    }
+
+    #[test]
+    fn each_player_has_their_own_tie_request() {
+        let mut games = omok();
+        games.play(ALICE, MiniGameRequest::AskTie);
+        games.play(BOB, MiniGameRequest::AnswerTie(false));
+        assert_eq!(
+            summary(&games.play(BOB, MiniGameRequest::AskTie)),
+            vec![s(ALICE, "0x32")]
+        );
+    }
+
+    #[test]
+    fn a_request_outlives_the_turn_it_was_made_in() {
+        let mut games = omok();
+        games.play(ALICE, MiniGameRequest::AskTie);
+        time_out(&mut games);
+        games.play(BOB, MiniGameRequest::Skip);
+        // The client's button stays shut until it hears back.
+        assert_eq!(
+            summary(&games.play(BOB, MiniGameRequest::AnswerTie(false))),
+            vec![s(ALICE, "0x33")]
+        );
+
+        games.play(ALICE, stone(0, 0, 2));
+        games.play(ALICE, MiniGameRequest::AskUndo);
+        time_out(&mut games);
+        games.play(BOB, MiniGameRequest::Skip);
+        let out = games.play(BOB, MiniGameRequest::AnswerUndo(true));
+        assert_eq!(summary(&out), both("0x37"));
+        // Alice's stone went, and she moves.
+        assert_eq!(&out_bytes(&out)[3..], &[1, 1, 0]);
+        assert_eq!(summary(&games.play(ALICE, stone(0, 0, 2))), both("0x40"));
     }
 
     #[test]
