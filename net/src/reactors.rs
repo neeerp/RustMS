@@ -195,7 +195,7 @@ pub enum Action {
     /// items and whose `act` is empty).
     DropsOnHit,
     /// One of the three beakers of a Magatia beaker room (Cosmic
-    /// `2618000`), which takes a Magic Stone a state at a time and drains
+    /// `2618000`), which takes a Suspicious Liquid a state at a time and drains
     /// a state back each 9.5 seconds: the first time each reaches
     /// `BEAKER_FULL` counts, and the third counted clears the stage
     /// (`crate::events::MAGATIA_BEAKERS`).
@@ -809,7 +809,7 @@ pub const ELLIN_FOUNTAIN: i32 = 3008000;
 pub const ELLIN_FOUNTAIN_NAME: &str = "";
 
 /// A Magatia beaker, and the state at which it counts as full (Cosmic
-/// `2618000`'s `hit`); one Magic Stone more fills it to its last.
+/// `2618000`'s `hit`); one Suspicious Liquid more fills it to its last.
 pub const MAGATIA_BEAKER: i32 = 2618000;
 pub const BEAKER_FULL: u8 = 6;
 

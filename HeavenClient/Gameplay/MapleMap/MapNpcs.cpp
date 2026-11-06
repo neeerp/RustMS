@@ -108,6 +108,8 @@ namespace ms
 	void MapNpcs::clear()
 	{
 		npcs.clear();
+		// What came for the old field in the same read must not spawn on the new one.
+		spawns = {};
 	}
 
 	MapObjects *MapNpcs::get_npcs()

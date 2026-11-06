@@ -73,6 +73,8 @@ namespace ms
 	void MapReactors::clear()
 	{
 		reactors.clear();
+		// What came for the old field in the same read must not spawn on the new one.
+		spawns = {};
 		touched.clear();
 	}
 

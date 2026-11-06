@@ -209,6 +209,8 @@ namespace ms
 	void MapMobs::clear()
 	{
 		mobs.clear();
+		// What came for the old field in the same read must not spawn on the new one.
+		spawns = {};
 		friendlyoid = 0;
 	}
 

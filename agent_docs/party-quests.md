@@ -1319,8 +1319,8 @@ The library's way on (`rnj1_pt00`, `jnr1_pt00`) and the hall's
 mobs (9300145 and 9300146, which don't come back) clear stage 2 with the
 last kill (`cleared_by_killing`), for 10,000 EXP each.
 
-The beaker room (x00100) has three beakers (2618000), each taking a Magic
-Stone (4001132) per state up to state 6; a state left alone goes back
+The beaker room (x00100) has three beakers (2618000), each taking a Suspicious
+Liquid (4001132) per state up to state 6; a state left alone goes back
 one after 9.5 seconds. Its mobs (9300147, which come back) drop the
 stones at 40% (`reward_overrides.toml`; the pack has none). The third
 beaker to reach state 6 (`net::reactors::Action::Beaker`, the field's
@@ -1383,7 +1383,8 @@ On the landing, its four ways (`rnj4_r1`-`rnj4_r4`, `jnr4_r1`-`jnr4_r4`)
 each lead into one rope room (x00301-x00304) the first time, and only
 then (`EventTicket::take_room`): anyone else is told, in pink, that the
 room is taken (`magatia.room_taken`). In a rope room each of ten rows
-has four ropes, `pt<row><rope>` (`rnj5_rp`, `jnr5_rp`), of which one is
+has four "ropes", ledges with a portal each and no ladder,
+`pt<row><rope>` (`rnj5_rp`, `jnr5_rp`), of which one is
 right; it leads to the row above (portal id + 4), and from the top row to
 the top (`success`); any other leads back to the bottom (`fail`). Each
 room draws its right ropes the first time anyone climbs
