@@ -789,7 +789,12 @@ force-and-friction model (`move_normal`).
   the feet move to its top. In the air, Up grabs only while falling: it
   grabs any ladder within 10 px of the path since the last move, at the
   current height. `MapInfo::findladder` checks ladders in number order and
-  returns the first one that matches.
+  returns the first one that matches. The test (0xa45b03) is that the span's
+  top is not below `y2` and its bottom is not above `y1`. The data has 61
+  short ropes with `y1` under `y2`, 2 to 32 px long (eight in the Keep's
+  Warrior Mastery Room, just under the tops of its long ropes). That test
+  catches one only with a span holding all of it, so a 20 px reach misses
+  those longer than that, and stepping off a long rope's top misses them too.
 - **Down-jump.** Allowed when the lowest platform within 300 px below, or
   else the highest one 300 to 600 px below, is at least 5 px under the feet
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s

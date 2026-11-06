@@ -201,7 +201,7 @@ namespace ms
 		auto ver = Range<int16_t>(std::min(a.y(), b.y()), std::max(a.y(), b.y()));
 
 		for (auto &ladder : ladders)
-			if (hor.contains(ladder.get_x()) && ver.overlaps({ladder.get_top(), ladder.get_bottom()}))
+			if (hor.contains(ladder.get_x()) && Ladder::meets(ver.first(), ver.second(), ladder.get_top(), ladder.get_bottom()))
 				return ladder;
 
 		return nullptr;
