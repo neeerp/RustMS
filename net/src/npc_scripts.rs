@@ -1311,6 +1311,9 @@ const SCROLL_OF_SECRETS: i32 = 4031019;
 const PIETRA: i32 = 9000010;
 /// Harry, on the Coconut Season fields (`Event09`).
 const HARRY: i32 = 9000012;
+/// What Harry sells, the bat of his balloon, and its price.
+const WOODEN_CLUB: i32 = 1322005;
+const WOODEN_CLUB_PRICE: i32 = 1;
 /// The Dimensional Mirror, in twenty towns, which sends players to the
 /// Mu Lung Dojo, the Carnival Field, Nett's Pyramid and the Abandoned
 /// Subway (Cosmic `9010022`).
@@ -13429,7 +13432,27 @@ fn gm_event_exit(npc_id: i32, player: &Player) -> Option<NpcScript> {
                 on_yes: leave,
                 on_no: None,
             };
-            return Some(NpcScript::new(HARRY, vec![ask]));
+            let club = if player.meso >= WOODEN_CLUB_PRICE {
+                Page::Done(vec![
+                    Effect::SpendMeso(WOODEN_CLUB_PRICE),
+                    Effect::GiveItem {
+                        item_id: WOODEN_CLUB,
+                        quantity: 1,
+                    },
+                ])
+            } else {
+                Page::End(text(keys::GM_EVENT_HARRY_SHORT))
+            };
+            let menu = Page::Menu {
+                text: text(keys::GM_EVENT_HARRY_MENU),
+                choices: vec![
+                    (text(keys::GM_EVENT_HARRY_LEAVE), vec![ask]),
+                    (text(keys::GM_EVENT_HARRY_CLUB), vec![club]),
+                ],
+            };
+            let mut script = NpcScript::new(HARRY, vec![menu]);
+            script.inventory_full = Some(text(keys::GM_EVENT_HARRY_FULL));
+            return Some(script);
         }
         _ => return None,
     };
@@ -24862,6 +24885,9 @@ mod tests {
         let back = |player: &Player, npc| {
             let mut exit = NpcScript::for_npc(npc, player).unwrap();
             exit.begin();
+            if npc == HARRY {
+                exit.respond(ScriptInput::Select(0)).unwrap();
+            }
             exit.respond(match npc {
                 HARRY => ScriptInput::Yes,
                 _ => ScriptInput::Next,
@@ -24888,6 +24914,31 @@ mod tests {
         let mut leave = vec![Effect::LeaveGmEvent { map_id: 109080000 }];
         leave.extend(go(60000));
         assert_eq!(back(&came, HARRY), leave);
+    }
+
+    #[test]
+    fn harry_sells_the_bat_of_his_balloon_for_a_meso() {
+        let buy = |meso| {
+            let player = rider(0, meso, 109080000);
+            let mut harry = NpcScript::for_npc(HARRY, &player).unwrap();
+            harry.begin();
+            let step = harry.respond(ScriptInput::Select(1)).unwrap();
+            (harry.inventory_full.clone(), step)
+        };
+        let (full, step) = buy(1);
+        assert_eq!(full, Some(text(keys::GM_EVENT_HARRY_FULL)));
+        assert_eq!(
+            step.effects,
+            vec![
+                Effect::SpendMeso(1),
+                Effect::GiveItem {
+                    item_id: WOODEN_CLUB,
+                    quantity: 1,
+                },
+            ]
+        );
+        // Not a meso to his name, and nothing changes hands.
+        assert!(buy(0).1.effects.is_empty());
     }
 
     #[test]

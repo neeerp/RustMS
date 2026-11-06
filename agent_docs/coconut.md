@@ -123,10 +123,13 @@ was saved, and forget it (`gm_event_exit` in `net/src/npc_scripts.rs`):
   them there. Every event whose winners go to 109050000 gives this one
   prize: Coconut Season, Snowball, the OX Quiz, the Fitness Test and Ola
   Ola (report b172).
-- Harry (9000012) on the Coconut Season fields, during the game: a yes or
-  no to leaving. Yes also gives the player's place back
+- Harry (9000012) on the Coconut Season fields, during the game: a menu.
+  Leaving is a yes or no; yes also gives the player's place back
   (`Effect::LeaveGmEvent`, then `DirectoryMessage::LeaveGmEvent`), if
-  that event is still the one open on the channel, up to its limit.
+  that event is still the one open on the channel, up to its limit. The
+  other choice buys a Wooden Club (1322005), the bat of his balloon, for
+  1 meso, as Cosmic's does. He refuses a player without the meso or
+  without room.
 
 ## Packets
 
