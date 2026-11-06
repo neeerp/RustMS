@@ -167,6 +167,13 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   decisions. When chasing, it jumps toward a target on a higher group whose
   reach covers it, walks down steps toward a target on its own group, and
   jumps off an end toward a lower target only half the time.
+- **Drawing order:** v83 sets a mob's z as it enters and on each change of
+  foothold (FUN_00664e35), and Gr2D puts a layer whose z was just set over
+  its equals, so on one layer the mob that last did either is in front
+  (`Mob::take_restack`, `MapObjects`). A layer that never has its z set again
+  goes under its equals as it is created, which HeavenClient assumes of every
+  other map object. HeavenClient doesn't use the foothold's zMass, which v83
+  takes into a mob's z. The reads are in `v83ref/reports/p282-gr2d-z-ties.md`.
 
 Packets follow the v83 layout (the mob's statuses, a 16-byte mask and its
 entries, after the mob id; see "Mob statuses"). After the

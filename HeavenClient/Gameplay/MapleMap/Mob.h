@@ -101,6 +101,10 @@ namespace ms
 		// Update movement and animations.
 		int8_t update(const Physics &physics) override;
 
+		// v83 sets a mob's z as it enters and on each change of foothold
+		// (FUN_00664e35, from 0x663398 and 0x66b6ca).
+		bool take_restack() override;
+
 		// Change this mob's control mode:
 		// 0 - no control, 1 - control, 2 - aggro
 		void set_control(int8_t mode);
@@ -814,5 +818,6 @@ namespace ms
 		// Whether Final Toss has thrown it. v83 only clears this with the RiseByToss status,
 		// which no server sends (mob+0x524).
 		bool tossed = false;
+		int32_t stacked_fh = -1;
 	};
 }

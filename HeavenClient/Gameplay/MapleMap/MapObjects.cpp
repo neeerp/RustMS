@@ -21,7 +21,7 @@ namespace ms
 {
 	void MapObjects::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
-		for (auto &oid : layers[layer])
+		for (auto &[stack, oid] : layers[layer])
 		{
 			auto mmo = get(oid);
 
@@ -34,7 +34,7 @@ namespace ms
 	{
 		for (auto &layer : layers)
 		{
-			for (auto &oid : layer)
+			for (auto &[stack, oid] : layer)
 			{
 				auto mmo = get(oid);
 
@@ -49,20 +49,25 @@ namespace ms
 		for (auto iter = objects.begin(); iter != objects.end();)
 		{
 			bool remove_mob = false;
+			int32_t oid = iter->first;
 
 			if (auto &mmo = iter->second)
 			{
-				int8_t oldlayer = mmo->get_layer();
 				int8_t newlayer = mmo->update(physics);
 
 				if (newlayer == -1)
 				{
 					remove_mob = true;
-				} else if (newlayer != oldlayer)
+				} else
 				{
-					int32_t oid = iter->first;
-					layers[oldlayer].erase(oid);
-					layers[newlayer].insert(oid);
+					Place current = places.at(oid);
+					bool restacked = mmo->take_restack();
+
+					if (restacked || newlayer != current.layer)
+					{
+						unplace(oid);
+						place(oid, newlayer, restacked ? ++highest_stack : current.stack);
+					}
 				}
 			} else
 			{
@@ -71,7 +76,8 @@ namespace ms
 
 			if (remove_mob)
 			{
-				entries.erase(iter->first);
+				unplace(oid);
+				entries.erase(oid);
 				iter = objects.erase(iter);
 			}
 			else
@@ -83,6 +89,9 @@ namespace ms
 	{
 		objects.clear();
 		entries.clear();
+		places.clear();
+		lowest_stack = 0;
+		highest_stack = 0;
 
 		for (auto &layer : layers)
 			layer.clear();
@@ -97,8 +106,10 @@ namespace ms
 	{
 		int32_t oid = toadd->get_oid();
 		int8_t layer = toadd->get_layer();
+		int32_t stack = toadd->take_restack() ? ++highest_stack : --lowest_stack;
+		unplace(oid);
 		objects[oid] = std::move(toadd);
-		layers[layer].insert(oid);
+		place(oid, layer, stack);
 		entries.emplace(oid, next_entry++);
 	}
 
@@ -108,11 +119,26 @@ namespace ms
 
 		if (iter != objects.end() && iter->second)
 		{
-			int8_t layer = iter->second->get_layer();
 			objects.erase(iter);
 			entries.erase(oid);
+			unplace(oid);
+		}
+	}
 
-			layers[layer].erase(oid);
+	void MapObjects::place(int32_t oid, int8_t layer, int32_t stack)
+	{
+		layers[layer].emplace(stack, oid);
+		places[oid] = { layer, stack };
+	}
+
+	void MapObjects::unplace(int32_t oid)
+	{
+		auto iter = places.find(oid);
+
+		if (iter != places.end())
+		{
+			layers[iter->second.layer].erase(iter->second.stack);
+			places.erase(iter);
 		}
 	}
 

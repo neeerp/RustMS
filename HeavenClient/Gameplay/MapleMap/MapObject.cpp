@@ -67,6 +67,11 @@ namespace ms
 		return phobj.fhlayer;
 	}
 
+	bool MapObject::take_restack()
+	{
+		return false;
+	}
+
 	int32_t MapObject::get_oid() const
 	{
 		return oid;

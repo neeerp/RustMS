@@ -54,6 +54,10 @@ namespace ms
 		// Obtains the layer used to determine the drawing order on the map.
 		virtual int8_t get_layer() const;
 
+		// Whether the object should now go over the others of its layer. Asked
+		// when it enters the map, where no means under them, and on each update.
+		virtual bool take_restack();
+
 		// Changes the objects position.
 		void set_position(int16_t x, int16_t y);
 
