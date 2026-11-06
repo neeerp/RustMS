@@ -21,6 +21,9 @@
 
 #include "../../Graphics/GraphicsGL.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <nlnx/nx.hpp>
 
 namespace ms
@@ -38,6 +41,7 @@ namespace ms
 		nl::node backnode = backsrc[src["bS"] + ".img"][animated ? "ani" : "back"][src["no"]];
 		animation = backnode;
 		additive = backnode["blend"].get_integer() == 1;
+		move = layer_move::read(animated ? backnode["0"] : backnode);
 		opacity = src["a"];
 		flipped = src["f"].get_bool();
 		cx = src["cx"];
@@ -123,6 +127,12 @@ namespace ms
 			y = moveobj.get_absolute_y(shift_y, alpha);
 		}
 
+		int64_t at = std::max<int64_t>(0, elapsed - Constants::TIMESTEP + std::lround(alpha * Constants::TIMESTEP));
+		auto [move_x, move_y] = layer_move::offset(move, at);
+
+		x += move_x;
+		y += move_y;
+
 		Point<int16_t> origin = animation.get_origin();
 
 		if (htile > 1)
@@ -139,13 +149,14 @@ namespace ms
 
 		int16_t tw = cx * htile;
 		int16_t th = cy * vtile;
+		float angle = layer_move::spun(move, at);
 
 		if (additive)
 			GraphicsGL::get().set_additive(true);
 
 		for (int16_t tx = 0; tx < tw; tx += cx)
 			for (int16_t ty = 0; ty < th; ty += cy)
-				animation.draw(DrawArgument(Point<int16_t>(ix + tx, iy + ty), flipped, opacity / 255), alpha);
+				animation.draw(DrawArgument(angle, Point<int16_t>(ix + tx, iy + ty), flipped, opacity / 255), alpha);
 
 		if (additive)
 			GraphicsGL::get().set_additive(false);
@@ -155,6 +166,7 @@ namespace ms
 	{
 		moveobj.move();
 		animation.update();
+		elapsed += Constants::TIMESTEP;
 
 		if (fade_elapsed < fade_duration)
 		{

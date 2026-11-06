@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "LayerMove.h"
 #include "ObstacleRules.h"
 
 #include "../../Audio/Audio.h"
@@ -92,12 +93,18 @@ namespace ms
 			obstacle::Trap trap;
 			// Each frame's `dir`, used where the trap has none.
 			std::vector<int32_t> frame_dirs;
+			// Its own motion, which runs from its map's load, shown or not.
+			layer_move::Keys move;
+			// `restartMoving`: it runs from when the state is shown instead, as the Keep's menhirs do.
+			bool restarts;
+			// The ms after its map loaded that its motion started.
+			int64_t started;
 		};
 
 		// Start its animation as its `repeat` says (FUN_006431e3).
 		static void play(State &state);
 
-		// Where its (x, y) has drifted to `at` ms after its map loaded.
+		// Where its (x, y) has drifted and swung to `at` ms after its map loaded.
 		std::pair<int64_t, int64_t> drifted(int64_t at) const;
 
 		std::vector<State> states;
@@ -122,7 +129,7 @@ namespace ms
 		int32_t cy;
 		// Whether it repeats, which only one without a name or a trap does.
 		bool tiled;
-		// The ms since its map loaded, while it drifts.
+		// The ms since its map loaded.
 		int64_t elapsed;
 	};
 }

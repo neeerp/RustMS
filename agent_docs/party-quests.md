@@ -1669,7 +1669,9 @@ The third stage (610030300) has the same five sigils. Each also sets the
 stage's menhirs going, traps that the field shows moved to everyone there
 and to later arrivals (`events::cwk_menhirs`, `FieldActor::move_obstacle`;
 Cosmic `moveEnvironment`): the warriors' `menhir0`, the bowmen's `menhir1`
-and `menhir2`, then `menhir3` to `menhir5`. Its lines say so
+and `menhir2`, then `menhir3` to `menhir5`. Each client then swings them
+itself, from when it sees them go (`layer_move`, the client's `s1` keys), so
+one that arrives late sees them in a different place. Its lines say so
 (`CWK_MENHIR_LINES`, `cwk.menhirs.*`). Its way on also waits on its climb:
 its top portal, `next00` (`scripts::CWK_STEP`, `glpqPortal2`), takes
 whoever reaches it back to the start and tells the event
