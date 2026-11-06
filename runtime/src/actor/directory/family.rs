@@ -42,11 +42,17 @@ fn refund_summons(summoner: ClientId) {
     });
 }
 
-/// A family member changing channel, and when they left.
+/// Someone changing channel, and when they left. Any of them may join a
+/// family later, whose tree shows how long they've been on.
 pub(super) struct Away {
     name: String,
     relatives: Relatives,
     left: Instant,
+    pub(super) logged_in: Instant,
+}
+
+fn minutes_since(logged_in: Instant) -> i32 {
+    (logged_in.elapsed().as_secs() / 60) as i32
 }
 
 impl WorldDirectory {
@@ -279,10 +285,16 @@ impl WorldDirectory {
                 member.online = true;
                 member.job = entry.presence.job;
                 member.level = entry.presence.level;
-                member.map_id = entry.presence.map_id;
-            } else if self.family_away.contains_key(&member.id) {
+                member.map_id = if entry.in_cash_shop {
+                    -1
+                } else {
+                    entry.presence.map_id
+                };
+                member.minutes = minutes_since(entry.logged_in);
+            } else if let Some(away) = self.family_away.get(&member.id) {
                 // Changing channel, as the guild list has it.
                 member.online = true;
+                member.minutes = minutes_since(away.logged_in);
             }
         }
         self.send_packet(owner, build_family_chart(&chart));
@@ -342,19 +354,17 @@ impl WorldDirectory {
         }
     }
 
-    /// A member left: changing channel, they are held for a while;
+    /// Someone left: changing channel, they are held for a while;
     /// otherwise their relatives hear at once.
     pub(super) fn family_left(&mut self, entry: &Entry, changing_channel: bool) {
         self.forget_summons(entry.handle.client_id);
         let relatives = &entry.presence.family;
-        if relatives.senior.is_none() && relatives.juniors.is_empty() {
-            return;
-        }
         if changing_channel {
             let away = Away {
                 name: entry.presence.name.clone(),
                 relatives: relatives.clone(),
                 left: Instant::now(),
+                logged_in: entry.logged_in,
             };
             self.family_away.insert(entry.handle.client_id, away);
         } else {

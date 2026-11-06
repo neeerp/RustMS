@@ -328,7 +328,10 @@ pub struct ChartMember {
     /// Rep recorded to their senior.
     pub senior_reputation: i32,
     pub today_reputation: i32,
+    /// Below 0 in the Cash Shop.
     pub map_id: i32,
+    /// Online since this many minutes ago.
+    pub minutes: i32,
     pub name: String,
 }
 

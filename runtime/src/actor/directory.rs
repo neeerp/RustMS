@@ -80,6 +80,8 @@ struct Entry {
     /// In the Cash Shop, off every map until they leave it, which
     /// registers them again.
     in_cash_shop: bool,
+    /// When they logged in; a change of channel keeps it.
+    logged_in: Instant,
 }
 
 impl Entry {
@@ -974,11 +976,14 @@ impl WorldDirectory {
             "Character online"
         );
         self.names.insert(presence.name.clone(), client_id);
+        let family_away = self.family_away.remove(&client_id);
+        let back = family_away.is_some();
         let entry = Entry {
             handle,
             presence,
             channel_id,
             in_cash_shop: false,
+            logged_in: family_away.map_or_else(Instant::now, |away| away.logged_in),
         };
         let member = entry.member();
         self.clients.insert(client_id, entry);
@@ -1007,7 +1012,6 @@ impl WorldDirectory {
                 }
             }
         }
-        let back = self.family_away.remove(&client_id).is_some();
         if previous.is_none() && !back {
             self.tell_relatives(client_id, true);
         }

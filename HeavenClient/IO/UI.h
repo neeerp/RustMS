@@ -147,7 +147,7 @@ namespace ms
 		show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration,
 				   bool levels = true);
 
-		void show_text(Tooltip::Parent parent, std::string text);
+		void show_text(Tooltip::Parent parent, std::string text, int16_t max_width = 340);
 
 		// The skill macro at `index`.
 		void show_macro(Tooltip::Parent parent, size_t index);

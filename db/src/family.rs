@@ -229,6 +229,7 @@ pub fn chart(viewed: i32, viewer: i32) -> crate::Result<FamilyChart> {
             senior_reputation: row.6,
             today_reputation: row.7,
             map_id: row.8,
+            minutes: 0,
             name: row.9,
         })
         .collect();

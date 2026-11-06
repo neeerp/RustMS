@@ -798,9 +798,9 @@ namespace ms
 		tooltipparent = parent;
 	}
 
-	void UIStateGame::show_text(Tooltip::Parent parent, std::string text)
+	void UIStateGame::show_text(Tooltip::Parent parent, std::string text, int16_t max_width)
 	{
-		tetooltip.set_text(text);
+		tetooltip.set_text(text, max_width);
 
 		if (!text.empty())
 		{

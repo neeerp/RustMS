@@ -89,7 +89,9 @@ packets into `FamilyRequest`s, which the client actor
     links anyone to it (report b044), so the leader comes again in the
     chain when it is one of the seniors or the character.
   - The directory marks who is online (a channel change counts) and fills
-    in their current level, job and map.
+    in their current level, job, map (-1 in the Cash Shop) and minutes since
+    they logged in. A channel change or a trip to the Cash Shop keeps the
+    login time (`Entry::logged_in`, held in `family_away` meanwhile).
   - Head counts:
     - key -1: the whole family;
     - key 0: the character's seniors;

@@ -15,6 +15,7 @@ use integration_harness::database::{
 };
 use integration_harness::events::party;
 use integration_harness::hunting::attack;
+use integration_harness::packets::build_enter_cash_shop;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
@@ -293,6 +294,40 @@ async fn take_junior(
     .await;
     family(senior, 2).await;
     family(junior, 2).await;
+}
+
+#[tokio::test]
+async fn the_tree_places_a_member_in_the_cash_shop() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    new_character(&a_config, 30).await;
+    new_character(&b_config, 15).await;
+    let (an, bn) = (
+        a_config.character_name.clone(),
+        b_config.character_name.clone(),
+    );
+    let (mut a, _) = enter(&a_config, LITH_HARBOR).await;
+    let (mut b, _) = enter(&b_config, LITH_HARBOR).await;
+    take_junior(&mut a, &an, &mut b, &bn).await;
+
+    send(&mut b.connection, build_enter_cash_shop()).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    send(
+        &mut a.connection,
+        request(RecvOpcode::OpenFamilyPedigree, &an),
+    )
+    .await;
+    let packets = family(&mut a, 1).await;
+    // No map, a moment online, and the name.
+    let mut place = (-1i32).to_le_bytes().to_vec();
+    place.extend(0i32.to_le_bytes());
+    place.extend(str_bytes(&bn));
+    assert!(packets[0]
+        .1
+        .windows(place.len())
+        .any(|bytes| bytes == place));
 }
 
 fn result(code: i32, arg: i32) -> (i16, Vec<u8>) {
