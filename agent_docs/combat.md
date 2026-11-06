@@ -2223,8 +2223,9 @@ Traps hurt too: objs whose `Map/Obj` node has `obstacle`, such as the jump
 quests' thorns and lasers, Adobis's fire and the Leafre animals (3514
 placements on 276 maps). The client tests them itself, as v83 does
 (FUN_00642264 and FUN_00642710; `ObstacleRules.h`). Each tick a trap's box is
-its current frame's `lt`/`rb` on the obj, mirrored when the obj is flipped,
-and frames without one, or under 5 px both ways, don't hurt. The client takes
+its current frame's `lt`/`rb` on the obj, mirrored when the obj is flipped
+and carried along where the obj moves, and frames without one, or under 5 px
+both ways, don't hurt. The client takes
 the last-loaded trap the player's body meets, under the same gates as a mob's
 touch, and rolls its `damage` within a tenth either way when it's over 10. A
 `forceHP` trap (Test of Agility's menhirs) takes the player down to that

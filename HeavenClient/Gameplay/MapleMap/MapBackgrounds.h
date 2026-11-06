@@ -19,6 +19,8 @@
 
 #include <cstdint>
 
+#include "LayerMove.h"
+
 #include "../Physics/PhysicsObject.h"
 
 #include "../../Graphics/Animation.h"
@@ -92,6 +94,10 @@ namespace ms
 		int32_t fade_duration = 0;
 
 		MovingObject moveobj;
+
+		// Its own motion, and the ms since its map loaded.
+		layer_move::Keys move;
+		int64_t elapsed = 0;
 	};
 
 	class MapBackgrounds

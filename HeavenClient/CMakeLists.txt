@@ -417,6 +417,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME catch_items COMMAND catch_items_tests)
     add_executable(obj_flow_tests tests/obj_flow.cpp)
     add_test(NAME obj_flow COMMAND obj_flow_tests)
+    add_executable(layer_move_tests tests/layer_move.cpp)
+    add_test(NAME layer_move COMMAND layer_move_tests)
     add_executable(item_properties_tests tests/item_properties.cpp)
     add_test(NAME item_properties COMMAND item_properties_tests)
     add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
@@ -761,6 +763,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapInfo.h
     Gameplay/MapleMap/CloudLayout.h
     Gameplay/MapleMap/ObjFlow.h
+    Gameplay/MapleMap/LayerMove.h
     Gameplay/MapleMap/MapClouds.cpp
     Gameplay/MapleMap/MapClouds.h
     Gameplay/MapleMap/FloatNotice.cpp

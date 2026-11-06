@@ -70,6 +70,10 @@ namespace ms
 				frame_dirs.push_back(data[std::to_string(fid)]["dir"]);
 		}
 
+		move = layer_move::read(data["0"]);
+		restarts = data["restartMoving"].get_integer() != 0;
+		started = 0;
+
 		// Nothing animates until it is played.
 		animation.stop();
 	}
@@ -131,15 +135,16 @@ namespace ms
 		if (visible)
 			states[current].animation.update();
 
-		if (flow != 0)
-			elapsed += Constants::TIMESTEP;
+		elapsed += Constants::TIMESTEP;
 	}
 
 	std::pair<int64_t, int64_t> Obj::drifted(int64_t at) const
 	{
 		auto [dx, dy] = obj_flow::offset(flow, rx, ry, at);
+		const State &state = states[current];
+		auto [mx, my] = layer_move::offset(state.move, std::max<int64_t>(0, at - state.started));
 
-		return { pos.x() + dx, pos.y() + dy };
+		return { pos.x() + dx + mx, pos.y() + dy + my };
 	}
 
 	void Obj::draw(Point<int16_t> viewpos, float inter) const
@@ -150,13 +155,17 @@ namespace ms
 		if (additive)
 			GraphicsGL::get().set_additive(true);
 
+		const State &state = states[current];
+		int64_t at = std::max<int64_t>(0, elapsed - Constants::TIMESTEP + std::lround(inter * Constants::TIMESTEP));
+		auto [x, y] = drifted(at);
+		float angle = layer_move::spun(state.move, std::max<int64_t>(0, at - state.started));
+
 		if (flow == 0)
 		{
-			states[current].animation.draw(DrawArgument(pos + viewpos, flip), inter);
+			Point<int16_t> at_view(static_cast<int16_t>(x + viewpos.x()), static_cast<int16_t>(y + viewpos.y()));
+			state.animation.draw(DrawArgument(angle, at_view, flip, 1.0f), inter);
 		} else
 		{
-			int64_t at = std::max<int64_t>(0, elapsed - Constants::TIMESTEP + std::lround(inter * Constants::TIMESTEP));
-			auto [x, y] = drifted(at);
 			int16_t width = Constants::Constants::get().get_viewwidth();
 			int16_t height = Constants::Constants::get().get_viewheight();
 			std::vector<std::pair<int32_t, int32_t>> places;
@@ -172,7 +181,7 @@ namespace ms
 			for (auto [px, py] : places)
 			{
 				Point<int16_t> at_view(static_cast<int16_t>(px + viewpos.x()), static_cast<int16_t>(py + viewpos.y()));
-				states[current].animation.draw(DrawArgument(at_view, flip), inter);
+				state.animation.draw(DrawArgument(angle, at_view, flip, 1.0f), inter);
 			}
 		}
 
@@ -200,6 +209,10 @@ namespace ms
 		visible = true;
 
 		State &shown = states[current];
+
+		if (shown.restarts)
+			shown.started = elapsed;
+
 		Point<int16_t> distance = pos - listener;
 		double length = std::sqrt(static_cast<double>(distance.x()) * distance.x() + static_cast<double>(distance.y()) * distance.y());
 
