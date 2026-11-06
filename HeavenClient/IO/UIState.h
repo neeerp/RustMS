@@ -89,7 +89,7 @@ namespace ms
 		virtual void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel,
 								int64_t expiration, bool levels) = 0;
 
-		virtual void show_text(Tooltip::Parent parent, std::string text) = 0;
+		virtual void show_text(Tooltip::Parent parent, std::string text, int16_t max_width) = 0;
 
 		// The skill macro at `index`.
 		virtual void show_macro(Tooltip::Parent parent, size_t index) {}
@@ -149,7 +149,7 @@ namespace ms
 		void show_equip(Tooltip::Parent, int16_t) override {}
 		void show_item(Tooltip::Parent, int32_t, int64_t, int16_t, bool, int32_t, const std::string &) override {}
 		void show_skill(Tooltip::Parent, int32_t, int32_t, int32_t, int64_t, bool) override {}
-		void show_text(Tooltip::Parent, std::string) override {}
+		void show_text(Tooltip::Parent, std::string, int16_t) override {}
 		void show_map(Tooltip::Parent, std::string, std::string) override {}
 		Iterator pre_add(UIElement::Type, bool, bool) override { return { nullptr, UIElement::Type::NUM_TYPES }; }
 		void remove(UIElement::Type) override {}

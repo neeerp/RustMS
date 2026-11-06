@@ -324,7 +324,9 @@ namespace ms
 		}
 		else
 		{
-			UI::get().show_text(Tooltip::Parent::FAMILYTREE, text);
+			// Its box fits the longest line, unwrapped (0x8e7028 with no
+			// width, 0x80a372).
+			UI::get().show_text(Tooltip::Parent::FAMILYTREE, text, 0);
 			tooltip = true;
 		}
 

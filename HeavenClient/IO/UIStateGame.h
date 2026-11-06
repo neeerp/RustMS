@@ -79,7 +79,7 @@ namespace ms
 		void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel,
 						int64_t expiration, bool levels) override;
 
-		void show_text(Tooltip::Parent parent, std::string text) override;
+		void show_text(Tooltip::Parent parent, std::string text, int16_t max_width) override;
 
 		void show_macro(Tooltip::Parent parent, size_t index) override;
 

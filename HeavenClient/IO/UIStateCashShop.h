@@ -48,7 +48,7 @@ namespace ms
 		void show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags, bool owned,
 					   int32_t remain_life, const std::string &owner) override {}
 		void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration, bool levels) override {}
-		void show_text(Tooltip::Parent parent, std::string text) override {}
+		void show_text(Tooltip::Parent parent, std::string text, int16_t max_width) override {}
 		void show_map(Tooltip::Parent parent, std::string name, std::string description) override {}
 		void show_help(UIElement::Type owner, std::string title, std::string description,
 					   std::optional<Point<int16_t>> anchor, bool above) override;

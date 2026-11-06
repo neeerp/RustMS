@@ -877,9 +877,9 @@ namespace ms
 		state->show_macro(parent, index);
 	}
 
-	void UI::show_text(Tooltip::Parent parent, std::string text)
+	void UI::show_text(Tooltip::Parent parent, std::string text, int16_t max_width)
 	{
-		state->show_text(parent, text);
+		state->show_text(parent, text, max_width);
 	}
 
 	void UI::show_map(Tooltip::Parent parent, std::string name, std::string description)

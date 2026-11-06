@@ -71,7 +71,7 @@ namespace ms
 		void show_skill(Tooltip::Parent, int32_t, int32_t, int32_t, int64_t, bool) override
 		{}
 
-		void show_text(Tooltip::Parent parent, std::string text) override;
+		void show_text(Tooltip::Parent parent, std::string text, int16_t max_width) override;
 
 		void show_map(Tooltip::Parent, std::string, std::string)
 		{}

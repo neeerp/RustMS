@@ -29,8 +29,7 @@ pub fn build_family_chart(chart: &FamilyChart) -> Result<Packet, NetworkError> {
         packet.write_int(member.senior_reputation)?;
         packet.write_int(member.today_reputation)?;
         packet.write_int(member.map_id)?;
-        // Minutes since they logged in, not kept yet.
-        packet.write_int(0)?;
+        packet.write_int(member.minutes)?;
         packet.write_str_with_length(&member.name)?;
     }
     packet.write_int(chart.counts.len() as i32)?;
@@ -216,6 +215,7 @@ pub fn build_family_job_change(job: i16, name: &str) -> Result<Packet, NetworkEr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game::family::ChartMember;
 
     #[test]
     fn set_privilege_gives_the_icon_the_tooltip_and_the_time_left() {
@@ -268,6 +268,23 @@ mod tests {
         expected.extend([1, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0]);
         expected.extend([2, 0]);
         assert_eq!(packet.bytes, expected);
+    }
+
+    #[test]
+    fn a_member_ends_with_their_map_minutes_online_and_name() {
+        let chart = FamilyChart {
+            members: vec![ChartMember {
+                map_id: -1,
+                minutes: 75,
+                name: "Bo".to_string(),
+                ..ChartMember::default()
+            }],
+            ..FamilyChart::default()
+        };
+        let packet = build_family_chart(&chart).unwrap();
+        let tail = [255, 255, 255, 255, 75, 0, 0, 0, 2, 0, b'B', b'o'];
+        let member_end = 2 + 8 + 12 + 4 * 4 + tail.len();
+        assert_eq!(packet.bytes[member_end - tail.len()..member_end], tail);
     }
 
     #[test]
