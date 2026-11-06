@@ -7,6 +7,9 @@ const DROP_SEARCH_HEIGHT: i16 = 50;
 /// floor that point stands on.
 const FLOOR_TOLERANCE: i32 = 5;
 
+/// How far a spawn may sit off the foothold it names and still stand on it.
+const STOOD_ON_TOLERANCE: i32 = 10;
+
 /// One foothold line, `Map.nx` `foothold/<layer>/<group>/<id>`. Lines with
 /// the same x at both ends are walls; the rest are floors.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -128,6 +131,24 @@ impl Footholds {
             .and_then(|(ground, id)| Some((i16::try_from(ground).ok()?, id)))
     }
 
+    /// The foothold a spawn at (`x`, `y`) stands on: `named`, unless that
+    /// is not the floor there, then the ground below it, or 0 with none.
+    /// Some Carnival fields name footholds on far platforms, and the client
+    /// would stand a mob on one wherever it is.
+    pub fn stood_on(&self, named: i16, x: i16, y: i16) -> i16 {
+        let on_it = self.lines.iter().filter(|fh| fh.id == named).any(|fh| {
+            let near = x.clamp(fh.x1.min(fh.x2), fh.x1.max(fh.x2));
+            (i32::from(near) - i32::from(x)).abs() <= STOOD_ON_TOLERANCE
+                && fh
+                    .ground_at(near)
+                    .is_some_and(|ground| (ground - i32::from(y)).abs() <= STOOD_ON_TOLERANCE)
+        });
+        if on_it {
+            return named;
+        }
+        self.below(x, y).map_or(0, |(_, id)| id)
+    }
+
     /// Whether a floor at about height `y` covers `x`.
     fn floor_at(&self, x: i16, y: i16) -> bool {
         self.lines
@@ -205,6 +226,28 @@ mod tests {
             line(0, 200, 150, 200),
             line(150, 200, 300, 180),
         ])
+    }
+
+    #[test]
+    fn a_spawn_stands_on_the_foothold_it_names_only_if_that_is_there() {
+        let mut lines = vec![
+            line(-300, 100, 0, 100),
+            line(0, 100, 0, 200),
+            line(0, 200, 300, 200),
+        ];
+        for (id, fh) in lines.iter_mut().enumerate() {
+            fh.id = id as i16 + 1;
+        }
+        let map = Footholds::new(lines);
+        // Its own floor, and a few px off its end or height.
+        assert_eq!(map.stood_on(1, -100, 100), 1);
+        assert_eq!(map.stood_on(1, 8, 96), 1);
+        // A foothold far away, a wall, and one not on the map at all.
+        assert_eq!(map.stood_on(1, 200, 200), 3);
+        assert_eq!(map.stood_on(2, 200, 200), 3);
+        assert_eq!(map.stood_on(9, -100, 100), 1);
+        // No ground under it: the client drops it.
+        assert_eq!(map.stood_on(1, 400, 200), 0);
     }
 
     #[test]

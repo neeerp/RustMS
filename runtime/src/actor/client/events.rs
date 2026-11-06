@@ -2313,12 +2313,15 @@ impl ClientActor {
         // The clock shows on arriving; the client keeps one already shown.
         let shown = ticket.clock.is_some();
         ticket.clock = clock;
+        let side = ticket.side;
+        let portal = net::carnival::battle_room(to)
+            .map_or(0, |room| net::carnival::start_portal(room, side));
         if let Some((floor, rest)) = dojo_floors.filter(|&(floor, rest)| floor < rest) {
             let record = self.in_game()?.player.dojo;
             self.apply_effects(&scripts::dojo_points(floor..=rest - 1, &record, false))
                 .await?;
         }
-        self.warp_within_event(to).await?;
+        self.warp_within_event_to(to, portal).await?;
         if shown && clock.is_none() {
             self.send(&mut build_stop_clock()?).await?;
         }

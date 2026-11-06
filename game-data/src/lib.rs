@@ -820,9 +820,12 @@ fn build_field_template(
         };
 
     let map_npcs = build_map_npcs_from_life(nx, body_idx)?;
-    let mob_spawns = build_mob_spawns_from_life(nx, body_idx)?;
+    let mut mob_spawns = build_mob_spawns_from_life(nx, body_idx)?;
     let reactors = build_reactors(nx, body_idx)?;
     let footholds = build_footholds(nx, body_idx)?;
+    for spawn in &mut mob_spawns {
+        spawn.foothold = footholds.stood_on(spawn.foothold, spawn.x, spawn.y);
+    }
     let traps = traps(nx, body_idx, trap_objs)?;
     let mob_rate = nx
         .child_by_name(map_node_idx, "info")?
@@ -844,7 +847,10 @@ fn build_field_template(
         positive_key("createMobInterval")?,
     );
     let massacre = build_massacre(nx, body_idx)?;
-    let carnival = build_carnival(nx, body_idx)?;
+    let mut carnival = build_carnival(nx, body_idx)?;
+    for spot in carnival.iter_mut().flat_map(|c| &mut c.mob_spots) {
+        spot.foothold = footholds.stood_on(spot.foothold, spot.x, spot.y);
+    }
     let coconut = build_coconut(nx, body_idx)?;
     let snowball = build_snowball(nx, body_idx)?;
     let guild_boss = build_guild_boss(nx, body_idx)?;
@@ -2198,6 +2204,24 @@ mod tests {
         // Its own mobs are on one side or the other.
         let teams: Vec<_> = field.mob_spawns.iter().map(|spawn| spawn.team).collect();
         assert!(teams.contains(&Some(0)) && teams.contains(&Some(1)));
+        // Three fields' life entries name footholds on far platforms; every
+        // mob stands on the floor under it all the same.
+        for map_id in [980_000_301, 980_000_501, 980_000_601] {
+            let field = game_data.field(map_id).expect("carnival field");
+            for spawn in &field.mob_spawns {
+                let (ground, foothold) = field
+                    .footholds
+                    .below(spawn.x, spawn.y)
+                    .expect("ground under a spawn");
+                assert_eq!((ground, foothold), (spawn.y, spawn.foothold));
+            }
+        }
+        // Likewise a bought mob on the one field whose spots do.
+        let field = game_data.field(980_032_100).expect("carnival field");
+        for spot in &field.carnival.as_ref().expect("monsterCarnival").mob_spots {
+            let (ground, foothold) = field.footholds.below(spot.x, spot.y).expect("ground");
+            assert_eq!((ground, foothold), (spot.y, spot.foothold));
+        }
         // The divided fields mark the sides of their guardians' spots.
         let divided = game_data.field(980_000_301).expect("field 3");
         let carnival = divided.carnival.as_ref().expect("monsterCarnival");

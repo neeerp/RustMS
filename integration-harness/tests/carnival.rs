@@ -34,6 +34,11 @@ use packet::Packet;
 
 /// A mob worth 1 CP, which Maple Blue summons for Maple Red to hunt.
 const BLUE_MOB: i32 = 9300127;
+/// The portals of a walled battle field where Red and Blue start, `red00`
+/// and `blue00`, and where Red comes back from the revive room.
+const RED_START: u8 = 2;
+const BLUE_START: u8 = 1;
+const RED_REVIVE: u8 = 4;
 
 /// The Monster Carnival packets with opcode `op`, by their bodies.
 fn carnival(seen: &Trace, op: SendOpcode) -> Vec<Vec<u8>> {
@@ -776,6 +781,24 @@ async fn a_death_costs_cp_and_the_revive_room_leads_back() {
     .await;
     let start = &carnival(&seen, SendOpcode::CarnivalStart)[starts];
     assert_eq!(start[..5], [vec![0], rest].concat()[..]);
+    // Room 4 is walled in two: Red comes back on their own half.
+    assert_eq!(seen.arrivals.last().unwrap().1, RED_REVIVE);
+}
+
+#[tokio::test]
+async fn each_side_of_a_walled_field_starts_on_its_own_half() {
+    let red = &mut leader().await;
+    let blue = &mut leader().await;
+    let (seen, theirs, _) = hunted(red, blue, 3).await;
+    let arrived = |t: &Trace| {
+        let mut arrivals = t.arrivals.iter();
+        arrivals
+            .rfind(|arrival| arrival.0 == battle_map(3))
+            .unwrap()
+            .1
+    };
+    assert_eq!(arrived(&seen), RED_START);
+    assert_eq!(arrived(&theirs), BLUE_START);
 }
 
 /// A party of one's leader on Carnival Field 2.

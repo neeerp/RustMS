@@ -128,6 +128,34 @@ pub const fn battle_map(room: u8) -> i32 {
     room_part(room, 1)
 }
 
+/// Whether room `room`'s battle field is walled in two (`mapDivided`), each
+/// side hunting on its own half: red00's on the left, blue00's on the right
+/// (Cosmic `isPurpleCPQMap`).
+const fn divided(room: u8) -> bool {
+    matches!(room, 3 | 4)
+}
+
+/// The portal of room `room`'s battle field where `side` (0 Maple Red)
+/// starts: `red00` or `blue00` on a divided field, else `sp`.
+pub const fn start_portal(room: u8, side: u8) -> u8 {
+    match (divided(room), side) {
+        (false, _) => 0,
+        (true, 0) => 2,
+        (true, _) => 1,
+    }
+}
+
+/// The portal of room `room`'s battle field where `side` comes back from
+/// the revive room: `red_revive` or `blue_revive` on a divided field, else
+/// `sp`.
+pub const fn return_portal(room: u8, side: u8) -> u8 {
+    match (divided(room), side) {
+        (false, _) => 0,
+        (true, 0) => 4,
+        (true, _) => 3,
+    }
+}
+
 /// The room whose waiting room `map_id` is.
 pub fn waiting_room(map_id: i32) -> Option<u8> {
     ALL_ROOMS.into_iter().find(|&room| room_map(room) == map_id)
@@ -856,6 +884,18 @@ mod tests {
         assert_eq!(revive_room(980000602), Some(6));
         assert_eq!(revive_room(980000601), None);
         assert_eq!(death_cp(1), 10);
+    }
+
+    #[test]
+    fn only_the_walled_fields_part_the_sides() {
+        for room in [1, 2, 5, 6, 7, 8, 9] {
+            assert_eq!([start_portal(room, 0), start_portal(room, 1)], [0, 0]);
+            assert_eq!([return_portal(room, 0), return_portal(room, 1)], [0, 0]);
+        }
+        for room in [3, 4] {
+            assert_eq!([start_portal(room, 0), start_portal(room, 1)], [2, 1]);
+            assert_eq!([return_portal(room, 0), return_portal(room, 1)], [4, 3]);
+        }
     }
 
     #[test]
