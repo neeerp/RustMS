@@ -2508,3 +2508,31 @@ replace = [
     { item = 2290093, prob = 0.015 },
     { item = 2290138, prob = 0.045 },
 ]
+
+[mobs.9400300]
+# The Boss of Showa's hideout: the pack has no drops for it, so the last body
+# of the fight, with explosiveReward and publicReward in its Mob.nx, fell with
+# nothing. These are Cosmic's 18 rows (152-drop-data), as with the other bosses
+# the pack lacks (v83ref/lanes/QUESTIONS.md b450). Every item is in our
+# String.nx and its own data file. Cosmic's 20,000 to 30,000 mesos at 40 in 100
+# are one pile that ours vary around.
+replace = [
+    { money = 25000, prob = 0.4 },
+    { item = 4000141, prob = 0.6 },
+    { item = 2000004, prob = 0.999999 },
+    { item = 2040813, prob = 0.003 },
+    { item = 2041030, prob = 0.003 },
+    { item = 2041040, prob = 0.003 },
+    { item = 1072238, prob = 0.008 },
+    { item = 1032026, prob = 0.01 },
+    { item = 1372011, prob = 0.007 },
+    { item = 2040817, prob = 0.01, min = 1, max = 4 },
+    { item = 2041034, prob = 0.01, min = 1, max = 4 },
+    { item = 2041044, prob = 0.01, min = 1, max = 4 },
+    { item = 2290081, prob = 0.03 },
+    { item = 2290045, prob = 0.03 },
+    { item = 2290063, prob = 0.03 },
+    { item = 2290079, prob = 0.03 },
+    { item = 2290096, prob = 0.03 },
+    { item = 2290055, prob = 0.03 },
+]

@@ -6455,6 +6455,21 @@ mod tests {
     }
 
     #[test]
+    fn the_boss_of_showa_drops_cosmics_table_without_the_pack() {
+        let table = RewardTable::load(None).unwrap();
+        let boss = table.drops(9400300);
+        assert_eq!(boss.len(), 18);
+        assert_eq!((boss[0].money, boss[0].prob), (Some(25000), 0.4));
+        let flashlight = boss.iter().find(|d| d.item == Some(4000141)).unwrap();
+        assert_eq!(flashlight.prob, 0.6);
+        let scroll = boss.iter().find(|d| d.item == Some(2040817)).unwrap();
+        assert_eq!(
+            (scroll.prob, scroll.min, scroll.max),
+            (0.01, Some(1), Some(4))
+        );
+    }
+
+    #[test]
     fn the_haunted_houses_mobs_drop_cosmics_tables_without_the_pack() {
         let table = RewardTable::load(None).unwrap();
         let lens: Vec<_> = (9400638..=9400640).map(|m| table.drops(m).len()).collect();
