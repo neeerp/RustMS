@@ -2079,9 +2079,9 @@ impl ClientActor {
     }
 
     /// Where `packet`, a walk through a portal, leads the player in the
-    /// Amorian Challenge, if it is one of stage 1's ways on: the open one
-    /// to its copy of stage 2, the others nowhere (`Some(None)`).
-    pub(super) fn amoria_way(&self, packet: &Packet) -> Option<Option<i32>> {
+    /// Amorian Challenge, if it is stage 1's open way on: to its copy of
+    /// stage 2.
+    pub(super) fn amoria_way(&self, packet: &Packet) -> Option<i32> {
         let (Some(ticket), Some(game)) = (&self.event, &self.game) else {
             return None;
         };

@@ -184,15 +184,39 @@ impl Footholds {
             })
     }
 
+    /// The point on a floor nearest `from`.
+    fn nearest_floor(&self, from: (i16, i16)) -> Option<(i16, i16)> {
+        let (fx, fy) = from;
+        self.lines
+            .iter()
+            .filter_map(|fh| {
+                let x = fx.clamp(fh.x1.min(fh.x2), fh.x1.max(fh.x2));
+                let y = fh.ground_at(x)?;
+                let dx = i64::from(x) - i64::from(fx);
+                let dy = i64::from(y) - i64::from(fy);
+                Some((dx * dx + dy * dy, x, i16::try_from(y).ok()?))
+            })
+            .min()
+            .map(|(_, x, y)| (x, y))
+    }
+
     /// Where a drop thrown from `from` toward `x` comes to rest: on the
     /// ground below `x`, or below `from` itself when no ground is there or a
-    /// wall is in the way. Without footholds the drop keeps `from`'s height.
+    /// wall is in the way. With no ground below `from` either, on the nearest
+    /// floor: a flier can die in the rock along a wall or past the ends of the
+    /// floors, where nobody could reach what it leaves (the Amorian Challenge
+    /// needs the Geist Fang from its last boss). Without footholds the drop
+    /// keeps `from`'s height.
     pub fn drop_position(&self, from: (i16, i16), x: i16) -> (i16, i16) {
         if self.is_empty() {
             return (x, from.1);
         }
         let search = from.1.saturating_sub(DROP_SEARCH_HEIGHT);
-        let fallback = (from.0, self.ground_below(from.0, search).unwrap_or(from.1));
+        let fallback = self
+            .ground_below(from.0, search)
+            .map(|y| (from.0, y))
+            .or_else(|| self.nearest_floor(from))
+            .unwrap_or(from);
         if self.wall_between(from, x) {
             return fallback;
         }
@@ -315,6 +339,18 @@ mod tests {
         let footholds = cliff();
         assert_eq!(footholds.drop_position((100, 150), 112), (112, 200));
         assert_eq!(footholds.drop_position((100, 150), 400), (100, 200));
+    }
+
+    #[test]
+    fn a_flier_killed_over_nothing_drops_onto_the_nearest_floor() {
+        let footholds = cliff();
+        // Past the end of the ground.
+        assert_eq!(footholds.drop_position((400, 190), 400), (300, 180));
+        // Under the upper ground, in the rock behind the cliff.
+        assert_eq!(footholds.drop_position((-100, 300), -100), (0, 200));
+        assert_eq!(footholds.drop_position((-100, 130), -100), (-100, 100));
+        // Spread past it, with the ground no nearer.
+        assert_eq!(footholds.drop_position((400, 190), 425), (300, 180));
     }
 
     #[test]

@@ -42,6 +42,18 @@ namespace ms
 			return side(left, right.x2(), right.y2()) > 0 ? underleft && underright : underleft || underright;
 		}
 
+		// A step that ends on a joint hasn't passed it: the next one does, and
+		// 0x9b3f1b then picks the side. At a fork in the floor that may not be
+		// the foothold the object was falling towards.
+		bool on_joint(const Foothold &fh, double fx, double fy)
+		{
+			int32_t x = static_cast<int32_t>(std::round(fx));
+			int32_t y = static_cast<int32_t>(std::round(fy));
+			bool joint = (x == fh.x1() && fh.prev() != 0) || (x == fh.x2() && fh.next() != 0);
+
+			return joint && side(fh, x, y) == 0;
+		}
+
 		// How fast an object moves along a foothold, to the right.
 		double along(const Foothold &fh, double hspeed, double vspeed)
 		{
@@ -285,6 +297,9 @@ namespace ms
 			);
 
 			bool collision = crnt_y <= ground.first() && next_y >= ground.second();
+
+			if (!phobj.onground && on_joint(get_fh(phobj.fhid), phobj.next_x(), next_y))
+				collision = false;
 
 			if (collision)
 			{
@@ -557,7 +572,7 @@ namespace ms
 				phobj.y = ground;
 		}
 
-		phobj.onground = phobj.y == ground;
+		phobj.onground = phobj.y == ground && (phobj.onground || !on_joint(nextfh, x, y));
 
 		if (phobj.onground)
 			phobj.fallstart = 0;
@@ -577,7 +592,9 @@ namespace ms
 		if (phobj.onground)
 			phobj.fhgroup = nextfh.group();
 
-		if (phobj.fhid == 0)
+		// A drop keeps to its own flight: one from a mob killed under the map
+		// has no floor below it on the way up to where it lands.
+		if (phobj.fhid == 0 && phobj.type != PhysicsObject::Type::FIXATED)
 		{
 			phobj.fhid = curfh.id();
 			phobj.limitx(curfh.x1());

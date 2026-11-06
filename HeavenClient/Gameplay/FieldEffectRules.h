@@ -152,6 +152,24 @@ namespace ms::field_effect
 		return from + (to - from) * elapsed / duration;
 	}
 
+	// Where a tiled background goes so that its tiles cover the view. `edge`
+	// is what the image's origin adds to the position to reach its left or
+	// top edge: an image can sit far from its origin (WeddingGL's sky, 71
+	// wide with an origin of 750), so wrapping the position alone leaves
+	// the far side of the view bare.
+	inline double back_tile_at(double position, int16_t edge, int16_t tile)
+	{
+		double start = position + edge;
+
+		while (start > 0)
+			start -= tile;
+
+		while (start < -tile)
+			start += tile;
+
+		return start - edge;
+	}
+
 	// A moving back (types 4-7) goes 100 px in 20000/|r| ms, i.e. 5r px a second, r being its rx or ry (FUN_0063cd4e,
 	// 0x63df25): its step every `timestep` ms. v83 divides by zero at r 0; such a back stays still here.
 	inline double back_step(double r, int32_t timestep)

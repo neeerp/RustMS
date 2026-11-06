@@ -1481,17 +1481,24 @@ here the shard is needed (QUESTIONS b260). Cosmic also turns item drops
 off on the stage maps at setup; the stage's mobs have no content drops,
 so that is left out.
 
-Clearing draws one of the stage's three ways up, `go00` to `go02`, at
-random (`Cleared::way`). These are same-map portals (type 5) in Map.nx,
-so the client sends CHANGE_MAP for them; `amoria_way` sends the drawn
-one's taker to its own copy of stage 2 (670010300-670010302) and turns
-the rest back as closed. The clear shows the map object `gate0` to
+The team starts on the top floor, and `go00` to `go02` are the way down:
+same-map portals (type 5) in Map.nx to `st00` on the floor with the side
+rooms' doors. The map's field limit bars the down-jump, so no other way
+there exists. `st00` leads back up to the mirror's floor, and from there a
+jump into `gom00` reaches the top. Clearing draws one of the three at
+random (`Cleared::way`), and `amoria_way` sends that one's taker to their
+own copy of stage 2 (670010300-670010302). The others still lead down, as
+in Cosmic, whose `setPortalState` on them changes nothing. The clear shows the map object `gate0` to
 `gate2` of the way drawn instead of the usual `gate`
 (`EventTicket::gate_object`), and so does entering the stage after.
 
 Stage 2 is played on whichever of the three copies the way led to; they
 count as one stage (`Event::stage_copies`), and their `next00` stays shut
-until it clears (`Event::gated`). Five of the team must hang on its three
+until it clears (`Event::gated`). The ropes hang high above the floor. A
+`gateNN` portal puts the player 10 px above its `doorNN`; they fall through
+the door's touch box while portals still refuse (`map-travel.md`) and land
+on the pot beneath, and a jump back into the box drops them from `SSMNN`,
+above the rope's top, where Up held catches it. Five of the team must hang on its three
 ropes (Map.nx `area` 0-2), as many on each as Amos wants
 (`events::draw_ropes`): each of the five is drawn to a rope at random.
 Cosmic's `generateCombo1` can want fewer than five, which no try meets;
@@ -1534,7 +1541,16 @@ named `gate00` to `gate06`, each hit open through four states; the last
 stays (`Action::Hold`). By each gate is a door, the `doorgo` portal
 `gtNNPCS`, which takes a player past it to `gtNNPIB` once its gate is
 open, and otherwise says in pink that it is shut
-(`scripts::amoria_door`). Amos (`AMOS_TRIALS`) waits at the far end
+(`scripts::amoria_door`), at most every five seconds: the client sends a
+script portal again on every answer for as long as the player stands in
+its box, which is why nobody can swing at a gate from up against its
+wall (`ExclRequest::USE_WAIT` never passes there, as in v83), only from
+beyond the door's box, 50 px either side of it. A parade of `trapGL`
+`mob` objects sets off behind the first gate when each client loads the
+map, from x -11083 to -9766 at 90 px a second for the Rombads
+(`obj_flow::offset`), whose 9999 damage takes three hits to kill a
+30000 HP player. It is all client side and starts again at every door,
+so only the first gate is close to it. Amos (`AMOS_TRIALS`) waits at the far end
 (`amoria_gather`): after the leader has heard the task, the whole team
 must be on the map and in its last area (`events::gathered`; the map's
 `gm00` portal is a shortcut there). With a gate still shut he says so;
@@ -1548,8 +1564,11 @@ Stage 6 (670010700, `AMORIA_STAGE6`) is the Geist Balrog (9400536), which
 the copy brings out at (942, 478) when it opens (`events::opening_mobs`).
 It comes back twice as it dies (`revive` in its Mob.nx data), as 9400537
 and then 9400514, and only that last form drops the Geist Fang (4031594,
-in `rewards.json`). Amos (`AMOS_TRIALS`, `npc_scripts::amos_geist`) stands
-above the map's first area: a living player who talks to him from inside
+in `rewards.json`). That form flies, along walls, past the ends of the
+floors and under the lowest of them, so it can die over no ground at all;
+the Fang then comes down on the nearest floor
+(`Footholds::drop_position`). Amos (`AMOS_TRIALS`,
+`npc_scripts::amos_geist`) stands above the map's first area: a living player who talks to him from inside
 that area (Map.nx `area` 0) is taken up to `st01` without a word, and a
 dead one is told so. Otherwise he sends the others to the leader, and asks
 the leader for the Fang; the leader's Fang wins the challenge for 11000

@@ -840,6 +840,15 @@ force-and-friction model (`move_normal`).
   about 110 px (v83 sets this up in `FUN_0042935a` as a Shape2D vector with
   looseness 100). The followed point isn't held inside the view range; only
   the view is.
+- **Joints in the air.** A falling step that ends exactly on a joint hasn't
+  landed yet (`on_joint` in `FootholdTree.cpp`). The next step passes it and
+  0x9b3f1b picks the side, so at a fork in the floor a hit can't land the
+  player on the hidden floor under a wall block (the gates of 670010600).
+- **No floor below.** `update_fh` still sends an object with no floor under
+  it back to the foothold it left, or to x 0 with none (see
+  `v83ref/reports/p194-landing-sweep.md` for why it stays). A drop keeps to
+  its own flight instead: one from a mob killed under the map has no floor
+  below it on the way up to where it lands.
 
 ## Cash Shop
 

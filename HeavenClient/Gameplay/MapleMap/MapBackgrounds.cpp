@@ -123,23 +123,16 @@ namespace ms
 			y = moveobj.get_absolute_y(shift_y, alpha);
 		}
 
+		Point<int16_t> origin = animation.get_origin();
+
 		if (htile > 1)
 		{
-			while (x > 0)
-				x -= cx;
-
-			while (x < -cx)
-				x += cx;
+			int16_t edge = flipped ? origin.x() - animation.get_dimensions().x() : -origin.x();
+			x = field_effect::back_tile_at(x, edge, cx);
 		}
 
 		if (vtile > 1)
-		{
-			while (y > 0)
-				y -= cy;
-
-			while (y < -cy)
-				y += cy;
-		}
+			y = field_effect::back_tile_at(y, -origin.y(), cy);
 
 		int16_t ix = static_cast<int16_t>(std::round(x));
 		int16_t iy = static_cast<int16_t>(std::round(y));

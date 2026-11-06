@@ -18,7 +18,11 @@ portal or the server's chase point, with no floor search (`CUserLocal::Init`,
 report b109), so they land where the fall first meets a floor, or on a fly map
 stay up. A snap to the floor below would drop a flier on the arrival of
 `200090510` onto the `down` portals of its ground, and back to the station. A
-portal within the map still moves the player onto the foothold below its target.
+portal within the map does the same: the client wants only some floor below a
+spot 10 pixels over the target, and leaves the player at rest in the air there
+(`FUN_00957b74`, `0x9b5e7f`), held keys and all (`Player::portal_to`), so Up held
+catches a rope on the way down. For 600 ms after it every portal refuses
+(`0x94e676`), touch ones too.
 
 The ships between continents run on a timetable instead; see `ships.md`.
 

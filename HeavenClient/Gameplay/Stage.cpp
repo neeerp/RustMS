@@ -90,6 +90,8 @@ namespace ms
 		// An in-map portal's move lands 120 ms after Up; the portal then
 		// waits 600 ms (v83 FUN_00957b74, FUN_0094e5e5).
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
+		// How far over its target an in-map portal leaves the player.
+		constexpr int16_t PORTAL_ABOVE = 10;
 
 		// How often v83 looks at the quest-bound tags again (FUN_00531b8d).
 		constexpr int32_t QUEST_TAG_INTERVAL = 5000;
@@ -964,8 +966,15 @@ namespace ms
 			if (pending_teleport || teleport_cooldown > 0)
 				return;
 
-			Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname);
-			pending_teleport = Teleport{ physics.get_y_below(spawnpoint), std::nullopt };
+			// It looks only for some floor below the spot, 10 px over the
+			// target: the player falls from there, and may catch a rope on
+			// the way (FUN_00957b74).
+			Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname) - Point<int16_t>(0, PORTAL_ABOVE);
+
+			if (!physics.get_fht().get_fhid_below(spawnpoint))
+				return;
+
+			pending_teleport = Teleport{ spawnpoint, std::nullopt };
 
 			player.show_effect_id(CharEffect::Id::TELEPORT);
 			Sound(Sound::Name::PORTAL).play();
@@ -1057,7 +1066,7 @@ namespace ms
 			player.get_phobj().fhid = *pending_teleport->foothold;
 		} else
 		{
-			player.respawn(pending_teleport->target, mapinfo.is_swimming(pending_teleport->target));
+			player.portal_to(pending_teleport->target, mapinfo.is_swimming(pending_teleport->target));
 		}
 
 		pending_teleport.reset();

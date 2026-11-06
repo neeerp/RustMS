@@ -4,7 +4,12 @@ use crate::error::RuntimeError;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat;
 use net::scripts;
+use std::time::Duration;
+use tokio::time::Instant;
 use tracing::debug;
+
+/// How often a player standing at a shut gate hears that it is shut.
+const GATE_SHUT_TOLD_EVERY: Duration = Duration::from_secs(5);
 
 impl ClientActor {
     /// Run the current map's `onUserEnter` script after joining it, or
@@ -79,7 +84,15 @@ impl ClientActor {
                     None => None,
                 };
                 let open = state == Some(net::events::AMORIA_GATE_OPEN);
-                Some(scripts::amoria_door(map_id, portal, open))
+                // The client touches it again on every answer, many times
+                // a second for as long as the player stands there.
+                let told = self.gate_shut_told;
+                if !open && told.is_some_and(|at| at.elapsed() < GATE_SHUT_TOLD_EVERY) {
+                    Some(Vec::new())
+                } else {
+                    self.gate_shut_told = (!open).then(Instant::now);
+                    Some(scripts::amoria_door(map_id, portal, open))
+                }
             }
             (Some(script), Some(_)) if script == scripts::CWK_STEP => self.cwk_step().await?,
             (Some(script), Some(_)) if script == scripts::LATANICA_IN => {
