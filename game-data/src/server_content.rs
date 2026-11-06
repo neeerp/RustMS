@@ -3703,6 +3703,11 @@ pub mod keys {
     pub const GM_EVENT_PIETRO_FULL: &str = "gm_event.pietro_full";
     pub const GM_EVENT_PIETRA: &str = "gm_event.pietra";
     pub const GM_EVENT_HARRY_ASK: &str = "gm_event.harry_ask";
+    pub const GM_EVENT_HARRY_MENU: &str = "gm_event.harry_menu";
+    pub const GM_EVENT_HARRY_LEAVE: &str = "gm_event.harry_leave";
+    pub const GM_EVENT_HARRY_CLUB: &str = "gm_event.harry_club";
+    pub const GM_EVENT_HARRY_SHORT: &str = "gm_event.harry_short";
+    pub const GM_EVENT_HARRY_FULL: &str = "gm_event.harry_full";
     pub const OX_WRONG: &str = "ox.wrong";
     pub const OX_WON: &str = "ox.won";
     /// The Physical Fitness Test's notices, in the order they go out.
@@ -6045,6 +6050,11 @@ mod tests {
                 keys::GM_EVENT_PIETRO_FULL,
                 keys::GM_EVENT_PIETRA,
                 keys::GM_EVENT_HARRY_ASK,
+                keys::GM_EVENT_HARRY_MENU,
+                keys::GM_EVENT_HARRY_LEAVE,
+                keys::GM_EVENT_HARRY_CLUB,
+                keys::GM_EVENT_HARRY_SHORT,
+                keys::GM_EVENT_HARRY_FULL,
                 keys::OX_WRONG,
                 keys::OX_WON,
                 keys::TOWER_ROCK_NONE,

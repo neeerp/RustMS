@@ -205,6 +205,8 @@ async fn harry_and_pietra_send_players_back_where_they_came_from() {
         let t = ask_paul(c, m).await;
         assert_eq!(t.warps, [COCONUT], "in");
         let t = step(c, m, talk(COCONUT, HARRY)).await;
+        assert_eq!(t.prompts, [(HARRY, 4)], "his menu");
+        let t = step(c, m, answer(4, 1, Some(0))).await;
         assert_eq!(t.prompts, [(HARRY, 1)], "leave?");
         let t = step(c, m, answer(1, 1, None)).await;
         assert_eq!(t.warps, [SOUTHPERRY], "out");
