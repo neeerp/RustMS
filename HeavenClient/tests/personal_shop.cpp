@@ -152,6 +152,11 @@ int main()
 
 		require(tagged.box == Box::NONE && tagged.sale.bundles == 20 && tagged.sale.per_bundle == 1,
 				"a cash etc stack goes up in bundles of one");
+		require(sale_quantity(1302000, -1) == 1, "an equip's cell has no count, and it offers one");
+		require(sale_quantity(2070000, 800) == 1 && sale_quantity(2330000, 1923) == 1, "a set of stars or bullets is one");
+		require(sale_quantity(2000000, 40) == 40, "a stack offers all of it");
+		require(check_sale({ "1", "70000", "1", false }, sale_quantity(1302000, -1), true, false).box == Box::NONE,
+				"an equip dropped on the list can go up");
 		require(sells_whole(1302000) && sells_whole(2070000) && !sells_whole(2000000), "equips and stars sell whole");
 		require(sells_whole(5072000) && sells_whole(2330000) && !sells_whole(4000000) && !sells_whole(3010000),
 				"so do cash items and bullets, but not etc or setup stacks");

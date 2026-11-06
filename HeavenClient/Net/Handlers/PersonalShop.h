@@ -200,6 +200,14 @@ namespace ms
 			return prefix < 2 || prefix > 4 || shop_list::is_rechargeable(itemid) || expiration < item_expiry::BEFORE;
 		}
 
+		// How many the sell dialog has to offer from an inventory cell. A set
+		// of stars or bullets counts as one, and so does an equip, whose cell
+		// has no count (FUN_004f3144, 0x6fda90).
+		inline int16_t sale_quantity(int32_t itemid, int16_t count)
+		{
+			return shop_list::is_rechargeable(itemid) || count < 1 ? 1 : count;
+		}
+
 		// What buying a cash item that sells whole asks.
 		constexpr const char* CASH_BUY_QUESTION = "Cash Items become untradable\\nonce they have been traded and "
 			"\\nMaple Points cannot be accumulated\\nusing Item Deletions in the Cash Shop.\\n\\nDo you really want to buy?";
