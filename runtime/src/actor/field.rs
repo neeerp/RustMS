@@ -5872,6 +5872,11 @@ impl FieldActor {
                     return;
                 };
                 info!(field = ?self.key, "OX Quiz reset");
+                // First, for the question stays up across maps and what a
+                // field sends doesn't reach those who have left it.
+                if let Ok(packet) = build_ox_quiz(false, set, 0) {
+                    self.broadcast(None, packet);
+                }
                 // The field has no way out but its exit's.
                 for occupant in self.occupants.values().filter(|o| !o.avatar.gm) {
                     occupant.handle.send(ServerMessage::ShipWarp {
@@ -5880,7 +5885,7 @@ impl FieldActor {
                         portal: conti::Portal::Id(0),
                     });
                 }
-                build_ox_quiz(false, set, 0)
+                return;
             }
         };
         if let Ok(packet) = packet {

@@ -41,8 +41,10 @@ Sets 8 and 9 have none.
 
 - A GM's `/start` on the field draws ten different questions from one set
   with at least ten English ones (`field_ox::draw`) and asks the first.
-  `/reset` stops the game, clears the question and sends every player who
-  isn't a GM to the exit, since the field has no other way out. `/start`
+  `/reset` stops the game, clears the question and then sends every player
+  who isn't a GM to the exit, since the field has no other way out. The
+  order matters: the question stays up across maps, and what a field sends
+  doesn't reach a player who has left it. `/start`
   does nothing while a game is on, and `/reset` while none is.
 - Each question is up for 30 s. When the time is up the answer shows, and
   each player who isn't a GM is judged where they stand: in the O room, in

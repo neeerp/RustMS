@@ -141,7 +141,7 @@ async fn the_wrong_go_out_and_who_answers_all_ten_wins() {
     }
 
     send(g, build_all_chat("/start", 0).unwrap()).await;
-    let [(stayer, _), (winner, _)] = &mut players[..] else {
+    let [(stayer, stayer_name), (winner, _)] = &mut players[..] else {
         unreachable!()
     };
 
@@ -188,6 +188,23 @@ async fn the_wrong_go_out_and_who_answers_all_ten_wins() {
     assert_eq!(gt.warps, [FIELD]);
     assert_eq!(questions(&gt).len(), 10);
     assert_eq!(quizzes(&gt).last(), Some(&(false, set, 0)));
+
+    // A reset sends a player out with the question off their screen.
+    let c = &mut stayer.connection;
+    let mut t = Trace::default();
+    assert_eq!(warp(c, SOUTHPERRY, "", &mut t).await, SOUTHPERRY);
+    barrier(c, stayer_name, &mut t).await;
+    let t = go(c, stayer_name, paul.clone()).await;
+    assert_eq!(t.warps, [FIELD], "back in");
+    send(g, build_all_chat("/start", 0).unwrap()).await;
+    let mut t = Trace::default();
+    until(c, &mut t, |t| !questions(t).is_empty()).await;
+    let (set, number) = questions(&t)[0];
+    send(g, build_all_chat("/reset", 0).unwrap()).await;
+    until(c, &mut t, |t| !t.warps.is_empty()).await;
+    assert_eq!(t.warps, [EXIT], "reset");
+    assert_eq!(quizzes(&t), [(true, set, number), (false, set, 0)]);
+
     send(g, build_all_chat("/endevent", 0).unwrap()).await;
     barrier(g, "closed", &mut gt).await;
 }
