@@ -559,7 +559,7 @@ pub enum AttackRejection {
     Damage,
     /// A shot without enough of an ammo its weapon fires.
     Ammo,
-    /// Stun or Seduce stops every attack, Seal every skill.
+    /// Stun or Seduce stops every attack, Seal every skill that is cast.
     Diseased,
     /// A finisher without an orb to spend.
     NoOrbs,
@@ -643,12 +643,18 @@ fn check(attack: &Attack, player: &Player, ice: bool) -> Result<Uses, AttackReje
     // v83 attacks only without Stun or Seduce, and skills fail under Seal
     // (FUN_0094be52, FUN_00966f7a). The body attack asks neither: the touch
     // alone sends it (FUN_0094a144, FUN_0095f135), and Cosmic's
-    // TouchMonsterDamageHandler doesn't look either.
+    // TouchMonsterDamageHandler doesn't look either. Nor does Seal stop what
+    // isn't cast: the plain attack key may shoot a Mortal Blow (0x94e425) and
+    // a Final Attack follows by itself (0x96cdfd), and neither way passes
+    // Seal's two checks (0x94be60, 0x96758f).
     let buffs = &player.buffs;
+    let cast = attack.skill != 0
+        && !skills::MORTAL_BLOWS.contains(&attack.skill)
+        && !skills::FINAL_ATTACKS.contains(&attack.skill);
     if attack.kind != AttackKind::Body
         && (buffs.has(BuffStat::Stun)
             || buffs.has(BuffStat::Seduce)
-            || (attack.skill != 0 && buffs.has(BuffStat::Seal)))
+            || (cast && buffs.has(BuffStat::Seal)))
     {
         return Err(AttackRejection::Diseased);
     }
@@ -1484,6 +1490,33 @@ mod tests {
             assert_eq!(
                 validate(&snails, &player).unwrap_err(),
                 AttackRejection::Diseased
+            );
+        }
+    }
+
+    #[test]
+    fn seal_leaves_what_the_client_does_not_cast() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let mut sealed = beginner_with_sword();
+        let mut stunned = beginner_with_sword();
+        sealed
+            .buffs
+            .give(game::Buff::new(-120, BuffStat::Seal, 1, now, long));
+        stunned
+            .buffs
+            .give(game::Buff::new(-123, BuffStat::Stun, 1, now, long));
+        for skill in [skills::MORTAL_BLOWS[0], skills::FINAL_ATTACKS[0]] {
+            let attack = parse_close_attack(&skill_attack_packet(skill, 1, 1)).unwrap();
+            assert_ne!(
+                validate(&attack, &sealed).err(),
+                Some(AttackRejection::Diseased),
+                "{skill}"
+            );
+            assert_eq!(
+                validate(&attack, &stunned).err(),
+                Some(AttackRejection::Diseased),
+                "{skill}"
             );
         }
     }

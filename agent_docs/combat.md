@@ -2074,7 +2074,9 @@ and Confuse (132) 51 (`game::mob_skill::inflicted`).
   player by its `x` (1 left, 2 right, 3 jump, 4 down, 6 and 7 jump left and
   right) and stops jumps, attacks and skills but Hero's Will; Confuse
   reverses the arrows (teleport too); Weakness stops jumping; Seal stops
-  every skill but Dispel; Slow sets the walking speed to its `x` before the
+  every skill cast but Dispel, not the Mortal Blow a plain attack may shoot
+  nor a Final Attack, which pass neither of its checks (0x94be60, 0x96758f);
+  Slow sets the walking speed to its `x` before the
   80-140 clamp. Each disease shows `MobSkill.img/<skill>/level/<lvl>/affected` on the
   character, over the face when its `pos` is 1, otherwise at the feet; the
   player also gets a grey chat notice (none for Slow or Confuse) but no

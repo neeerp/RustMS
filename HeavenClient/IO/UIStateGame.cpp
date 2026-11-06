@@ -659,6 +659,11 @@ namespace ms
 					{
 						remove_cursors();
 
+						// A window hears nothing once the cursor leaves it for
+						// the field, so a tooltip of its still up goes here.
+						if (tooltipparent != Tooltip::Parent::NONE && tooltipparent != Tooltip::Parent::FIELD)
+							clear_tooltip(tooltipparent);
+
 						return Stage::get().send_cursor(clicked, cursorpos);
 					}
 				} else
