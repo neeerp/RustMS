@@ -221,7 +221,7 @@ namespace ms
 		void show_mob_hit(Char &target, int32_t mobid, int8_t index, bool left);
 
 		// Show a named map obj, such as a party quest's gate, in `state`, or in its current one again for -1.
-		void set_object_state(const std::string &name, int32_t state);
+		void set_object_state(const std::string &name, int32_t object_state);
 
 		// The box of each of Coconut Season's nuts, by index; empty where the field has no such nut.
 		std::vector<coconut::Box> coconut_boxes() const;
@@ -537,6 +537,14 @@ namespace ms
 		};
 
 		std::vector<WeddingNews> pending_wedding;
+
+		struct ObjectNews
+		{
+			std::string name;
+			int32_t state;
+		};
+
+		std::vector<ObjectNews> pending_objects;
 		// The last BLOW_WEATHER that came before its map loaded, such as the Dojo entrance's taunt sent on
 		// arrival, with the flag that came with it.
 		struct WeatherNews

@@ -134,7 +134,7 @@ namespace ms
 		return timestep * static_cast<float>(scales.second - scales.first) / delay;
 	}
 
-	Animation::Animation(nl::node src)
+	Animation::Animation(nl::node src, int16_t limit)
 	{
 		bool istexture = src.data_type() == nl::node::type::bitmap;
 
@@ -151,7 +151,7 @@ namespace ms
 				{
 					int16_t fid = string_conversion::or_default<int16_t>(sub.name(), -1);
 
-					if (fid >= 0)
+					if (fid >= 0 && fid < limit)
 						frameids.insert(fid);
 				}
 			}
