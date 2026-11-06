@@ -269,11 +269,10 @@ namespace ms
 				winner = 0;
 			}
 
-			// A new turn: the server drops whatever was asked in the last
-			// one, so an answer to it does nothing (field_games give_turn).
+			// A new turn. A tie still waiting stays asked until the other
+			// player answers it (only 0x33 clears +0x738, 0x6e4139).
 			void new_turn()
 			{
-				tie_asked = false;
 				tie_this_turn = false;
 			}
 
@@ -330,7 +329,6 @@ namespace ms
 				}
 
 				new_turn();
-				undo_asked = false;
 				undo_this_turn = false;
 				restart_timer();
 			}
@@ -368,7 +366,6 @@ namespace ms
 			{
 				my_turn = slot == own_slot;
 				new_turn();
-				undo_asked = false;
 				restart_timer();
 			}
 

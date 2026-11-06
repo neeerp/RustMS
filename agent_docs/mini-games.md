@@ -77,9 +77,9 @@ player's `ClientActor` holds the game they're at
   - Five or more in a row wins, and a winning stone may make double threes
     (the usual rule, inferred). A full board is a tie.
   - Taking a stone back (0x36 asked, 0x37 answered): each player may do it
-    once a game, if they have a stone down, with one request at a time.
-    The other player has to agree. The asker's last stone and any played
-    after it are removed, and the asker moves again.
+    once a game, if they have a stone down, with one of their requests at
+    a time. The other player has to agree. The asker's last stone and any
+    played after it are removed, and the asker moves again.
 - **Match Cards.** The first card of a turn (0x44, first = 1) is shown to
   the other player only. The second is shown to both, with whether the
   two matched. A pair goes to the finder, who keeps the turn and gets a
@@ -91,9 +91,13 @@ player's `ClientActor` holds the game they're at
   clients send 0x3f. Only the player whose turn it is counts, and only
   after 25 s (Omok) or 8 s (Match Cards). The turn then passes, and the
   server sends 0x3f with the new mover's slot.
-- **Ties** (0x32 asked, 0x33 answered): once a turn, whoever asks. If the
-  other player agrees, the game ends in a tie; if not, the asker gets
-  0x33.
+- **Ties** (0x32 asked, 0x33 answered): each player may ask once a turn.
+  If the other player agrees, the game ends in a tie; if not, the asker
+  gets 0x33.
+- **A request outlives its turn.** v83's client keeps its Draw or Redo
+  shut until it hears back (+0x738 clears only on 0x33, +0x740 only on
+  0x37) and the other player's prompt stays up, so a turn running out
+  doesn't drop a tie or undo request: the answer still counts.
 - **Giving up** (0x34) loses the game: both see game notice 2 ("[%s] have
   forfeited."), and the game ends as a forfeit.
 - **Leave after this game** (0x38/0x39), only during a game: both see game
