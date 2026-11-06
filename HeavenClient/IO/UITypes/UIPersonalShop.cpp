@@ -701,10 +701,9 @@ namespace ms
 			}
 		}
 
-		// A set of stars or bullets counts as one. An item with a time limit
-		// sells whole, and a cash one, by its data or its serial, in one
-		// bundle (FUN_004f3144, 0x6fda90).
-		int16_t quantity = shop_list::is_rechargeable(itemid) ? 1 : count;
+		// An item with a time limit sells whole, and a cash one, by its data
+		// or its serial, in one bundle (0x6fda90).
+		int16_t quantity = personal_shop::sale_quantity(itemid, count);
 		const Inventory &inventory = Stage::get().get_player().get_inventory();
 		Optional<const Item> item = inventory.get_item(tab, slot);
 		bool whole = personal_shop::sells_whole(itemid, item ? item->get_expiration() : item_expiry::BEFORE);
@@ -1347,6 +1346,10 @@ namespace ms
 			field->set_enter_callback([&](std::string) { confirm(); });
 			field->set_key_callback(KeyAction::Id::ESCAPE, [&]() { cancel(); });
 		}
+
+		// A disabled box still shows its number (0x4ca700).
+		count.set_shown_disabled();
+		per_bundle.set_shown_disabled();
 
 		if (whole || cash)
 			count.set_state(Textfield::State::DISABLED);
