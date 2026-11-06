@@ -111,8 +111,8 @@ The waiting room's way on leads to Sharenian's outskirts (990000100,
 - **The rocks.** The glowing rocks (reactors 9202000 and 9202009) break
   after their hits and drop the protector earring 1032033
   (`guild_quest::EARRING`), from the content pack's reactor drops. Its
-  120-minute `period` there is ignored: the earring is taken on leaving
-  instead. The outskirts and 990000200 have no mobs, and no gate: their
+  120-minute `period` there runs from the drop and outlasts the quest's
+  90 minutes; the earring is taken on leaving all the same. The outskirts and 990000200 have no mobs, and no gate: their
   `next00` portals are plain.
 - **The guide.** The guide (9040005, `guild_quest::EXIT_GUIDE`) on each
   stage asks whether to give up and, on yes, takes the player back to the
@@ -167,10 +167,16 @@ hurting a player without the earring.
   `stage_cleared`).
 - **The gates.** `next00` is `speargate_open`: shut until the stage is
   cleared, then on to 990000401. `in02` is `stonegate_open`: a stone
-  (4001026, from 420's boss) set in the door (9208006, which holds it,
-  `Action::Hold`) opens the way to the metal room (430). There `in00`,
-  `metalgate_open`, needs a piece of metal (4001037, from 430's big
-  reactor) set in its door (9208005), and leads on to 431.
+  (the Key 4001026, from 420's boss) set in the door (9208006, which holds
+  it, `Action::Hold`) opens the way to the metal room (430). There `in00`,
+  `metalgate_open`, needs a piece of metal (the Rusty Key 4001037, from
+  430's big reactor) set in its door (9208005), and leads on to 431.
+- **The metal room.** Walls around each of 430's pillars part the lower
+  floor, and a hop can't pass them: the big reactor at the far right is
+  for Teleport, as the old guides have it, or their Flash Jump. Stairs on
+  the left climb to a row of Dark Muscle Stones that leads to the door,
+  crossed in Dark Sight. The gap in that row, x -754 to -711, takes a
+  running jump from no more than about 27 pixels before its edge.
 
 ## The fountain
 

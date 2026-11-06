@@ -977,6 +977,82 @@ void walls(const ms::Physics& physics)
 	}
 }
 
+// Where a floor forks at the foot of a wall, as at the pillars of the Room
+// of Faith (990000430), the wall's own floor and the one running on under it
+// meet in one point. A hop against the wall comes down on that point and
+// must stay on the side it came from, whichever way the footholds are listed.
+void walls_at_forks()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 500, -1500, 500, 0, 0},
+		{3, 8, 1500, 500, 2000, 500, 0, 0},
+		{1, 53, -300, 0, -100, 0, 0, 60},
+		{1, 60, -100, 0, -100, -300, 53, 0},
+		{1, 59, -100, 0, 0, 0, 53, 69},
+		{1, 68, 0, -300, 0, 0, 0, 69},
+		{1, 69, 0, 0, 200, 0, 68, 2},
+		{1, 2, 200, 0, 400, 0, 69, 99},
+		{1, 99, 400, 0, 400, -300, 2, 0},
+		{1, 98, 400, 0, 500, 0, 2, 84},
+		{1, 63, 500, -300, 500, 0, 0, 84},
+		{1, 84, 500, 0, 700, 0, 63, 6},
+		{1, 6, 700, 0, 900, 0, 84, 28},
+		{1, 28, 900, 0, 900, -300, 6, 0},
+		{1, 27, 900, 0, 1000, 0, 6, 0},
+		{1, 30, 1100, 0, 1200, 0, 0, 31},
+		{1, 31, 1200, 0, 1200, -300, 30, 0},
+		{1, 32, 1200, -300, 1200, 0, 0, 33},
+		{1, 33, 1200, 0, 1300, 0, 32, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		struct Case { double x; int8_t direction; double wall; uint16_t fhid; };
+		for (Case c : {Case {-150, 1, -100, 53}, Case {350, 1, 400, 2}, Case {850, 1, 900, 6},
+			Case {50, -1, 0, 69}, Case {550, -1, 500, 84}})
+		{
+			for (int rest : {0, 3, 8, 20})
+			{
+				ms::PhysicsObject player;
+				player.shoe = true;
+				player.set_x(c.x); player.set_y(-5);
+				for (int tick = 0; tick < 100; ++tick) physics.move_object(player);
+				require(player.onground && player.fhid == c.fhid, "fork fixture did not find its floor");
+				int wait = 0;
+				for (int tick = 0; tick < 3000; ++tick)
+				{
+					player.walkdir = c.direction;
+					if (player.onground && wait-- <= 0)
+					{
+						ms::Physics::jump(player, ms::Physics::jump_speed(1.0), c.direction);
+						wait = rest;
+					}
+					physics.move_object(player);
+					// A step within one column of pixels isn't stopped, in v83 too.
+					require(c.direction * (player.crnt_x() - c.wall) < 1.0, "a hop went past the wall at a fork");
+				}
+			}
+		}
+		// With a wall on each face of the point, a hop still lands on a floor.
+		for (int8_t direction : {1, -1})
+		{
+			ms::PhysicsObject player;
+			player.shoe = true;
+			player.set_x(1200 - direction * 50); player.set_y(-5);
+			for (int tick = 0; tick < 100; ++tick) physics.move_object(player);
+			for (int tick = 0; tick < 3000; ++tick)
+			{
+				player.walkdir = direction;
+				if (player.onground)
+					ms::Physics::jump(player, ms::Physics::jump_speed(1.0), direction);
+				physics.move_object(player);
+				require(!player.onground || player.fhid == 30 || player.fhid == 33, "a hop landed on a wall");
+			}
+		}
+	}
+	std::filesystem::remove(path);
+}
+
 // Group 1 is a floor at y 0 from x -500 to 500, a 100 px wall up at 500
 // and a floor on from there to 800, with a ledge from -300 to -100 at y
 // -150. Group 2 is a separate floor from 1000 to 1400, and group 3 keeps
@@ -1440,6 +1516,7 @@ int main()
 		std::filesystem::remove(path);
 		landings();
 		walls_in_the_air();
+		walls_at_forks();
 		std::cout << "Movement physics passed\n";
 		return 0;
 	}

@@ -451,11 +451,18 @@ namespace ms
 					left = crossedleft;
 				} else if (order == 0)
 				{
-					// At the same point, the higher of the two.
-					if (side(*right, crossedright->x1(), crossedright->y1()) < 0)
+					// At the same point, the higher of the two. Level at a fork
+					// in the floor, v83 keeps the one its tree lists first; the
+					// wall goes first here, so a hop against it stays on its own
+					// side, whatever the order of this map's footholds. One
+					// side stays a floor, as the landing below needs one.
+					int32_t startside = side(*right, crossedright->x1(), crossedright->y1());
+					int32_t endside = side(*left, crossedleft->x2(), crossedleft->y2());
+
+					if (startside < 0 || (startside == 0 && crossedright->is_wall() && !left->is_wall()))
 						right = crossedright;
 
-					if (side(*left, crossedleft->x2(), crossedleft->y2()) < 0)
+					if (endside < 0 || (endside == 0 && crossedleft->is_wall() && !right->is_wall()))
 						left = crossedleft;
 				}
 			}
