@@ -3058,15 +3058,6 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         // (Cosmic `ariantMout`, `ariantMout2`).
         "ariantMout" => through(Effect::WarpToPortal(crate::ariant::ARIANT_EXIT, 0)),
         "ariantMout2" => through(Effect::WarpToPortal(crate::ariant::ARIANT_LOBBY, 0)),
-        // A Monster Carnival room's revive room, back into its battle
-        // (Cosmic `MCrevive1` to `MCrevive6`).
-        script if script.starts_with("MCrevive") => {
-            let room = script["MCrevive".len()..].parse::<u8>().ok()?;
-            let battle = crate::carnival::battle_map(room);
-            let first = !crate::carnival::second(room);
-            (first && crate::carnival::battle_room(battle) == Some(room))
-                .then(|| through(Effect::WarpToPortal(battle, 0)))?
-        }
         // Carnival Field 2's revive rooms share one script, back into the
         // battle of the room the player is in (Cosmic `MC2revive`).
         "MC2revive" => {
@@ -4108,6 +4099,23 @@ pub fn rand_ola(map_id: i32, portal: &str, seed: u64) -> Option<Vec<Effect>> {
         Effect::PortalSound,
         Effect::WarpToPortal(to, named(to, "start00")),
     ])
+}
+
+/// The start of the scripts of the first Carnival Field's revive rooms,
+/// `MCrevive1` to `MCrevive6`.
+pub const MC_REVIVE: &str = "MCrevive";
+
+/// A Monster Carnival revive room's way back into its battle, for a player
+/// of `side`: on a divided field, to that side's half (Cosmic `MCrevive1`
+/// to `MCrevive6`). `None` for a script of no room on the first field.
+pub fn mc_revive(script: &str, side: u8) -> Option<Vec<Effect>> {
+    let room = script.strip_prefix(MC_REVIVE)?.parse::<u8>().ok()?;
+    let battle = crate::carnival::battle_map(room);
+    let first = !crate::carnival::second(room);
+    (first && crate::carnival::battle_room(battle) == Some(room)).then(|| {
+        let portal = crate::carnival::return_portal(room, side);
+        vec![Effect::PortalSound, Effect::WarpToPortal(battle, portal)]
+    })
 }
 
 /// The portals on the Amorian Challenge's first stage to its side rooms,
@@ -7721,11 +7729,15 @@ mod tests {
         assert_eq!(portal("mc_out", &player).unwrap().effects, out(102000000));
         player.saved_locations.insert(CARNIVAL_RETURN, 220000000);
         assert_eq!(portal("mc_out", &player).unwrap().effects, out(220000000));
-        assert_eq!(
-            portal("MCrevive3", &player).unwrap().effects,
-            [Effect::PortalSound, Effect::WarpToPortal(980000301, 0)]
-        );
-        assert_eq!(portal("MCrevive7", &player), None);
+        let back = |map, portal| vec![Effect::PortalSound, Effect::WarpToPortal(map, portal)];
+        assert_eq!(mc_revive("MCrevive1", 0), Some(back(980000101, 0)));
+        assert_eq!(mc_revive("MCrevive6", 1), Some(back(980000601, 0)));
+        // Rooms 3 and 4 are walled in two: each side goes back to its half.
+        assert_eq!(mc_revive("MCrevive3", 0), Some(back(980000301, 4)));
+        assert_eq!(mc_revive("MCrevive3", 1), Some(back(980000301, 3)));
+        assert_eq!(mc_revive("MCrevive4", 0), Some(back(980000401, 4)));
+        assert_eq!(mc_revive("MCrevive4", 1), Some(back(980000401, 3)));
+        assert_eq!(mc_revive("MCrevive7", 0), None);
         assert_eq!(portal("MC2revive", &player), None);
         player.stats.map_id = 980032200;
         assert_eq!(

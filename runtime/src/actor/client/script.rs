@@ -59,6 +59,9 @@ impl ClientActor {
             (Some(script), Some(_)) if script.starts_with("guild1F") => {
                 self.guild_quest_grid(script)?
             }
+            (Some(script), Some(_)) if script.starts_with(scripts::MC_REVIVE) => {
+                scripts::mc_revive(script, self.event_side())
+            }
             (Some(script), Some(_)) if script == scripts::RAND_OLA => {
                 scripts::rand_ola(map_id, portal, self.ola_seed)
             }

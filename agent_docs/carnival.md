@@ -29,6 +29,18 @@ CP window for spending CP, with its side panel counting the mobs summoned
   member back to the Carnival Field. Its battle field is 980000n01 (`battle_map`),
   then the revive room (n02), the winners' (n03) and the losers' (n04). The
   revive rooms' `MCrevive<n>` portals go back to the battle field.
+- Some of these fields name footholds that aren't under the mob: 22 `life`
+  entries on 980000301, 501 and 601, and the bought-mob spots of 980032100,
+  point at far platforms, some past the wall. The client stands a mob on the
+  foothold it enters on, however far off, so the map loader swaps those for
+  the ground below (`Footholds::stood_on`). Cosmic sends 0 there, which drops
+  the mob to the same floor.
+- The battle fields of rooms 3 and 4 are walled in two (`mapDivided`), with
+  no way between the halves. Maple Red starts on the left half at `red00`,
+  Maple Blue on the right at `blue00` (`start_portal`); on the other fields
+  both start at `sp`. A team tag in these maps' data marks the other half:
+  what Red buys appears among Blue, so a side's mobs and guardians stand
+  where the other side can reach them.
 - The exit room, 980000010 (`CARNIVAL_EXIT`), has 2042002, who sends
   players back to the Carnival Field. 2042002 also stands in each room's
   winners' and losers' rooms (`win_map`, `lose_map`, `result_room`), whose
@@ -170,8 +182,10 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   everyone there through DIED (`FieldMessage::CarnivalDied`). Reviving
   takes the player to the field's `returnMap`, the room's revive room
   (980000n02, `net::carnival::revive_map`), whose screen takes their side
-  from START. Its `pt00` portal (`MCrevive<n>`) leads back to the battle
-  field's portal 0, where START gives the score again.
+  from START. Its `pt00` portal (`MCrevive<n>`, `scripts::mc_revive`) leads
+  back to the battle field, where START gives the score again: to portal 0,
+  or on a divided field to the side's own `red_revive` or `blue_revive`
+  (`return_portal`).
 
 ## Results
 

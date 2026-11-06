@@ -71,10 +71,11 @@ Jewel run. Those who reach 109050000 get Pietro's prize there
   ways on.
 - A GM's `/jewel` opens it. v83 has no word for it that we know of
   (report b172); this one is ours.
-- The halls are full of boxes (reactors) whose reactor time is -1, so a
-  broken one stays broken. The GM's `/start` puts every box of every
-  event map back (`FieldReactors::refill`) before the clock starts, so
-  each run starts full.
+- The halls are full of boxes (reactors). Those whose reactor time is -1
+  stay broken; the others come back after their time (60 to 280 seconds).
+  The GM's `/start` puts every box of every event map back
+  (`FieldReactors::refill`) before the clock starts, so each run starts
+  full.
 - Most boxes (9002000 to 9002002, in the halls and rooms) drop items from
   the content pack; 9002002's include the Treasure Scroll 4031018. Some do
   something else (`net::reactors::action`):
