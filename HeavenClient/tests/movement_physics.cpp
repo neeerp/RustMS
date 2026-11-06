@@ -1438,6 +1438,19 @@ void landings()
 	std::filesystem::remove(path);
 }
 
+// Rope 1 of 610030510 has y1 -123 under y2 -146, beside the long rope's top.
+void ropes_met()
+{
+	require(ms::Ladder::meets(-164, -144, -142, 95) == false, "the feet above a rope's top met it");
+	require(ms::Ladder::meets(-20, 0, -142, 95), "a span inside a rope missed it");
+	require(ms::Ladder::meets(-162, -142, -142, 95), "a span ending at a rope's top missed it");
+	require(ms::Ladder::meets(95, 115, -142, 95), "a span starting at a rope's bottom missed it");
+	require(!ms::Ladder::meets(-147, -146, -123, -146), "a short step met a rope with y1 below y2");
+	require(!ms::Ladder::meets(-143, -123, -123, -146), "a 20 px reach met a 23 px rope with y1 below y2");
+	require(ms::Ladder::meets(-146, -123, -123, -146), "a span holding such a rope missed it");
+	require(ms::Ladder::meets(355, 375, 374, 372), "a reach holding a 2 px rope with y1 below y2 missed it");
+}
+
 int main()
 {
 	std::filesystem::path path;
@@ -1448,6 +1461,7 @@ int main()
 			nl::file map(path.string());
 			ms::Physics physics(map.root());
 			view_limits(map.root());
+			ropes_met();
 			ice(map.root());
 			// v83 keeps objects 30 px inside the outermost footholds.
 			auto walls = physics.get_fht().get_walls();

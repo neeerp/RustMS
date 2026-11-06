@@ -48,6 +48,14 @@ namespace ms
 	class Ladder
 	{
 	public:
+		// Whether the height span from upper to lower meets a ladder (0xa45b03).
+		// The data has short ropes with y1 below y2. The same test catches one
+		// only with a span holding all of it, so most are never caught.
+		static constexpr bool meets(int16_t upper, int16_t lower, int16_t y1, int16_t y2)
+		{
+			return upper <= y2 && y1 <= lower;
+		}
+
 		Ladder(nl::node source);
 
 		bool is_ladder() const;
