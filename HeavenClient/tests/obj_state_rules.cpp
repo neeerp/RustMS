@@ -33,6 +33,14 @@ int main()
 		require(next_state(0, 4, 4) == -1 && next_state(0, 1, 1) == -1, "one it hasn't changes nothing");
 		require(next_state(0, 4, -2) == -1, "nor a negative one");
 
+		auto numbered = [](std::vector<int16_t> ids)
+		{
+			return frame_count([&](int16_t id) { return std::find(ids.begin(), ids.end(), id) != ids.end(); });
+		};
+		require(numbered({ 0, 1, 2 }) == 3, "all of them");
+		require(numbered({ 0, 2 }) == 1, "the Keep's dark ring stops at its gap, so it doesn't blink");
+		require(numbered({ 1, 2, 3, 4 }) == 0, "without a first there are none");
+
 		using Tags = std::vector<std::string>;
 		require(split_tags("bowQuest ") == Tags{ "bowQuest" }, "the spaces around a tag go");
 		require(split_tags("james1;james2;james3;") == Tags{ "james1;james2;james3;" }, "\";\" doesn't split");

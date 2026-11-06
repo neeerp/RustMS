@@ -246,6 +246,12 @@ namespace ms
 
 		state = State::ACTIVE;
 
+		// The objects already in other states, sent as the player arrives, wait for the map.
+		for (const ObjectNews &news : pending_objects)
+			tilesobjs.set_state(news.name, news.state, player.get_position());
+
+		pending_objects.clear();
+
 		// The map's help, sent as the player arrives, waits until now: it
 		// shows only on an active field.
 		if (pending_help)
@@ -305,6 +311,7 @@ namespace ms
 		pending_wedding.clear();
 		pending_weather.reset();
 		pending_weather_flag = 0;
+		pending_objects.clear();
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -2031,9 +2038,12 @@ namespace ms
 		sound.play(field_effect::summon_volume(length));
 	}
 
-	void Stage::set_object_state(const std::string &name, int32_t state)
+	void Stage::set_object_state(const std::string &name, int32_t object_state)
 	{
-		tilesobjs.set_state(name, state, player.get_position());
+		if (state != State::ACTIVE)
+			pending_objects.push_back({ name, object_state });
+		else
+			tilesobjs.set_state(name, object_state, player.get_position());
 	}
 
 	void Stage::swing_pulley()

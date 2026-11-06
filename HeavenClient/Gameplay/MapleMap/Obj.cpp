@@ -24,18 +24,24 @@
 
 #include "../../Constants.h"
 #include "../../Graphics/GraphicsGL.h"
-#include "../../Util/Misc.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
-#include <set>
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
-	Obj::State::State(nl::node data) : animation(data)
+	namespace
+	{
+		int16_t frames_of(nl::node data)
+		{
+			return obj_state::frame_count([&](int16_t id) { return data[std::to_string(id)].data_type() == nl::node::type::bitmap; });
+		}
+	}
+
+	Obj::State::State(nl::node data) : animation(data, frames_of(data))
 	{
 		repeat = data["repeat"].get_integer();
 
@@ -58,15 +64,9 @@ namespace ms
 			if (data["forceHP"])
 				trap.force_hp = data["forceHP"];
 
-			// In the order Animation keeps its frames.
-			std::set<int16_t> frameids;
+			int16_t count = frames_of(data);
 
-			for (auto sub : data)
-				if (sub.data_type() == nl::node::type::bitmap)
-					if (int16_t fid = string_conversion::or_default<int16_t>(sub.name(), -1); fid >= 0)
-						frameids.insert(fid);
-
-			for (int16_t fid : frameids)
+			for (int16_t fid = 0; fid < count; fid++)
 				frame_dirs.push_back(data[std::to_string(fid)]["dir"]);
 		}
 

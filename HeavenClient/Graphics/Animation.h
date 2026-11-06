@@ -72,7 +72,8 @@ namespace ms
 	class Animation
 	{
 	public:
-		Animation(nl::node source);
+		// Of the frames numbered below `limit`.
+		Animation(nl::node source, int16_t limit = INT16_MAX);
 
 		// An animation of these frames, which mustn't be empty.
 		Animation(std::vector<Frame> frames);

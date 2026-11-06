@@ -37,6 +37,19 @@ namespace ms::obj_state
 		return { false, Animation::End::LOOP, 0, false };
 	}
 
+	// How many frames an object has: "0", "1" and on up to the first that isn't there (0x43ea3e), so one past a gap in
+	// the numbers never shows. A mob's or NPC's action has another loader, which takes them all (0x40bbcb).
+	template <typename IsFrame>
+	int16_t frame_count(IsFrame is_frame)
+	{
+		int16_t count = 0;
+
+		while (is_frame(count))
+			count++;
+
+		return count;
+	}
+
 	// The state a named object shows after a switch to `state`, of `count` (FUN_00642aca). -1 shows the current one
 	// again. A state it doesn't have changes nothing, which is -1 here.
 	inline int32_t next_state(int32_t current, int32_t count, int32_t state)
