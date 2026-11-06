@@ -41,11 +41,14 @@ but the squad's rejoin lets them.
 ## The boss
 
 The arena's statue, reactor 8001000 (`shouwaBoss`, `SHOWA_STATUE`), is a
-type-100 reactor that takes a comb dropped in its area. It is
+type-100 reactor that takes a comb dropped in its area: the top of the
+gold it stands on (the platform at y=124), about 5 seconds after the comb
+lands. A comb dropped from the ground below just lies there. It is
 `Action::SpawnAt` with no notice and no music: the first bodyguard
 (9400112, `SHOWA_BODYGUARD`) comes out on the ground below (420, 160).
 Mob.nx's `revive` chain does the rest: Bodyguard A dies into Bodyguard B
-(9400113), and that into The Boss (9400300, `THE_BOSS`).
+(9400113), and that into The Boss (9400300, `THE_BOSS`). The pack has no
+drops for The Boss, so `reward_overrides.toml` holds Cosmic's table.
 
 The Boss's death in the copy is `boss_falls` in the field
 (`runtime/src/actor/field.rs`), as Papulatus's: the clear effect and jingle,
