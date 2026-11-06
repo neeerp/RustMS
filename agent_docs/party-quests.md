@@ -958,7 +958,7 @@ and stop coming (`FieldMessage::ClearMobs`, `MobSet::clear_hostile`, Cosmic
 The mobs come back on the field's usual seven seconds (Cosmic forces
 fifteen).
 
-The Red Flower Serpents (9300160/61) on Looking for Delli 2 and 3 banish
+The Red Flower Serpents (9300160/61) on Looking for Delli 1 to 3 banish
 by touch (`ban/banType` 1): a touch sends the player back to Looking for
 Delli 1 (925010000, `sp`) with their pink line ([combat](combat.md)).
 
@@ -1795,7 +1795,7 @@ the Snow Spirit urges it grown.
 
 Once it is whole, the Snow Spirit tells the leader so, and its Next brings
 out Scrooge (`events::holiday_scrooge(level)`, 9400318 + level) by the
-snowman, as everyone hears in pink (`holiday.scrooge.out`;
+snowman, in front of it as the later mob, as everyone hears in pink (`holiday.scrooge.out`;
 `Effect::BringOutScrooge`, `FieldActor::bring_out_scrooge`; picks in
 QUESTIONS b298); anyone else is sent to the leader, and while Scrooge is
 out everyone hears to fight. Every ten seconds while Scrooge lives, the

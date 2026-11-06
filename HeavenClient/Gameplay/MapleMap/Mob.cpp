@@ -415,6 +415,16 @@ namespace ms
 		return { body.get_x(), body.get_y() };
 	}
 
+	bool Mob::take_restack()
+	{
+		if (stacked_fh == phobj.fhid)
+			return false;
+
+		stacked_fh = phobj.fhid;
+
+		return true;
+	}
+
 	int8_t Mob::update(const Physics &physics)
 	{
 		if (!active)

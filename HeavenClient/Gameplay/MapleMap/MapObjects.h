@@ -26,8 +26,8 @@
 
 #include "../../Template/Optional.h"
 
+#include <map>
 #include <memory>
-#include <unordered_set>
 
 namespace ms
 {
@@ -84,8 +84,25 @@ namespace ms
 		underlying_t::size_type size() const;
 
 	private:
+		// Where an object is drawn: its layer, and its stack on that layer.
+		struct Place
+		{
+			int8_t layer;
+			int32_t stack;
+		};
+
+		void place(int32_t oid, int8_t layer, int32_t stack);
+		void unplace(int32_t oid);
+
 		std::unordered_map<int32_t, std::unique_ptr<MapObject>> objects;
-		std::array<std::unordered_set<int32_t>, Layer::Id::LENGTH> layers;
+
+		// By stack, the lowest drawn first. v83's Gr2D sorts layers of one z the
+		// same way: a new layer goes under its equals (0x5040399b), and setting
+		// a layer's z puts it over them (0x50409efd).
+		std::array<std::map<int32_t, int32_t>, Layer::Id::LENGTH> layers;
+		std::unordered_map<int32_t, Place> places;
+		int32_t lowest_stack = 0;
+		int32_t highest_stack = 0;
 		std::unordered_map<int32_t, uint32_t> entries;
 		uint32_t next_entry = 0;
 	};
