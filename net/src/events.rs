@@ -2485,17 +2485,15 @@ impl Ropes {
 
 /// Where `portal` on `map_id` leads a player in the Amorian Challenge
 /// whose stage 1 opened the way numbered `open`, if any: the open one of
-/// stage 1's ways to its copy of stage 2, and the others nowhere (`Some(None)`).
-/// `None` for any other portal.
-pub fn amoria_way(map_id: i32, portal: &str, open: Option<u8>) -> Option<Option<i32>> {
+/// stage 1's ways to its copy of stage 2. `None` for any other portal,
+/// which leads where Map.nx says: the others down to `st00`.
+pub fn amoria_way(map_id: i32, portal: &str, open: Option<u8>) -> Option<i32> {
     if map_id != AMORIA_ENTRY {
         return None;
     }
     let way = AMORIA_WAYS.iter().position(|&way| way == portal)?;
-    Some(
-        open.filter(|&open| usize::from(open) == way)
-            .map(|_| AMORIA_STAGE2[way]),
-    )
+    open.filter(|&open| usize::from(open) == way)
+        .map(|_| AMORIA_STAGE2[way])
 }
 
 /// The Amorian Challenge (Cosmic `AmoriaPQ`): six of a party, all married,
@@ -6576,10 +6574,10 @@ mod tests {
     #[test]
     fn amoria_s_first_stage_opens_only_the_way_drawn() {
         let way = |portal, open| amoria_way(AMORIA_ENTRY, portal, open);
-        assert_eq!(way("go00", None), Some(None));
-        assert_eq!(way("go02", Some(1)), Some(None));
-        assert_eq!(way("go01", Some(1)), Some(Some(670010301)));
-        assert_eq!(way("go02", Some(2)), Some(Some(670010302)));
+        assert_eq!(way("go00", None), None);
+        assert_eq!(way("go02", Some(1)), None);
+        assert_eq!(way("go01", Some(1)), Some(670010301));
+        assert_eq!(way("go02", Some(2)), Some(670010302));
         assert_eq!(way("male00", Some(0)), None);
         assert_eq!(amoria_way(AMORIA_STAGE2[0], "go00", Some(0)), None);
     }

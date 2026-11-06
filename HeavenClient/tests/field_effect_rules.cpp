@@ -62,6 +62,10 @@ int main()
 		require(back_alpha(100, 255, 1000, 1000) == 255 && back_alpha(100, 255, 1200, 1000) == 255, "then held");
 		require(back_alpha(0, 255, 0, 0) == 255, "at once without a duration");
 
+		require(back_tile_at(650, 0, 71) == -60 && back_tile_at(-200, 0, 71) == -58, "a tile at the view's edge");
+		require(back_tile_at(650, -750, 71) == 721, "an origin far right of the image moves the tiles right");
+		require(back_tile_at(10, 30, 71) == -61, "an origin left of the image moves them left");
+
 		require(back_step(-30, 8) == -1.2 && back_step(-30, 1000) == -150, "150 px a second to the left at rx -30");
 		require(back_step(100, 20000) == 10000 && back_step(0, 8) == 0, "100 px in 20000/r ms; still at 0");
 

@@ -75,6 +75,8 @@ namespace ms
 		void respawn(Point<int16_t> position, bool underwater);
 		// As respawn, but at rest in the air, as a new field starts a player.
 		void enter_field(Point<int16_t> position, bool underwater);
+		// As enter_field, for a portal within the map: keys stay held.
+		void portal_to(Point<int16_t> position, bool underwater);
 
 		// Mark where the player is now in the path to the server, as
 		// element `command` of no duration (v83 FUN_0052ef17).

@@ -1292,6 +1292,12 @@ namespace ms
 				healed = request_heal();
 			}
 
+			// A basic attack waits as an item use does (0x94e268): in a script
+			// portal's box, whose every answer restarts the wait, it never
+			// comes.
+			if (!move.is_skill() && !follow && !player.can_request(ExclRequest::USE_WAIT))
+				return false;
+
 			// Coconut Season's field takes a basic attack whatever it hits
 			// (its attack hook, A 94e30c).
 			if (!move.is_skill() && coconut::on_field())
@@ -1995,11 +2001,6 @@ namespace ms
 
 	std::optional<Combat::Swing> Combat::aim_swing()
 	{
-		// It waits as an item use does; here only these swings wait, not
-		// the whole attack.
-		if (!player.can_request(ExclRequest::USE_WAIT))
-			return std::nullopt;
-
 		Weapon::Type weapon = player.get_stats().get_weapontype();
 		bool degenerate =
 				weapon == Weapon::BOW || weapon == Weapon::CROSSBOW || weapon == Weapon::CLAW || weapon == Weapon::GUN;

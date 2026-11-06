@@ -284,8 +284,8 @@ void conveyor_belts()
 }
 
 // A portal within the map may lead straight up or down, onto a floor over
-// the same span as the one the player stands on (Eos Tower, 221023400). v83
-// stands the player on the floor below the target (0x957b74).
+// the same span as the one the player stands on (Eos Tower, 221023400). The
+// player must leave the floor they stood on for the one under the target.
 void placed_on_another_floor()
 {
 	auto path = foothold_map({
@@ -1053,6 +1053,90 @@ void walls_at_forks()
 	std::filesystem::remove(path);
 }
 
+// The gates of the Amorian Challenge's fifth stage (670010600) stand on such
+// a fork: a hit from behind must not carry the player through the block.
+void hits_at_forks()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 500, -1500, 500, 0, 0},
+		{3, 8, 1500, 500, 2000, 500, 0, 0},
+		{3, 36, -1100, 450, -990, 450, 0, 37},
+		{3, 37, -990, 450, -931, 450, 36, 289},
+		{3, 289, -931, 450, -931, 420, 37, 285},
+		{3, 285, -931, 420, -931, 360, 289, 283},
+		{3, 283, -931, 360, -931, 300, 285, 281},
+		{3, 281, -931, 300, -931, 240, 283, 277},
+		{3, 277, -931, 240, -931, 210, 281, 278},
+		{3, 278, -931, 210, -871, 210, 277, 279},
+		{3, 279, -871, 210, -871, 240, 278, 280},
+		{3, 280, -871, 240, -871, 300, 279, 282},
+		{3, 282, -871, 300, -871, 360, 280, 284},
+		{3, 284, -871, 360, -871, 420, 282, 286},
+		{3, 286, -871, 420, -871, 450, 284, 287},
+		{3, 287, -871, 450, -810, 450, 286, 35},
+		{3, 288, -931, 450, -900, 450, 37, 34},
+		{3, 34, -900, 450, -871, 450, 288, 287},
+		{3, 35, -810, 450, -700, 450, 287, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		for (int rest = 20; rest < 140; ++rest)
+		{
+			for (double air : {0.0, 1.0})
+			{
+				for (double start : {-960.0, -940.0, -932.0})
+				{
+					ms::PhysicsObject player;
+					player.shoe = true;
+					player.set_x(start); player.set_y(445);
+					for (int tick = 0; tick < 100; ++tick) physics.move_object(player);
+					require(player.onground && player.fhid == 37, "gate fixture did not find its floor");
+					int wait = 0;
+					for (int tick = 0; tick < 3000; ++tick)
+					{
+						player.walkdir = 1;
+						if ((player.onground || air > 0.0) && wait-- <= 0)
+						{
+							ms::Physics::knockback(player, 270.0, -270.0);
+							wait = rest;
+						}
+						physics.move_object(player);
+						require(player.crnt_x() < -930.0 || player.crnt_y() < 300.0, "a hit carried the player through the gate's block");
+					}
+				}
+			}
+		}
+	}
+	std::filesystem::remove(path);
+}
+
+// The Geist Balrog can die under the lowest floor of the Amorian Challenge's
+// last stage (670010700), with nothing below its drop's start.
+void drops_from_under_the_map()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{1, 1, 74, 600, 1814, 600, 0, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject drop;
+		drop.type = ms::PhysicsObject::Type::FIXATED;
+		drop.set_x(1845); drop.set_y(755);
+		for (int tick = 0; tick < 60; ++tick)
+		{
+			drop.hspeed = 1814.0 - drop.x.get();
+			drop.vspeed = 596.0 - drop.y.get();
+			physics.move_object(drop);
+		}
+		require(drop.crnt_x() == 1814.0, "a drop with no floor below went to x 0");
+		require(drop.crnt_y() == 596.0, "a drop with no floor below lost its height");
+	}
+	std::filesystem::remove(path);
+}
+
 // Group 1 is a floor at y 0 from x -500 to 500, a 100 px wall up at 500
 // and a floor on from there to 800, with a ledge from -300 to -100 at y
 // -150. Group 2 is a separate floor from 1000 to 1400, and group 3 keeps
@@ -1517,6 +1601,8 @@ int main()
 		landings();
 		walls_in_the_air();
 		walls_at_forks();
+		hits_at_forks();
+		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;
 	}

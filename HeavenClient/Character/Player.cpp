@@ -192,9 +192,8 @@ namespace ms
 	Player::Player() : Char(0, {}, "")
 	{}
 
-	// A portal within the map moves the player onto the foothold below its
-	// target (v83 FUN_00957b74), as a new field does, whatever floor they
-	// stood on.
+	// What a new field and a portal within the map do to the player, wherever
+	// they stood.
 	void Player::respawn(Point<int16_t> pos, bool uw)
 	{
 		phobj.place(pos.x(), pos.y());
@@ -217,6 +216,17 @@ namespace ms
 	{
 		phobj.enter(pos.x(), pos.y());
 		respawn(pos, uw);
+	}
+
+	// A portal within the map leaves the player at rest in the air, with no
+	// foothold (vecctrl slot +0x40, 0x9b5e7f, from FUN_0094e5e5). v83 reads
+	// the arrows as they are, so what is held stays held, and Up held catches
+	// a rope on the way down.
+	void Player::portal_to(Point<int16_t> pos, bool uw)
+	{
+		auto held = keysdown;
+		enter_field(pos, uw);
+		keysdown = held;
 	}
 
 	void Player::send_action(KeyAction::Id action, bool down)

@@ -4156,7 +4156,7 @@ pub fn amoria_door_gate(portal: &str) -> Option<&'static str> {
 
 /// Where `portal`, a `doorgo` portal on `map_id`, takes a player: past its
 /// gate, to `gtNNPIB`, if the gate is `open`; else they are told in pink
-/// that it is shut (Cosmic `doorgo`).
+/// that it is shut (Cosmic `apqDoor`).
 pub fn amoria_door(map_id: i32, portal: &str, open: bool) -> Vec<Effect> {
     let to = (portal.get(2..4)).map(|nn| named(map_id, &format!("gt{nn}PIB")));
     match to {

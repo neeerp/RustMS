@@ -59,11 +59,14 @@ async fn hears(player: &mut WorldSession, npc: i32, key: &str) -> Trace {
 }
 
 /// `player` takes the stage's way `name` and is turned back.
-async fn shut(player: &mut WorldSession, name: &str) {
+async fn leads_down(player: &mut WorldSession, name: &str) {
     let mut t = Trace::default();
     send(&mut player.connection, build_change_map(-1, name).unwrap()).await;
-    until(&mut player.connection, &mut t, |t| !t.blocked.is_empty()).await;
-    assert!(t.warps.is_empty(), "{name} {t:?}");
+    until(&mut player.connection, &mut t, |t| {
+        t.warps.contains(&AMORIA_ENTRY)
+    })
+    .await;
+    assert!(t.blocked.is_empty(), "{name} {t:?}");
 }
 
 // One test: a channel holds one run at a time.
@@ -118,9 +121,10 @@ async fn the_glimmer_man_s_shard_lets_amos_open_one_way_up() {
     hears(&mut team[0], AMOS_STAGE, keys::AMORIA_PQ_STAGE1_INTRO).await;
     hears(&mut team[0], GLIMMER_MAN, keys::AMORIA_PQ_GLIMMER_TASK).await;
 
-    // Every way up is shut.
+    // Every way leads down to the floor with the side rooms' doors, the
+    // only way there on foot.
     for way in AMORIA_WAYS {
-        shut(&mut team[0], way).await;
+        leads_down(&mut team[0], way).await;
     }
 
     // With the stage bare, the Glimmer Man brings out the fierry, once.
@@ -192,9 +196,10 @@ async fn the_glimmer_man_s_shard_lets_amos_open_one_way_up() {
         .clone();
     let way: usize = gate.1[4..].parse().unwrap();
 
-    // The way drawn leads to its copy of stage 2; the others stay shut.
+    // The way drawn leads to its copy of stage 2; the others still lead
+    // down.
     for (_, name) in (AMORIA_WAYS.into_iter().enumerate()).filter(|&(n, _)| n != way) {
-        shut(&mut team[1], name).await;
+        leads_down(&mut team[1], name).await;
     }
     let mut t = Trace::default();
     let c = &mut team[1].connection;
