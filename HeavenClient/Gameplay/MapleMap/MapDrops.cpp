@@ -169,6 +169,8 @@ namespace ms
 	void MapDrops::clear()
 	{
 		drops.clear();
+		// What came for the old field in the same read must not spawn on the new one.
+		spawns = {};
 		explosions.clear();
 	}
 
