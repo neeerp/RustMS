@@ -53,7 +53,8 @@ namespace ms
 
 		UINotice(std::string message, NoticeType type);
 
-		// Draws the box and the message. The message sits in the text frame, above the field for number entry.
+		// Draws the box and the message. The message sits in the text frame, above the field for number or text
+		// entry, which v83 draws for both (Notice4/s, FUN_009a8716).
 		void draw() const;
 
 		// The top edge of the button frames at the bottom of the box.
@@ -70,6 +71,8 @@ namespace ms
 		int16_t rows;
 		NoticeType type;
 		Text::Alignment alignment;
+		ColorBox fieldborder;
+		ColorBox fieldfill;
 	};
 
 	class UIYesNo : public UINotice
@@ -133,8 +136,6 @@ namespace ms
 		};
 
 		std::function<void(int32_t number)> numhandler;
-		ColorBox fieldborder;
-		ColorBox fieldfill;
 		Textfield numfield;
 		int32_t max;
 		int32_t min;
