@@ -24,6 +24,7 @@
 #include "UIItemMegaphone.h"
 #include "UIItemProtector.h"
 #include "UIIncubator.h"
+#include "UIItemBook.h"
 #include "UIKarmaScissors.h"
 #include "UIRemoteGachapon.h"
 #include "UIMemoSend.h"
@@ -1607,6 +1608,9 @@ namespace ms
 
 						if (item_id / 10000 == 429)
 							Stage::get().use_item_effect(item_id);
+						// A book opens its pages, asking the server nothing (0x4eff77).
+						else if (item_book::opens(item_id))
+							UIItemBook::open(item_id);
 						else if (marriage::is_invitation(item_id))
 							MarriageActions::invite(slot);
 						else if (marriage::is_received_invitation(item_id))
