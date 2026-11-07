@@ -220,6 +220,14 @@ namespace ms
 			field.draw(position);
 		}
 
+		for (const auto &link : links)
+		{
+			Point<int16_t> start = origin + link;
+
+			if (visible(start.y() - LINE + 4, start.y() + 4))
+				dot.draw(start + Point<int16_t>(DOT_X, -8));
+		}
+
 		for (size_t i = 0; i < choices.size(); i++)
 		{
 			const Choice &choice = choices[i];
@@ -948,8 +956,10 @@ namespace ms
 
 				images.resize(std::count(formatted_text.begin(), formatted_text.end(), Text::BOX));
 			}
-		} else if (type == TalkType::SENDSIMPLE)
+		} else
 		{
+			// Inline choices; and on a page that asks nothing, as a quest's last, a link is still a dot and its
+			// text (99dd54).
 			formatted_text = NpcTextMarkup::mark_choices(formatted_text, inline_ids);
 		}
 
@@ -993,6 +1003,16 @@ namespace ms
 		text.set_boxes(boxes);
 
 		int16_t block = text.height();
+
+		links.clear();
+
+		if (type != TalkType::SENDSIMPLE)
+		{
+			for (const auto &mark : marks)
+				links.push_back(text.box_position(mark.first));
+
+			inline_ids.clear();
+		}
 
 		for (size_t i = 0; i < mark_ends.size() && i < inline_ids.size(); i++)
 		{

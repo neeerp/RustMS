@@ -271,6 +271,9 @@ namespace ms
 		int16_t widest(const Choice &choice) const;
 
 		std::vector<Choice> choices;
+		// Where the links of a page that asks nothing start: v83 draws their dots (99dd54 tokenises #L on every
+		// page) but only a selection answers them.
+		std::vector<Point<int16_t>> links;
 		// Text that shows at once while the rest types out, in order: inline
 		// choices, as in footage, and what v83 puts between #w marks.
 		std::vector<std::pair<size_t, size_t>> instant_text;
