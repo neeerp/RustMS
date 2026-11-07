@@ -172,13 +172,13 @@ namespace ms::Claim
 		{
 			case 2:
 				if (!today)
-					return "The report has been successfully made.\\r\\nYou may not report for the rest of the day.";
+					return "The report has been successfully made.\\nYou may not report for the rest of the day.";
 
 				if (left > 0)
-					return "Your report has been successfully registered.\\r\\nYou have " + std::to_string(left) +
+					return "Your report has been successfully registered.\\nYou have " + std::to_string(left) +
 						   " reports left this week.";
 
-				return "Your report has been successfully registered.\\r\\nYou have no report left this week.";
+				return "Your report has been successfully registered.\\nYou have no report left this week.";
 			case 3:
 				return "You have been reported by a user.";
 			case 0x41:
@@ -190,7 +190,7 @@ namespace ms::Claim
 			case 0x44:
 				return "Unable to connect to the server.";
 			case 0x45:
-				return "You have exceeded\\r\\nthe number of reports available.";
+				return "You have exceeded\\nthe number of reports available.";
 			case 0x47:
 				return "You may only report from " + std::to_string(start_hour) + " to " + std::to_string(end_hour) +
 					   ".";

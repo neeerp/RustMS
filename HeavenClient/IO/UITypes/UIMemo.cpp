@@ -18,8 +18,9 @@ namespace ms
 {
 	namespace
 	{
-		// v83 places text about 3 px lower than ours.
-		constexpr int16_t TEXT_RAISE = 3;
+		// HC's text stands lower than v83's at the same point. Any less and a note's last line loses its tails under
+		// the row's bottom edge, which is drawn over it.
+		constexpr int16_t TEXT_RAISE = 6;
 		const Point<int16_t> HEADING_AT(100, 32);
 		// The list's 260 px wide view; rows wrap their text at 244 px.
 		const Point<int16_t> LIST_AT(8, 66);
