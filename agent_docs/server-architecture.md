@@ -87,7 +87,8 @@ the world server deletes `in_game` sessions for the channels it hosts.
   under which name and on which channel. It handles whispers, `/find`,
   world broadcasts, and duplicate connections. It also owns Maple Messenger
   rooms (`runtime/src/actor/messenger.rs`); a member changing channel keeps
-  their seat for `CHANNEL_CHANGE_GRACE`.
+  their seat for `CHANNEL_CHANGE_GRACE`. Only a new member's ADD to those
+  already in the room sets its announce byte (b458).
 
 ### Backpressure rule
 

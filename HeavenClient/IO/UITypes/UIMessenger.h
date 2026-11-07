@@ -19,6 +19,9 @@
 
 #include "../UIDragElement.h"
 
+#include "../MessengerRules.h"
+
+#include "../Components/ChatFloodGuard.h"
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
 
@@ -26,6 +29,8 @@
 #include "../../Graphics/Animation.h"
 
 #include <array>
+#include <string>
+#include <vector>
 
 namespace ms
 {
@@ -52,17 +57,20 @@ namespace ms
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
+		void remove_cursor() override;
+
 		UIElement::Type get_type() const override;
 
-		// Opens a new messenger, or leaves the one we are in.
+		// Opens a new messenger, or folds the open one to its title and back.
 		static void toggle();
 
 		// The server seated us in a slot; shows the window. A negative slot
 		// means we couldn't join, and v83 seats us first (0x84f281).
 		static void seat(int8_t slot);
 
-		// Someone took a seat, announced in the log if `announce`.
-		void set_member(uint8_t slot, const CharLook &look, const std::string &name, bool announce = false);
+		// Someone took a seat, announced in the log if `announce`. `channel`
+		// counts from zero.
+		void set_member(uint8_t slot, const CharLook &look, const std::string &name, uint8_t channel, bool announce = false);
 
 		// Someone left, said in the log (0x84f36c).
 		void remove_member(uint8_t slot);
@@ -74,8 +82,9 @@ namespace ms
 		// Empties a seat without a word, as mode 8 does (0x8519f2).
 		void empty_seat(uint8_t slot);
 
-		// A line someone said, formatted as "name : text".
-		void add_chat(const std::string &line);
+		// A line from the room: something said, as "name : text", or a notice
+		// that someone started or stopped typing (0x8515d7).
+		void hear(const std::string &line);
 
 		// A notice from the messenger itself.
 		void add_note(const std::string &note);
@@ -88,19 +97,39 @@ namespace ms
 
 		void clear_member(uint8_t slot);
 
+		// The three sizes the window folds through (0x850769).
+		enum class Size
+		{
+			FULL,
+			SHORT,
+			TITLE
+		};
+
 		void leave();
 
-		void submit(const std::string &text);
+		void drop_focus();
 
-		void ask_invite();
+		void ask_leave();
+
+		void submit();
+
+		void say(const std::string &text);
 
 		void invite(const std::string &name);
 
-		void add_line(const std::string &line);
+		void add_line(const std::string &line, Color::Name color);
+
+		void keep_said(const std::string &line);
 
 		void scroll_to_bottom();
 
-		void set_minimized(bool minimized);
+		void set_size(Size next);
+
+		void refresh_typing();
+
+		void show_channel(Point<int16_t> cursorpos);
+
+		void clear_channel();
 
 		int16_t log_rows() const;
 
@@ -110,7 +139,7 @@ namespace ms
 			MAX,
 			CLOSE,
 			ENTER,
-			SLOT
+			CLAIM
 		};
 
 		struct Member
@@ -119,14 +148,17 @@ namespace ms
 			CharLook look;
 			Text name;
 			Animation balloon;
-			uint16_t balloon_left = 0;
+			uint8_t channel = 0;
+			bool typing = false;
+			bool balloon_shown = false;
 		};
 
 		std::array<Member, SLOTS> members;
 		uint8_t own_slot;
 
 		Texture backgrnd;
-		Texture minimized_backgrnd;
+		Texture short_backgrnd;
+		Texture title_backgrnd;
 		Texture blink;
 		std::array<Texture, SLOTS + 1> namebars;
 
@@ -135,9 +167,18 @@ namespace ms
 		int16_t log_row;
 		Slider slider;
 		Textfield input;
+		Text typing_row;
 
-		bool minimized;
+		// The chat lines of the log, for the report button.
+		std::vector<std::string> said;
+
+		messenger_rules::TypingGate typing_gate;
+		messenger_rules::History history;
+		ChatFloodGuard flood_guard;
+
+		Size size;
 		bool unread;
 		uint16_t blink_elapsed;
+		bool channel_tip;
 	};
 }

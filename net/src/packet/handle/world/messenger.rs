@@ -24,8 +24,10 @@ impl WorldHandler for MessengerHandler {
             },
             MESSENGER_LEAVE_MODE => MessengerRequest::Leave,
             MESSENGER_INVITE_MODE => {
+                // The client doesn't check a name's length, so one too long
+                // gets the same "can't be found" as any stranger.
                 let target = reader.read_str_with_length()?;
-                if !valid_name(&target) || target == ctx.player.name() {
+                if target.is_empty() || target == ctx.player.name() {
                     return Ok(HandlerResult::empty());
                 }
                 MessengerRequest::Invite { target }
@@ -45,8 +47,7 @@ impl WorldHandler for MessengerHandler {
                 // The v83 client sends the whole line, "name : text"; only
                 // accept lines that speak as this character.
                 let line = reader.read_str_with_length()?;
-                let prefix = format!("{} : ", ctx.player.name());
-                if !line.starts_with(&prefix) || line.len() == prefix.len() {
+                if !speaks_as(&line, ctx.player.name()) {
                     return Ok(HandlerResult::empty());
                 }
                 MessengerRequest::Chat { line }
@@ -59,6 +60,18 @@ impl WorldHandler for MessengerHandler {
 
 fn valid_name(name: &str) -> bool {
     !name.is_empty() && name.len() <= MAX_NAME_LEN
+}
+
+/// A chat line of `name`'s, or their typing notice: the name and "1" as they
+/// start typing, the name and "0" as they empty the input (0x84e930).
+fn speaks_as(line: &str, name: &str) -> bool {
+    let Some(rest) = line.strip_prefix(name) else {
+        return false;
+    };
+    matches!(rest, "0" | "1")
+        || rest
+            .strip_prefix(" : ")
+            .is_some_and(|text| !text.is_empty())
 }
 
 #[cfg(test)]
@@ -156,6 +169,26 @@ mod tests {
     }
 
     #[test]
+    fn a_typing_notice_is_passed_on() {
+        let line = |text: &'static str| {
+            move |p: &mut Packet| {
+                p.write_str_with_length(text).unwrap();
+            }
+        };
+        assert!(matches!(
+            handle(MESSENGER_CHAT_MODE, line("Alice1")),
+            Some(MessengerRequest::Chat { line }) if line == "Alice1"
+        ));
+        assert!(matches!(
+            handle(MESSENGER_CHAT_MODE, line("Alice0")),
+            Some(MessengerRequest::Chat { line }) if line == "Alice0"
+        ));
+        assert!(handle(MESSENGER_CHAT_MODE, line("Alice")).is_none());
+        assert!(handle(MESSENGER_CHAT_MODE, line("Alice2")).is_none());
+        assert!(handle(MESSENGER_CHAT_MODE, line("Bob1")).is_none());
+    }
+
+    #[test]
     fn players_cannot_invite_themselves() {
         let name = |text: &'static str| {
             move |p: &mut Packet| {
@@ -167,6 +200,10 @@ mod tests {
         assert!(matches!(
             handle(MESSENGER_INVITE_MODE, name("Bob")),
             Some(MessengerRequest::Invite { target }) if target == "Bob"
+        ));
+        assert!(matches!(
+            handle(MESSENGER_INVITE_MODE, name("aNameFarTooLongForAnyone")),
+            Some(MessengerRequest::Invite { .. })
         ));
     }
 

@@ -153,12 +153,18 @@ namespace ms
 				switch (key)
 				{
 				case KeyAction::Id::LEFT:
+					if (text.empty() && callbacks.count(key))
+						callbacks.at(key)();
+
 					selected = false;
 					markerpos = text_lines::step_left(text, markerpos);
 					follow_marker();
 
 					break;
 				case KeyAction::Id::RIGHT:
+					if (text.empty() && callbacks.count(key))
+						callbacks.at(key)();
+
 					selected = false;
 					markerpos = text_lines::step_right(text, markerpos);
 					follow_marker();

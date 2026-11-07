@@ -88,6 +88,16 @@ namespace ms
 
 	void UIClaimNotice::open(const std::string &name)
 	{
+		std::vector<std::string> rows;
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			rows = chatbar->claim_rows();
+
+		open(name, rows);
+	}
+
+	void UIClaimNotice::open(const std::string &name, const std::vector<std::string> &rows)
+	{
 		std::time_t now = std::time(nullptr);
 
 		if (auto refusal = Claim::refusal(Claim::open, Claim::start_hour, Claim::end_hour,
@@ -97,11 +107,6 @@ namespace ms
 
 			return;
 		}
-
-		std::vector<std::string> rows;
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			rows = chatbar->claim_rows();
 
 		UI::get().emplace<UIClaimNotice>(name, rows);
 	}

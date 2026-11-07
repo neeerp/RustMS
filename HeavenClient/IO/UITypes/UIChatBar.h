@@ -132,6 +132,10 @@ namespace ms
 		// notices.
 		std::vector<std::string> claim_rows() const;
 
+		// Whether a line may be sent through `guard`; if not, warns as v83
+		// does. The messenger has a guard of its own (0x851d3b).
+		static bool flood_allows(ChatFloodGuard& guard, const std::string& line);
+
 		// item: the name the line gives in place of %s
 		void display_message(Messages::Type line, UIChatBar::LineType type, const std::string &item = "");
 
