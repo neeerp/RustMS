@@ -623,7 +623,9 @@ and Escape closes the window, which closes before the rock is used. Tab and
 Shift+Tab move the keys through ADD MAP, DEL. MAP, MOVE, the close button and
 the name field, past the disabled ones (v83 FUN_008392c1; the VIP rock's
 scroll bar isn't a stop here), and Space clicks a button that has them, as
-in the megaphone dialogs. Clicking a map in the list gives the keys to ADD
+in the megaphone dialogs. The VIP rock's list scrolls with the mouse wheel, a
+row a notch, while the cursor is over its bar (15 by 98 at 155, 80) or the
+165 px left of it, the rows (`0x839754`). Clicking a map in the list gives the keys to ADD
 MAP, as v83 does. A refused
 rock shows the result as a notice, naming the character for result 6.
 

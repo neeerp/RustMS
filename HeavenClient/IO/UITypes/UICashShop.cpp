@@ -729,9 +729,28 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
+	// v83's bars take the wheel over themselves and left of them: the locker's 208 px (0x4afff0), the
+	// inventory's 140 (0x4b0d17).
+	void UICashShop::send_scroll(double yoffset)
+	{
+		constexpr Rectangle<int16_t> CASH_WHEEL = Rectangle<int16_t>(229 - 208, 229 + 15 - 1, 347, 416 + 13);
+		constexpr Rectangle<int16_t> ITEM_WHEEL = Rectangle<int16_t>(163 - 140, 163 + 15 - 1, 476, 584 + 13);
+
+		if (cash_slider.isenabled() && CASH_WHEEL.contains(lastcursor))
+			cash_slider.send_scroll(yoffset);
+		else if (item_slider.isenabled() && ITEM_WHEEL.contains(lastcursor))
+			item_slider.send_scroll(yoffset);
+		else
+			return;
+
+		// The item under the cursor changed though the cursor didn't move.
+		update_tooltip(lastcursor, lastcursor + position);
+	}
+
 	Cursor::State UICashShop::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor = cursorpos - position;
+		lastcursor = cursor;
 
 		update_tooltip(cursor, cursorpos);
 

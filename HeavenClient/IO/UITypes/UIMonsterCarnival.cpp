@@ -62,6 +62,9 @@ namespace ms
 		constexpr int16_t SIDE_SLIDER_X = 107;
 		constexpr int16_t SIDE_SLIDER_Y = 8;
 		constexpr int16_t SIDE_SLIDER_LENGTH = 92;
+		// The side bar takes the wheel over itself and the 100 px left of it (0x86d710).
+		constexpr Rectangle<int16_t> SIDE_WHEEL = Rectangle<int16_t>(SIDE.x() + SIDE_SLIDER_X - 100, SIDE.x() + SIDE_SLIDER_X + 15 - 1,
+																  SIDE_SLIDER_Y, SIDE_SLIDER_Y + SIDE_SLIDER_LENGTH - 1);
 		constexpr int16_t LOCK_X = 9;
 		constexpr int16_t DECIDE_X = 110;
 
@@ -465,6 +468,13 @@ namespace ms
 		}
 
 		tip.set_text("");
+	}
+
+	// The list's bar never has rows to scroll, so only the side panel's moves.
+	void UIMonsterCarnival::send_scroll(double yoffset)
+	{
+		if (side_open && hovered && SIDE_WHEEL.contains(cursor - position))
+			side_slider.send_scroll(yoffset);
 	}
 
 	Cursor::State UIMonsterCarnival::send_cursor(bool clicked, Point<int16_t> cursorpos)

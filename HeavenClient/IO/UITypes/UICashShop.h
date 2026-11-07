@@ -72,6 +72,8 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+
+		void send_scroll(double yoffset) override;
 		// Double-clicking moves an item between the Cash and Item Inventories.
 		void doubleclick(Point<int16_t> cursorpos) override;
 		void remove_cursor() override;
@@ -300,6 +302,8 @@ namespace ms
 
 		std::vector<CashItem> cash_items;
 		Slider cash_slider;
+		// Where the cursor was last, inside the window.
+		Point<int16_t> lastcursor;
 		size_t cash_row;
 
 		InventoryType::Id item_tab;
