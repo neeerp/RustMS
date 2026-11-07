@@ -1690,7 +1690,8 @@ the stage's field starts, it wakes one at each place (`events::cwk_wake`,
 sigil of each job is among them (the last place has only fakes), and
 deals the eight places out among them afresh
 (`ReactorSet::shuffle_named`). Its woken sigils count as the second
-stage's do. Its fakes break on a swing.
+stage's do. A swing sets a fake spinning like a lit sigil, and it stays so
+(`events::CWK_FAKES`, `reactors::stays`), counting for nothing.
 
 The fourth stage's floor has fires, `a1` to `i7` (flametorch objects:
 state 1 lit, which burns, 2 out). The field starts with all of them lit

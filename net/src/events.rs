@@ -3116,6 +3116,12 @@ pub fn cwk_sigil(reactor_id: i32) -> Option<u8> {
         })
 }
 
+/// The fourth stage's fakes. A swing sets one spinning, as a sigil spins
+/// once lit, and that is all: nothing counts it. It stays so, as its last
+/// state's art loops and the map gives it no `reactorTime` (Cosmic's
+/// `hitReactor` triggers such a reactor rather than destroying it).
+pub const CWK_FAKES: [i32; 3] = [6_108_000, 6_108_001, 6_108_005];
+
 /// What everyone hears as each job's sigil lights on the third stage,
 /// where it also sets the stage's menhirs going.
 pub const CWK_MENHIR_LINES: [&str; 5] = [

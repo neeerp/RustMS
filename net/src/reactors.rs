@@ -872,12 +872,14 @@ pub fn first_state(reactor_id: i32) -> u8 {
 }
 
 /// Whether a reactor stays when it reaches its last state, rather than
-/// going away: a moonflower stays in bloom, a scar keeps its piece.
+/// going away: a moonflower stays in bloom, a scar keeps its piece, the
+/// Keep's fakes go on spinning.
 pub fn stays(reactor_id: i32) -> bool {
     matches!(
         action(reactor_id),
         Action::Bloom | Action::Hold | Action::Spear | Action::KingGate | Action::Sigil
     ) || acts_staying(reactor_id)
+        || crate::events::CWK_FAKES.contains(&reactor_id)
 }
 
 /// Whether a reactor, reaching its end state (its last, or one whose own
@@ -1308,6 +1310,11 @@ mod tests {
         for sigil in (6_109_000..=6_109_009).chain(6_109_016..=6_109_020) {
             assert_eq!(action(sigil), Action::Sigil);
             assert!(stays(sigil) && !acts_staying(sigil));
+        }
+        // Its fakes do nothing but stay, spinning.
+        for fake in crate::events::CWK_FAKES {
+            assert_eq!(action(fake), Action::Drops);
+            assert!(stays(fake) && !acts_staying(fake));
         }
         for door in MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR {
             assert_eq!(action(door), Action::SideDoor);
