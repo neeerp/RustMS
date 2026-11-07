@@ -29,9 +29,9 @@ use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{
-    cwk_menhirs, CWK, CWK_ENTRY, CWK_ESCORT, CWK_EYE, CWK_HIDDEN_WAY, CWK_HOST, CWK_JACK,
-    CWK_LATER_SIGILS, CWK_LOBBY, CWK_MASTERS, CWK_MASTER_GUARDIAN, CWK_MENHIR_LINES, CWK_ROOMS,
-    CWK_SIGILS, CWK_SIGIL_LINES,
+    cwk_menhirs, CWK, CWK_ENTRY, CWK_ESCORT, CWK_EYE, CWK_FAKES, CWK_HIDDEN_WAY, CWK_HOST,
+    CWK_JACK, CWK_LATER_SIGILS, CWK_LOBBY, CWK_MASTERS, CWK_MASTER_GUARDIAN, CWK_MENHIR_LINES,
+    CWK_ROOMS, CWK_SIGILS, CWK_SIGIL_LINES,
 };
 use net::npc_scripts::CWK_RECRUITER;
 use tokio::time::Duration;
@@ -64,8 +64,6 @@ const ALTARS: [(i32, i16, i16); 5] = [
 /// The third stage's way up, and its way on.
 const WAY_UP: &str = "next00";
 const STAGE3_WAY_ON: &str = "next01";
-/// The fourth stage's fakes.
-const FAKES: [i32; 3] = [6_108_000, 6_108_001, 6_108_005];
 /// A skill of each job that lights its sigil: a White Knight's, a
 /// Ranger's, a Fire/Poison Wizard's, a Hermit's and a Marauder's.
 const SIGIL_SKILLS: [i32; 5] = [1_211_002, 3_211_006, 2_111_002, 4_111_005, 5_111_005];
@@ -371,9 +369,20 @@ async fn the_keep_s_first_stages_clear_by_the_hidden_way_and_the_sigils() {
         assert_eq!(woken[n + 1..].iter().filter(near).count(), 0, "{woken:?}");
     }
 
+    // A swing sets a fake spinning, and it stays there.
+    let c = &mut leader.connection;
+    let mut fakes = woken.iter();
+    let fake = fakes.find(|r| CWK_FAKES.contains(&r.reactor_id)).unwrap();
+    send(c, walk_to(fake.x, fake.y)).await;
+    send(c, hit_reactor(fake.object_id)).await;
+    until(c, &mut lt, |t| {
+        t.field.reactor_hits.contains(&(fake.object_id, 2))
+    })
+    .await;
+    assert!(lt.field.reactors_removed.is_empty());
+
     // The woken sigils light as the second stage's do, and clear the
     // stage.
-    let c = &mut leader.connection;
     for job in 0..5 {
         let mut sigils = woken.iter();
         let sigil = sigils
@@ -655,7 +664,7 @@ fn woken(t: &Trace) -> Vec<MapReactor> {
     let later = CWK_LATER_SIGILS..CWK_LATER_SIGILS + 5;
     let reactors = t.field.reactors.iter();
     let woken = reactors.filter(|r| {
-        r.state == 1 && (later.contains(&r.reactor_id) || FAKES.contains(&r.reactor_id))
+        r.state == 1 && (later.contains(&r.reactor_id) || CWK_FAKES.contains(&r.reactor_id))
     });
     woken.copied().collect()
 }
