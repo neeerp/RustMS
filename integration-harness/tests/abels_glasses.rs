@@ -76,6 +76,8 @@ async fn a_bush_gives_glasses_and_abel_takes_them() {
     assert_eq!(items, [(NAUTILUS_RETURN, scrolls), (glasses, -1)]);
     assert_eq!(t.gains, [exp]);
     assert_eq!(t.states.get(&FIND_MY_GLASSES), Some(&2));
+    // A quest a script completes shows Quest Clear, as the quest window's do.
+    assert_eq!(t.cleared, 1, "{t:?}");
     // Abel plays the quest's `npcAct`.
     let &(abel, _) = trace
         .field
