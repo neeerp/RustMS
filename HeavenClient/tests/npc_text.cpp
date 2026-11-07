@@ -60,6 +60,14 @@ int main()
 			"Mai's First Training #b(Ended)#k\\n  #b(In Progress)#k Not Started", "quest names and states");
 		require(ms::NpcTextMarkup::expand("raise #q2321003#'s power", quests) == "raise Bahamut's power", "a skill's name");
 		require(expand("#p99999999999999999999#") == "#p99999999999999999999#", "an overlong id is text");
+		// v83 reads a name tag's id with atoi, up to the next '#', '\\' or '\r'.
+		require(expand("Hunt #o 100100# and #t2010000s#.") == "Hunt Snail and Apple.", "spaces and letters around an id");
+		require(expand("Read the #tLeafre Guidebook#.") == "Read the .", "an id without digits names nothing");
+		// Say.img/3907/0/yes/0: the tag is never closed, so the rest is its argument.
+		require(expand("Please give it to #b#p2000. I can't see him... Thanks") == "Please give it to #bRoger",
+			"an unclosed tag takes the rest of the text");
+		require(expand("Ask #p2000\\r\\n#L0#Yes#l") == "Ask Roger\\r\\n#L0#Yes#l", "or ends at a backslash");
+		require(expand("#m10000\rnext") == "Mushroom Town\rnext", "or at a carriage return");
 		using Choices = std::vector<std::pair<int32_t, std::string>>;
 		auto choices = ms::NpcTextMarkup::choices;
 		require(choices("Pick:\\r\\n#L0#One#l\\r\\n#L1#Two#l") == Choices{{0, "One"}, {1, "Two"}}, "closed choices");
