@@ -2199,13 +2199,19 @@ impl NpcScript {
     }
 
     /// An Event Assistant (`EVENT_ASSISTANTS`), while a GM's event is
-    /// `open` on the player's channel or not.
-    pub fn event_assistant(npc_id: i32, open: bool) -> Self {
+    /// `open` on the player's channel or not. They also take the Rock,
+    /// Paper, Scissors certificates (`CERTIFICATES`).
+    pub fn event_assistant(npc_id: i32, open: bool, player: &Player) -> Self {
         let go = match open {
             true => Page::Done(vec![Effect::JoinGmEvent { npc: npc_id }]),
             false => Page::Say(text(keys::GM_EVENT_NOT_OPEN)),
         };
-        NpcScript::new(
+        let key = |part: &str| keys::trader(CERTIFICATES.name, part);
+        let exchange = Page::Menu {
+            text: text(&key("menu")),
+            choices: trades(&CERTIFICATES, player, &mut rand::thread_rng()),
+        };
+        let mut script = NpcScript::new(
             npc_id,
             vec![Page::Menu {
                 text: text(keys::GM_EVENT_MENU),
@@ -2215,9 +2221,13 @@ impl NpcScript {
                         vec![Page::Say(text(keys::GM_EVENT_INFO))],
                     ),
                     (text(keys::GM_EVENT_GO), vec![go]),
+                    (text(keys::GM_EVENT_EXCHANGE), vec![exchange]),
                 ],
             }],
-        )
+        );
+        script.inventory_full = Some(text(&key("full")));
+        script.refused = Some(text(&key("refused")));
+        script
     }
 
     /// An Event Assistant on a player who couldn't join after all.
@@ -11467,6 +11477,66 @@ const TRADERS: [Trader; 3] = [
     },
 ];
 
+/// The Rock, Paper, Scissors certificates, which the Event Assistants
+/// exchange: how many of each win count, for one prize at random. From
+/// Cosmic's `9000011.js`, less its prizes v83 has no item for (its chairs and
+/// boxes) and its "temporary prize" of mesos (QUESTIONS b457). All four
+/// assistants speak alike, so `npc` is only the first of them.
+const CERTIFICATES: Trader = Trader {
+    npc: EVENT_ASSISTANTS[0],
+    name: "certificates",
+    quest: None,
+    intro: false,
+    confirm: false,
+    exp: 0,
+    wants: &[
+        (
+            4031332,
+            10,
+            &[
+                (YELLOW_ROSE, 1),
+                (2000000, 1),
+                (2000001, 1),
+                (2000002, 1),
+                (2000003, 1),
+                (2000004, 1),
+                (2000005, 1),
+            ],
+        ),
+        (
+            4031333,
+            8,
+            &[
+                (YELLOW_ROSE, 1),
+                (4080100, 1),
+                (4080001, 1),
+                (4080002, 1),
+                (4080003, 1),
+                (4080004, 1),
+                (4080005, 1),
+                (4080006, 1),
+                (4080007, 1),
+                (4080008, 1),
+                (4080009, 1),
+                (4080010, 1),
+                (4080011, 1),
+            ],
+        ),
+        (4031334, 6, &[(YELLOW_ROSE, 1), (RED_ROSE, 1), (2022070, 1)]),
+        (4031335, 5, &[(RED_ROSE, 1)]),
+        (4031336, 4, &[(RED_ROSE, 1)]),
+        (4031337, 3, &[(RED_ROSE, 1), (WHITE_ROSE, 1)]),
+        (4031338, 2, &[(WHITE_ROSE, 1)]),
+        (4031339, 1, &[(WHITE_ROSE, 1), (BLUE_ROSE, 1)]),
+        (4031340, 1, &[(BLUE_ROSE, 1)]),
+        (4031341, 1, &[(BLUE_ROSE, 1)]),
+    ],
+};
+const YELLOW_ROSE: i32 = 1442047;
+const RED_ROSE: i32 = 1442048;
+const BLUE_ROSE: i32 = 1442049;
+const WHITE_ROSE: i32 = 1442050;
+
 /// The trader offers to trade; a yes shows what it takes, and picking one
 /// (and a yes, if it asks) trades the pile for a prize drawn now, or says
 /// the player hasn't enough.
@@ -11480,7 +11550,31 @@ fn item_trader(trader: &Trader, player: &Player, rng: &mut impl Rng) -> NpcScrip
         script.pages = vec![Page::Say(text(&key("not_yet")))];
         return script;
     }
-    let choices = trader
+    let choices = trades(trader, player, rng);
+    if trader.intro {
+        script.pages.push(Page::Say(text(&key("intro"))));
+    }
+    script.pages.extend([
+        Page::Ask {
+            text: text(&key("deal")),
+            on_yes: vec![],
+            on_no: Some(text(&key("no_deal"))),
+        },
+        Page::Menu {
+            text: text(&key("menu")),
+            choices,
+        },
+    ]);
+    script.inventory_full = Some(text(&key("full")));
+    script.refused = Some(text(&key("refused")));
+    script
+}
+
+/// A menu's rows for each of what `trader` takes, with the prize of each
+/// drawn already.
+fn trades(trader: &Trader, player: &Player, rng: &mut impl Rng) -> Vec<(String, Vec<Page>)> {
+    let key = |part: &str| keys::trader(trader.name, part);
+    trader
         .wants
         .iter()
         .map(|&(item_id, count, prizes)| {
@@ -11530,24 +11624,7 @@ fn item_trader(trader: &Trader, player: &Player, rng: &mut impl Rng) -> NpcScrip
             };
             (label, pages)
         })
-        .collect();
-    if trader.intro {
-        script.pages.push(Page::Say(text(&key("intro"))));
-    }
-    script.pages.extend([
-        Page::Ask {
-            text: text(&key("deal")),
-            on_yes: vec![],
-            on_no: Some(text(&key("no_deal"))),
-        },
-        Page::Menu {
-            text: text(&key("menu")),
-            choices,
-        },
-    ]);
-    script.inventory_full = Some(text(&key("full")));
-    script.refused = Some(text(&key("refused")));
-    script
+        .collect()
 }
 
 /// Wiz lists the storybooks the player has brought back, by the quests
@@ -29944,6 +30021,50 @@ mod tests {
                 assert!(known.contains(&key), "{key}");
             }
             assert!(trader.wants.iter().all(|want| !want.2.is_empty()));
+        }
+    }
+
+    #[test]
+    fn an_event_assistant_takes_certificates_for_a_prize() {
+        const CERTIFICATE: i32 = 4031340;
+        let exchange = |player: &Player| {
+            let mut script = NpcScript::event_assistant(EVENT_ASSISTANTS[1], false, player);
+            script.begin();
+            script.respond(ScriptInput::Select(2)).unwrap();
+            script.respond(ScriptInput::Select(8)).unwrap()
+        };
+        let say = |part| text(&keys::trader("certificates", part));
+
+        assert_eq!(
+            exchange(&traveller(30, 0, false)).effects,
+            Vec::<Effect>::new()
+        );
+        let traded = exchange(&holding(CERTIFICATE, 1));
+        assert_eq!(
+            traded.effects,
+            vec![
+                Effect::TakeItem {
+                    item_id: CERTIFICATE,
+                    quantity: 1,
+                },
+                Effect::GiveItem {
+                    item_id: BLUE_ROSE,
+                    quantity: 1,
+                },
+            ]
+        );
+
+        let script =
+            NpcScript::event_assistant(EVENT_ASSISTANTS[1], false, &holding(CERTIFICATE, 1));
+        assert_eq!(script.inventory_full, Some(say("full")));
+        let known = keys::all();
+        for part in ["menu", "lack", "full", "refused", "done"] {
+            let key = keys::trader("certificates", part);
+            assert!(known.contains(&key), "{key}");
+        }
+        assert_eq!(CERTIFICATES.wants.len(), 10);
+        for (rank, want) in CERTIFICATES.wants.iter().enumerate() {
+            assert_eq!(Some(want.0), crate::rps::certificate(rank as i8 + 1));
         }
     }
 

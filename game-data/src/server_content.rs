@@ -3698,6 +3698,7 @@ pub mod keys {
     pub const GM_EVENT_ABOUT: &str = "gm_event.about";
     pub const GM_EVENT_INFO: &str = "gm_event.info";
     pub const GM_EVENT_GO: &str = "gm_event.go";
+    pub const GM_EVENT_EXCHANGE: &str = "gm_event.exchange";
     pub const GM_EVENT_NOT_OPEN: &str = "gm_event.not_open";
     pub const GM_EVENT_PIETRO: &str = "gm_event.pietro";
     pub const GM_EVENT_PIETRO_FULL: &str = "gm_event.pietro_full";
@@ -6045,6 +6046,7 @@ mod tests {
                 keys::GM_EVENT_ABOUT,
                 keys::GM_EVENT_INFO,
                 keys::GM_EVENT_GO,
+                keys::GM_EVENT_EXCHANGE,
                 keys::GM_EVENT_NOT_OPEN,
                 keys::GM_EVENT_PIETRO,
                 keys::GM_EVENT_PIETRO_FULL,
