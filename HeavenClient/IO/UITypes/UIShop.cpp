@@ -422,7 +422,9 @@ namespace ms
 
 	void UIShop::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (pressed && escape)
+		// The window holds the keyboard, so Enter ends it as Esc does (FUN_004edd21), except that Miu Miu's has only
+		// its EXIT button (FUN_007543c8, from her info/cash).
+		if (pressed && !cash && (escape || keycode == KeyAction::Id::RETURN))
 			exit_shop();
 	}
 
@@ -497,6 +499,7 @@ namespace ms
 	{
 		std::string strid = string_format::extend_id(npcid, 7);
 		npc = nl::nx::npc[strid + ".img"]["stand"]["0"];
+		cash = nl::nx::npc[strid + ".img"]["info"]["cash"].get_bool();
 
 		for (auto &button : buttons)
 			button.second->set_state(Button::State::NORMAL);
