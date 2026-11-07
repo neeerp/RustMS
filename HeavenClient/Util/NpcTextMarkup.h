@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <algorithm>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -77,6 +79,32 @@ namespace ms
 			return true;
 		}
 
+		// The id atoi would read from `arg` (spaces, a sign, then digits),
+		// 0 where it has no digits; none where it has more than 9 digits,
+		// which v83's atoi would overflow.
+		inline std::optional<int32_t> leading_id(const std::string& arg)
+		{
+			size_t i = arg.find_first_not_of(" \t\n\v\f");
+			if (i == std::string::npos)
+				return 0;
+
+			bool negative = arg[i] == '-';
+			if (arg[i] == '-' || arg[i] == '+')
+				i++;
+
+			size_t digits = 0;
+			int32_t id = 0;
+			for (; i < arg.size() && arg[i] >= '0' && arg[i] <= '9'; i++, digits++)
+			{
+				if (digits == 9)
+					return std::nullopt;
+
+				id = id * 10 + (arg[i] - '0');
+			}
+
+			return negative ? -id : id;
+		}
+
 		// Letters and digits only, and at least one.
 		inline bool is_key(const std::string& s)
 		{
@@ -128,6 +156,37 @@ namespace ms
 				}
 
 				char tag = text[i + 1];
+
+				// A name tag's argument runs to the next '#', '\\' or '\r', or
+				// the end, and the id is its atoi (0x9a29be, 0x9a262f): "#o
+				// 1210100#" and "#t4000332s#" name their ids, and an unclosed
+				// "#p2101001. I can't see him..." names Jiyur and takes the rest
+				// of the line with it (Say.img/3907/0/yes/0).
+				if (std::string("ptzomyuq").find(tag) != std::string::npos)
+				{
+					size_t end = text.find_first_of("#\\\r", i + 2);
+					size_t next = end == std::string::npos ? text.size() : text[end] == '#' ? end + 1 : end;
+					std::optional<int32_t> id = leading_id(text.substr(i + 2, std::min(end, text.size()) - i - 2));
+
+					if (id)
+					{
+						switch (tag)
+						{
+							case 'p': name('p', *id, *id ? lookups.npc_name(*id) : std::string()); i = next; continue;
+							case 't':
+							case 'z': out += *id ? lookups.item_name(*id) : std::string(); i = next; continue;
+							case 'o': out += *id ? lookups.mob_name(*id) : std::string(); i = next; continue;
+							case 'm': name('m', *id, *id ? lookups.map_name(*id) : std::string()); i = next; continue;
+							case 'y': if (lookups.quest_name && *id) { out += lookups.quest_name(*id); i = next; continue; } break;
+							case 'u': if (lookups.quest_state && *id) { out += lookups.quest_state(*id); i = next; continue; } break;
+							case 'q': if (lookups.skill_name && *id) { out += lookups.skill_name(*id); i = next; continue; } break;
+						}
+					}
+
+					out += text[i++];
+					continue;
+				}
+
 				size_t close = text.find('#', i + 2);
 				std::string arg = close == std::string::npos ? std::string() : text.substr(i + 2, close - i - 2);
 
@@ -147,28 +206,6 @@ namespace ms
 							i = close + 1;
 							continue;
 						}
-						break;
-					case 'p':
-						if (numeric) { name('p', id(), lookups.npc_name(id())); i = close + 1; continue; }
-						break;
-					case 't':
-					case 'z':
-						if (numeric) { out += lookups.item_name(id()); i = close + 1; continue; }
-						break;
-					case 'o':
-						if (numeric) { out += lookups.mob_name(id()); i = close + 1; continue; }
-						break;
-					case 'm':
-						if (numeric) { name('m', id(), lookups.map_name(id())); i = close + 1; continue; }
-						break;
-					case 'y':
-						if (numeric && lookups.quest_name) { out += lookups.quest_name(id()); i = close + 1; continue; }
-						break;
-					case 'u':
-						if (numeric && lookups.quest_state) { out += lookups.quest_state(id()); i = close + 1; continue; }
-						break;
-					case 'q':
-						if (numeric && lookups.skill_name) { out += lookups.skill_name(id()); i = close + 1; continue; }
 						break;
 					case 'v':
 					case 'i':
