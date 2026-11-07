@@ -20,7 +20,7 @@ namespace ms
 		// Shows cid's request to be added (FUN_00522d22).
 		void ask(const std::string& name, int32_t cid);
 		// Asks again about each request still unanswered, unless one is
-		// showing, as v83 does once a map has loaded (FUN_00a3fecf).
+		// showing, as v83 does on opening the user list (0xa059cd).
 		void show_requests();
 		// The buddies this character has blocked, from the settings.
 		FriendGroups::Blocks blocks();

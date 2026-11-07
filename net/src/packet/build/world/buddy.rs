@@ -37,7 +37,7 @@ pub struct BuddyView {
     /// Zero-based channel, or `None` while offline or not mutual.
     pub channel: Option<u8>,
     /// They asked to be added and haven't been answered. The client keeps
-    /// the entry, hidden, and asks about it again after each map change.
+    /// the entry, hidden, and asks about it again when its list window opens.
     pub requesting: bool,
 }
 

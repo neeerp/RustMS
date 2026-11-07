@@ -27,7 +27,7 @@ use net::maple_tv::MapleTv;
 use net::owl::Searches;
 use net::packet::build::world::alliance;
 use net::packet::build::world::anti_macro::AntiMacroResult;
-use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
+use net::packet::build::world::buddy::{build_buddy_list, build_buddy_request, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
 use net::packet::build::world::guild::{
     build_guild_agreement, build_guild_error, build_guild_info, build_guild_invite,
@@ -82,6 +82,8 @@ struct Entry {
     in_cash_shop: bool,
     /// When they logged in; a change of channel keeps it.
     logged_in: Instant,
+    /// Here from another channel or the Cash Shop, not from logging in.
+    changed_channel: bool,
 }
 
 impl Entry {
@@ -328,7 +330,11 @@ impl WorldDirectory {
                 self.party_skill(from, used, origin)
             }
             DirectoryMessage::PartyItem { from, item_id } => self.party_item(from, item_id),
-            DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
+            DirectoryMessage::BuddyList {
+                owner,
+                buddies,
+                entering,
+            } => self.send_buddy_list(owner, buddies, entering),
             DirectoryMessage::GuildInfo { owner, guild } => self.send_guild_info(owner, guild),
             DirectoryMessage::Online { client_id, reply } => {
                 let _ = reply.send(self.clients.contains_key(&client_id));
@@ -984,6 +990,7 @@ impl WorldDirectory {
             channel_id,
             in_cash_shop: false,
             logged_in: family_away.map_or_else(Instant::now, |away| away.logged_in),
+            changed_channel: back,
         };
         let member = entry.member();
         self.clients.insert(client_id, entry);
@@ -1389,7 +1396,19 @@ impl WorldDirectory {
     }
 
     /// Only mutual buddies show their channel.
-    fn send_buddy_list(&self, owner: ClientId, buddies: Vec<ListedBuddy>) {
+    fn send_buddy_list(&self, owner: ClientId, buddies: Vec<ListedBuddy>, entering: bool) {
+        // A login is asked about each request at once. v83 adds an asked
+        // request to its list unchecked (0xa40028), so these stay out of the
+        // list, and only come after it, as it replaces what the client has.
+        // A change of channel doesn't ask again: the window brings them back.
+        let logging_in = entering
+            && self
+                .clients
+                .get(&owner)
+                .is_some_and(|entry| !entry.changed_channel);
+        let (requests, buddies): (Vec<_>, Vec<_>) = buddies
+            .into_iter()
+            .partition(|buddy| logging_in && buddy.pending);
         let views: Vec<_> = buddies
             .into_iter()
             .map(|buddy| BuddyView {
@@ -1405,6 +1424,9 @@ impl WorldDirectory {
             })
             .collect();
         self.send_packet(owner, build_buddy_list(&views));
+        for request in requests {
+            self.send_packet(owner, build_buddy_request(request.id, &request.name, None));
+        }
     }
 
     /// Send `owner` their guild with who is online.
@@ -2842,6 +2864,7 @@ mod tests {
                 buddy(3, "Carol", false),
                 buddy(4, "Dave", true),
             ],
+            entering: false,
         });
         let Ok(ServerMessage::SendPacket(packet)) = alice.try_recv() else {
             panic!("no buddy list");
@@ -2860,6 +2883,84 @@ mod tests {
         });
         let buddy_list = format!("opcode {:#x}", SendOpcode::BuddyList as i16);
         assert_eq!(received(&mut alice), [buddy_list]);
+    }
+
+    /// How many rows the buddy list holds, how many of them are hidden
+    /// requests, then how many requests were asked about after it.
+    fn listed_and_asked(rx: &mut mpsc::Receiver<ServerMessage>) -> (u8, u8, usize) {
+        let Ok(ServerMessage::SendPacket(list)) = rx.try_recv() else {
+            panic!("no buddy list");
+        };
+        assert_eq!(list.bytes[2], 7, "the list comes first");
+        let rows = list.bytes[3];
+        let hidden = (0..usize::from(rows))
+            .map(|i| list.bytes[4 + i * 39 + 17])
+            .sum();
+        let mut asked = 0;
+        while let Ok(ServerMessage::SendPacket(request)) = rx.try_recv() {
+            assert_eq!(request.bytes[2], 9);
+            asked += 1;
+        }
+        (rows, hidden, asked)
+    }
+
+    fn requesters() -> Vec<ListedBuddy> {
+        let buddy = |id, name: &str, pending: bool| ListedBuddy {
+            id,
+            name: name.into(),
+            group: "Default Group".into(),
+            mutual: !pending,
+            pending,
+        };
+        vec![
+            buddy(2, "Bobby", true),
+            buddy(3, "Carol", false),
+            buddy(4, "Dave", true),
+        ]
+    }
+
+    #[test]
+    fn a_login_is_asked_about_each_request_after_the_list() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        received(&mut alice);
+        directory.handle(DirectoryMessage::BuddyList {
+            owner: 1,
+            buddies: requesters(),
+            entering: true,
+        });
+        assert_eq!(listed_and_asked(&mut alice), (1, 0, 2));
+    }
+
+    #[test]
+    fn only_entering_the_game_asks_about_requests() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        received(&mut alice);
+        directory.handle(DirectoryMessage::BuddyList {
+            owner: 1,
+            buddies: requesters(),
+            entering: false,
+        });
+        assert_eq!(listed_and_asked(&mut alice), (3, 2, 0));
+    }
+
+    #[test]
+    fn a_change_of_channel_keeps_requests_in_the_list() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let _alice = online(&mut directory, 1, "Alice", 10000);
+        directory.unregister(1, 1, true);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        received(&mut alice);
+        directory.handle(DirectoryMessage::BuddyList {
+            owner: 1,
+            buddies: requesters(),
+            entering: true,
+        });
+        assert_eq!(listed_and_asked(&mut alice), (3, 2, 0));
     }
 
     #[test]

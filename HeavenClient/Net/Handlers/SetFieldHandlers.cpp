@@ -41,7 +41,6 @@
 #include "../../Gameplay/MapleMap/MapleTvScreen.h"
 #include "../../Gameplay/OxQuizRules.h"
 #include "../../Gameplay/Stage.h"
-#include "../../IO/BuddyCommands.h"
 #include "../../IO/MarriageActions.h"
 #include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
@@ -171,10 +170,7 @@ namespace ms
 
 				Stage::get().transfer_player();
 
-				// Requests left unanswered come back (FUN_00a3fecf).
-				BuddyCommands::show_requests();
-
-				// So do notes left unread (0x5293eb).
+				// Notes left unread come back (0x5293eb).
 				if (!Memos::Inbox::get().empty() && !UIMemoNotice::showing())
 					UI::get().emplace<UIMemoNotice>();
 

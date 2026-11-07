@@ -1179,6 +1179,8 @@ pub enum DirectoryMessage {
     BuddyList {
         owner: ClientId,
         buddies: Vec<ListedBuddy>,
+        /// The list that comes with entering the game.
+        entering: bool,
     },
     /// Send `owner` their guild with who is online.
     GuildInfo {

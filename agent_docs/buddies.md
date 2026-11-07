@@ -43,13 +43,21 @@ characters list each other without `pending`.
   are both mutual and online; everyone else gets -1.
 - `DirectoryMessage::Deliver` sends a packet to whichever of a set of
   characters is online. Requests, channel updates, and buddy chat use it.
-- Every list carries the unanswered requests too, flagged (`GW_Friend` flag
-  1), as v83 expects: the client hides them, and asks about them itself
-  once a map has loaded. A request made while the player is online is also
-  sent on its own (mode 9).
+- A list carries the unanswered requests too, flagged (`GW_Friend` flag 1),
+  as v83 expects: the client hides them, and asks about them itself each
+  time its user list window opens from closed, on any tab (`0xa059cd`,
+  `0xa3fecf`), unless a buddy card is already up. A request made while the
+  player is online is also sent on its own (mode 9).
 - On entering the game, the client actor:
   - sends the list (or nothing, if it is empty);
   - tells mutual buddies its channel.
+- A login is asked about what came while they were away: the directory
+  leaves those rows out of the list and sends each as a mode 9 after it. v83
+  adds a mode 9 to its list unchecked, so the row must not be there too, and
+  a list arriving later would replace it. The client alone would wait for
+  the window to open. Coming back from another channel or the Cash Shop
+  (`Entry::changed_channel`) keeps them flagged in the list instead: a card
+  still up is lost with the change, and the window brings it back.
 - On logout, mutual buddies see channel -1. A channel change skips that,
   since the new channel announces itself.
 - Buddy chat only reaches the listed recipients who are mutual buddies. The
