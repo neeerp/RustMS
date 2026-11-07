@@ -32,6 +32,8 @@ use tokio::time::Duration;
 const AMORIA: i32 = 680_000_000;
 const HALL: i32 = 680_000_200;
 const ALTAR: i32 = 680_000_210;
+/// `we00`, the foot of the altar's aisle.
+const AISLE: u8 = 2;
 const EXIT: i32 = 680_000_500;
 const PARTY_ROOM: i32 = 680_000_300;
 const HUNTING_GROUND: i32 = 680_000_400;
@@ -272,9 +274,12 @@ async fn the_high_priest_marries_a_couple_their_guests_bless() {
     go_in(&mut leaver).await;
 
     // At the altar everyone hears his welcome.
+    // The couple stand at the foot of the aisle and the guests in the pews.
     let mut everyone = [&mut a, &mut b, &mut blesser, &mut late, &mut leaver];
-    for session in everyone.iter_mut() {
+    for (i, session) in everyone.iter_mut().enumerate() {
         let t = arrive(session, ALTAR, Trace::default()).await;
+        let portal = if i < 2 { AISLE } else { 0 };
+        assert!(t.arrivals.iter().any(|a| (a.0, a.1) == (ALTAR, portal)));
         let t = hear(session, 1, t).await;
         assert_eq!(t.wedding, [priest(0, groom, bride)]);
     }

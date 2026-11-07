@@ -15,4 +15,12 @@ namespace ms
 		else
 			background();
 	}
+
+	// With an NPC's page and a notice both up, the keys go to whichever is on
+	// top, as the mouse does. A prompt's complaint comes over its page; a page
+	// that comes after a notice, as the booking's does, covers it until it closes.
+	inline bool npc_page_hears_keys(bool page_open, bool notice_open, bool page_in_front)
+	{
+		return page_open && (!notice_open || page_in_front);
+	}
 }

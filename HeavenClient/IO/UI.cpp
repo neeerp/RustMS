@@ -19,6 +19,7 @@
 
 #include <chrono>
 
+#include "InputFocus.h"
 #include "UIStateCashShop.h"
 #include "UIStateGame.h"
 #include "UIStateLogin.h"
@@ -457,14 +458,19 @@ namespace ms
 			//auto whisper = UI::get().get_element<UIWhisper>();
 
 			// A notice over an NPC's talk, such as a prompt's complaint, hears
-			// the keys first.
+			// the keys first; one the talk came over waits for it to close.
 			UIElement *notice = state->get(UIElement::Type::NOTICE);
 			bool notice_open = notice && notice->is_active();
 			// So does a slideshow (233), modal over everything below it.
 			UIElement *slides = state->get(UIElement::Type::IMAGESLIDES);
 			bool slides_open = slides && slides->is_active();
 
-			if (npctalk && npctalk->is_active() && !notice_open && !slides_open)
+			bool talk_open = npctalk && npctalk->is_active();
+			bool talk_in_front = talk_open && notice_open &&
+								 state->get_front(std::list<UIElement::Type>{ UIElement::Type::NPCTALK, UIElement::Type::NOTICE }) ==
+									 state->get(UIElement::Type::NPCTALK);
+
+			if (npc_page_hears_keys(talk_open, notice_open, talk_in_front) && !slides_open)
 			{
 				npctalk->send_key(mapping.action, pressed, escape);
 				sent = true;

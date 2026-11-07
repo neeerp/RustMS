@@ -50,18 +50,27 @@ namespace ms
 		constexpr int16_t ONE_BUTTON_X = 97;
 		constexpr int16_t LEFT_BUTTON_X = 53;
 		constexpr int16_t RIGHT_BUTTON_X = 141;
+
+		// Notice3: its panel starts 10 down and ends 12 into s, 23 more than its rows.
+		constexpr int16_t WAITING_TEXT_WIDTH = 200;
+		constexpr int16_t WAITING_TEXT_TOP = 10;
+		constexpr int16_t WAITING_TEXT_EXTRA = 23;
+		constexpr int16_t WAITING_BUTTON_X = 205;
+		constexpr int16_t WAITING_BUTTON_UP = 30;
 	}
 
 	UINotice::UINotice(std::string message, NoticeType t, Text::Alignment a, Sound::Name sound)
 			: UIDragElement<PosNOTICE>(), type(t), alignment(a)
 	{
-		nl::node src = NxFiles::ui_classic["Basic.img"][type == NoticeType::OK ? "Notice2" : "YesNo2"];
+		const char *frame = type == NoticeType::OK ? "Notice2" : type == NoticeType::WAITING ? "Notice3" : "YesNo2";
+		nl::node src = NxFiles::ui_classic["Basic.img"][frame];
 
 		top = src["t"];
 		center = src["c"];
 		bottom = src["s"];
 
-		question = Text(Text::Font::A12M, alignment, Color::Name::BLACK, message, TEXT_WIDTH);
+		int16_t width = type == NoticeType::WAITING ? WAITING_TEXT_WIDTH : TEXT_WIDTH;
+		question = Text(Text::Font::A12M, alignment, Color::Name::BLACK, message, width);
 
 		int16_t needed = question.height() + 2 * TEXT_PADDING;
 
@@ -103,8 +112,9 @@ namespace ms
 		if (type != NoticeType::ENTERNUMBER)
 		{
 			// The glyphs sit a few pixels below the top of their line, so the line is centred a little high.
-			int16_t area = rows * center.height() + 4;
-			text_y = TEXT_TOP + (area - question.height()) / 2 - 3;
+			bool waiting = type == NoticeType::WAITING;
+			int16_t area = rows * center.height() + (waiting ? WAITING_TEXT_EXTRA : 4);
+			text_y = (waiting ? WAITING_TEXT_TOP : TEXT_TOP) + (area - question.height()) / 2 - 3;
 		}
 
 		int16_t text_x = alignment == Text::Alignment::LEFT ? TEXT_LEFT : dimension.x() / 2;
@@ -426,14 +436,17 @@ namespace ms
 		deactivate();
 	}
 
-	UIOk::UIOk(std::string message, std::function<void(bool ok)> oh, Sound::Name sound)
-			: UINotice(message, NoticeType::OK, Text::Alignment::CENTER, sound)
+	UIOk::UIOk(std::string message, std::function<void(bool ok)> oh, Sound::Name sound, bool waiting)
+			: UINotice(message, waiting ? NoticeType::WAITING : NoticeType::OK, Text::Alignment::CENTER, sound)
 	{
 		okhandler = oh;
 
 		nl::node src = NxFiles::ui_classic["Basic.img"];
 
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], ONE_BUTTON_X, buttons_y());
+		if (waiting)
+			buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtCancel2"], WAITING_BUTTON_X, dimension.y() - WAITING_BUTTON_UP);
+		else
+			buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], ONE_BUTTON_X, buttons_y());
 	}
 
 	void UIOk::draw(float alpha) const

@@ -42,7 +42,8 @@ namespace ms
 		{
 			YESNO,
 			ENTERNUMBER,
-			OK
+			OK,
+			WAITING
 		};
 
 		// Every notice but number entry plays a sound as it opens: DlgNotice, or BuyShopItem for the
@@ -185,7 +186,8 @@ namespace ms
 	class UIOk : public UINotice
 	{
 	public:
-		UIOk(std::string message, std::function<void(bool ok)> okhandler, Sound::Name sound = Sound::Name::DLGNOTICE);
+		// A waiting box is the wait for someone's answer: Notice3's frame, with a small Cancel in its corner (v83 0x515c0f).
+		UIOk(std::string message, std::function<void(bool ok)> okhandler, Sound::Name sound = Sound::Name::DLGNOTICE, bool waiting = false);
 
 		void draw(float alpha) const override;
 

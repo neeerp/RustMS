@@ -53,6 +53,9 @@ const GRACE: Duration = Duration::from_secs(2);
 /// How long each of the priest's lines that leads on waits for the couple
 /// to close it before he goes on anyway.
 const LINE_WAIT: Duration = Duration::from_secs(10);
+/// Where the couple arrive at either altar: the foot of the aisle, which the
+/// pews' floors don't reach.
+const AISLE: &str = "we00";
 /// Room for each of the couple and the guests to leave while another
 /// message of theirs waits, so a dropped ticket is never turned away. Each
 /// of the couple may also have up to five closes queued (one per step of
@@ -518,6 +521,7 @@ impl WeddingActor {
         let moved = || ServerMessage::WeddingMoved {
             id,
             to: PARTY_ROOM,
+            portal: None,
             clock: Some(ends),
         };
         if self.partying {
@@ -564,13 +568,19 @@ impl WeddingActor {
             WeddingStage::Gathering => {
                 self.set_stage(WeddingStage::Ceremony);
                 self.ends = Instant::now() + scaled(CEREMONY);
-                // The guests take their seats at the altar too.
-                for member in self.members.values().chain(self.guests().values()) {
-                    member.send(ServerMessage::WeddingMoved {
-                        id: self.id,
-                        to: self.venue.altar(),
-                        clock: Some(self.ends),
-                    });
+                // The couple walk the aisle; the guests take their seats.
+                let (id, to, clock) = (self.id, self.venue.altar(), Some(self.ends));
+                let moved = |portal| ServerMessage::WeddingMoved {
+                    id,
+                    to,
+                    portal,
+                    clock,
+                };
+                for member in self.members.values() {
+                    member.send(moved(Some(AISLE)));
+                }
+                for guest in self.guests().values() {
+                    guest.send(moved(None));
                 }
                 self.say(PRIEST_WELCOME);
                 info!(venue = ?self.venue, id = self.id, "Ceremony started");

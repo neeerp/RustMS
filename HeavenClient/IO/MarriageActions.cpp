@@ -55,7 +55,7 @@ namespace ms
 
 					proposing = false;
 					CancelProposalPacket().dispatch();
-				});
+				}, Sound::Name::DLGNOTICE, true);
 			}
 		}
 

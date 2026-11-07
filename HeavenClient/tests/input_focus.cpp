@@ -54,6 +54,11 @@ int main()
 		panel.active = false;
 		send(&panel, right, true);
 		require(walking, "closing the modal did not restore movement immediately");
+
+		require(ms::npc_page_hears_keys(true, false, false), "a page alone must hear the keys");
+		require(!ms::npc_page_hears_keys(true, true, false), "a notice over its page must hear them first");
+		require(ms::npc_page_hears_keys(true, true, true), "a page over a notice must hear them");
+		require(!ms::npc_page_hears_keys(false, true, false), "no page, nothing for it to hear");
 		std::cout << "Keyboard focus transitions passed\n";
 		return 0;
 	}

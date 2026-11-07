@@ -353,7 +353,10 @@ doors are closed, or the hall is full (`GuestRefusal`). Guests without
 wedding clothes are reminded of them but let in (b071 Q1).
 
 Guests go on to the altar with the couple, and their clock follows the
-couple's after the vows. The priest treats them as anyone else. The
+couple's after the vows. The couple arrive at `we00`, at the foot of the
+aisle, and the guests at the map's spawn, in the pews, as in Cosmic: on the
+Cathedral's altar the pews' floors don't reach the aisle. The priest treats
+them as anyone else. The
 assistant in the hall and Jackie or Nancy at the altar offer them the way
 out (`Effect::LeaveWedding`, to 680000500); a guest who leaves, logs out
 or changes channel only leaves the wedding. When it ends, guests go out
@@ -658,8 +661,9 @@ not made.
 
 Any result ends the client's wait, as does a new field (a channel change
 or the Cash Shop, where the server drops the proposal). The result's OK
-dialog replaces the waiting one, so no withdrawal is sent. v83's waiting
-dialog has a Cancel button; HeavenClient's has OK.
+dialog replaces the waiting one, so no withdrawal is sent. The waiting
+dialog is v83's: `UI/Basic.img/Notice3`'s frame, with `BtCancel2` in its
+lower right corner.
 
 HeavenClient shows one notice at a time, and a new one replaces the open
 one without calling its handler. A partner whose Yes/No is replaced never

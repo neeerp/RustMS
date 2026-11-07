@@ -326,12 +326,13 @@ impl ClientActor {
         self.warp_within_event(hall).await
     }
 
-    /// Wedding `id` takes the player on to `to`, where the time left is
-    /// `clock`.
+    /// Wedding `id` takes the player on to `to`, at `portal` or else the
+    /// map's spawn, where the time left is `clock`.
     pub(super) async fn wedding_moved(
         &mut self,
         id: u32,
         to: i32,
+        portal: Option<&str>,
         clock: Option<Instant>,
     ) -> Result<(), RuntimeError> {
         if self.in_cash_shop || self.game.is_none() {
@@ -345,7 +346,8 @@ impl ClientActor {
             return Ok(());
         }
         ticket.clock = clock;
-        self.warp_within_event(to).await
+        let portal = portal.map_or(0, |name| net::scripts::named(to, name));
+        self.warp_within_event_to(to, portal).await
     }
 
     /// Wedding `id` ended: out to the exit, if the player still holds its

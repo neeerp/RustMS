@@ -37,6 +37,8 @@ use tokio::time::Duration;
 const AMORIA: i32 = 680_000_000;
 const HALL: i32 = 680_000_100;
 const ALTAR: i32 = 680_000_110;
+/// `we00`, the foot of the altar's aisle.
+const AISLE: u8 = 2;
 const EXIT: i32 = 680_000_500;
 const WAYNE: i32 = 9201012;
 const PRIEST: i32 = 9201011;
@@ -208,6 +210,7 @@ async fn wayne_starts_a_due_wedding_and_the_priest_marries_the_couple() {
     // the priest welcomes them.
     let (groom, bride) = (a.character_id, b.character_id);
     let at = arrive(&mut a, ALTAR, Trace::default()).await;
+    assert!(at.arrivals.iter().any(|a| (a.0, a.1) == (ALTAR, AISLE)));
     assert_eq!(at.countdowns.len(), 1, "{:?}", at.countdowns);
     let at = hear(&mut a, 1, at).await;
     assert_eq!(at.wedding, [priest(0, groom, bride)]);
