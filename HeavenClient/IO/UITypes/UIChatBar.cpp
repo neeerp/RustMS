@@ -1328,10 +1328,15 @@ namespace ms
 
 	bool UIChatBar::flood_guard_allows(const std::string& line)
 	{
+		return flood_allows(flood_guard, line);
+	}
+
+	bool UIChatBar::flood_allows(ChatFloodGuard& guard, const std::string& line)
+	{
 		auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::steady_clock::now().time_since_epoch()).count();
 
-		switch (flood_guard.check(line, now))
+		switch (guard.check(line, now))
 		{
 			case ChatFloodGuard::Result::SEND:
 				return true;

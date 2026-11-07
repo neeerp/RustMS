@@ -308,10 +308,20 @@ from `UI.nx`. Moved so far:
   with the members standing in them, the chat log, and the input line, laid
   out from period footage. The MAPLECHAT key or ShortCut's MESSENGER button
   opens a room, or minimises the open one to its title bar (which blinks on
-  unread lines). Clicking an empty seat or typing `/invite name` invites; `/q`
-  or the close button leaves. A speaker shows the `chatBalloon` dots for a
-  few seconds. Invitations arrive as an invitation notice, whose O does
-  nothing while a room is open.
+  unread lines). Min and Max step through the full, short and title-bar
+  sizes; each step empties the input, as v83 rebuilds it. `/invite name`
+  invites; `/q` or the close button leaves, and Esc in the input asks first. No other `/` line goes out as chat. The siren
+  opens the report form with the members in its list. Invitations arrive as
+  an invitation notice, whose O does nothing while a room is open.
+  - `IO/MessengerRules.h` holds the rules: reading a typed line, reading a
+    heard line, the typing notices, and the Up/Down history. A line starting
+    with own name and "0" or "1" is a typing notice, not chat: it shows the
+    `chatBalloon` dots over that seat and the row under the window, and goes
+    out at most every three seconds. A newcomer is told at once.
+  - The log has eleven rows, nine at the short size, 13 px apart, coloured by
+    seat. Chat isn't read for `#` codes.
+  - Hovering an avatar shows its channel. Like v83 it doesn't follow a
+    member's channel change.
   - The log says "- 'name' has entered." for our own join and for an
     arrival the server announces, and "- 'name' have left the room." when
     someone leaves. A negative seat from the server means we couldn't join:

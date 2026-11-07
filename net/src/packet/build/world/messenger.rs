@@ -39,24 +39,28 @@ fn member_packet(
     look: &AvatarLook,
     name: &str,
     channel: u8,
+    announce: bool,
 ) -> Result<Packet, NetworkError> {
     let mut packet = messenger_packet(mode)?;
     packet.write_byte(slot)?;
     encode_avatar_look(&mut packet, look, true)?;
     packet.write_str_with_length(name)?;
     packet.write_byte(channel)?;
-    packet.write_byte(0)?;
+    packet.write_byte(announce as u8)?;
     Ok(packet)
 }
 
-/// Another character sits in `slot`. `channel` is zero-based.
+/// Another character sits in `slot`. `channel` is zero-based. `announce` is for
+/// a member who just came in: the client logs "- 'name' has entered." and sends
+/// them whether it is typing (0x84f162).
 pub fn build_messenger_add(
     slot: u8,
     look: &AvatarLook,
     name: &str,
     channel: u8,
+    announce: bool,
 ) -> Result<Packet, NetworkError> {
-    member_packet(ADD_MODE, slot, look, name, channel)
+    member_packet(ADD_MODE, slot, look, name, channel, announce)
 }
 
 /// A member changed channel or equipment.
@@ -66,7 +70,7 @@ pub fn build_messenger_update(
     name: &str,
     channel: u8,
 ) -> Result<Packet, NetworkError> {
-    member_packet(UPDATE_MODE, slot, look, name, channel)
+    member_packet(UPDATE_MODE, slot, look, name, channel, false)
 }
 
 /// The receiving client joined a messenger and sits in `slot`.
@@ -141,13 +145,22 @@ mod tests {
     #[test]
     fn add_and_update_carry_the_member_look_name_and_channel() {
         for (packet, mode) in [
-            (build_messenger_add(1, &look(), "Bob", 2).unwrap(), 0x00),
+            (
+                build_messenger_add(1, &look(), "Bob", 2, false).unwrap(),
+                0x00,
+            ),
             (build_messenger_update(1, &look(), "Bob", 2).unwrap(), 0x07),
         ] {
             let mut expect = Expect::new(&packet.bytes);
             expect.short(OP).byte(mode).byte(1).look(&look(), true);
             expect.string("Bob").byte(2).byte(0).end();
         }
+    }
+
+    #[test]
+    fn an_add_can_announce_the_member() {
+        let packet = build_messenger_add(1, &look(), "Bob", 2, true).unwrap();
+        assert_eq!(*packet.bytes.last().unwrap(), 1);
     }
 
     #[test]

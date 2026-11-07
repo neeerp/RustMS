@@ -122,12 +122,12 @@ impl Messengers {
             push(
                 &mut out,
                 other.client_id,
-                build_messenger_add(slot, &member.look, &member.name, member.channel),
+                build_messenger_add(slot, &member.look, &member.name, member.channel, true),
             );
             push(
                 &mut out,
                 client_id,
-                build_messenger_add(other_slot, &other.look, &other.name, other.channel),
+                build_messenger_add(other_slot, &other.look, &other.name, other.channel, false),
             );
         }
         room.slots[slot as usize] = Some(member);
@@ -268,7 +268,7 @@ impl Messengers {
                 push(
                     &mut out,
                     client_id,
-                    build_messenger_add(slot, &other.look, &other.name, other.channel),
+                    build_messenger_add(slot, &other.look, &other.name, other.channel, false),
                 );
             }
         }
@@ -394,6 +394,16 @@ mod tests {
         assert_eq!(
             summary(&join),
             vec![(BOB, 0x01, 1), (ALICE, 0x00, 1), (BOB, 0x00, 0)]
+        );
+        assert_eq!(
+            *join[1].1.bytes.last().unwrap(),
+            1,
+            "the room hears who came in"
+        );
+        assert_eq!(
+            *join[2].1.bytes.last().unwrap(),
+            0,
+            "they don't hear of those already there"
         );
     }
 

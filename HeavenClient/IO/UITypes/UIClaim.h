@@ -36,6 +36,10 @@ namespace ms
 		// server takes no reports now, the notice opens.
 		static void open(const std::string &name);
 
+		// The same with the chat lines to choose from; the messenger's button
+		// offers its own log (0x84ef23).
+		static void open(const std::string &name, const std::vector<std::string> &rows);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 

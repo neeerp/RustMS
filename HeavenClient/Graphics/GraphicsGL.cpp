@@ -817,6 +817,9 @@ namespace ms
 
 					Offset offset = ch.offset;
 
+					if (char_y >= maxheight)
+						continue;
+
 					if (char_bottom > maxheight)
 					{
 						GLshort bottom_adjust = char_bottom - maxheight;
