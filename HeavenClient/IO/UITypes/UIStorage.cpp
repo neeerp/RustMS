@@ -109,7 +109,8 @@ namespace ms
 
 	UIStorage::UIStorage(const CharLook &in_charlook, const Inventory &in_inventory)
 			: UIDragElement<PosSTORAGE>(), charlook(in_charlook), inventory(in_inventory), npcid(0), put_fee(0),
-			  get_fee(0), slots(0), meso(0), tab(InventoryType::Id::EQUIP), pending(false)
+			  get_fee(0), slots(0), meso(0), tab(InventoryType::Id::EQUIP), pending(false),
+			  taking(InventoryType::Id::NONE)
 	{
 		nl::node src = NxFiles::ui_classic["UIWindow.img"]["Trunk"];
 
@@ -156,7 +157,7 @@ namespace ms
 				Slider::Type::CLASSIC, STORED_SLIDER, STORED_SLIDER_X, STORED_ROWS, STORED_ROWS,
 				[&](bool upwards)
 				{
-					scroll(stored.offset, static_cast<int16_t>(stored.rows.size()), STORED_ROWS, upwards);
+					scroll(stored.offset, storage_rows::stored_positions(slots, STORED_ROWS), STORED_ROWS, upwards);
 				}
 		);
 
@@ -219,7 +220,7 @@ namespace ms
 			entry.name[0].draw(row + NAME);
 			entry.name[1].draw(row + NAME + Point<int16_t>(0, NAME_LINE));
 
-			if (shows_count(tab))
+			if (shows_count(entry.type))
 				countset.draw(std::to_string(entry.count), row + COUNT);
 		}
 	}
@@ -237,18 +238,9 @@ namespace ms
 
 		if (buttonid >= Buttons::TAB0 && buttonid <= Buttons::TAB4)
 		{
-			auto newtab = static_cast<InventoryType::Id>(InventoryType::Id::EQUIP + buttonid - Buttons::TAB0);
-
-			// The tab shown, clicked again, rebuilds its lists where they
-			// were, picks and all (0x7c665a's notify).
-			if (newtab == tab)
-			{
-				refresh_stored();
-				refresh_carried();
-			} else
-			{
-				change_tab(newtab);
-			}
+			// The tab shown, clicked again, rebuilds its list too (0x7c6c43's
+			// notify).
+			change_tab(static_cast<InventoryType::Id>(InventoryType::Id::EQUIP + buttonid - Buttons::TAB0));
 
 			return Button::State::NORMAL;
 		}
@@ -257,8 +249,12 @@ namespace ms
 		{
 			int16_t index = stored.offset + buttonid - Buttons::STORED0;
 
+			// One pick at a time, between the lists (FUN_007c6ce0).
 			if (index < static_cast<int16_t>(stored.rows.size()))
+			{
 				stored.selection = index;
+				carried.selection = -1;
+			}
 
 			return Button::State::NORMAL;
 		}
@@ -268,7 +264,10 @@ namespace ms
 			int16_t index = carried.offset + buttonid - Buttons::CARRIED0;
 
 			if (index < static_cast<int16_t>(carried.rows.size()))
+			{
 				carried.selection = index;
+				stored.selection = -1;
+			}
 
 			return Button::State::NORMAL;
 		}
@@ -408,11 +407,16 @@ namespace ms
 			stored_slider.send_scroll(yoffset);
 		else
 			carried_slider.send_scroll(yoffset);
+
+		// The row under the cursor changed though the cursor didn't move.
+		show_item(lastcursorpos);
 	}
 
-	void UIStorage::send_key(int32_t, bool pressed, bool escape)
+	void UIStorage::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (pressed && escape)
+		// The window holds the keyboard from when it opens (FUN_009de4d2), so
+		// Enter ends it as Esc does and never reaches the chat bar (FUN_004edd21).
+		if (pressed && (escape || keycode == KeyAction::Id::RETURN))
 			close();
 	}
 
@@ -440,6 +444,9 @@ namespace ms
 			button.second->set_state(Button::State::NORMAL);
 
 		pending = false;
+		taking = InventoryType::Id::NONE;
+		stored.offset = 0;
+		carried.offset = 0;
 		change(contents);
 		change_tab(InventoryType::Id::EQUIP);
 
@@ -462,7 +469,24 @@ namespace ms
 			if (contents.bags[type])
 				bags[type] = *contents.bags[type];
 
+		// Every answer drops the stored pick (FUN_007c5dfd).
+		stored.selection = -1;
 		refresh_stored();
+	}
+
+	void UIStorage::taken_out()
+	{
+		if (taking == InventoryType::Id::NONE)
+			return;
+
+		if (storage_rows::switches_tab(tab - InventoryType::Id::EQUIP, taking))
+			change_tab(taking);
+
+		int16_t row = storage_rows::changed_row(taking_from, carried_entries(tab));
+
+		carried.offset = storage_rows::scrolled_to(row, carried.offset);
+		fit_carried();
+		carried.selection = row;
 	}
 
 	void UIStorage::answered()
@@ -480,12 +504,8 @@ namespace ms
 	{
 		tab = newtab;
 
-		stored.offset = 0;
-		stored.selection = -1;
-		carried.offset = 0;
-		carried.selection = -1;
-
-		refresh_stored();
+		// The stored list shows every bag, and stays as it is; the player's
+		// keeps its scroll as far as the new bag goes.
 		refresh_carried();
 	}
 
@@ -493,44 +513,57 @@ namespace ms
 	{
 		stored.rows.clear();
 
-		for (const storage_contents::Stored &item : bags[tab])
-			stored.rows.push_back(make_row(item.itemid, item.count, 0));
+		for (int8_t type = InventoryType::Id::EQUIP; type <= InventoryType::Id::CASH; type++)
+			for (size_t i = 0; i < bags[type].size(); i++)
+				stored.rows.push_back(make_row(static_cast<InventoryType::Id>(type), bags[type][i].itemid,
+					bags[type][i].count, static_cast<int16_t>(i)));
 
-		auto size = static_cast<int16_t>(stored.rows.size());
-		stored.offset = std::max<int16_t>(0, std::min<int16_t>(stored.offset, size - STORED_ROWS));
+		int16_t positions = storage_rows::stored_positions(slots, STORED_ROWS);
+		stored.offset = std::max<int16_t>(0, std::min<int16_t>(stored.offset, positions - STORED_ROWS));
 
-		if (stored.selection >= size)
-			stored.selection = -1;
-
-		stored_slider.setrows(stored.offset, STORED_ROWS, std::max<int16_t>(size, STORED_ROWS));
+		stored_slider.setrows(stored.offset, STORED_ROWS, positions);
 	}
 
 	void UIStorage::refresh_carried()
 	{
 		carried.rows.clear();
 
-		for (int16_t slot = 1; slot <= inventory.get_slotmax(tab); slot++)
-		{
-			int32_t itemid = inventory.get_item_id(tab, slot);
+		for (const storage_rows::Entry &entry : carried_entries(tab))
+			carried.rows.push_back(make_row(tab, entry.itemid, entry.count, entry.slot));
 
-			if (itemid && storable(inventory, tab, slot, itemid))
-				carried.rows.push_back(make_row(itemid, inventory.get_item_count(tab, slot), slot));
-		}
+		// Every rebuild drops the pick (FUN_007c6e3a).
+		carried.selection = -1;
+		fit_carried();
+	}
 
+	void UIStorage::fit_carried()
+	{
 		auto size = static_cast<int16_t>(carried.rows.size());
 		carried.offset = std::max<int16_t>(0, std::min<int16_t>(carried.offset, size - CARRIED_ROWS));
-
-		if (carried.selection >= size)
-			carried.selection = -1;
 
 		carried_slider.setrows(carried.offset, CARRIED_ROWS, std::max<int16_t>(size, CARRIED_ROWS));
 	}
 
-	UIStorage::Row UIStorage::make_row(int32_t itemid, int16_t count, int16_t slot)
+	std::vector<storage_rows::Entry> UIStorage::carried_entries(InventoryType::Id type) const
+	{
+		std::vector<storage_rows::Entry> entries;
+
+		for (int16_t slot = 1; slot <= inventory.get_slotmax(type); slot++)
+		{
+			int32_t itemid = inventory.get_item_id(type, slot);
+
+			if (itemid && storable(inventory, type, slot, itemid))
+				entries.push_back({ itemid, inventory.get_item_count(type, slot), slot });
+		}
+
+		return entries;
+	}
+
+	UIStorage::Row UIStorage::make_row(InventoryType::Id type, int32_t itemid, int16_t count, int16_t slot)
 	{
 		const ItemData &item = ItemData::get(itemid);
 
-		Row row = { itemid, count, slot, item.get_icon(false), {} };
+		Row row = { type, itemid, count, slot, item.get_icon(false), {} };
 
 		// Whole words fill the first line; the rest go on the second.
 		std::string name = item.get_name();
@@ -575,8 +608,9 @@ namespace ms
 
 		if (row >= 0 && stored.offset + row < static_cast<int16_t>(stored.rows.size()))
 		{
-			// The rows are the bag's items in order.
-			UI::get().show_item(Tooltip::Parent::STORAGE, bags[tab][stored.offset + row]);
+			const Row &entry = stored.rows[stored.offset + row];
+
+			UI::get().show_item(Tooltip::Parent::STORAGE, bags[entry.type][entry.slot]);
 
 			return;
 		}
@@ -616,9 +650,11 @@ namespace ms
 		if (!can_request() || stored.selection < 0 || stored.selection >= static_cast<int16_t>(stored.rows.size()))
 			return;
 
-		auto type = static_cast<int8_t>(tab);
-		auto index = static_cast<int8_t>(stored.selection);
-		const storage_contents::Stored &item = bags[tab][stored.selection];
+		// The server counts an item within its bag.
+		const Row &row = stored.rows[stored.selection];
+		InventoryType::Id type = row.type;
+		auto index = static_cast<int8_t>(row.slot);
+		const storage_contents::Stored &item = bags[type][row.slot];
 
 		auto ask = [this, type, index]()
 		{
@@ -627,7 +663,11 @@ namespace ms
 				if (yes && can_request())
 				{
 					pending = true;
-					TrunkRequestPacket(type, index).dispatch();
+					taking = type;
+					// The item's bag, whatever tab shows (0x7c8535); taken_out() compares it with the shown tab.
+					taking_from = carried_entries(type);
+					carried.selection = -1;
+					TrunkRequestPacket(static_cast<int8_t>(type), index).dispatch();
 				}
 			};
 

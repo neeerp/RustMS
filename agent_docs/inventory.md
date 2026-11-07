@@ -1484,10 +1484,16 @@ first. The storage and the player are then saved in one transaction
 saving fails, both are restored.
 
 The client's window is `UIStorage`, from v83's CTrunkDlg (layout in
-`v83ref` report 163). Stored items are on the left and the player's storable
-items on the right; one tab picks the bag for both. Clicking a selected row
-again takes it out or stores it, like the shop. The v83 prompts are reproduced
-except karma. Stored equips show their name and icon but not their stats.
+`v83ref` report 163). The left list holds everything stored, one bag after
+another, whatever the tab, and scrolls over every slot, filled or not. The
+right list holds the player's storable items of the tab's bag. Only one row is
+picked at a time, between the lists; an answer from the server drops the
+stored pick and a rebuild of the right list drops its pick. Clicking a picked
+row again takes it out or stores it, like the shop. A take-out names the item
+by its type and its place in that bag. Its result switches the tab to the
+item's bag and picks the row that changed, with v83's slips in `IO/StorageRows.h`.
+The window holds the keyboard from when it opens, so no chat line can be typed
+while it is up, and Enter closes it as Esc does.
 
 ## Duey
 
