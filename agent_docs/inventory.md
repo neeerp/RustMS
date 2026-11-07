@@ -215,6 +215,11 @@ enable-actions stat update.
 HeavenClient cancels any icon drag before applying an INVENTORY_OPERATION,
 because the dragged icon points into the icons being rebuilt.
 
+The small inventory window scrolls with the mouse wheel, a row a notch, while
+the cursor is over its bar (15 by 200 at 152, 51) or the 142 px left of it,
+the slots: v83's CCtrlScrollBar takes the wheel over that much (`0x81ccd8`).
+The full window has no bar and doesn't scroll.
+
 The player is marked dirty and saved with the usual autosave/logout path.
 
 ## Using items and recovery

@@ -114,6 +114,9 @@ namespace ms
 		constexpr int16_t PAGE_PITCH = 149;
 		constexpr int16_t SLIDER_X = 152;
 		constexpr Range<int16_t> SLIDER_RANGE = Range<int16_t>(51, 237);
+		// The wheel scrolls over v83's bar, 15 by 200 at (152, 51), and the 142 px left of it, the slots (0x81ccd8).
+		// Inclusive, where PtInRect leaves out the right and bottom edges.
+		constexpr Rectangle<int16_t> WHEEL_AREA = Rectangle<int16_t>(152 - 142, 152 + 15 - 1, 51, 51 + 200 - 1);
 		constexpr Point<int16_t> COIN = Point<int16_t>(8, 267);
 		constexpr Point<int16_t> FULL_COIN = Point<int16_t>(7, 267);
 		// Only the full window has the Cash Shop button (0x81cef7).
@@ -1673,6 +1676,8 @@ namespace ms
 	{
 		Cursor::State dstate = UIDragElement::send_cursor(pressed, cursorpos);
 
+		lastcursor = cursorpos - position;
+
 		if (dragged)
 		{
 			clear_tooltip();
@@ -1827,6 +1832,18 @@ namespace ms
 			clear_new();
 			clear_tooltip();
 		}
+	}
+
+	// The full window has no bar to scroll (0x81cc74).
+	void UIItemInventory::send_scroll(double yoffset)
+	{
+		if (full_enabled || !slider.isenabled() || !WHEEL_AREA.contains(lastcursor))
+			return;
+
+		slider.send_scroll(yoffset);
+
+		// The slot under the cursor changed though the cursor didn't move.
+		clear_tooltip();
 	}
 
 	void UIItemInventory::remove_cursor()
