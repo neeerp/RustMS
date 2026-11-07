@@ -165,7 +165,8 @@ The Holy Stone (2030006) takes a Dark Crystal (4005004; Spiruna, 2032001,
 refines one from 10 ore and 500,000 mesos after her quest 3034) and asks
 five questions picked from the text's `holy_stone.q.<n>` keys, with the
 answers shuffled. A wrong answer ends the try; all right earns the Necklace
-of Wisdom (4031058). The chief takes it for `Effect::TakeThirdJob`
+of Wisdom (4031058), given with the line for passing under an OK (Cosmic's
+last `sendOk` and `gainItem`), so END CHAT there keeps it. The chief takes it for `Effect::TakeThirdJob`
 (`Player::take_third_job`: 1 SP, 5 AP and the second job's max HP or MP
 again) once the player has no more SP left than 3 for each level past 70.
 Upstream tracks the steps in quest records the client data lacks; here
