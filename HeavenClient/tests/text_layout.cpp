@@ -61,6 +61,9 @@ int main()
 		require(ms::Utf8::decode("\xC3\xA9", 0, c) == 2 && c == 0xE9, "two-byte character");
 		require(ms::Utf8::decode("\xE2\x80", 0, c) == 1 && c == ms::Utf8::REPLACEMENT, "truncated sequence");
 		require(ms::Utf8::decode("\xFF" "a", 0, c) == 1 && c == ms::Utf8::REPLACEMENT, "invalid lead byte");
+		require(ms::Utf8::decode("\xEF\xBC\x88", 0, c) == 3 && c == U'(', "a full-width ( is drawn as (");
+		require(ms::Utf8::decode("\xEF\xBD\x9E", 0, c) == 3 && c == U'~', "the last full-width form is ~");
+		require(ms::Utf8::decode("\xEF\xBD\xA1", 0, c) == 3 && c == 0xFF61, "half-width forms stay");
 
 		// Issue #495: Puro's balloon line, 84 px wide.
 		auto l = layout(puro, 84);

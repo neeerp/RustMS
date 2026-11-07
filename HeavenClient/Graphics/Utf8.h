@@ -91,6 +91,13 @@ namespace ms
 				value = (value << 6) | (static_cast<unsigned char>(text[pos + i]) & 0x3F);
 			}
 
+			// v83 turned the WZ's UTF-16 into code page 1252 with best fit
+			// (WideCharToMultiByte(CP_ACP, 0, ...), ds:0xbf03d4), which
+			// writes a full-width form as its ASCII twin: Kino's
+			// "\uFF08I told Kinokono...\uFF09" reads "(I told Kinokono...)".
+			if (value >= 0xFF01 && value <= 0xFF5E)
+				value -= 0xFEE0;
+
 			codepoint = value;
 			return length;
 		}
