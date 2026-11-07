@@ -951,8 +951,25 @@ impl ClientActor {
                 }
             }
         }
+        // A quest a script completes shows the Quest Clear effect, to the
+        // player and the map, as one completed through the quest window
+        // does (Cosmic `Quest.forceComplete`).
+        let cleared = matches!(
+            change,
+            Some(QuestChange::Complete(_) | QuestChange::Finish(_))
+        );
         if (changed || change.is_some()) && !self.commit_player(next, change, &mut packets).await? {
             return Ok(Applied::Refused);
+        }
+        if cleared {
+            packets.push(effect::build_own_effect(CharEffect::QuestClear)?);
+            let character_id = self.in_game()?.player.id();
+            let shown = effect::build_foreign_effect(character_id, CharEffect::QuestClear)?;
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::Broadcast(shown),
+            })
+            .await?;
         }
         if save_now {
             self.flush().await?;
