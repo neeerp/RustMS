@@ -49,7 +49,7 @@ namespace ms
 		constexpr Point<int16_t> CHECK_BOX = Point<int16_t>(2, 1);
 
 		// StringPool 0x10f6, 0x110 and 0xce0.
-		constexpr const char *EMPTY_SLOT = "Drag the skill icon from the skill inventory\\r\\non the left into the slots.";
+		constexpr const char *EMPTY_SLOT = "Drag the skill icon from the skill inventory\\non the left into the slots.";
 		constexpr const char *NO_CURSING = "Cursing is not allowed.";
 		constexpr const char *SAVED = "It is saved.";
 

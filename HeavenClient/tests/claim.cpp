@@ -73,10 +73,10 @@ int main()
 		require(description({ "", " ", "", "" }).empty(), "nothing but spaces");
 
 		require(*result_message(2, true, 9) ==
-				"Your report has been successfully registered.\\r\\nYou have 9 reports left this week.",
+				"Your report has been successfully registered.\\nYou have 9 reports left this week.",
 				"the reports left");
 		require(*result_message(2, true, 0) ==
-				"Your report has been successfully registered.\\r\\nYou have no report left this week.",
+				"Your report has been successfully registered.\\nYou have no report left this week.",
 				"none left");
 		require(result_message(2, false, 3)->find("rest of the day") != std::string::npos, "none today");
 		require(*result_message(3, false, 0) == "You have been reported by a user.", "reported");
@@ -84,7 +84,7 @@ int main()
 		require(*result_message(0x42, false, 0) == "Please re-check the character name, then try again.", "the name");
 		require(*result_message(0x43, false, 0) == "You do not have enough mesos to report.", "the fee");
 		require(*result_message(0x44, false, 0) == "Unable to connect to the server.", "no server");
-		require(*result_message(0x45, false, 0) == "You have exceeded\\r\\nthe number of reports available.",
+		require(*result_message(0x45, false, 0) == "You have exceeded\\nthe number of reports available.",
 				"the limit");
 		require(result_message(0x48, false, 0)->find("false report") != std::string::npos, "a false report");
 		start_hour = 9;
