@@ -55,8 +55,8 @@ impl ClientActor {
         })
         .await?;
         let open = open.await.ok().flatten().is_some();
-        self.start_script(NpcScript::event_assistant(npc_id, open))
-            .await
+        let script = NpcScript::event_assistant(npc_id, open, &self.in_game()?.player);
+        self.start_script(script).await
     }
 
     /// The player takes a place at the channel's event (`npc_id` sent

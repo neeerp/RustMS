@@ -1653,6 +1653,12 @@ Continue, 4 Exit, 5 Retry. Requests that don't fit the game are ignored.
 - Exit closes the window (mode 13). After a win it gives the certificate for
   the streak, 4031332 for one win up to 4031341 for ten. The tenth win ends
   the game and gives its certificate at once.
+- Paul, Jean, Martin and Tony, the Event Assistants, exchange the certificates
+  (the items' text sends players to them): ten of one win down to one of eight,
+  nine or ten wins, for one prize at random. The table is Cosmic's less what v83
+  has no item for, so the Valentine Roses, potions, Omok and Match Cards sets
+  and Congrats from GM stay (`CERTIFICATES` in `net/src/npc_scripts.rs`,
+  QUESTIONS b457).
 
 The server's game stays until the next talk, which starts a new one, in
 case a client closes the window without a packet.
