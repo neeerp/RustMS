@@ -49,6 +49,8 @@ namespace ms
 		// The VIP rock's ten maps scroll through the five rows.
 		constexpr int16_t SLIDER_X = 155;
 		constexpr Range<int16_t> SLIDER = Range<int16_t>(80, 165);
+		// The wheel scrolls over v83's bar, 15 by 98 at (155, 80), and the 165 px left of it, the rows (0x839754).
+		constexpr Rectangle<int16_t> WHEEL_AREA = Rectangle<int16_t>(155 - 165, 155 + 15 - 1, 80, 80 + 98 - 1);
 
 		// The map's name, under the map it borrows its data from (FUN_005cf792).
 		std::string map_name(int32_t map_id)
@@ -202,6 +204,7 @@ namespace ms
 		held = clicked;
 
 		Point<int16_t> cursor = cursorpos - position;
+		lastcursor = cursor;
 
 		if (vip)
 		{
@@ -220,6 +223,13 @@ namespace ms
 			return state;
 
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	// Only the VIP rock has a bar to scroll.
+	void UITeleportRock::send_scroll(double yoffset)
+	{
+		if (vip && WHEEL_AREA.contains(lastcursor))
+			slider.send_scroll(yoffset);
 	}
 
 	void UITeleportRock::send_key(int32_t keycode, bool pressed, bool escape)

@@ -101,6 +101,8 @@ namespace ms
 	{
 		if (auto front = dialog())
 			front->send_scroll(yoffset);
+		else if (auto shop = get(UIElement::Type::CASHSHOP); shop && shop->is_active())
+			shop->send_scroll(yoffset);
 	}
 
 	Cursor::State UIStateCashShop::send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos)
