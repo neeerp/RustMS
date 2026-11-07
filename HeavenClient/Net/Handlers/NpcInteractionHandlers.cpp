@@ -466,6 +466,9 @@ namespace ms
 		switch (mode)
 		{
 		case Mode::TAKEN_OUT:
+			storage.taken_out();
+			storage.change(storage_contents::read(recv));
+			return;
 		case Mode::STORED:
 		case Mode::SORTED:
 		case Mode::MESO:

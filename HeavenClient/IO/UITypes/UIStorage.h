@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "../StorageRows.h"
 #include "../UIDragElement.h"
 
 #include "../Components/ClassicTabs.h"
@@ -17,9 +18,9 @@
 
 namespace ms
 {
-	// The storage an NPC keeps for the account (v83 CTrunkDlg): its items on
-	// the left, the player's storable ones on the right, and one tab choosing
-	// the bag both show.
+	// The storage an NPC keeps for the account (v83 CTrunkDlg): all its items
+	// in one list on the left, a bag after another, and on the right the
+	// player's storable ones of the bag the tab chooses.
 	class UIStorage : public UIDragElement<PosSTORAGE>
 	{
 	public:
@@ -54,6 +55,10 @@ namespace ms
 		// A request was answered with what changed.
 		void change(const storage_contents::Contents &contents);
 
+		// The last take-out came through, before what changed is read: the
+		// player's list goes to its bag and picks the item (0x7c8b24).
+		void taken_out();
+
 		// A request was answered, or refused.
 		void answered();
 
@@ -69,9 +74,11 @@ namespace ms
 	private:
 		struct Row
 		{
+			InventoryType::Id type;
 			int32_t itemid;
 			int16_t count;
-			// The inventory slot of a carried item.
+			// The inventory slot of a carried item, or a stored one's place in
+			// its bag.
 			int16_t slot;
 			Texture icon;
 			// The name, wrapped onto two lines.
@@ -90,6 +97,11 @@ namespace ms
 		void refresh_stored();
 
 		void refresh_carried();
+
+		void fit_carried();
+
+		// The storable items of a bag.
+		std::vector<storage_rows::Entry> carried_entries(InventoryType::Id type) const;
 
 		void draw_list(const List &list, Point<int16_t> origin, int16_t rows, int16_t select_x, int16_t limit) const;
 
@@ -112,7 +124,7 @@ namespace ms
 
 		void close();
 
-		static Row make_row(int32_t itemid, int16_t count, int16_t slot);
+		static Row make_row(InventoryType::Id type, int32_t itemid, int16_t count, int16_t slot);
 
 		static constexpr int16_t STORED_ROWS = 5;
 		static constexpr int16_t CARRIED_ROWS = 4;
@@ -162,6 +174,10 @@ namespace ms
 
 		// A request is out, and the next waits for its answer.
 		bool pending;
+
+		// The bag of the last take-out, and its storable items as it went out.
+		InventoryType::Id taking;
+		std::vector<storage_rows::Entry> taking_from;
 
 		Point<int16_t> lastcursorpos;
 	};
