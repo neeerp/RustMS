@@ -1520,9 +1520,11 @@ up, so the server keeps `duey: Option<DueyWindow>` (Duey's own window, a
 receive-only one, or a quick send). It is set on open, so a second open
 sends nothing. DUEY_ACTION op 7 clears it, and so do a map change and
 entering the Cash Shop: the client destroys the window on any new field or
-stage without sending op 7 (`v83ref` report b029). The window isn't modal,
-so the player may walk and talk to NPCs while it is up. The client uses a coupon only with no window up, so using one
-always opens a quick send. Duey requests in the Cash Shop are ignored. A
+stage without sending op 7 (`v83ref` report b029). The window holds v83's one
+dialog slot, so while it is up the field takes no keys or clicks: the player
+can't walk, use skills or talk to NPCs (report c015). The client uses a
+coupon only with no window up, so using one always opens a quick send. Duey
+requests in the Cash Shop are ignored. A
 send, claim or delete that doesn't fit the open window gets `0x13`, since
 the window waits for an answer. With no window open such a request gets
 nothing. The client's FILETIME is a day short of the parcel's expiry, which

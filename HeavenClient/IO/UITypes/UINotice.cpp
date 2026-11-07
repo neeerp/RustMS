@@ -228,6 +228,8 @@ namespace ms
 				}
 		);
 
+		// The default comes selected, so the first key typed replaces it.
+		numfield.select_all();
 		numfield.set_keeps_focus();
 		numfield.set_state(Textfield::State::FOCUSED);
 	}
