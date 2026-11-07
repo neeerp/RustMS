@@ -85,8 +85,16 @@ namespace ms
 		position = Point<int16_t>(position.x() - dimension.x() / 2, position.y() - dimension.y() / 2);
 		dragarea = Point<int16_t>(dimension.x(), 19);
 
-		if (type != NoticeType::ENTERNUMBER)
+		if (type == NoticeType::ENTERNUMBER)
+		{
+			int16_t field_width = FIELD_RIGHT - FIELD_LEFT;
+			fieldborder = ColorBox(field_width, FIELD_HEIGHT, Color::Name::DUSTYGRAY, 1.0f);
+			fieldfill = ColorBox(field_width - 2, FIELD_HEIGHT - 2, Color::Name::WHITE, 1.0f);
+		}
+		else
+		{
 			Sound(sound).play();
+		}
 	}
 
 	UINotice::UINotice(std::string message, NoticeType t) : UINotice(message, t, Text::Alignment::CENTER)
@@ -120,6 +128,13 @@ namespace ms
 		int16_t text_x = alignment == Text::Alignment::LEFT ? TEXT_LEFT : dimension.x() / 2;
 
 		question.draw(position + Point<int16_t>(text_x, text_y));
+
+		if (type == NoticeType::ENTERNUMBER)
+		{
+			Point<int16_t> field = position + Point<int16_t>(FIELD_LEFT, field_y());
+			fieldborder.draw(field);
+			fieldfill.draw(field + Point<int16_t>(1, 1));
+		}
 	}
 
 	int16_t UINotice::buttons_y() const
@@ -203,10 +218,6 @@ namespace ms
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], LEFT_BUTTON_X, buttons_y());
 		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel"], RIGHT_BUTTON_X, buttons_y());
 
-		int16_t field_width = FIELD_RIGHT - FIELD_LEFT;
-		fieldborder = ColorBox(field_width, FIELD_HEIGHT, Color::Name::DUSTYGRAY, 1.0f);
-		fieldfill = ColorBox(field_width - 2, FIELD_HEIGHT - 2, Color::Name::WHITE, 1.0f);
-
 		// Text draws below its anchor, so the bounds sit a little above the box.
 		int16_t top = field_y();
 		numfield = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
@@ -238,10 +249,6 @@ namespace ms
 	{
 		UINotice::draw();
 		UIElement::draw(alpha);
-
-		Point<int16_t> field = position + Point<int16_t>(FIELD_LEFT, field_y());
-		fieldborder.draw(field);
-		fieldfill.draw(field + Point<int16_t>(1, 1));
 
 		numfield.draw(position);
 	}
