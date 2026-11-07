@@ -18875,6 +18875,10 @@ fn holy_stone(player: &Player, rng: &mut impl Rng) -> NpcScript {
             wrong: keys::holy_stone_wrong,
             pass: keys::HOLY_STONE_PASS,
             fail: keys::HOLY_STONE_FAIL,
+            reward: Effect::GiveItem {
+                item_id: NECKLACE_OF_WISDOM,
+                quantity: 1,
+            },
         },
     );
     let mut pages = vec![Page::Ask {
@@ -18887,10 +18891,6 @@ fn holy_stone(player: &Player, rng: &mut impl Rng) -> NpcScript {
     }];
     pages.extend(next);
     let mut script = NpcScript::new(HOLY_STONE, pages);
-    script.on_end = vec![Effect::GiveItem {
-        item_id: NECKLACE_OF_WISDOM,
-        quantity: 1,
-    }];
     script.inventory_full = Some(text(keys::THIRD_JOB_INVENTORY_FULL));
     script
 }
@@ -18904,6 +18904,9 @@ struct Quiz {
     wrong: fn(usize, usize) -> String,
     pass: &'static str,
     fail: &'static str,
+    /// Given with the line for passing, as Cosmic gives it with its last
+    /// `sendOk`: END CHAT there keeps it.
+    reward: Effect,
 }
 
 /// `QUIZ_LENGTH` of `quiz`'s questions, in a random order, their answers
@@ -18915,7 +18918,10 @@ fn quiz(rng: &mut impl Rng, quiz: Quiz) -> Vec<Page> {
         .take_while(|&n| content.contains(&(quiz.question)(n)))
         .collect();
     let fail = vec![Page::End(text(quiz.fail))];
-    let mut next = vec![Page::Say(text(quiz.pass))];
+    let mut next = vec![Page::Act {
+        text: text(quiz.pass),
+        effects: vec![quiz.reward],
+    }];
     for &n in questions.choose_multiple(rng, QUIZ_LENGTH) {
         let mut choices = vec![(text(&(quiz.right)(n)), next)];
         choices.extend(
@@ -18972,13 +18978,13 @@ fn boss_kitty(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
             wrong: keys::boss_kitty_wrong,
             pass: keys::BOSS_KITTY_PASS,
             fail: keys::BOSS_KITTY_FAIL,
+            reward: Effect::GiveItem {
+                item_id: ORANGE_MARBLE,
+                quantity: 1,
+            },
         },
     ));
     let mut script = NpcScript::new(BOSS_KITTY, pages);
-    script.on_end = vec![Effect::GiveItem {
-        item_id: ORANGE_MARBLE,
-        quantity: 1,
-    }];
     script.inventory_full = Some(text(keys::BOSS_KITTY_ETC_FULL));
     Some(script)
 }
@@ -28045,6 +28051,7 @@ mod tests {
             [crystal.clone()]
         );
         let mut asked = Vec::new();
+        let mut last = None;
         for _ in 0..QUIZ_LENGTH {
             let Page::Menu { text, choices } = &stone.pages[stone.page] else {
                 panic!("a question");
@@ -28052,21 +28059,24 @@ mod tests {
             assert_eq!(choices.len(), 5);
             asked.push(text.clone());
             let right = right_answer(&stone);
-            assert_eq!(
-                stone.respond(ScriptInput::Select(right)).unwrap().effects,
-                []
-            );
+            last = stone.respond(ScriptInput::Select(right));
         }
         asked.sort();
         asked.dedup();
         assert_eq!(asked.len(), QUIZ_LENGTH, "no question twice");
+        // The necklace comes with the line for passing, under an OK, so
+        // END CHAT there doesn't lose it with the crystal.
+        let passed = last.unwrap();
         assert_eq!(
-            stone.respond(ScriptInput::Next).unwrap().effects,
+            passed.effects,
             [Effect::GiveItem {
                 item_id: NECKLACE_OF_WISDOM,
                 quantity: 1
             }]
         );
+        assert_eq!(page_text(&passed), text(keys::HOLY_STONE_PASS));
+        assert_eq!(buttons(&passed), (false, false));
+        assert_eq!(stone.respond(ScriptInput::Next).unwrap().effects, []);
 
         // A wrong answer ends it, the crystal spent.
         let mut stone = holy_stone(&ready, &mut rng);
@@ -28121,6 +28131,7 @@ mod tests {
         );
         kitty.respond(ScriptInput::Next).unwrap();
         let mut asked = Vec::new();
+        let mut last = None;
         for _ in 0..QUIZ_LENGTH {
             let Page::Menu { text, choices } = &kitty.pages[kitty.page] else {
                 panic!("a question");
@@ -28128,18 +28139,21 @@ mod tests {
             assert_eq!(choices.len(), 3);
             asked.push(text.clone());
             let right = right_answer(&kitty);
-            kitty.respond(ScriptInput::Select(right)).unwrap();
+            last = kitty.respond(ScriptInput::Select(right));
         }
         asked.sort();
         asked.dedup();
         assert_eq!(asked.len(), QUIZ_LENGTH, "no question twice");
+        let passed = last.unwrap();
         assert_eq!(
-            kitty.respond(ScriptInput::Next).unwrap().effects,
+            passed.effects,
             [Effect::GiveItem {
                 item_id: ORANGE_MARBLE,
                 quantity: 1
             }]
         );
+        assert_eq!(buttons(&passed), (false, false));
+        assert_eq!(kitty.respond(ScriptInput::Next).unwrap().effects, []);
 
         // A wrong answer ends it, the chicken spent.
         let mut kitty = boss_kitty(&on_quest(300), &mut rng).unwrap();
