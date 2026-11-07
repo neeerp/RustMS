@@ -22,8 +22,8 @@ fn built(packet: Result<Packet, NetworkError>) -> Result<Packet, RuntimeError> {
 impl ClientActor {
     /// On entering the game: show the list, unanswered requests included,
     /// and tell mutual buddies we're on this channel. The client asks about
-    /// each request once the map has loaded. It starts with an empty list,
-    /// so nothing is sent for one.
+    /// each request that came meanwhile. It starts with an empty list, so
+    /// nothing is sent for one.
     pub(super) async fn load_buddies(&mut self) -> Result<(), RuntimeError> {
         let rows = self.buddy_rows().await?;
         if rows.is_empty() {
@@ -31,7 +31,7 @@ impl ClientActor {
         }
         let mutual = rows.iter().filter(|b| b.mutual).map(|b| b.id).collect();
         self.announce_channel(mutual, Some(self.channel_id)).await?;
-        self.show_buddies(rows).await
+        self.send_buddies(rows, true).await
     }
 
     /// On leaving the game (not a channel change, which announces the new
@@ -131,6 +131,10 @@ impl ClientActor {
     /// Send the rows through the directory, which knows channels. v83 keeps
     /// the requests in the list too, hidden, so that answering one finds it.
     async fn show_buddies(&mut self, rows: Vec<Buddy>) -> Result<(), RuntimeError> {
+        self.send_buddies(rows, false).await
+    }
+
+    async fn send_buddies(&mut self, rows: Vec<Buddy>, entering: bool) -> Result<(), RuntimeError> {
         let buddies = rows
             .into_iter()
             .map(|buddy| ListedBuddy {
@@ -144,6 +148,7 @@ impl ClientActor {
         self.send_to_directory(DirectoryMessage::BuddyList {
             owner: self.client_id,
             buddies,
+            entering,
         })
         .await
     }

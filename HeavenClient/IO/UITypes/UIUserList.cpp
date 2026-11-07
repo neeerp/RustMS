@@ -301,6 +301,8 @@ namespace ms
 		rebuild_alliance();
 		rebuild_blacklist();
 		change_tab(tab);
+
+		BuddyCommands::show_requests();
 	}
 
 	void UIUserList::draw(float) const
@@ -685,6 +687,10 @@ namespace ms
 		{
 			drop_panels();
 			UIGuildBBS::dismiss();
+		} else
+		{
+			// Opening asks again about requests left unanswered (0xa059cd).
+			BuddyCommands::show_requests();
 		}
 
 		UIElement::toggle_active();

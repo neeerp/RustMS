@@ -646,10 +646,8 @@ namespace ms
 					UI::get().emplace<UIUserList>(tab);
 				} else
 				{
-					if (userlist->is_active() && userlist->get_tab() == tab)
+					if (!userlist->is_active() || userlist->get_tab() == tab)
 						userlist->toggle_active();
-					else
-						userlist->makeactive();
 
 					userlist->change_tab(tab);
 				}

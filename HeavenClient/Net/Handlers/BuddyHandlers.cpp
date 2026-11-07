@@ -89,7 +89,7 @@ namespace ms
 			break;
 		}
 		// The request joins the list, hidden, so that accepting it works
-		// and it can be asked again after a map change (FUN_00a40028).
+		// and it can be asked again when the window opens (FUN_00a40028).
 		case Operation::REQUEST:
 		{
 			int32_t id = recv.read_int();
