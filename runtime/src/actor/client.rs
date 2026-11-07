@@ -2019,9 +2019,12 @@ impl ClientActor {
                 clock,
             } => self.event_moved(id, from, to, clock).await?,
             ServerMessage::WeddingStarted(ticket) => self.wedding_started(ticket).await?,
-            ServerMessage::WeddingMoved { id, to, clock } => {
-                self.wedding_moved(id, to, clock).await?
-            }
+            ServerMessage::WeddingMoved {
+                id,
+                to,
+                portal,
+                clock,
+            } => self.wedding_moved(id, to, portal, clock).await?,
             ServerMessage::WeddingEnded { id, failed } => self.wedding_ended(id, failed).await?,
             ServerMessage::Married {
                 id,

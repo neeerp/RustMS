@@ -530,11 +530,12 @@ pub enum ServerMessage {
     },
     /// The couple started their wedding; this is the player's ticket.
     WeddingStarted(crate::actor::wedding::WeddingTicket),
-    /// Wedding `id` takes the couple to `to`, where the time left is
-    /// `clock`.
+    /// Wedding `id` takes the couple to `to`, at `portal` or else the map's
+    /// spawn, where the time left is `clock`.
     WeddingMoved {
         id: u32,
         to: i32,
+        portal: Option<&'static str>,
         clock: Option<tokio::time::Instant>,
     },
     /// Wedding `id` ended, before the couple married if `failed`; out of
