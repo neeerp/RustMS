@@ -132,6 +132,7 @@ namespace ms
 		std::vector<shop_list::Row> recharges;
 
 		bool rightclicksell;
+		bool cash = false;
 
 		Point<int16_t> lastcursorpos;
 

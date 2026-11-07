@@ -1443,6 +1443,13 @@ builds each row's item from the template (0x752a9b), and the hover goes to the
 equip tooltip (FUN_007541c7). The 2025 client also shows the equipped item
 beside it (FUN_008eba5b). HeavenClient leaves that out (QUESTIONS b424).
 
+The shop window takes the keyboard while it is up. Esc and Enter both leave,
+as its EXIT button does (mode 3): it has no control with id 1, so the base
+dialog's key handler (FUN_004edd21) hands Enter to the end-dialog call too.
+A notice or number prompt over it takes those keys first. Miu Miu's shop
+(9090000, the only NPC with `info/cash`) ignores both and closes only by
+EXIT (FUN_007543c8 swallows them when the template's cash flag is set).
+
 ## Storage
 
 An account's storage (`game::Storage`) holds mesos and up to its slot count
