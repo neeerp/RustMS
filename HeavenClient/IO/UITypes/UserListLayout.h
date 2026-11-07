@@ -20,8 +20,9 @@ namespace ms
 		inline constexpr int16_t ROW = 18;
 
 		// The guild tab, as the client lays it out (FUN_0090f17c). The
-		// client places text by its top; HeavenClient's 5 pixels lower.
-		inline constexpr int16_t CLIENT_TEXT = -5;
+		// client places text by its top; HeavenClient's 7 pixels lower, or a
+		// row's tails would reach the line under it.
+		inline constexpr int16_t CLIENT_TEXT = -7;
 		// The header: the guild's emblem and name, centred, then the notice.
 		inline constexpr Point<int16_t> GUILD_HEADER = Point<int16_t>(5, 55);
 		inline constexpr int16_t GUILD_HEADER_WIDTH = 306;
