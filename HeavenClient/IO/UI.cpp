@@ -591,6 +591,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::CLAIMNOTICE);
 					types.emplace_back(UIElement::Type::CLAIM);
 					types.emplace_back(UIElement::Type::GMBLOCK);
+					types.emplace_back(UIElement::Type::ITEMBOOK);
 				}
 				else if (enter)
 				{
@@ -623,6 +624,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::GUILDRANK);
 					types.emplace_back(UIElement::Type::IMAGESLIDES);
 					types.emplace_back(UIElement::Type::GMBLOCK);
+					types.emplace_back(UIElement::Type::ITEMBOOK);
 				} else if (tab)
 				{
 					// Game
