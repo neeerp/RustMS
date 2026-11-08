@@ -6264,6 +6264,15 @@ mod tests {
         };
         assert_eq!(table.drops(9001006), [crystal(4031856, 2191)]);
         assert_eq!(table.drops(9001005), [crystal(4031857, 2192)]);
+        // Baine's The Truth Behind the Black Shadow (2173) needs the
+        // Black Magician's Token from the Red Snails and Pigs it counts.
+        let token = RewardEntry {
+            prob: 0.05,
+            ..quest_item(4031846, 2173)
+        };
+        for mob in [130101, 1210100, 9300343] {
+            assert!(table.drops(mob).contains(&token), "{mob}");
+        }
     }
 
     #[test]
