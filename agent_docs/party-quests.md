@@ -876,8 +876,9 @@ Use tabs she gives nothing yet.
 
 The hub's way out, `ps01` (script `Zakum03`, `zpq_portal`), stays shut with
 a pink line until the quest is won and, after, until the player has
-claimed the prize. Aura's way out needs neither. Cosmic's warp of holders
-of 4001109 to 921100000 is a custom left out.
+claimed the prize. Aura's way out needs neither. Adobis sends holders of
+the Lava Mug (4001109) to the Heart of Lava (921100000) before any of this
+(`zakum.md`).
 
 ## Horntail's Trial Grounds
 
