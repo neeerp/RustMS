@@ -2487,6 +2487,7 @@ namespace ms
 			OtherChar &user = *ouser;
 			user.update_skill(attack.skill, attack.level);
 			user.update_speed(attack.speed);
+			user.update_mastery(attack.mastery);
 
 			// An attack ends the skill the user was preparing, unless it
 			// is one of its shots (0x98044f).

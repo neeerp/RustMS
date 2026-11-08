@@ -310,6 +310,56 @@ fn expert_attack(player: &Player, weapon: i32) -> i32 {
         .unwrap_or(0)
 }
 
+/// The attacker's mastery with their weapon for this attack (FUN_00764795),
+/// which other players' clients read after its speed and use as the
+/// weapon's afterimage set (0x9804e7, then 0x936f34): Sword Mastery 20
+/// swings set 10. Each weapon has its mastery skills, most only for a blow
+/// or only for a shot; a few skills keep their weapon's mastery from the
+/// other. A spell's is never read.
+pub fn weapon_mastery(player: &Player, attack: &Attack) -> u8 {
+    let shot = match attack.kind {
+        AttackKind::Close | AttackKind::Body => false,
+        AttackKind::Ranged => true,
+        AttackKind::Magic => return 0,
+    };
+    let job = i32::from(player.stats.job);
+    let cygnus = job / 1000 == 1;
+    let skill = attack.skill;
+    let mastery = |id| skills::learned(player, id).map_or(0, |skill| skill.effect.mastery);
+    // The first of these the player has; an expert's replaces the base's.
+    let first = |ids: &[i32]| {
+        ids.iter()
+            .map(|&id| mastery(id))
+            .find(|&m| m > 0)
+            .unwrap_or(0)
+    };
+    let value = match weapon(player) / 10_000 % 100 {
+        30 | 40 if !shot || skill == 11101004 => first(&[1100000, 1200000, 11100000]),
+        31 | 41 if !shot => mastery(1100001),
+        32 | 42 if !shot => mastery(1200001),
+        33 if !shot => mastery(4200000),
+        // Beholder adds its own.
+        43 if !shot => mastery(1300000) + mastery(1321007),
+        44 if !shot || matches!(skill, 21100004 | 21110004 | 21120006) => {
+            if job / 100 == 21 || job == 2000 {
+                first(&[21120001, 21100000])
+            } else {
+                mastery(1300001) + mastery(1321007)
+            }
+        }
+        45 if shot && cygnus => first(&[13110003, 13100000]),
+        45 if shot => first(&[3120005, 3100000]),
+        46 if shot => first(&[3220004, 3200000]),
+        47 if shot || skill == 14111006 => mastery(if cygnus { 14100000 } else { 4100000 }),
+        48 if !shot || matches!(skill, 5121002 | 15111007) => {
+            mastery(if cygnus { 15100001 } else { 5100001 })
+        }
+        49 if shot || skill == 5221003 => mastery(5200000),
+        _ => 0,
+    };
+    value.clamp(0, i32::from(u8::MAX)) as u8
+}
+
 /// What the star, arrow, or bullet a shot throws adds to its attack
 /// (FUN_0077df48); a Gunslinger's capsules add nothing.
 fn ammo_attack(attack: &Attack, player: &Player, weapon: i32) -> i32 {
@@ -948,11 +998,13 @@ fn damage_percent(skill: &Learned) -> Option<i32> {
 }
 
 /// The attack as other players see it (`addAttackBody`), under the opcode
-/// of its kind. A shot names the star, arrow, or bullet it fired.
+/// of its kind, with the attacker's `mastery` (weapon_mastery). A shot names
+/// the star, arrow, or bullet it fired.
 pub fn build_attack(
     character_id: i32,
     attack: &Attack,
     skill_level: u8,
+    mastery: u8,
     projectile: i32,
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -967,7 +1019,7 @@ pub fn build_attack(
     p.write_byte(attack.display)?;
     p.write_short(attack.action as i16)?;
     p.write_byte(attack.speed)?;
-    p.write_byte(0x0A)?;
+    p.write_byte(mastery)?;
     p.write_int(projectile)?;
     // Bit 31 marks a critical (v83 0x980620). The client sends none, but
     // Snipe always is one (0x78e4d6).
@@ -1335,6 +1387,52 @@ mod tests {
         swing.kind = AttackKind::Magic;
         swing.hits[0].damage = vec![500];
         assert!(!hits_like_ice(&swing, &swing.hits[0]));
+    }
+
+    #[test]
+    fn others_see_the_weapons_mastery_as_its_afterimage_set() {
+        let mut player = beginner_with_sword();
+        player.stats.job = 112;
+        let mut swing = parse_close_attack(&attack_packet(1, 9)).unwrap();
+        assert_eq!(weapon_mastery(&player, &swing), 0, "no Sword Mastery");
+        let packet = build_attack(5, &swing, 0, 10, 0).unwrap();
+        // opcode, id, counts, 0x5B, level, display, action, speed, mastery
+        assert_eq!(packet.bytes[2 + 4 + 3 + 1 + 2 + 1], 10);
+        if skills::data().is_err() {
+            return;
+        }
+        let learn = |player: &mut Player, skill_id, level| {
+            player.skills.set(game::SkillRecord {
+                skill_id,
+                level,
+                master_level: 0,
+                expiration: None,
+            })
+        };
+        learn(&mut player, 1100000, 20);
+        assert_eq!(weapon_mastery(&player, &swing), 10);
+        learn(&mut player, 1100000, 9);
+        assert_eq!(weapon_mastery(&player, &swing), 5);
+        swing.kind = AttackKind::Ranged;
+        assert_eq!(
+            weapon_mastery(&player, &swing),
+            0,
+            "a sword's is for a blow"
+        );
+        swing.kind = AttackKind::Magic;
+        assert_eq!(weapon_mastery(&player, &swing), 0);
+
+        // A Dark Knight's spear adds Beholder's, up to set 14.
+        player.stats.job = 132;
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(1432000, EquipStats::default()),
+        );
+        learn(&mut player, 1300000, 20);
+        learn(&mut player, 1321007, 10);
+        swing.kind = AttackKind::Close;
+        assert_eq!(weapon_mastery(&player, &swing), 14);
     }
 
     #[test]
@@ -2365,7 +2463,7 @@ mod tests {
             AttackKind::Ranged,
         )
         .unwrap();
-        let packet = build_attack(5, &attack, 30, 2060000).unwrap();
+        let packet = build_attack(5, &attack, 30, 10, 2060000).unwrap();
         let damage = i32::from_le_bytes(
             packet.bytes[packet.bytes.len() - 8..][..4]
                 .try_into()
@@ -2524,7 +2622,7 @@ mod tests {
             AttackKind::Ranged,
         )
         .unwrap();
-        let packet = build_attack(5, &attack, 0, 2070000).unwrap();
+        let packet = build_attack(5, &attack, 0, 10, 2070000).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::RangedAttack as i16)
@@ -2545,7 +2643,7 @@ mod tests {
     #[test]
     fn a_skill_broadcast_names_the_skill() {
         let attack = parse_close_attack(&skill_attack_packet(1000, 77, 25)).unwrap();
-        let packet = build_attack(5, &attack, 2, 0).unwrap();
+        let packet = build_attack(5, &attack, 2, 10, 0).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CloseRangeAttack as i16)
@@ -2571,7 +2669,7 @@ mod tests {
             AttackKind::Magic,
         )
         .unwrap();
-        let packet = build_attack(5, &attack, 30, 0).unwrap();
+        let packet = build_attack(5, &attack, 30, 10, 0).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::MagicAttack as i16)
@@ -2593,7 +2691,7 @@ mod tests {
     #[test]
     fn the_broadcast_matches_add_attack_body() {
         let attack = parse_close_attack(&attack_packet(77, 9)).unwrap();
-        let packet = build_attack(5, &attack, 0, 0).unwrap();
+        let packet = build_attack(5, &attack, 0, 10, 0).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CloseRangeAttack as i16)
@@ -2666,7 +2764,7 @@ mod tests {
             })
         );
         // The others hear how many hits each target takes.
-        let packet = build_attack(5, &attack, 30, 0).unwrap();
+        let packet = build_attack(5, &attack, 30, 10, 0).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CloseRangeAttack as i16)

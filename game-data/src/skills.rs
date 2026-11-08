@@ -60,6 +60,9 @@ pub struct SkillLevel {
     pub x: i32,
     /// A second value, e.g. Element Amplification's damage percent.
     pub y: i32,
+    /// A weapon mastery skill's mastery (`mastery`), 1..10 for Sword
+    /// Mastery, which also picks the weapon's afterimage set.
+    pub mastery: i32,
     /// HP and MP added to each natural recovery, as Improved HP Recovery and
     /// Endure do (`hp`, `mp`).
     pub hp: i32,
@@ -194,6 +197,7 @@ impl SkillData {
                     speed: int("speed")?,
                     x: int("x")?,
                     y: int("y")?,
+                    mastery: int("mastery")?,
                     hp: int("hp")?,
                     mp: int("mp")?,
                     pad: int("pad")?,

@@ -119,6 +119,11 @@ namespace ms
 		attackspeed = as;
 	}
 
+	void OtherChar::update_mastery(uint8_t m)
+	{
+		mastery = m;
+	}
+
 	const RingLooks &OtherChar::get_ring_looks() const
 	{
 		return ring_looks;
@@ -296,6 +301,11 @@ namespace ms
 	int32_t OtherChar::get_charge() const
 	{
 		return get_buff(Buffstat::Id::WK_CHARGE).value_or(0);
+	}
+
+	uint8_t OtherChar::get_afterimage_index(const WeaponData &) const
+	{
+		return mastery;
 	}
 
 	bool OtherChar::is_stealthed() const
