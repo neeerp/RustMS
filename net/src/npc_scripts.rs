@@ -13002,7 +13002,9 @@ fn corba() -> NpcScript {
 
 /// Shane (`herb_in`): from level 25, the Forest of Patience for a fare,
 /// starting at the step of the herb quest the player is on, else the one
-/// for their level.
+/// for their level. Once Sabitrama's first herb quest is done the ride is
+/// free, as his thanks there says ("from here on out, Shane will let you
+/// in free", Quest.nx Say/2050/1).
 fn shane(player: &Player) -> NpcScript {
     if player.stats.level < SHANE_LEVEL {
         return NpcScript::new(SHANE, vec![Page::Say(text(keys::SHANE_TOO_LOW))]);
@@ -13015,6 +13017,18 @@ fn shane(player: &Player) -> NpcScript {
     } else {
         PATIENCE_STEP_1
     };
+    let warp = Effect::WarpToPortal(step, 0);
+    if player.quests.state(2050) == QuestState::Completed {
+        let ask = text(keys::SHANE_ASK_FREE);
+        let pages = gated(
+            ask,
+            Some(keys::SHANE_DECLINE),
+            keys::SHANE_SHORT,
+            true,
+            vec![warp],
+        );
+        return NpcScript::new(SHANE, pages);
+    }
     let price = SHANE_FARE.to_string();
     let ask = content::text().get(keys::SHANE_ASK, &[("price", &price)]);
     let mut script = NpcScript::new(
@@ -13024,7 +13038,7 @@ fn shane(player: &Player) -> NpcScript {
             Some(keys::SHANE_DECLINE),
             keys::SHANE_SHORT,
             SHANE_FARE,
-            Effect::WarpToPortal(step, 0),
+            warp,
             player,
         ),
     );
@@ -26050,6 +26064,14 @@ mod tests {
         let short = ask(&player);
         assert!(short.effects.is_empty());
         assert_eq!(kind(&short), Some(0));
+
+        // After 2050, free: no fare even with no mesos.
+        let mut player = with_quests(&[(2050, true)]);
+        (player.meso, player.stats.level) = (0, 30);
+        assert_eq!(ask(&player).effects, [Effect::WarpToPortal(101000100, 0)]);
+        let mut player = with_quests(&[(2050, true), (2051, false)]);
+        (player.meso, player.stats.level) = (0, 50);
+        assert_eq!(ask(&player).effects, [Effect::WarpToPortal(101000102, 0)]);
 
         player.stats.level = 24;
         let shane = NpcScript::for_npc(SHANE, &player).unwrap();

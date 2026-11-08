@@ -848,6 +848,7 @@ pub mod keys {
     /// Shane (`herb_in`) and Louis (`herb_out`) of the Forest of Patience.
     pub const SHANE_TOO_LOW: &str = "shane.too_low";
     pub const SHANE_ASK: &str = "shane.ask";
+    pub const SHANE_ASK_FREE: &str = "shane.ask_free";
     pub const SHANE_DECLINE: &str = "shane.decline";
     pub const SHANE_SHORT: &str = "shane.short";
     pub const LOUIS_ASK: &str = "louis.ask";
@@ -4675,6 +4676,7 @@ mod tests {
             keys::CRUMBLING_ASK,
             keys::SHANE_TOO_LOW,
             keys::SHANE_ASK,
+            keys::SHANE_ASK_FREE,
             keys::SHANE_DECLINE,
             keys::SHANE_SHORT,
             keys::LOUIS_ASK,
