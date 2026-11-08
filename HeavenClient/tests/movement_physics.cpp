@@ -1111,6 +1111,107 @@ void hits_at_forks()
 	std::filesystem::remove(path);
 }
 
+// The Breath of Lava (280020000) steps down from a jagged ledge at y -210
+// to the lava's floor at -153 by the walls at x -780, and the lava's traps
+// push back (ObstacleRules.h fallback) every 1.5 s. A fall ending right on
+// a joint stops a fraction under both floors; the next step lands there, it
+// isn't thrown back to the start of the floor it left and under the map.
+void lava_step()
+{
+	auto path = foothold_map({
+		{5, 622, -900, -270, -870, -270, 0, 623},
+		{5, 623, -870, -270, -870, -240, 622, 193},
+		{5, 193, -870, -240, -870, -213, 623, 518},
+		{5, 518, -870, -213, -850, -213, 193, 519},
+		{5, 519, -850, -213, -843, -215, 518, 520},
+		{5, 520, -843, -215, -831, -211, 519, 521},
+		{5, 521, -831, -211, -816, -213, 520, 522},
+		{5, 522, -816, -213, -810, -210, 521, 523},
+		{5, 523, -810, -210, -780, -210, 522, 286},
+		{5, 286, -780, -210, -780, -180, 523, 192},
+		{5, 192, -780, -180, -780, -153, 286, 204},
+		{5, 204, -780, -153, -774, -152, 192, 205},
+		{5, 205, -774, -152, -767, -156, 204, 206},
+		{5, 206, -767, -156, -752, -156, 205, 207},
+		{5, 207, -752, -156, -744, -152, 206, 208},
+		{5, 208, -744, -152, -737, -152, 207, 209},
+		{5, 209, -737, -152, -731, -155, 208, 210},
+		{5, 210, -731, -155, -725, -154, 209, 211},
+		{5, 211, -725, -154, -720, -150, 210, 416},
+		{5, 416, -720, -150, -400, -150, 211, 0},
+		{5, 1, -840, -300, -840, -330, 0, 2},
+		{5, 2, -840, -330, -780, -330, 1, 3},
+		{5, 3, -780, -330, -780, -300, 2, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		auto under = [](const ms::PhysicsObject& player)
+		{
+			return (player.crnt_x() < -780.5 && player.crnt_y() > -209.0) || player.crnt_y() > -140.0;
+		};
+
+		// Dropped onto the ledge's joints, the player stands on them.
+		for (double x : {-850.0, -843.0, -831.0, -816.0, -810.0})
+		{
+			for (double y = -290.0; y < -216.0; y += 1.0)
+			{
+				ms::PhysicsObject player;
+				player.shoe = true;
+				player.set_x(x); player.set_y(y);
+				for (int tick = 0; tick < 100; ++tick) physics.move_object(player);
+				require(player.onground && player.crnt_x() == x && !under(player), "a fall onto a joint went through the ledge");
+			}
+		}
+
+		// Walking or hopping off the ledge into the lava, hit from either side
+		// at any time on the way, the player stays above the floors.
+		for (double start = -868.0; start <= -782.0; start += 6.0)
+		{
+			for (int jump_at : {-1, 3})
+			{
+				for (int hit_at = 0; hit_at < 140; hit_at += 2)
+				{
+					for (double push : {-270.0, 270.0})
+					{
+						ms::PhysicsObject player;
+						player.shoe = true;
+						player.set_x(start); player.set_y(-215);
+						for (int tick = 0; tick < 100; ++tick) physics.move_object(player);
+						require(player.onground, "lava fixture did not find its ledge");
+						int invincible = 0;
+						for (int tick = 0; tick < 300; ++tick)
+						{
+							player.walkdir = 1;
+							if (tick == jump_at && player.onground)
+								ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 0);
+							if (tick == hit_at)
+							{
+								ms::Physics::knockback(player, push, -270.0);
+								invincible = 187;
+							}
+							physics.move_object(player);
+							int lx = player.get_last_x(), x = player.get_x(), ly = player.get_last_y(), y = player.get_y();
+							// The lava's traps from x -791 cover y -168 to -59.
+							bool burnt = -791 < std::max(lx, x) && std::min(ly, y) - 50 < -59 && -168 < std::max(ly, y);
+							if (invincible > 0)
+								invincible--;
+							else if (burnt)
+							{
+								int dx = lx - x, dy = ly - y;
+								ms::Physics::knockback(player, dx < 0 ? -270.0 : dx > 0 ? 270.0 : 0.0, dy > 0 ? 0.0 : -270.0);
+								invincible = 187;
+							}
+							require(!under(player), "a hit by the lava's step left the player under the floor");
+						}
+					}
+				}
+			}
+		}
+	}
+	std::filesystem::remove(path);
+}
+
 // The Geist Balrog can die under the lowest floor of the Amorian Challenge's
 // last stage (670010700), with nothing below its drop's start.
 void drops_from_under_the_map()
@@ -1616,6 +1717,7 @@ int main()
 		walls_in_the_air();
 		walls_at_forks();
 		hits_at_forks();
+		lava_step();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;

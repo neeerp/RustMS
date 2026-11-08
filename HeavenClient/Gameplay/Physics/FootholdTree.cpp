@@ -523,6 +523,7 @@ namespace ms
 			return;
 
 		const Foothold &curfh = get_fh(phobj.fhid);
+		bool grounded = phobj.onground;
 		bool checkslope = false;
 
 		double x = phobj.crnt_x();
@@ -593,11 +594,15 @@ namespace ms
 			phobj.fhgroup = nextfh.group();
 
 		// A drop keeps to its own flight: one from a mob killed under the map
-		// has no floor below it on the way up to where it lands.
+		// has no floor below it on the way up to where it lands. Nothing else
+		// in the air is moved either: a step ending on a joint stops a fraction
+		// under both floors, and the next one lands (0x9b34c8).
 		if (phobj.fhid == 0 && phobj.type != PhysicsObject::Type::FIXATED)
 		{
 			phobj.fhid = curfh.id();
-			phobj.limitx(curfh.x1());
+
+			if (grounded)
+				phobj.limitx(curfh.x1());
 		}
 	}
 
