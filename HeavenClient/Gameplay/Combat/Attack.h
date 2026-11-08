@@ -231,6 +231,8 @@ namespace ms
 		uint8_t display = 0;
 		uint8_t stance = 0;
 		uint8_t speed = 0;
+		// The attacker's weapon mastery, sent for another's attack.
+		uint8_t mastery = 0;
 		bool toleft = false;
 		// Each target's oid and damage, in target order.
 		std::vector<std::pair<int32_t, std::vector<std::pair<int32_t, bool>>>> damagelines;

@@ -56,6 +56,9 @@ namespace ms
 		// Update the attack speed.
 		void update_speed(uint8_t attackspeed);
 
+		// Their weapon's mastery, as their last attack named it.
+		void update_mastery(uint8_t mastery);
+
 		// Update the character look.
 		void update_look(const LookEntry &look);
 
@@ -88,6 +91,9 @@ namespace ms
 		// Return the charge skill on the character's weapon, or 0.
 		int32_t get_charge() const override;
 
+		// The set their last attack named (0x980d01).
+		uint8_t get_afterimage_index(const WeaponData &weapon) const override;
+
 		// Return the skill whose clone Shadow Partner draws, or 0 without the buff.
 		int32_t get_shadow_partner() const override;
 
@@ -104,6 +110,7 @@ namespace ms
 
 		std::unordered_map<int32_t, uint8_t> skilllevels;
 		uint8_t attackspeed;
+		uint8_t mastery = 0;
 		std::map<Buffstat::Id, int32_t> buffs;
 		RingLooks ring_looks;
 

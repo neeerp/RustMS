@@ -1203,11 +1203,9 @@ namespace ms
 		return Rectangle<int16_t>(src[std::to_string(get_afterimage_index(weapon))][Stance::names[stance]]);
 	}
 
-	uint8_t Char::get_afterimage_index(const WeaponData &weapon) const
+	uint8_t Char::get_afterimage_index(const WeaponData &) const
 	{
-		// Another's attack names its mastery, which this client doesn't
-		// read; their weapon's level stands in for it.
-		return static_cast<uint8_t>(weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL) / 10);
+		return 0;
 	}
 
 	void Char::set_direction(bool f)

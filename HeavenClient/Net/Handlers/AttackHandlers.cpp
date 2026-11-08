@@ -51,9 +51,8 @@ namespace ms
 		attack.toleft = (action >> 15) != 0;
 		attack.stance = static_cast<uint8_t>(action & 0x7FFF);
 		attack.speed = recv.read_byte();
-
-		recv.skip(1);
-
+		// Their weapon's mastery, the afterimage set they swing (0x9804e7).
+		attack.mastery = recv.read_byte();
 		attack.bullet = recv.read_int();
 
 		attack.mobcount = (count >> 4) & 0xF;
