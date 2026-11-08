@@ -1440,6 +1440,7 @@ add = [
     { item = 4032340, prob = 0.2, quest = 21710 },  # A Monster War?
     { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
     { item = 4032379, prob = 0.08, quest = 2409 },  # The Lost Letter of Commendation
+    { item = 4031846, prob = 0.05, quest = 2173 },  # The Truth Behind the Black Shadow
 ]
 
 [mobs.1210101]
@@ -1732,6 +1733,7 @@ add = [
     { item = 4030012, prob = 0.125 },
     { item = 4032130, prob = 0.01, quest = 20707 },  # Revolt of the Pigs
     { item = 4032340, prob = 0.2, quest = 21710 },  # A Monster War?
+    { item = 4031846, prob = 0.05, quest = 2173 },  # The Truth Behind the Black Shadow
 ]
 
 [mobs.9303004]
@@ -1987,7 +1989,10 @@ replace = [
 
 [mobs.130101]
 # Red Snail.
-add = [{ item = 4001359, prob = 0.024, quest = 28248 }]  # Calming the Soul with Music
+add = [
+    { item = 4001359, prob = 0.024, quest = 28248 },  # Calming the Soul with Music
+    { item = 4031846, prob = 0.05, quest = 2173 },  # The Truth Behind the Black Shadow
+]
 
 [mobs.1110100]
 # Green Mushroom.
