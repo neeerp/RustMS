@@ -1806,6 +1806,14 @@ namespace ms
 		return skillbook.get_level(skillid);
 	}
 
+	uint8_t Player::get_afterimage_index(const WeaponData &) const
+	{
+		physical_damage::Weapon weapon = physical_damage::weapon(look.get_equips().get_weapon());
+		auto lookup = [&](int32_t skill_id) { return learned(skillbook, skill_id); };
+
+		return physical_damage::afterimage_set(weapon, stats.get_job().get_id(), lookup);
+	}
+
 	int32_t Player::get_charge() const
 	{
 		return has_buff(Buffstat::Id::WK_CHARGE) ? buffs[Buffstat::Id::WK_CHARGE].skillid : 0;

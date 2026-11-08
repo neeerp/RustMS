@@ -266,6 +266,9 @@ namespace ms
 		// Return the character's level of a skill.
 		int32_t get_skilllevel(int32_t skillid) const override;
 
+		// The set by the weapon's mastery (physical_damage::afterimage_set).
+		uint8_t get_afterimage_index(const WeaponData &weapon) const override;
+
 		// Return the charge skill on the character's weapon, or 0.
 		int32_t get_charge() const override;
 

@@ -24,7 +24,7 @@
 namespace ms
 {
 	Afterimage::Afterimage(int32_t skill_id, const std::string &name, const std::string &action,
-						   const std::string &stance_name, int16_t level, uint8_t charge)
+						   const std::string &stance_name, uint8_t index, uint8_t charge)
 	{
 		nl::node set = nl::nx::character["Afterimage"][name + ".img"];
 
@@ -42,7 +42,7 @@ namespace ms
 				found = set["charge"][std::to_string(charge)][key];
 
 			if (!found)
-				found = set[level / 10][key];
+				found = set[std::to_string(index)][key];
 
 			return found;
 		};
