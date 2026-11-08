@@ -808,7 +808,7 @@ const FIELD_NORTH_OF_ELLINIA: i32 = 101010000;
 const MINAR_FOREST_WEST_BORDER: i32 = 240010100;
 const MAGIC_SEED: i32 = 4031346;
 /// The Nautilus's Navigation Room and Omega Sector's Command Center
-/// (`enter_earth00`, `enter_earth01`), linked for holders of a Warp Card.
+/// (`enter_earth00`, `enter_earth01`), linked by a Warp Card spent each way.
 const NAVIGATION_ROOM: i32 = 120000101;
 const OMEGA_COMMAND_CENTER: i32 = 221000300;
 const WARP_CARD: i32 = 4031890;
@@ -2993,11 +2993,21 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         }
         "minar_elli" => refused(keys::MAGIC_SEED_NEEDED),
         "enter_earth00" | "enter_earth01" if player.inventory.count(WARP_CARD) > 0 => {
-            through(if script == "enter_earth00" {
+            // Bartol: "Once this card is inserted in the machine to activate
+            // it, the card will not be returned."
+            let mut outcome = through(if script == "enter_earth00" {
                 to(OMEGA_COMMAND_CENTER, Portal::Named("earth00"))
             } else {
                 to(NAVIGATION_ROOM, Portal::Named("earth01"))
-            })
+            });
+            outcome.effects.insert(
+                0,
+                Effect::TakeItem {
+                    item_id: WARP_CARD,
+                    quantity: 1,
+                },
+            );
+            outcome
         }
         "enter_earth00" | "enter_earth01" => refused(keys::WARP_CARD_NEEDED),
         "ariant_queens" if disguised_as_tigun(player) => ScriptOutcome::default(),
@@ -7577,10 +7587,17 @@ mod tests {
             ("enter_earth01", NAVIGATION_ROOM, "earth01"),
         ] {
             assert_ne!(named(to, name), 0);
-            // The card is kept.
+            // The card is spent.
             assert_eq!(
-                warp_of(&portal(script, &holder).unwrap()),
-                Some((to, named(to, name)))
+                portal(script, &holder).unwrap().effects,
+                [
+                    Effect::TakeItem {
+                        item_id: WARP_CARD,
+                        quantity: 1
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(to, named(to, name)),
+                ]
             );
         }
     }

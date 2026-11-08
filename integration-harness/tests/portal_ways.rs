@@ -205,7 +205,7 @@ async fn seeds_cards_and_tiguns_disguise_open_their_ways() {
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
     grant_stack(id, ETC, 1, MAGIC_SEED, 2).await.unwrap();
-    grant_stack(id, ETC, 2, WARP_CARD, 1).await.unwrap();
+    grant_stack(id, ETC, 2, WARP_CARD, 2).await.unwrap();
     grant_stack(id, USE, 1, TIGUNS_DISGUISE, 1).await.unwrap();
     let mut player = relogin(&config).await;
 
@@ -217,15 +217,17 @@ async fn seeds_cards_and_tiguns_disguise_open_their_ways() {
     let trace = try_portal(&mut player, 240010100, "elli00").await;
     assert_eq!(arrived(&trace).0, 101010000);
     assert_eq!(trace.removed, [(ETC as u8, 1)]);
-    // The card is kept.
-    for (map, portal, to) in [
-        (120000101, "earth01", 221000300),
-        (221000300, "earth00", 120000101),
-    ] {
-        let trace = try_portal(&mut player, map, portal).await;
-        assert_eq!(arrived(&trace).0, to, "{map} {portal}");
-        assert!(trace.removed.is_empty(), "{trace:?}");
-    }
+    // A card each way.
+    let trace = try_portal(&mut player, 120000101, "earth01").await;
+    assert_eq!(arrived(&trace).0, 221000300);
+    assert!(trace.quantities.contains(&(ETC as u8, 2, 1)), "{trace:?}");
+    let trace = try_portal(&mut player, 221000300, "earth00").await;
+    assert_eq!(arrived(&trace).0, 120000101);
+    assert_eq!(trace.removed, [(ETC as u8, 2)]);
+    // With none left, the machine stays still.
+    let trace = try_portal(&mut player, 120000101, "earth01").await;
+    assert!(trace.warps.is_empty(), "{:?}", trace.warps);
+    assert!(pink(&trace), "{:?}", trace.broadcasts);
 
     // In Tigun's disguise, the palace lets the player be.
     let name = player.character_name.clone();
