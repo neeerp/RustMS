@@ -32,7 +32,7 @@ namespace ms
 		// A charged weapon (charge, its element) swings the charge's set.
 		// The action's own afterimage comes first, then its stance's.
 		Afterimage(int32_t skill_id, const std::string &name, const std::string &action, const std::string &stance,
-				   int16_t level, uint8_t charge = 0);
+				   uint8_t index, uint8_t charge = 0);
 
 		Afterimage();
 

@@ -1165,11 +1165,11 @@ namespace ms
 		const WeaponData &weapon = WeaponData::get(weapon_id);
 
 		std::string stance_name = Stance::names[look.get_stance()];
-		int16_t weapon_level = weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL);
 		const std::string& ai_name = weapon.get_afterimage();
 
 		uint8_t charge = physical_damage::charge_element(get_charge());
-		afterimage = Afterimage(skill_id, ai_name, look.get_action_name(), stance_name, weapon_level, charge);
+		afterimage = Afterimage(skill_id, ai_name, look.get_action_name(), stance_name, get_afterimage_index(weapon),
+								charge);
 	}
 
 	const Afterimage &Char::get_afterimage() const
@@ -1185,9 +1185,9 @@ namespace ms
 			return {};
 
 		const WeaponData &weapon = WeaponData::get(weapon_id);
-		int16_t weapon_level = weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL);
 
-		return Afterimage(skill_id, weapon.get_afterimage(), action, action, weapon_level, 0).get_range();
+		return Afterimage(skill_id, weapon.get_afterimage(), action, action, get_afterimage_index(weapon), 0)
+				.get_range();
 	}
 
 	Rectangle<int16_t> Char::get_afterimage_range(Stance::Id stance) const
@@ -1198,10 +1198,16 @@ namespace ms
 			return {};
 
 		const WeaponData &weapon = WeaponData::get(weapon_id);
-		int16_t weapon_level = weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL);
 		nl::node src = nl::nx::character["Afterimage"][weapon.get_afterimage() + ".img"];
 
-		return Rectangle<int16_t>(src[weapon_level / 10][Stance::names[stance]]);
+		return Rectangle<int16_t>(src[std::to_string(get_afterimage_index(weapon))][Stance::names[stance]]);
+	}
+
+	uint8_t Char::get_afterimage_index(const WeaponData &weapon) const
+	{
+		// Another's attack names its mastery, which this client doesn't
+		// read; their weapon's level stands in for it.
+		return static_cast<uint8_t>(weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL) / 10);
 	}
 
 	void Char::set_direction(bool f)

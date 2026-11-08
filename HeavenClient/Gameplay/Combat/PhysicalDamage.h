@@ -214,6 +214,16 @@ namespace ms
 			return result;
 		}
 
+		// Which of a weapon's afterimage sets (Afterimage/<name>.img/<set>)
+		// the character swings, and so how far a blow reaches: the
+		// weapon's mastery for a blow (0x764795 with no reach and no skill,
+		// at 0x957443 and 0x951045), not its level. A bow whacks with set 0.
+		template<typename Lookup>
+		uint8_t afterimage_set(Weapon weapon, int32_t job, Lookup learned)
+		{
+			return static_cast<uint8_t>(mastery(weapon, CLOSE, job, 0, learned).mastery);
+		}
+
 		// Where the stat roll starts: (mastery * 5 + 10) * 0.9% of the stat,
 		// so 9% with no mastery.
 		inline double least(int32_t mastery)

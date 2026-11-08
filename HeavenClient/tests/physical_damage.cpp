@@ -54,6 +54,10 @@ int main()
 		book.erase(3120005);
 		require(mastery(BOW, SHOT, 312, 0, learned).mastery == 10, "Bow Mastery alone");
 
+		require(afterimage_set(SWORD_2H, 112, learned) == 10, "a level 120 sword swings set 10, not 12");
+		require(afterimage_set(BOW, 312, learned) == 0, "a bow whacks with set 0");
+		require(afterimage_set(SPEAR, 132, learned) == 15, "Beholder's set is past 10");
+		require(afterimage_set(AXE, 112, learned) == 0, "no Axe Mastery, set 0");
 		require(mastery(SPEAR, CLOSE, 132, 0, learned).mastery == 15, "Beholder adds its own");
 		Mastery aran = mastery(POLEARM, CLOSE, 2112, 0, learned);
 		require(aran.mastery == 15 && aran.accuracy == 20 && aran.attack == 30, "High Mastery replaces Polearm Mastery");

@@ -56,6 +56,8 @@
 
 namespace ms
 {
+	class WeaponData;
+
 	// Base for characters, e.g. the player and other clients on the same map.
 	class Char : public MapObject
 	{
@@ -187,6 +189,10 @@ namespace ms
 		Rectangle<int16_t> get_afterimage_range(Stance::Id stance) const;
 		// And of a skill's swing in an action.
 		Rectangle<int16_t> get_afterimage_range(int32_t skill_id, const std::string &action) const;
+
+		// Which of the weapon's afterimage sets the character swings
+		// (Afterimage/<name>.img/<index>).
+		virtual uint8_t get_afterimage_index(const WeaponData &weapon) const;
 
 		// Display an animation as an effect with the character
 		void show_attack_effect(Animation animation, int8_t z);
