@@ -65,8 +65,12 @@ Where this differs from Cosmic:
   Choosing Zakum never takes the Necklace of Strength; in Cosmic, any choice
   takes it.
 - Lira's 10,000 EXP is not multiplied by the server's EXP rate.
-- Adobis doesn't warp holders of item 4001109 to 921100000, a Cosmic
-  custom.
+- Before anything else, Adobis sends a holder of the Lava Mug (4001109,
+  Vogen's prize in The Lava Mug, 6273) to the Heart of Lava (921100000,
+  `out00`) without a word, as Cosmic's `2030008.js` does and as Jeff sends
+  an Orihalcon Hammer's holder to Ice Valley. Dropped on the frame there
+  (reactor 2112015, `s4frameItem0`), the mug gives the Skill Book of Fire
+  Demon (2280000), which 6273 itself needs; it is the book's only source.
 
 ## The gate
 

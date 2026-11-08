@@ -14835,6 +14835,11 @@ const GOLD_TEETH_TO_FORGE: i16 = 30;
 pub(crate) const EYE_OF_FIRE: i32 = 4001017;
 /// Where Adobis stands, and the gate to Zakum.
 const DOOR_TO_ZAKUM: i32 = 211042300;
+/// Vogen's Lava Mug (The Lava Mug, 6273), which Adobis sends to the Heart
+/// of Lava (`out00`), where dropping it on the Frame (reactor 2112015,
+/// `s4frameItem0`) gives the book of Fire Demon (2280000).
+const LAVA_MUG: i32 = 4001109;
+const HEART_OF_LAVA: (i32, u8) = (921100000, 1);
 const BREATH_OF_LAVA: i32 = 280020000;
 const ZAKUM_ALTAR: i32 = 280030000;
 /// Where Amon takes players off the altar: the expedition's exit in
@@ -14861,9 +14866,16 @@ fn zakum_approval(player: &Player) -> Vec<Page> {
 /// Adobis at the Door to Zakum: a warning until a chief approves, then
 /// the trials. The party's leader takes it into the Dead Mine (stage 1),
 /// whose prize, a Piece of Fire Ore, the Breath of Lava takes, and the forge turns both trials' items and 30
-/// Gold Teeth into five Eyes of Fire.
+/// Gold Teeth into five Eyes of Fire. Before all that, a Lava Mug's holder
+/// goes to the Heart of Lava without a word (Cosmic `2030008.js`), as
+/// Jeff sends the Orihalcon Hammer's to Ice Valley.
 fn adobis(entry: Entry, player: &Player) -> NpcScript {
     let mut script = NpcScript::new(ADOBIS, Vec::new());
+    if holds(player, LAVA_MUG) {
+        let (map, portal) = HEART_OF_LAVA;
+        script.pages = vec![Page::Done(vec![Effect::WarpToPortal(map, portal)])];
+        return script;
+    }
     if !zakum_approved(player) {
         let key = if player.stats.level >= ZAKUM_LEVEL {
             keys::ZAKUM_ADOBIS_UNAPPROVED
@@ -27886,6 +27898,14 @@ mod tests {
         let adobis = |player: &Player| NpcScript::adobis(Entry::NoParty, player);
         let says = |player: &Player| page_text(&adobis(player).begin());
         assert_eq!(says(&hunter(&[], &[])), text(keys::ZAKUM_ADOBIS_UNAPPROVED));
+        // A Lava Mug's holder goes to the Heart of Lava at once, approved
+        // or not.
+        for marks in [&[][..], &[ZAKUM_APPROVED]] {
+            assert_eq!(
+                adobis(&hunter(&[(LAVA_MUG, 1)], marks)).begin().effects,
+                [Effect::WarpToPortal(921100000, 1)]
+            );
+        }
         let mut young = hunter(&[], &[]);
         young.stats.level = 49;
         assert_eq!(says(&young), text(keys::ZAKUM_ADOBIS_WARNING));
