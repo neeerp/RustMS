@@ -579,6 +579,7 @@
 "crumbling.ask" = "[placeholder] Do you want to leave the forest?"
 "shane.too_low" = "[placeholder] The Forest of Patience is no place for you yet. Come back at level 25."
 "shane.ask" = "[placeholder] I'll let you into the Forest of Patience for #b{price} mesos#k. Will you go?"
+"shane.ask_free" = "[placeholder] Sabitrama's helper? Then in you go, no charge. Will you go?"
 "shane.decline" = "[placeholder] Come back when you're ready."
 "shane.short" = "[placeholder] You don't have enough mesos."
 "louis.ask" = "[placeholder] Do you want to go back to Ellinia?"
