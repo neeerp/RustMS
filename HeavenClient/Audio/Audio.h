@@ -24,6 +24,8 @@
 #include "../Template/EnumMap.h"
 #include "../Template/Point.h"
 
+#include "RecentTracks.h"
+
 #include <unordered_map>
 #include <cstdint>
 #include <string>
@@ -201,12 +203,16 @@ namespace ms
 
 		static void start(const std::string &path);
 
+		// Takes the decoded track from the context's cache, and frees those it no longer keeps.
+		static alure::Buffer load(const std::string &path);
+
 		static std::unordered_map<std::string, membuf *> audiodb;
 		static alure::DeviceManager devMgr;
 		static alure::Device dev;
 		static alure::Context ctx;
 		static alure::Source music_src;
 		static alure::Buffer music_buff;
+		static RecentTracks recent;
 		static float volume;
 		// The track last asked for, playing or pending.
 		static std::string current;

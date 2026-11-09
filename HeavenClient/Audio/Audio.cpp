@@ -42,6 +42,7 @@ namespace ms
 	alure::Context Music::ctx;
 	alure::Source Music::music_src;
 	alure::Buffer Music::music_buff;
+	RecentTracks Music::recent(3);
 	float Music::volume = 1.0f;
 	std::string Music::current;
 	std::string Music::pending;
@@ -380,9 +381,19 @@ namespace ms
 		start(path);
 	}
 
+	alure::Buffer Music::load(const std::string &path)
+	{
+		alure::Buffer buffer = ctx.getBuffer(path);
+
+		for (const std::string &dropped : recent.use(path))
+			ctx.removeBuffer(dropped);
+
+		return buffer;
+	}
+
 	void Music::start(const std::string &path)
 	{
-		music_buff = Music::ctx.getBuffer(path);
+		music_buff = load(path);
 		fading_in = fadein_length > 0;
 		fadein_start = std::chrono::steady_clock::now();
 		music_src.setGain(fading_in ? 0.0f : volume);
@@ -414,7 +425,7 @@ namespace ms
 		}
 
 		//alure::Context::MakeCurrent(ctx);
-		music_buff = Music::ctx.getBuffer(path);
+		music_buff = load(path);
 		music_src.setLooping(false);
 		music_src.play(music_buff);
 
