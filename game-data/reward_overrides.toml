@@ -2204,6 +2204,7 @@ add = [{ item = 4032518, prob = 0.4, quest = 3743 }]  # The New and Improved, Ob
 [mobs.9001009]
 # Master of Disguise.
 add = [
+    { item = 4032101, prob = 0.7, quest = 20301 },  # The Master of Disguise
     { item = 4032102, prob = 0.7, quest = 20302 },  # The Master of Disguise
     { item = 4032103, prob = 0.7, quest = 20303 },  # The Master of Disguise
     { item = 4032104, prob = 0.7, quest = 20304 },  # The Master of Disguise

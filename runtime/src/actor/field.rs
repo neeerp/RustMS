@@ -1268,6 +1268,7 @@ impl FieldActor {
                         self.appear(npc_id, at);
                     }
                 }
+                FieldRequest::Unmask { npc_id, mob_id } => self.unmask(from, npc_id, mob_id),
                 FieldRequest::OpenReactor { name } => self.open_reactor(name),
                 FieldRequest::NpcSpecialAction { npc_id, action } => {
                     self.npc_special_action(npc_id, action)
@@ -3715,6 +3716,24 @@ impl FieldActor {
                 }
             }
         }
+    }
+
+    /// NPC `npc_id` goes from here, and a `mob_id` comes out where it stood
+    /// unless one is out already (`scripts::Effect::Unmask`).
+    fn unmask(&mut self, from: ClientId, npc_id: i32, mob_id: i32) {
+        let Some(index) = self.map_npcs.iter().position(|npc| npc.npc_id == npc_id) else {
+            return;
+        };
+        let npc = self.map_npcs.remove(index);
+        for packet in [
+            build_uncontrol_npc(npc.object_id),
+            build_remove_npc(npc.object_id),
+        ] {
+            if let Ok(packet) = packet {
+                self.broadcast(None, packet);
+            }
+        }
+        self.handle_bring_out_mob(from, mob_id, (npc.x, npc.y));
     }
 
     /// Bring out NPC `npc_id` on the ground below (x, y), there until the
