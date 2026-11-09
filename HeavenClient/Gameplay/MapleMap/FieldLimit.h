@@ -152,17 +152,18 @@ namespace ms
 		}
 
 		// v83 FUN_00a0977b: bit 0x4 keeps summoning sacks shut unless the
-		// map's info/allowedItem lists them.
-		inline bool may_summon(int32_t fieldlimit, const std::vector<int32_t> &allowed, int32_t item_id)
+		// map's info/allowedItem lists them. A GM (FUN_00473cde() & 1) may
+		// open one anywhere.
+		inline bool may_summon(int32_t fieldlimit, const std::vector<int32_t> &allowed, int32_t item_id, bool gm)
 		{
-			return !(fieldlimit & SUMMON_SACKS) || std::find(allowed.begin(), allowed.end(), item_id) != allowed.end();
+			return gm || !(fieldlimit & SUMMON_SACKS) || std::find(allowed.begin(), allowed.end(), item_id) != allowed.end();
 		}
 
 		// v83 FUN_00a0977b: a summoning sack asks before it opens, unless
-		// it is an event's (2109xxx) or 2100067.
-		inline bool sack_asks(int32_t item_id)
+		// it is an event's (2109xxx) or 2100067, or the player is a GM.
+		inline bool sack_asks(int32_t item_id, bool gm)
 		{
-			return item_id / 1000 != 2109 && item_id != 2100067;
+			return !gm && item_id / 1000 != 2109 && item_id != 2100067;
 		}
 
 		// v83 FUN_00a0a63f, type 0x25: bit 0x40000 keeps Miu Miu's merchant

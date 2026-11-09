@@ -645,7 +645,12 @@ A summoning sack (210xxxx) is opened from the USE tab with USE_SUMMON_BAG
 of its mobs at its percent chance, below the player. Where the map's
 fieldLimit has 0x4 and its `allowedItem` doesn't list the sack, the client
 shows "You can't use it here in this map." itself, unless the player is
-a GM (v83 FUN_00a0977b). The server also keeps a sack with `info/reqMap`
+a GM (v83 FUN_00a0977b). Then, again unless the player is a GM, and
+unless the sack is an event's (2109xxx) or the Ariant Coliseum's Bomb
+2100067, it asks "Too much interest can hinder your process of leveling
+up. will you really summon the monster?" and sends nothing on No
+(`field_limit::sack_asks`). The client's GM bit comes only with gm_level 3
+and up. The server also keeps a sack with `info/reqMap`
 to the maps it names (their ids are the children's names): the Ariant
 Coliseum's Bomb 2100067 opens only in 980010101, 980010201 and 980010301.
 A sack the server refuses for the map gets
