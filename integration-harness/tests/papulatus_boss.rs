@@ -13,7 +13,7 @@ use integration_harness::database::{
 use integration_harness::events::{clears, party, throw_down, waiting_in};
 use integration_harness::hunting::{attack, move_mob, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{read_for, send, until, warp, Trace};
+use integration_harness::trace::{ask_for_skill, read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{CLOCKTOWER_DEPTHS, ORIGIN_OF_CLOCKTOWER};
 use net::packet::op::RecvOpcode;
@@ -101,9 +101,7 @@ async fn darkstars(c: &mut MapleTestConnection, t: &mut Trace, clock: i32) -> (u
     let at = t.field.mob_positions[&clock];
     for _ in 0..40 {
         t.field.grants.clear();
-        send(c, move_mob(clock, at, true, 0, 0)).await;
-        until(c, t, |t| !t.field.grants.is_empty()).await;
-        let (_, skill, level) = t.field.grants[0];
+        let (skill, level) = ask_for_skill(c, t, clock, at).await;
         let nth = ACTIONS.iter().find(|a| a.0 == skill).unwrap().1;
         let before = t.field.mob_positions.len();
         send(c, cast(clock, at, nth, skill, level)).await;

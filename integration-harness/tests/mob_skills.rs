@@ -7,7 +7,7 @@
 use integration_harness::database::{set_job, set_str};
 use integration_harness::hunting::{attack, move_mob};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{read_for, send, until, warp, Trace};
+use integration_harness::trace::{ask_for_skill, read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use packet::Packet;
 use tokio::time::Duration;
@@ -122,8 +122,7 @@ async fn wounded_mobs_heal_and_summon() {
     // It may be granted its Banish instead, a grant that lapses after 10
     // seconds uncast.
     for _ in 0..8 {
-        send(c, move_mob(wolf, at, true, 0, 0)).await;
-        until(c, &mut t, |t| !t.field.grants.is_empty()).await;
+        ask_for_skill(c, &mut t, wolf, at).await;
         if t.field.grants != [(wolf, BANISH, 1)] {
             break;
         }
@@ -144,8 +143,7 @@ async fn wounded_mobs_heal_and_summon() {
     let at = t.field.mob_positions[&cerebes];
     send(c, attack(cerebes, 3_000)).await;
     until(c, &mut t, |t| t.field.controlled.contains(&cerebes)).await;
-    send(c, move_mob(cerebes, at, true, 0, 0)).await;
-    until(c, &mut t, |t| !t.field.grants.is_empty()).await;
+    ask_for_skill(c, &mut t, cerebes, at).await;
     assert_eq!(t.field.grants, [(cerebes, SUMMON, 27)]);
     let before = t.field.alive(SUMMONED);
     send(c, cast(cerebes, at, 1, SUMMON, 27, 0)).await;

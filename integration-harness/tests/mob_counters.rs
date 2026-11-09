@@ -10,7 +10,7 @@
 use integration_harness::database::{set_hp, set_job, set_str, set_weapon_attack};
 use integration_harness::hunting::{attack, move_mob};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{send, stat, until, warp, Trace};
+use integration_harness::trace::{ask_for_skill, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use packet::Packet;
 use tokio::time::Duration;
@@ -82,14 +82,12 @@ async fn a_counter_hurts_whoever_attacks_the_mob() {
 
     // It is granted its heal or its counter; a heal waits five minutes
     // after, so the counter comes next.
-    send(c, move_mob(boss, at, true, 0, 0)).await;
-    until(c, &mut t, |t| !t.field.grants.is_empty()).await;
+    ask_for_skill(c, &mut t, boss, at).await;
     if t.field.grants.last() == Some(&(boss, HEAL, 23)) {
         send(c, cast(boss, at, 1, HEAL, 23)).await;
         until(c, &mut t, |t| !t.field.heals.is_empty()).await;
         tokio::time::sleep(Duration::from_millis(600)).await;
-        send(c, move_mob(boss, at, true, 0, 0)).await;
-        until(c, &mut t, |t| t.field.grants.len() > 1).await;
+        ask_for_skill(c, &mut t, boss, at).await;
     }
     assert_eq!(t.field.grants.last(), Some(&(boss, COUNTER, 1)));
     send(c, cast(boss, at, 2, COUNTER, 1)).await;

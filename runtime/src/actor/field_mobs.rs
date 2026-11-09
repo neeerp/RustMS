@@ -397,11 +397,14 @@ impl LiveMob {
         })
     }
 
-    /// Pick a skill for its controller to cast next, by `roll` in 0..1,
-    /// from those it may: ones the server casts, that it can pay for, that
-    /// are off cooldown, whose HP limit it is at or under, and, to summon,
-    /// that have fewer than their limit of its `summons` alive. None while
-    /// sealed or waiting on a grant.
+    /// Pick a skill for its controller to cast next: `roll` in 0..1 picks
+    /// one of those listed, which is granted only if it may be cast: the
+    /// server casts it, the mob can pay for it, it is off cooldown, the mob
+    /// is at or under its HP limit, and, to summon, fewer than its limit of
+    /// its `summons` are alive. Otherwise the mob attacks. As Cosmic's
+    /// MoveLifeHandler, so a skill with no cooldown (Prototype Lord's
+    /// Confusion 132/5) doesn't crowd out its attacks. None while sealed or
+    /// waiting on a grant.
     fn grant(
         &mut self,
         now: Instant,
@@ -421,32 +424,26 @@ impl LiveMob {
         }
         let max_hp = i64::from(self.info.max_hp.max(1));
         let hp_percent = self.hp * 100 / max_hp;
-        let usable: Vec<(u8, u8)> = self
-            .info
-            .skills
-            .iter()
-            .filter(|entry| {
-                let (Ok(_), Ok(_), Some(effect)) = (
-                    u8::try_from(entry.skill),
-                    u8::try_from(entry.level),
-                    mob_skill::effect(entry.skill, 0),
-                ) else {
-                    return false;
-                };
-                let Some(level) = levels(entry.skill, entry.level) else {
-                    return false;
-                };
-                level.mp_cost <= self.mp
-                    && hp_percent <= i64::from(level.hp)
-                    && self.cooldowns.get(&entry.skill).is_none_or(|&at| at <= now)
-                    && (effect != MobSkillEffect::Summon
-                        || (!level.summons.is_empty()
-                            && (level.limit <= 0 || summons < level.limit as usize)))
-            })
-            .map(|entry| (entry.skill as u8, entry.level as u8))
-            .collect();
-        let index = ((roll * usable.len() as f64) as usize).min(usable.len().checked_sub(1)?);
-        let (skill, level) = usable[index];
+        let listed = &self.info.skills;
+        let entry =
+            &listed[((roll * listed.len() as f64) as usize).min(listed.len().checked_sub(1)?)];
+        let (Ok(skill), Ok(level), Some(effect)) = (
+            u8::try_from(entry.skill),
+            u8::try_from(entry.level),
+            mob_skill::effect(entry.skill, 0),
+        ) else {
+            return None;
+        };
+        let data = levels(entry.skill, entry.level)?;
+        let usable = data.mp_cost <= self.mp
+            && hp_percent <= i64::from(data.hp)
+            && self.cooldowns.get(&entry.skill).is_none_or(|&at| at <= now)
+            && (effect != MobSkillEffect::Summon
+                || (!data.summons.is_empty()
+                    && (data.limit <= 0 || summons < data.limit as usize)));
+        if !usable {
+            return None;
+        }
         self.granted = Some(Grant {
             skill,
             level,
@@ -2242,7 +2239,9 @@ mod tests {
         // An ungranted cast is shown as nothing.
         let early = act(&mut mobs, power_up, 100 | 1 << 8, false, now, 0.0);
         assert_eq!((early.action, early.cast), (NO_ACTION, None));
-        // At full HP Heal (under 50%) can't be granted: Power Up or the summon.
+        // A roll picks one of the three listed. At full HP Heal (under 50%)
+        // can't be granted, and nothing else is in its place.
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, now, 0.4).grant, None);
         let granted = act(&mut mobs, NO_ACTION, 0, true, now, 0.0);
         assert_eq!((granted.grant, granted.next_attack), (Some((100, 1)), true));
         // While it waits, nothing more is granted, but it may still attack.
@@ -2267,15 +2266,17 @@ mod tests {
         assert_eq!((cast.skill, cast.level, cast.effect.x), (100, 1, 115));
         assert_eq!(cast.at, now + Duration::from_millis(900));
         assert_eq!(mobs.reached_by(&cast), [mob]);
-        // Power Up cools down for 40 s; the summon is next.
-        let next = act(&mut mobs, NO_ACTION, 0, true, now, 0.0);
+        // Power Up cools down for 40 s: picking it grants nothing (a mob
+        // with attacks would attack), rather than the summon in its place.
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, now, 0.0).grant, None);
+        let next = act(&mut mobs, NO_ACTION, 0, true, now, 0.99);
         assert_eq!(next.grant, Some((200, 1)));
         // A new controller starts afresh.
         mobs.release(1, Some(2));
         assert!(mobs.get(mob).unwrap().granted.is_none());
         // Summon twice: its limit is 2 alive.
         assert_eq!(
-            act(&mut mobs, NO_ACTION, 0, true, now, 0.0).grant,
+            act(&mut mobs, NO_ACTION, 0, true, now, 0.99).grant,
             Some((200, 1))
         );
         let summoned = mobs.summon(
@@ -2295,17 +2296,18 @@ mod tests {
         assert!(mobs
             .summon(mob, &[snail_spawn(0).1], 2, || None, now)
             .is_empty());
-        // Hurt below half, only Heal remains while the summons live, and
+        // Hurt below half, only Heal may be cast while the summons live, and
         // only with MP for it.
         let later = now + GRANT_TIMEOUT;
         mobs.damage(1, mob, 600, later);
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, later, 0.99).grant, None);
         assert_eq!(
-            act(&mut mobs, NO_ACTION, 0, true, later, 0.99).grant,
+            act(&mut mobs, NO_ACTION, 0, true, later, 0.4).grant,
             Some((114, 1))
         );
         mobs.live.get_mut(&mob).unwrap().mp = 4;
         let broke = later + GRANT_TIMEOUT;
-        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.0).grant, None);
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.4).grant, None);
         // A sealed mob casts nothing.
         mobs.live.get_mut(&mob).unwrap().mp = 12;
         mobs.add_statuses(
@@ -2316,7 +2318,7 @@ mod tests {
             broke,
             broke + GRANT_TIMEOUT,
         );
-        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.0).grant, None);
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.4).grant, None);
         // So does one under a player's Seal.
         mobs.live.get_mut(&mob).unwrap().statuses.clear();
         mobs.add_statuses(
@@ -2327,7 +2329,7 @@ mod tests {
             broke,
             broke + GRANT_TIMEOUT,
         );
-        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.0).grant, None);
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.4).grant, None);
         // Summons die for good.
         let Some(Err(_)) = mobs.damage(1, summoned[0], 100, later) else {
             panic!("the summon should die");
