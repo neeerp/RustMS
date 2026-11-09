@@ -9,6 +9,15 @@ use tokio::net::tcp::OwnedWriteHalf;
 /// reading would otherwise block its connection's actor forever.
 pub const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// A write to a peer that has gone only means it left.
+fn left(error: std::io::Error) -> RuntimeError {
+    if super::peer_left(&error) {
+        RuntimeError::ClientDisconnected
+    } else {
+        error.into()
+    }
+}
+
 pub struct PacketWriter {
     writer: BufWriter<OwnedWriteHalf>,
     crypt: MapleAES,
@@ -24,8 +33,8 @@ impl PacketWriter {
 
     /// Send the handshake packet (unencrypted).
     pub async fn send_handshake(&mut self, packet: &[u8]) -> Result<(), RuntimeError> {
-        self.writer.write_all(packet).await?;
-        self.writer.flush().await?;
+        self.writer.write_all(packet).await.map_err(left)?;
+        self.writer.flush().await.map_err(left)?;
         Ok(())
     }
 
@@ -46,11 +55,41 @@ impl PacketWriter {
             self.writer.flush().await
         };
         match tokio::time::timeout(WRITE_TIMEOUT, write).await {
-            Ok(result) => Ok(result?),
+            Ok(result) => result.map_err(left),
             Err(_) => Err(RuntimeError::Io(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "peer is not reading",
             ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::{TcpListener, TcpStream};
+
+    #[tokio::test]
+    async fn writing_to_a_client_that_left_is_a_disconnect() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (client, server) = tokio::join!(
+            TcpStream::connect(listener.local_addr().unwrap()),
+            listener.accept()
+        );
+        let client = client.unwrap();
+        let (_, write_half) = server.unwrap().0.into_split();
+        let mut writer = PacketWriter::new(write_half, &[1, 2, 3, 4]);
+        client.set_zero_linger().unwrap();
+        drop(client);
+        // The first write may still be accepted before the reset arrives.
+        let mut result = Ok(());
+        for _ in 0..50 {
+            result = writer.send_packet(&mut Packet::new(&[0x0a, 0, 1])).await;
+            if result.is_err() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert!(matches!(result, Err(RuntimeError::ClientDisconnected)));
     }
 }

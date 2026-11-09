@@ -1,7 +1,6 @@
 use crate::error::RuntimeError;
 use crypt::MapleAES;
 use packet::{Packet, MAX_PACKET_LENGTH};
-use std::io;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::net::tcp::OwnedReadHalf;
 
@@ -48,20 +47,13 @@ impl PacketReader {
             match self.reader.read_buf(&mut self.pending_bytes).await {
                 Ok(0) => return Err(RuntimeError::ClientDisconnected),
                 Ok(_) => {}
-                // A client that is killed, or closes with data still unread,
-                // resets the connection. It has still only left.
-                Err(error) if is_reset(&error) => return Err(RuntimeError::ClientDisconnected),
+                Err(error) if super::peer_left(&error) => {
+                    return Err(RuntimeError::ClientDisconnected)
+                }
                 Err(error) => return Err(error.into()),
             }
         }
     }
-}
-
-fn is_reset(error: &io::Error) -> bool {
-    matches!(
-        error.kind(),
-        io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
-    )
 }
 
 #[cfg(test)]
