@@ -3725,7 +3725,10 @@ impl FieldActor {
             return;
         };
         let npc = self.map_npcs.remove(index);
-        for packet in [build_uncontrol_npc(npc.object_id), build_remove_npc(npc.object_id)] {
+        for packet in [
+            build_uncontrol_npc(npc.object_id),
+            build_remove_npc(npc.object_id),
+        ] {
             if let Ok(packet) = packet {
                 self.broadcast(None, packet);
             }

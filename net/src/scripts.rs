@@ -3454,7 +3454,11 @@ fn disguise_searching(player: &Player) -> bool {
 fn disguise_forest(map: i32) -> Option<(i16, i16)> {
     let n = map.checked_sub(DISGUISE_FORESTS)?;
     (n % 10 == 0)
-        .then(|| DISGUISED_KNIGHTS_AT.get(usize::try_from(n / 10).ok()?).copied())
+        .then(|| {
+            DISGUISED_KNIGHTS_AT
+                .get(usize::try_from(n / 10).ok()?)
+                .copied()
+        })
         .flatten()
 }
 

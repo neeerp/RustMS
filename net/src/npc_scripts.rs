@@ -20045,9 +20045,19 @@ mod tests {
         );
         // Mihile (1104100) does for a Dawn Warrior but not a Blaze Wizard.
         let mihile = scripts::DISGUISED_KNIGHTS;
-        assert!(!read_through(disguised_knight(mihile, &knight(1110))).1.is_empty());
-        assert_eq!(read_through(disguised_knight(mihile, &knight(1210))), (mihile, vec![]));
-        assert_eq!(read_through(disguised_knight(mihile, &knight(1111))).1.len(), 1);
+        assert!(!read_through(disguised_knight(mihile, &knight(1110)))
+            .1
+            .is_empty());
+        assert_eq!(
+            read_through(disguised_knight(mihile, &knight(1210))),
+            (mihile, vec![])
+        );
+        assert_eq!(
+            read_through(disguised_knight(mihile, &knight(1111)))
+                .1
+                .len(),
+            1
+        );
     }
 
     #[test]
