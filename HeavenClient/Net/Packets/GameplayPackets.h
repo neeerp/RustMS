@@ -129,6 +129,14 @@ namespace ms
 		EnterCashShopPacket() : OutPacket(OutPacket::Opcode::ENTER_CASHSHOP) {}
 	};
 
+	// Opcode: ENTER_MTS(156)
+	class EnterMtsPacket : public OutPacket
+	{
+	public:
+		// The TRADE button: asks for the Item-Trading Shop (v83 FUN_00a12522)
+		EnterMtsPacket() : OutPacket(OutPacket::Opcode::ENTER_MTS) {}
+	};
+
 	// Opcode: CHECK_CASH(228)
 	class CheckCashPacket : public OutPacket
 	{

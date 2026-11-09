@@ -99,6 +99,7 @@ pub use self::carnival::MonsterCarnivalHandler;
 pub use self::cash_item::UseCashItemHandler;
 pub use self::cash_shop::{
     CashShopOperationHandler, CheckCashHandler, CouponCodeHandler, EnterCashShopHandler,
+    EnterMtsHandler,
 };
 pub use self::catch_item::{trade_catch, UseCatchItemHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};

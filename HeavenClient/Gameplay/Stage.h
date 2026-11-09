@@ -356,6 +356,11 @@ namespace ms
 		// catch their breath. A present is offered once the shop opens.
 		void enter_cash_shop(std::optional<cash_catalog::Present> present = std::nullopt);
 
+		// The TRADE button: ask for the Item-Trading Shop, with the Cash
+		// Shop's refusals bar the quiz. The server's answer (BLOCKED_SERVER)
+		// ends the request.
+		void enter_trade_shop();
+
 	private:
 		void load_map(int32_t mapid);
 
