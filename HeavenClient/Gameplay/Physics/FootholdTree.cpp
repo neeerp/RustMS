@@ -54,6 +54,26 @@ namespace ms
 			return joint && side(fh, x, y) == 0;
 		}
 
+		// Drawn right to left, as under a ledge.
+		bool backward(const Foothold &fh)
+		{
+			return fh.id() != 0 && fh.x2() < fh.x1();
+		}
+
+		// v83 walks on to the next foothold only if it runs left to right
+		// (0x9b3fd1). Past a wall or a backward one that rises from the joint
+		// it stops there; from one that drops away it falls.
+		bool blocks(const Foothold &next, bool left, const Range<int16_t> &vertical)
+		{
+			if (next.is_blocking(vertical))
+				return true;
+
+			bool rises = left ? next.y1() <= next.y2() : next.y2() <= next.y1();
+			Range<int16_t> feet(vertical.first(), vertical.second() + 1);
+
+			return backward(next) && rises && Range<int16_t>(next.t(), next.b()).overlaps(feet);
+		}
+
 		// How fast an object moves along a foothold, to the right.
 		double along(const Foothold &fh, double hspeed, double vspeed)
 		{
@@ -540,10 +560,12 @@ namespace ms
 				return fh.id() != 0 && fh.x1() < fh.x2();
 			};
 
+			// It never walks on to one drawn backwards: past the joint it
+			// falls (0x9b3fd1).
 			if (floor(curfh.next()) ? x > curfh.r() : std::floor(x) > curfh.r())
-				phobj.fhid = curfh.next();
+				phobj.fhid = backward(get_fh(curfh.next())) ? 0 : curfh.next();
 			else if (floor(curfh.prev()) ? x < curfh.l() : std::ceil(x) < curfh.l())
-				phobj.fhid = curfh.prev();
+				phobj.fhid = backward(get_fh(curfh.prev())) ? 0 : curfh.prev();
 
 			if (phobj.fhid == 0)
 				phobj.fhid = get_fhid_below(x, y);
@@ -626,7 +648,7 @@ namespace ms
 		{
 			const Foothold &prev = get_fh(cur.prev());
 
-			if (prev.is_blocking(vertical))
+			if (blocks(prev, true, vertical))
 				return cur.l();
 
 			const Foothold &prev_prev = get_fh(prev.prev());
@@ -639,7 +661,7 @@ namespace ms
 		{
 			const Foothold &next = get_fh(cur.next());
 
-			if (next.is_blocking(vertical))
+			if (blocks(next, false, vertical))
 				return cur.r();
 
 			const Foothold &next_next = get_fh(next.next());
