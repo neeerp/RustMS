@@ -117,5 +117,9 @@ namespace ms
 	{
 		for (size_t i = 0; i < ROWS; i++)
 			settings[i]->save(allowed[i]);
+
+		// v83 writes the options out on OK (CUIGameOpt's close calls CConfig's
+		// save at once), so a crash or a killed client keeps them too.
+		Configuration::get().save();
 	}
 }
