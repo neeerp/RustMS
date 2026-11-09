@@ -1,8 +1,9 @@
 //! Buffs, skill cooldowns, and skill effects.
 
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::{Beacon, BuffStat, Mount, Ride, ShownBuff};
+use game::{Beacon, BuffStat, Buffs, Mount, Ride, ShownBuff};
 use packet::{io::write::PktWrite, Packet};
+use std::time::{Duration, Instant};
 
 /// A temporary stat's bit in the client's 128-bit flags, as the two longs
 /// the packet carries (first, second). The flags go out as they lie in
@@ -389,6 +390,66 @@ pub fn build_cooldown(skill_id: i32, seconds: i16) -> Result<Packet, NetworkErro
     p.write_int(skill_id)?;
     p.write_short(seconds)?;
     Ok(p)
+}
+
+/// What a player's own client is told of the buffs and cooldowns they
+/// brought from another channel, or back from the Cash Shop: it makes the
+/// user anew and knows none of them. A skill's stats go out together with
+/// what is left of them, Energy Charge's gauge and a dash in their own
+/// blocks, and each cooldown with its seconds left, rounded up. A ghost
+/// item's buff is left to the map change, which shows it anyway
+/// (`show_ghost`), and a summon's icon stays out of Combo's slot.
+pub fn build_buffs_again(buffs: &Buffs, now: Instant) -> Result<Vec<Packet>, NetworkError> {
+    let left = |expires: Instant| expires.saturating_duration_since(now);
+    let millis = |left: Duration| i32::try_from(left.as_millis()).unwrap_or(i32::MAX);
+    let seconds = |left: Duration| left.as_millis().div_ceil(1000);
+    let mut given: Vec<(i32, Instant, Vec<(BuffStat, i16)>)> = Vec::new();
+    for buff in buffs.active() {
+        let own_block = matches!(
+            buff.stat,
+            BuffStat::Ghost
+                | BuffStat::EnergyCharge
+                | BuffStat::DashSpeed
+                | BuffStat::DashJump
+                | BuffStat::Riding
+                | BuffStat::GuidedBullet
+        );
+        if own_block || left(buff.expires).is_zero() || !buffs.heard(buff.stat) {
+            continue;
+        }
+        let stat = (buff.stat, buff.value);
+        match (given.iter_mut()).find(|(id, at, _)| *id == buff.skill_id && *at == buff.expires) {
+            Some((_, _, stats)) => stats.push(stat),
+            None => given.push((buff.skill_id, buff.expires, vec![stat])),
+        }
+    }
+    let mut packets = Vec::new();
+    for (skill_id, expires, stats) in given {
+        packets.push(build_give_buff(skill_id, millis(left(expires)), &stats)?);
+    }
+    if let Some(energy) = buffs.energy() {
+        packets.push(build_give_energy(energy)?);
+    }
+    let dash = (buffs.active().iter()).find(|buff| buff.stat == BuffStat::DashSpeed);
+    let jump = buffs.two_state(BuffStat::DashJump);
+    if let (Some(dash), Some(jump)) = (dash, jump) {
+        let speed = ShownBuff {
+            stat: dash.stat,
+            value: dash.value,
+            skill_id: dash.skill_id,
+        };
+        let secs = seconds(left(dash.expires)).min(u128::from(u16::MAX)) as u16;
+        if secs > 0 {
+            packets.push(build_give_dash(speed, jump, secs)?);
+        }
+    }
+    for &(skill_id, until) in buffs.cooldowns() {
+        let secs = seconds(left(until)).min(i16::MAX as u128) as i16;
+        if secs > 0 {
+            packets.push(build_cooldown(skill_id, secs)?);
+        }
+    }
+    Ok(packets)
 }
 
 /// SHOW_FOREIGN_EFFECT 1: another player used a skill.
@@ -906,5 +967,50 @@ mod tests {
         expect.short(SendOpcode::ShowForeignEffect as i16).int(7);
         expect.byte(5).int(1311008);
         expect.end();
+    }
+
+    #[test]
+    fn buffs_brought_along_are_given_again_with_what_is_left() {
+        let now = Instant::now();
+        let second = Duration::from_secs(1);
+        let mut buffs = Buffs::default();
+        // Hyper Body's two stats, 100 s in, with 200 s left.
+        let cast = now - 100 * second;
+        buffs.give(game::Buff::new(
+            1301007,
+            BuffStat::MaxHp,
+            60,
+            cast,
+            300 * second,
+        ));
+        buffs.give(game::Buff::new(
+            1301007,
+            BuffStat::MaxMp,
+            60,
+            cast,
+            300 * second,
+        ));
+        // A ghost is the map change's to show, and a run-out buff nobody's.
+        buffs.give(game::Buff::new(
+            2022090,
+            BuffStat::Ghost,
+            1,
+            now,
+            60 * second,
+        ));
+        buffs.give(game::Buff::new(
+            1001003,
+            BuffStat::Pdd,
+            10,
+            cast,
+            100 * second,
+        ));
+        buffs.start_cooldown(1121011, now, Duration::from_millis(1500));
+        let packets = build_buffs_again(&buffs, now).unwrap();
+        let stats = [(BuffStat::MaxHp, 60), (BuffStat::MaxMp, 60)];
+        let given = build_give_buff(1301007, 200_000, &stats).unwrap();
+        let cooldown = build_cooldown(1121011, 2).unwrap();
+        let bytes: Vec<_> = packets.iter().map(|p| p.bytes.clone()).collect();
+        assert_eq!(bytes, [given.bytes, cooldown.bytes]);
     }
 }
