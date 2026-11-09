@@ -863,6 +863,13 @@ force-and-friction model (`move_normal`).
   riser one pixel wide and 19 high, as in 107000400 (fh861), is 19 px of
   steep slope that slides a walker back to its foot, and only a jump gets
   over it. Before, the x step crossed it in one tick (test `up_a_steep_riser`).
+- **Landings.** v83 lands a falling object where its step crosses the floor
+  and walks the rest of the step on along it (0x9b34c8). `limit_movement`
+  carries the rest of the step's x along the floor, so a flat or a straight
+  down landing is unchanged, but a fall into a steep riser lands near the
+  crossing. Before, it landed at the step's end x and took the floor's y
+  there, up to 276 px up the line in 610020006 (fh147). A step stopped by a
+  wall still lands at the wall (test `onto_a_steep_riser`).
 - **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
   footholds and at most 300 px above the highest. A map with `info/VRLimit`
   pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`,
