@@ -547,6 +547,72 @@ namespace ms
 		phobj.y = std::clamp(phobj.crnt_y(), double(spacey.first()), spacey.second() - 1.0);
 	}
 
+	double FootholdTree::walk_on(PhysicsObject &phobj) const
+	{
+		const Foothold &cur = get_fh(phobj.fhid);
+
+		if (!phobj.onground || phobj.hspeed == 0.0 || cur.id() == 0 || cur.x1() >= cur.x2())
+			return 1.0;
+
+		auto ux = [](const Foothold &fh)
+		{
+			return 1.0 / std::sqrt(1.0 + fh.slope() * fh.slope());
+		};
+
+		bool right = phobj.hspeed > 0.0;
+		double sign = right ? 1.0 : -1.0;
+		double x = phobj.crnt_x();
+		double at = right ? cur.r() : cur.l();
+		double past = sign * (x + phobj.hspeed - at);
+
+		if (past <= 0.0)
+			return 1.0;
+
+		// v83 steps a grounded object a distance along its foothold, and the
+		// time left at a joint goes on along a floor drawn left to right
+		// beyond it (0x9b3fd1). Up a steep riser that is a short way, which
+		// the slant then slides back down.
+		const Foothold *fh = &cur;
+		double left = past / ux(cur);
+
+		for (;;)
+		{
+			const Foothold &next = get_fh(right ? fh->next() : fh->prev());
+
+			if (next.id() == 0 || next.x1() >= next.x2())
+			{
+				if (fh == &cur)
+					return 1.0;
+
+				// Beyond the floors it walked on, a wall stops it at the
+				// joint; anything else drops away under it.
+				bool wall = next.id() != 0 && (right ? next.y2() <= next.y1() : next.y2() >= next.y1());
+
+				phobj.hspeed = (wall ? at : at + sign * left * ux(*fh)) - x;
+				phobj.fhid = fh->id();
+				phobj.fhslope = fh->slope();
+
+				return wall ? 0.0 : ux(*fh) / ux(cur);
+			}
+
+			fh = &next;
+
+			double room = (next.r() - next.l()) / ux(next);
+
+			if (left <= room)
+				break;
+
+			left -= room;
+			at = right ? next.r() : next.l();
+		}
+
+		phobj.hspeed = at + sign * left * ux(*fh) - x;
+		phobj.fhid = fh->id();
+		phobj.fhslope = fh->slope();
+
+		return ux(*fh) / ux(cur);
+	}
+
 	void FootholdTree::update_fh(PhysicsObject &phobj) const
 	{
 		if (phobj.type == PhysicsObject::Type::FIXATED && phobj.fhid > 0)

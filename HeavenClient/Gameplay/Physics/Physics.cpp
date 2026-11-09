@@ -425,10 +425,13 @@ namespace ms
 
 		phobj.landed = false;
 		fht.limit_movement(phobj);
+
+		double along = fht.walk_on(phobj);
+
 		phobj.move();
 
 		if (!hstep || phobj.hspeed != 0.0)
-			phobj.hspeed = phobj.landed ? landing_speed(phobj.landspeed, dir) : hspeed * TICK;
+			phobj.hspeed = phobj.landed ? landing_speed(phobj.landspeed, dir) : hspeed * along * TICK;
 
 		if (!vstep || phobj.vspeed != 0.0)
 			phobj.vspeed = vspeed * TICK;
