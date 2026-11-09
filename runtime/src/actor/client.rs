@@ -174,6 +174,10 @@ pub struct ClientActor {
     ola_seed: u64,
     npc_request_id: u64,
     changing_channel: bool,
+    /// The connection is over and cleanup has begun: whatever cleanup
+    /// would tell the client (an offer given back, a shop closed) is not
+    /// written, as the socket may already be shut.
+    closing: bool,
     /// The player left their field for the Cash Shop.
     in_cash_shop: bool,
     /// The gift last asked about (SN, receiver, message), which the same ask
@@ -291,6 +295,7 @@ impl ClientActor {
             ola_seed: thread_rng().gen(),
             npc_request_id: 0,
             changing_channel: false,
+            closing: false,
             in_cash_shop: false,
             gift_lookup: None,
             locker_expiry: HashMap::new(),
@@ -424,6 +429,9 @@ impl ClientActor {
     }
 
     async fn write(&mut self, packet: &mut Packet) -> Result<(), RuntimeError> {
+        if self.closing {
+            return Ok(());
+        }
         let kill = self.kill.clone();
         tokio::select! {
             biased;
@@ -2444,6 +2452,7 @@ impl ClientActor {
     }
 
     async fn cleanup(&mut self) {
+        self.closing = true;
         if self.game.is_some() {
             // Before the save: the player gets their offer back, or the
             // partner's, and their unsold stock.
