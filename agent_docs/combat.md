@@ -782,8 +782,10 @@ the old session hands them over (`HandedBuffs` in `WorldServices`, keyed by
 character and session like the quest clocks), the new one takes them before
 fitting HP and MP, and `build_buffs_again` tells the client each one again
 with the time left (GIVE_BUFF grouped by skill, then energy, dash and
-COOLDOWN). Riding and the Homing Beacon end at the change; a logout ends
-everything.
+COOLDOWN). A ride comes along too, as Cosmic keeps mounts: it goes out as
+the cast's GIVE_BUFF with the Battleship's defense, then the ship's HP. The
+Homing Beacon ends at the change, as its mob is the old channel's; a logout
+ends everything.
 
 A skill that reaches the party (`skills::reaches_party`) carries a slot mask
 after the level: 0x80 alone, else bit `1 << (5 - slot)` for each member the

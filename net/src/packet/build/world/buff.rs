@@ -398,8 +398,14 @@ pub fn build_cooldown(skill_id: i32, seconds: i16) -> Result<Packet, NetworkErro
 /// what is left of them, Energy Charge's gauge and a dash in their own
 /// blocks, and each cooldown with its seconds left, rounded up. A ghost
 /// item's buff is left to the map change, which shows it anyway
-/// (`show_ghost`), and a summon's icon stays out of Combo's slot.
-pub fn build_buffs_again(buffs: &Buffs, now: Instant) -> Result<Vec<Packet>, NetworkError> {
+/// (`show_ghost`), and a summon's icon stays out of Combo's slot. A `ride`
+/// goes out as the cast gave it, with the defense of its skill (the
+/// Battleship's) and then the ship's HP.
+pub fn build_buffs_again(
+    buffs: &Buffs,
+    ride: Option<Ride>,
+    now: Instant,
+) -> Result<Vec<Packet>, NetworkError> {
     let left = |expires: Instant| expires.saturating_duration_since(now);
     let millis = |left: Duration| i32::try_from(left.as_millis()).unwrap_or(i32::MAX);
     let seconds = |left: Duration| left.as_millis().div_ceil(1000);
@@ -414,7 +420,8 @@ pub fn build_buffs_again(buffs: &Buffs, now: Instant) -> Result<Vec<Packet>, Net
                 | BuffStat::Riding
                 | BuffStat::GuidedBullet
         );
-        if own_block || left(buff.expires).is_zero() || !buffs.heard(buff.stat) {
+        let ridden = ride.is_some_and(|ride| ride.skill_id == buff.skill_id);
+        if own_block || ridden || left(buff.expires).is_zero() || !buffs.heard(buff.stat) {
             continue;
         }
         let stat = (buff.stat, buff.value);
@@ -426,6 +433,21 @@ pub fn build_buffs_again(buffs: &Buffs, now: Instant) -> Result<Vec<Packet>, Net
     let mut packets = Vec::new();
     for (skill_id, expires, stats) in given {
         packets.push(build_give_buff(skill_id, millis(left(expires)), &stats)?);
+    }
+    if let Some(ride) = ride {
+        let defense: Vec<_> = (buffs.active().iter())
+            .filter(|buff| buff.skill_id == ride.skill_id && buff.stat != BuffStat::Riding)
+            .filter(|buff| !left(buff.expires).is_zero())
+            .collect();
+        let ms = defense.first().map_or(0, |buff| millis(left(buff.expires)));
+        let stats: Vec<_> = defense.iter().map(|buff| (buff.stat, buff.value)).collect();
+        packets.push(build_give_ride(ride, ms, &stats)?);
+        if let (game::mount::BATTLESHIP, Some(hp)) = (ride.skill_id, buffs.battleship_hp) {
+            packets.push(build_cooldown(
+                game::mount::BATTLESHIP_HP,
+                hp as u16 as i16,
+            )?);
+        }
     }
     if let Some(energy) = buffs.energy() {
         packets.push(build_give_energy(energy)?);
@@ -1006,11 +1028,52 @@ mod tests {
             100 * second,
         ));
         buffs.start_cooldown(1121011, now, Duration::from_millis(1500));
-        let packets = build_buffs_again(&buffs, now).unwrap();
+        let packets = build_buffs_again(&buffs, None, now).unwrap();
         let stats = [(BuffStat::MaxHp, 60), (BuffStat::MaxMp, 60)];
         let given = build_give_buff(1301007, 200_000, &stats).unwrap();
         let cooldown = build_cooldown(1121011, 2).unwrap();
         let bytes: Vec<_> = packets.iter().map(|p| p.bytes.clone()).collect();
         assert_eq!(bytes, [given.bytes, cooldown.bytes]);
+    }
+
+    #[test]
+    fn a_ship_brought_along_is_boarded_again_with_its_defense_and_hp() {
+        use game::mount::{BATTLESHIP, BATTLESHIP_HP, BATTLESHIP_VEHICLE, RIDE_DURATION};
+        let now = Instant::now();
+        let second = Duration::from_secs(1);
+        let cast = now - 20 * second;
+        let mut buffs = Buffs::default();
+        buffs.give(game::Buff::new(
+            BATTLESHIP,
+            BuffStat::Riding,
+            0,
+            cast,
+            RIDE_DURATION,
+        ));
+        buffs.give(game::Buff::new(
+            BATTLESHIP,
+            BuffStat::Pdd,
+            300,
+            cast,
+            120 * second,
+        ));
+        buffs.give(game::Buff::new(
+            BATTLESHIP,
+            BuffStat::Mdd,
+            300,
+            cast,
+            120 * second,
+        ));
+        buffs.battleship_hp = Some(3000);
+        let ride = Ride {
+            item_id: BATTLESHIP_VEHICLE,
+            skill_id: BATTLESHIP,
+        };
+        let packets = build_buffs_again(&buffs, Some(ride), now).unwrap();
+        let stats = [(BuffStat::Pdd, 300), (BuffStat::Mdd, 300)];
+        let boarded = build_give_ride(ride, 100_000, &stats).unwrap();
+        let hp = build_cooldown(BATTLESHIP_HP, 3000).unwrap();
+        let bytes: Vec<_> = packets.iter().map(|p| p.bytes.clone()).collect();
+        assert_eq!(bytes, [boarded.bytes, hp.bytes]);
     }
 }
