@@ -1046,6 +1046,9 @@ pub enum FieldRequest {
     /// A script brings out NPC `npc_id` on the ground below `at`, unless
     /// it is here already.
     BringOutNpc { npc_id: i32, at: (i16, i16) },
+    /// A script has NPC `npc_id` here go and a `mob_id` come out where it
+    /// stood, unless one is out already (`scripts::Effect::Unmask`).
+    Unmask { npc_id: i32, mob_id: i32 },
     /// A script brings out a `mob_id` on the ground below each of `at`.
     BringOutMobs { mob_id: i32, at: Vec<(i16, i16)> },
     /// A script puts the reactors named `name` here in `state`

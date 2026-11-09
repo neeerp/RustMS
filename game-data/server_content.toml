@@ -698,6 +698,8 @@ unsourced = [
     "medal.explorer.earned_info",
     "portal.disguise.occupied",
     "portal.disguise.already_found",
+    "disguise.not_here",
+    "disguise.found_out",
     "portal.mysterious_force",
     "portal.earth.no_card",
     "portal.ariant_palace.intruder",

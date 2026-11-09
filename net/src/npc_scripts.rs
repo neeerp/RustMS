@@ -2569,6 +2569,9 @@ impl NpcScript {
         if npc_id == OPENING_NEINHEART {
             return Some(opening_neinheart());
         }
+        if (scripts::DISGUISED_KNIGHTS..scripts::DISGUISED_KNIGHTS + 5).contains(&npc_id) {
+            return Some(disguised_knight(npc_id, player));
+        }
         if let Some(&(_, mob_id, ask, notice)) = BOSS_SWITCHES.iter().find(|s| s.0 == npc_id) {
             return Some(boss_switch(npc_id, mob_id, ask, notice));
         }
@@ -6564,6 +6567,23 @@ fn violetta_found() -> NpcScript {
         Effect::CompleteQuest(events::WHERES_VIOLETTA),
         Effect::GainExp(4400),
     ];
+    script
+}
+
+/// The Chief Knight a searcher finds in one of the Master of Disguise's
+/// forests (1104100 to 1104104, Cosmic `1104100.js` on): to a Knight of
+/// another line, they have searched there already; to their own line's
+/// Knight, he is found out, and once that is read he fights.
+fn disguised_knight(npc_id: i32, player: &Player) -> NpcScript {
+    let line = 11 + (npc_id - scripts::DISGUISED_KNIGHTS);
+    if i32::from(player.stats.job) / 100 != line {
+        return NpcScript::new(npc_id, vec![Page::Say(text(keys::DISGUISE_NOT_HERE))]);
+    }
+    let mut script = NpcScript::new(npc_id, vec![Page::Say(text(keys::DISGUISE_FOUND_OUT))]);
+    script.on_end = vec![Effect::Unmask {
+        npc_id,
+        mob_id: scripts::MASTER_OF_DISGUISE,
+    }];
     script
 }
 
@@ -20000,6 +20020,34 @@ mod tests {
         let end = script.respond(ScriptInput::Next).unwrap();
         assert_eq!(end.prompt, None);
         (npc, end.effects)
+    }
+
+    #[test]
+    fn a_forests_chief_knight_is_the_master_of_disguise_only_to_his_own_line() {
+        let knight = |job: i16| {
+            let mut player = player(50);
+            player.stats.job = job;
+            player
+        };
+        // Hawkeye (1104104) in the Drill Hall's entrance unmasks for a
+        // Thunder Breaker, through the dispatcher as the client asks.
+        let hawkeye = scripts::DISGUISED_KNIGHTS + 4;
+        let found = NpcScript::for_npc(hawkeye, &knight(1510)).unwrap();
+        assert_eq!(
+            read_through(found),
+            (
+                hawkeye,
+                vec![Effect::Unmask {
+                    npc_id: hawkeye,
+                    mob_id: scripts::MASTER_OF_DISGUISE
+                }]
+            )
+        );
+        // Mihile (1104100) does for a Dawn Warrior but not a Blaze Wizard.
+        let mihile = scripts::DISGUISED_KNIGHTS;
+        assert!(!read_through(disguised_knight(mihile, &knight(1110))).1.is_empty());
+        assert_eq!(read_through(disguised_knight(mihile, &knight(1210))), (mihile, vec![]));
+        assert_eq!(read_through(disguised_knight(mihile, &knight(1111))).1.len(), 1);
     }
 
     #[test]

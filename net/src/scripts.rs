@@ -568,6 +568,14 @@ const DISGUISE_WAYS: [(i32, &str); 5] = [
 ];
 const DISGUISE_FORESTS: i32 = 108010600;
 const DISGUISE_PROOF: i32 = 4032101;
+/// The Chief Knight each forest's searcher finds there (Mihile, Oz, Irena,
+/// Eckhart and Hawkeye, 1104100 on), and where. The forests' data places
+/// nobody, so they come out for a searcher on the way in; the Knight's own
+/// Chief is the Master of Disguise (`npc_scripts`, Cosmic `1104100.js`).
+pub const DISGUISED_KNIGHTS: i32 = 1104100;
+const DISGUISED_KNIGHTS_AT: [(i16, i16); 5] =
+    [(2250, 60), (3750, 60), (-400, 60), (-1700, 60), (650, 60)];
+pub const MASTER_OF_DISGUISE: i32 = 9001009;
 /// Ariant's Treasure Room of Queen (`skyrom`), which one player at a time
 /// searches for the jewel quest 3935 is after.
 const QUEENS_TREASURE_ROOM: i32 = 926000010;
@@ -1164,6 +1172,14 @@ pub enum Effect {
         npc_id: i32,
         at: (i16, i16),
     },
+    /// NPC `npc_id` on the player's map goes, and `mob_id` comes out on
+    /// the ground where it stood unless one is out already, as the Master
+    /// of Disguise drops his disguise (Cosmic's `spawnMonsterOnGroundBelow`
+    /// at the NPC, then `destroyNPC`).
+    Unmask {
+        npc_id: i32,
+        mob_id: i32,
+    },
     /// Bring out `each` of `mob_id` on the ground below each point of `at`
     /// in the player's map, as the Magic Library's black shadow sets Blue
     /// Mushrooms on the player. They never respawn.
@@ -1363,6 +1379,14 @@ const STRANGE_INFORMATION_RECORD: i16 = 21762;
 /// beaten yet (Cosmic `enterInfo`). His fall sets 21733's record
 /// (`crate::quests::kill_records`).
 pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
+    if let Some(at) = disguise_forest(player.stats.map_id) {
+        let npc_id = DISGUISED_KNIGHTS + (player.stats.map_id - DISGUISE_FORESTS) / 10;
+        return if disguise_searching(player) {
+            vec![Effect::BringOutNpc { npc_id, at }]
+        } else {
+            Vec::new()
+        };
+    }
     match player.stats.map_id {
         PUPPETEERS_HIDEOUT => hunted_puppeteer(player)
             .map(|mob_id| Effect::BringOutMob {
@@ -3420,11 +3444,24 @@ fn elevator(map_id: i32, t: i64) -> ScriptOutcome {
     }
 }
 
+/// Whether `player` is on one of the Master of Disguise quests.
+fn disguise_searching(player: &Player) -> bool {
+    (20301..=20305).any(|id| player.quests.state(id) == QuestState::Started)
+}
+
+/// Where the Chief Knight stands in `map`, if it is one of the Master of
+/// Disguise's forests.
+fn disguise_forest(map: i32) -> Option<(i16, i16)> {
+    let n = map.checked_sub(DISGUISE_FORESTS)?;
+    (n % 10 == 0)
+        .then(|| DISGUISED_KNIGHTS_AT.get(usize::try_from(n / 10).ok()?).copied())
+        .flatten()
+}
+
 /// Ereve's Training Forest way on for the Knight `job` (0 to 4); see
 /// `DISGUISE_WAYS`.
 fn disguise(player: &Player, job: usize) -> ScriptOutcome {
-    let searching = (20301..=20305).any(|id| player.quests.state(id) == QuestState::Started);
-    if !searching {
+    if !disguise_searching(player) {
         let (map, portal) = DISGUISE_WAYS[job];
         return through(Effect::WarpToPortal(map, named(map, portal)));
     }
@@ -7548,6 +7585,36 @@ mod tests {
             [Effect::RequireEmptyMap(108010610), Effect::Pink(_)]
         ));
         assert_eq!(super::portal("enterDisguise6", &fresh), None);
+    }
+
+    #[test]
+    fn each_forest_shows_a_searcher_its_chief_knight_standing_on_its_ground() {
+        let data = crate::get_game_data().unwrap();
+        let quest = [(20301, QuestState::Started)];
+        for (n, at) in DISGUISED_KNIGHTS_AT.into_iter().enumerate() {
+            let map = DISGUISE_FORESTS + 10 * n as i32;
+            let mut searcher = player_with(&quest);
+            searcher.stats.map_id = map;
+            assert_eq!(
+                unscripted_map_enter(&searcher),
+                [Effect::BringOutNpc {
+                    npc_id: DISGUISED_KNIGHTS + n as i32,
+                    at
+                }]
+            );
+            // Nobody waits for one who isn't searching.
+            let mut passer = player_with(&[]);
+            passer.stats.map_id = map;
+            assert!(unscripted_map_enter(&passer).is_empty());
+            // The forest's floor is under the spot.
+            let field = data.field(map).unwrap();
+            assert_eq!(field.footholds.ground_below(at.0, at.1), Some(88), "{map}");
+        }
+        // The forest after them is no forest of his.
+        let mut beyond = player_with(&quest);
+        beyond.stats.map_id = DISGUISE_FORESTS + 50;
+        assert!(disguise_forest(beyond.stats.map_id).is_none());
+        assert!(disguise_forest(DISGUISE_FORESTS + 5).is_none());
     }
 
     #[test]

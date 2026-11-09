@@ -805,6 +805,10 @@ pub mod keys {
     /// else is searching, or he has already been found.
     pub const DISGUISE_FOREST_OCCUPIED: &str = "portal.disguise.occupied";
     pub const DISGUISE_ALREADY_FOUND: &str = "portal.disguise.already_found";
+    /// A forest's Chief Knight (1104100 to 1104104): to a Knight of another
+    /// line, nobody is hiding here; to the Knight's own, found out.
+    pub const DISGUISE_NOT_HERE: &str = "disguise.not_here";
+    pub const DISGUISE_FOUND_OUT: &str = "disguise.found_out";
     /// Ways a quest has yet to open (`tristanEnter`, `s4resur_enter`,
     /// `s4rush`).
     pub const MYSTERIOUS_FORCE: &str = "portal.mysterious_force";
@@ -4650,6 +4654,8 @@ mod tests {
             keys::MEDAL_EARNED_INFO,
             keys::DISGUISE_FOREST_OCCUPIED,
             keys::DISGUISE_ALREADY_FOUND,
+            keys::DISGUISE_NOT_HERE,
+            keys::DISGUISE_FOUND_OUT,
             keys::MYSTERIOUS_FORCE,
             keys::MAGIC_SEED_SPENT,
             keys::MAGIC_SEED_NEEDED,

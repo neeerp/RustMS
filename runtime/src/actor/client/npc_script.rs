@@ -276,6 +276,10 @@ impl ClientActor {
                     npc_id: *npc_id,
                     at: *at,
                 }),
+                Effect::Unmask { npc_id, mob_id } => to_field.push(FieldRequest::Unmask {
+                    npc_id: *npc_id,
+                    mob_id: *mob_id,
+                }),
                 Effect::BringOutMobs { mob_id, at, each } => {
                     to_field.push(FieldRequest::BringOutMobs {
                         mob_id: *mob_id,
