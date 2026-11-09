@@ -79,6 +79,9 @@ impl WorldHandler for UseUpgradeScrollHandler {
                 ctx.player,
             )?));
         }
+        if used.refit {
+            result = result.with_reply(stat::build_hp_mp(&ctx.player.stats)?);
+        }
         Ok(result)
     }
 }
@@ -99,6 +102,8 @@ struct ScrollUse {
     outcome: ScrollOutcome,
     /// A White Scroll was used up.
     white: bool,
+    /// HP or MP came down to a lower max.
+    refit: bool,
 }
 
 /// Use the scroll in USE `scroll_slot` on the equip at `(kind, equip_slot)`
@@ -164,10 +169,15 @@ fn use_scroll(
         });
     }
     *player.inventory_mut() = next;
+    // A worn equip that raised max HP or MP was destroyed or lost some
+    // (Cosmic's equipChanged → enforceMaxHpMp).
+    let refit =
+        kind == InventoryType::Equipped && outcome != ScrollOutcome::Fail && player.fit_hp_mp();
     Some(ScrollUse {
         changes,
         outcome,
         white: white_slot.is_some(),
+        refit,
     })
 }
 
@@ -329,6 +339,36 @@ mod tests {
             ]
         );
         assert!(sword(&player).is_none());
+        assert!(!used.refit);
+    }
+
+    #[test]
+    fn destroying_a_worn_equip_brings_hp_and_mp_down_to_the_new_max() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = armed_player(&[(2043004, 1)]);
+        let mut sword = player
+            .inventory
+            .get(InventoryType::Equipped, equip_slot::WEAPON)
+            .unwrap()
+            .clone();
+        let gear = sword.equip.as_mut().unwrap();
+        (gear.hp, gear.mp) = (120, 120);
+        player
+            .inventory
+            .insert(InventoryType::Equipped, equip_slot::WEAPON, sword);
+        let (hp, mp) = (player.effective_max_hp(), player.effective_max_mp());
+        (player.stats.hp, player.stats.mp) = (hp as i16, mp as i16);
+        let mut rolls = [99, 0].into_iter();
+        let used = use_scroll(&mut player, 1, WORN, false, &mut |_, _| {
+            rolls.next().unwrap()
+        })
+        .unwrap();
+        assert_eq!(used.outcome, ScrollOutcome::Cursed);
+        assert!(used.refit);
+        assert_eq!(i32::from(player.stats.hp), hp - 120);
+        assert_eq!(i32::from(player.stats.mp), mp - 120);
     }
 
     #[test]
