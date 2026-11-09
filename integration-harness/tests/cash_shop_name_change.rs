@@ -3,7 +3,9 @@
 //! taking effect at logout, with a month before the next (report c060).
 
 use integration_harness::connection::{MapleTestConnection, PacketEnvelope};
-use integration_harness::database::{rename_character, set_job, set_nx_prepaid};
+use integration_harness::database::{
+    befriend, found_guild, join_guild, queue_name_change, rename_character, set_job, set_nx_prepaid,
+};
 use integration_harness::packets::{
     build_cash_shop_take_out, build_check_char_name, build_enter_cash_shop, build_leave_cash_shop,
     build_player_logged_in, decode_channel_change, opcode_name,
@@ -295,4 +297,62 @@ async fn a_name_taken_meanwhile_refunds_the_request() {
     let connection = &mut session.connection;
     assert_eq!(enter_cash_shop(connection).await, (0, PRICE), "refunded");
     assert_eq!(rules(connection, id).await, 0, "no month to wait");
+}
+
+/// Buddies and guild members online keep the names of the last list they
+/// were sent, and a buddy's login sends only their channel: so the rename
+/// sends them the list and the guild again.
+#[tokio::test]
+async fn buddies_and_guild_online_see_the_new_name() {
+    let config = load_harness_config_or_fail().await;
+    let other = load_harness_config_or_fail().await;
+    let session = login_to_world_session(&config)
+        .await
+        .expect("login-to-world session flow failed");
+    let (id, old_name) = (session.character_id, session.character_name.clone());
+    drop(session);
+    let other_id = login_to_world_session(&other)
+        .await
+        .expect("the other character")
+        .character_id;
+    sleep(Duration::from_millis(500)).await;
+    befriend(id, other_id).await.expect("buddies");
+    let guild = format!("rn{id}");
+    found_guild(id, &guild).await.expect("a guild");
+    join_guild(other_id, &guild).await.expect("join it");
+    let new_name = format!("renamed{id}");
+    queue_name_change(id, &old_name, &new_name)
+        .await
+        .expect("a Name Change");
+
+    let mut watcher = relogin(&other).await;
+    let renamed = relogin(&config).await;
+    sleep(Duration::from_millis(500)).await;
+    drop(renamed);
+
+    let named = |bytes: &[u8]| {
+        bytes
+            .windows(new_name.len())
+            .any(|w| w == new_name.as_bytes())
+    };
+    let (mut buddies, mut guild) = (false, false);
+    while !(buddies && guild) {
+        let envelope = timeout(
+            Duration::from_secs(5),
+            watcher.connection.read_packet("the new name"),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("timed out: buddies {buddies}, guild {guild}"))
+        .expect("read");
+        let bytes = &envelope.packet.bytes;
+        if !named(bytes) {
+            continue;
+        }
+        if envelope.opcode() == SendOpcode::BuddyList as i16 {
+            assert_eq!(bytes[2], 0x07, "the whole list");
+            buddies = true;
+        } else if envelope.opcode() == SendOpcode::GuildOperation as i16 {
+            guild = true;
+        }
+    }
 }

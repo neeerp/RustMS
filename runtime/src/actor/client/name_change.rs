@@ -138,7 +138,17 @@ impl ClientActor {
         };
         let character_id = game.player.stats.id;
         match spawn_db(move || db::name_change::apply(character_id, SystemTime::now())).await {
-            Ok(Some(applied)) => log_applied(character_id, &applied),
+            Ok(Some(applied)) => {
+                log_applied(character_id, &applied);
+                if matches!(applied, Applied::Renamed { .. }) {
+                    if let Err(error) = self.show_new_name_to_buddies().await {
+                        warn!(self.client_id, %error, "Failed to show buddies a new name");
+                    }
+                    if let Err(error) = self.show_new_name_to_guild().await {
+                        warn!(self.client_id, %error, "Failed to show the guild a new name");
+                    }
+                }
+            }
             Ok(None) => {}
             Err(error) => warn!(self.client_id, %error, "Failed to apply a Name Change"),
         }

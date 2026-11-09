@@ -314,8 +314,13 @@ Prepaid, with no month to wait; either way the receipt goes from the Cash
 Inventory and the bags. The world applies every waiting request when it
 starts; one that fails waits for the next logout. Deleting the character
 refunds its request. Gifts not yet thanked for (`cash_items.gift_from`)
-follow the new name; notes, owner tags and the like keep the old one. Name
-Change Coupons (5401000) stay sold out.
+follow the new name; notes, owner tags and the like keep the old one. A
+rename at logout sends everyone online whose buddy list holds the character
+the whole list again (`0x3F` 7), and the other guild members online the
+guild: their clients keep the names they were last sent, and a buddy's
+login sends only the channel (`0x3F` 0x14), so the next login card would
+show the old name. Parties refresh the name on login (`Parties::update`).
+Name Change Coupons (5401000) stay sold out.
 
 ## Packets
 
