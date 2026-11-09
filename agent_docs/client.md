@@ -844,7 +844,19 @@ force-and-friction model (`move_normal`).
   along a foothold (0x9b3fd1) takes the next one only if it runs left to
   right. One that rises from the joint stops the walker there like a wall.
   From one that drops away, the walker falls (`blocks` and `update_fh` in
-  `FootholdTree.cpp`; test `under_a_ledge`).
+  `FootholdTree.cpp`; test `under_a_ledge`). The same goes for a wall that
+  drops away, such as the side of a step in Perion (102000000): the walker
+  falls to the floor below instead of being put at its foot (test
+  `off_a_step`).
+- **Loose ends.** A walker off a loose end with no floor below, as at the top
+  of the Southern Forest dungeon (100040001), falls into the gap. It keeps
+  the foothold it held, but neither goes back to that foothold's start nor
+  lands on its line drawn on past its end (test `off_a_loose_end`).
+- **Slopes.** The null foothold's slope is 0 / 0. An object over no floor
+  takes a slope of 0, and a landing takes the new floor's slope at once, so a
+  jump on the next tick goes along it. A jump just after a landing under a
+  joint, as in Ellinia's North Forest (101020000), used to make the position
+  NaN (test `jump_after_a_joint_landing`).
 - **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
   footholds and at most 300 px above the highest. A map with `info/VRLimit`
   pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`,
