@@ -847,7 +847,11 @@ force-and-friction model (`move_normal`).
   `FootholdTree.cpp`; test `under_a_ledge`). The same goes for a wall that
   drops away, such as the side of a step in Perion (102000000): the walker
   falls to the floor below instead of being put at its foot (test
-  `off_a_step`).
+  `off_a_step`). Nor does a fall land on one. v83's air step (0x9b34c8)
+  meets a line drawn right to left only from below, as a ceiling, so a
+  player who jumped up into a block falls back out through its underside
+  instead of standing on it, even when that line is the one held below
+  (test `through_a_backward_line`).
 - **Loose ends.** A walker off a loose end with no floor below, as at the top
   of the Southern Forest dungeon (100040001), falls into the gap. It keeps
   the foothold it held, but neither goes back to that foothold's start nor
