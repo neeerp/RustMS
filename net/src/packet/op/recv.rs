@@ -98,6 +98,9 @@ pub enum RecvOpcode {
     FamilySummonResponse = 0x99,
     /// The guild bulletin board (FUN_008166f6 and its siblings).
     GuildBbs = 0x9B,
+    /// The TRADE button: into the Item-Trading Shop (MTS), no fields
+    /// (FUN_00a12522).
+    EnterMts = 0x9C,
     FaceExpression = 0x33,
     UseItemEffect = 0x34,
     /// A dead player's Wheel of Destiny, with where they lie (FUN_0095af8e).

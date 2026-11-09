@@ -2402,4 +2402,34 @@ namespace ms
 		if (player.request(EnterCashShopPacket(), ExclRequest::WAIT, true))
 			cash_catalog::pending_present() = std::move(present);
 	}
+
+	// v83 FUN_00a12522: the alert, the request gate, the Lie Detector, then
+	// fieldLimit 0x10, as for the Cash Shop but with no quiz check.
+	void Stage::enter_trade_shop()
+	{
+		if (player.get_look().get_alerted())
+		{
+			notice(CATCH_BREATH);
+			return;
+		}
+
+		if (!player.can_request(ExclRequest::WAIT, true))
+			return;
+
+		if (lie_detector::testing())
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(lie_detector::IN_TEST, UIChatBar::LineType::SKILL);
+
+			return;
+		}
+
+		if (!mapinfo.can_migrate())
+		{
+			notice(NOT_HERE);
+			return;
+		}
+
+		player.request(EnterMtsPacket(), ExclRequest::WAIT, true);
+	}
 }

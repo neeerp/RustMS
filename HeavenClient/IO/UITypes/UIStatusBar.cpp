@@ -571,6 +571,7 @@ namespace ms
 				UIClaimNotice::open("");
 				break;
 			case Buttons::BT_TRADE:
+				Stage::get().enter_trade_shop();
 				break;
 			case Buttons::BT_EQUIP:
 			case Buttons::BT_SHORTCUT_EQUIP:

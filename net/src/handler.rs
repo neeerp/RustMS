@@ -1166,6 +1166,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
             (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
             (Op::EnterCashShop, InGame(&world::EnterCashShopHandler)),
+            (Op::EnterMts, InGame(&world::EnterMtsHandler)),
             (Op::CheckCash, InGame(&world::CheckCashHandler)),
             (Op::CouponCode, InGame(&world::CouponCodeHandler)),
             (Op::RaiseRecord, InGame(&world::RaiseRecordHandler)),

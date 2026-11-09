@@ -714,7 +714,7 @@ doc named on its row.
 | Pets | Summoning, following, others' pets, map changes, chat commands, `/petcome`, idle actions, level-up effect, food, cash food, hunger, name tags, equipment, looting, the exception list and auto potions; see `pets.md` |
 | Mounts, summons | Riding, with the mount's effects (`Player::change_ride`), and summons (`MapSummons`); see "Mounts" and "Summons" in `combat.md` |
 | Party quests, the Guild Quest, bosses, events | See the docs for each in the index of `AGENTS.md` |
-| MTS | Absent, client and server |
+| MTS | Absent, client and server. The TRADE button asks for it (`ENTER_MTS`, 0x9C, behind the Cash Shop's refusals bar the quiz) and the server answers that the Item-Trading Shop is unavailable (`BLOCKED_SERVER` 3), which ends the request |
 
 93 outbound opcodes are defined (`Net/OutPacket.h`) and 120 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
@@ -1163,7 +1163,7 @@ What is left that is larger:
 
 | System | Client status | Effort |
 | --- | --- | --- |
-| MTS | Nothing, client or server | L |
+| MTS | Only the refusal: TRADE hears it is unavailable | L |
 | Cash shop | CHARGE does nothing | S |
 
 ## Protocol deviations fixed

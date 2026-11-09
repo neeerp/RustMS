@@ -27,6 +27,19 @@ impl WorldHandler for EnterCashShopHandler {
     }
 }
 
+/// 0x9C, `ENTER_MTS`: the TRADE button. There is no Item-Trading Shop, so
+/// the client is told it is unavailable (BLOCKED_SERVER 3, v83's 0x1288),
+/// which also lets it ask for a move again.
+pub struct EnterMtsHandler;
+
+impl WorldHandler for EnterMtsHandler {
+    fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        Ok(HandlerResult::reply(
+            build::world::map::build_blocked_server(BlockedServer::TradeShop)?,
+        ))
+    }
+}
+
 /// 0xE5, `CASHSHOP_OPERATION`: an action byte, then its fields. Buying (0x03,
 /// or 0x1E for a package) sends a byte, the balance to pay with, and the
 /// commodity's serial number;
@@ -415,6 +428,23 @@ mod tests {
         assert!(matches!(
             result.actions.as_slice(),
             [WorldAction::Reply(p)] if p.bytes == [0x84, 0, 2]
+        ));
+    }
+
+    #[test]
+    fn the_trade_button_hears_the_trade_shop_is_unavailable() {
+        let mut player = crate::codec::stats::sample_player();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::EnterMts as i16).unwrap();
+        let result = EnterMtsHandler.handle(&mut packet, &mut ctx).unwrap();
+        assert!(matches!(
+            result.actions.as_slice(),
+            [WorldAction::Reply(p)] if p.bytes == [0x84, 0, 3]
         ));
     }
 
