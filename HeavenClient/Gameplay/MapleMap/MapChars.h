@@ -74,6 +74,9 @@ namespace ms
 
 		Optional<OtherChar> get_char(int32_t cid);
 
+		// The id of the character on the map with a name, ignoring case, or 0.
+		int32_t find(const std::string &name) const;
+
 		// Draw HP bars over the heads of the player's party members.
 		void draw_party_hp(const Party &party, int32_t self, int32_t mapid, double viewx, double viewy, float alpha) const;
 

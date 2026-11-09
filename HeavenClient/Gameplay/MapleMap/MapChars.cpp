@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapChars.h"
 
+#include <algorithm>
+#include <cctype>
+
 namespace ms
 {
 	void MapChars::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
@@ -93,6 +96,21 @@ namespace ms
 			otherchar->update_look(look);
 			otherchar->set_ring_looks(ring_looks);
 		}
+	}
+
+	int32_t MapChars::find(const std::string &name) const
+	{
+		auto same = [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); };
+
+		for (auto &[oid, object] : chars)
+		{
+			std::string other = static_cast<const OtherChar &>(*object).get_name();
+
+			if (other.size() == name.size() && std::equal(other.begin(), other.end(), name.begin(), same))
+				return oid;
+		}
+
+		return 0;
 	}
 
 	std::vector<RingWearer> MapChars::ring_wearers(RingKind kind) const
