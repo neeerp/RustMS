@@ -506,6 +506,9 @@ pub struct FieldTemplate {
     /// the server checks where players stand in them, as on Kerning City's
     /// party quest's ropes, platforms and barrels.
     pub areas: Vec<Area>,
+    /// The `seat` points, seat `i` being the node named `i` (as v83 reads
+    /// them, FUN_0052b754): where a player may sit on the map itself.
+    pub seats: Vec<(i32, i32)>,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
 }
@@ -977,6 +980,16 @@ fn build_field_template(
         }
     }
 
+    let mut seats = Vec::new();
+    if let Some(seat_root) = nx.child_by_name(body_idx, "seat")? {
+        for i in 0..nx.child_indices(seat_root)?.len() {
+            let Some(point) = nx.vector_child(seat_root, &i.to_string())? else {
+                break;
+            };
+            seats.push(point);
+        }
+    }
+
     let mut portal_ids_by_name: HashMap<String, Vec<u32>> = HashMap::new();
     for (id, portal) in &portals_by_id {
         portal_ids_by_name
@@ -1018,6 +1031,7 @@ fn build_field_template(
         traps,
         footholds,
         areas,
+        seats,
         portals_by_id,
         portal_ids_by_name,
     })
@@ -1854,6 +1868,7 @@ mod tests {
             traps: Traps::default(),
             footholds: footholds::Footholds::default(),
             areas: Vec::new(),
+            seats: Vec::new(),
             portals_by_id: BTreeMap::from([
                 (
                     0,
@@ -1941,6 +1956,7 @@ mod tests {
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             areas: Vec::new(),
+            seats: Vec::new(),
             portals_by_id: BTreeMap::from([
                 (0, portal(0, PORTAL_TYPE_START_POINT, -500, None)),
                 (1, portal(1, 0, 300, None)),
@@ -1990,6 +2006,20 @@ mod tests {
         assert_eq!(center.level_force_move, Some(20));
         assert_eq!(center.level_limit, None);
         assert_eq!(field(103040100).level_force_move, Some(51));
+    }
+
+    #[test]
+    fn seats_go_by_their_names() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let henesys = game_data.field(100000000).expect("Henesys");
+        assert_eq!(henesys.seats.len(), 29);
+        // Seat 10 follows 9, not 1, though the nodes sort as strings.
+        assert_eq!(henesys.seats[2], (5699, 453));
+        assert_eq!(henesys.seats[10], (5466, 453));
+        assert_eq!(henesys.seats[28], (2569, 333));
     }
 
     #[test]

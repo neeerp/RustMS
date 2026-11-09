@@ -372,8 +372,11 @@ namespace ms
 		// Return a pointer to the ladder the player is on.
 		Optional<const Ladder> get_ladder() const;
 
-		// Change players position to the seat's position and stance to Char::State::SIT
-		void set_seat(Optional<const Seat> seat);
+		// Sit on the map's seat id at pos, once the server allows it.
+		void sit_on_seat(int16_t id, Point<int16_t> pos);
+
+		// Whether the player sits on one of the map's seats.
+		bool on_map_seat() const;
 
 		// Scale natural recovery by the map's info/recovery.
 		void set_recovery_rate(double rate);
@@ -381,7 +384,8 @@ namespace ms
 		// Sit down on the portable chair itemid where the player stands.
 		void sit_on_chair(int32_t itemid);
 
-		// Ask the server to let the player up from their portable chair.
+		// Ask the server to let the player up from their portable chair or
+		// map seat.
 		void leave_chair();
 
 		// Get up from the portable chair once the server allows it.
@@ -568,6 +572,8 @@ namespace ms
 		int16_t chair_recovery_mp = 0;
 		// Whether the player asked to get off their chair and waits for the server.
 		bool leaving_chair = false;
+		// The map seat the player sits on, or -1 (v83's +0x2b74).
+		int16_t map_seat = -1;
 
 		void update_recovery();
 

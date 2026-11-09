@@ -355,8 +355,28 @@ So does an inventory operation that removes the last slot holding the chair
 the player sits on (dropping, selling, or trading it away). Up does not
 cancel. `CancelChairHandler` replies with CANCEL_CHAIR (0xCD: byte
 0), which stands the client up, and sends `Chair(0)`, so the others get
-SHOW_CHAIR with item 0. Map seats (a seat id other than -1) are not
-implemented and get no reply.
+SHOW_CHAIR with item 0.
+
+## Map seats
+
+Some maps have benches and the like under `seat` (97 maps; Henesys has
+29). Seat `i` is the node named `i`, as v83 reads them (FUN_0052b754), and
+`FieldTemplate::seats` keeps them in that order. The client never sits on
+one by itself:
+
+- **Asking.** Sit, while standing on the ground, not alert and with a seat
+  within 10 px across and 30 px up or down, sends CANCEL_CHAIR (0x2A) with
+  the seat's number behind the request gate (200 ms; FUN_0094e45f).
+- **The answer.** `CancelChairHandler` answers with CANCEL_CHAIR (0xCD: byte
+  1, the seat) when the map has that seat. Otherwise it answers byte 0, so
+  the client is never left waiting on it.
+- **Sitting.** On byte 1 the client sits on the seat if it still stands by
+  it; otherwise it asks to stand (seat -1) (FUN_00959797).
+- **Standing up.** Left, Right, Jump, Sit or a hit sends seat -1, as from a
+  portable chair, and byte 0 stands the client up.
+
+Others see the sitting through the player's movement. The server keeps no
+record of who sits where.
 
 The client draws `Item/Install/0301.img/<id>/effect` while the character
 sits. The effect is anchored at the face when `pos` is 1, otherwise at the

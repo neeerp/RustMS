@@ -1,7 +1,7 @@
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
-use crate::packet::build::world::field::build_cancel_chair;
+use crate::packet::build::world::field::{build_cancel_chair, build_sit_on_seat};
 use crate::packet::build::world::stat::build_stat_update;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -31,8 +31,10 @@ impl WorldHandler for UseChairHandler {
     }
 }
 
-/// CANCEL_CHAIR: the player wants to stand up. Seat -1 is a portable chair;
-/// map seats are handled by the client alone.
+/// CANCEL_CHAIR: seat -1 stands the player up, from a portable chair or a
+/// map seat; any other is a map seat they would sit on. v83 waits on the
+/// answer before any other request (FUN_0094e45f, FUN_00a0fbf4), so a seat
+/// the map lacks is answered by standing up.
 pub struct CancelChairHandler;
 
 impl WorldHandler for CancelChairHandler {
@@ -42,7 +44,18 @@ impl WorldHandler for CancelChairHandler {
         let seat = reader.read_short()?;
 
         if seat != -1 {
-            return Ok(HandlerResult::empty());
+            let known = usize::try_from(seat).is_ok_and(|seat| {
+                crate::get_game_data()
+                    .ok()
+                    .and_then(|data| data.field(ctx.player.stats.map_id))
+                    .is_some_and(|field| seat < field.seats.len())
+            });
+            let answer = if known {
+                build_sit_on_seat(seat)?
+            } else {
+                build_cancel_chair()?
+            };
+            return Ok(HandlerResult::reply(answer));
         }
         ctx.player.chair = 0;
         Ok(HandlerResult::empty()
@@ -119,11 +132,18 @@ mod tests {
                 WorldAction::Field(FieldRequest::Chair(0))
             ]
         ));
-        assert!(handle(
+    }
+
+    #[test]
+    fn a_seat_the_map_lacks_is_answered_by_standing_up() {
+        // No map has 999 seats; the answer still frees the client.
+        let actions = handle(
             &CancelChairHandler,
             RecvOpcode::CancelChair,
-            &3i16.to_le_bytes()
-        )
-        .is_empty());
+            &999i16.to_le_bytes(),
+        );
+        assert!(matches!(actions.as_slice(),
+            [WorldAction::Reply(p)] if p.bytes == [0xCD, 0, 0]));
+        assert_eq!(build_sit_on_seat(10).unwrap().bytes, [0xCD, 0, 1, 10, 0]);
     }
 }

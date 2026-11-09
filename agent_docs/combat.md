@@ -1164,7 +1164,8 @@ and says nothing, from a portable chair or a tamed monster (190xxxx;
 `morph::cash_morph_refused`); the server refuses those too, keeping the
 item (`world/use_item.rs` `cash_morph`). Otherwise it takes the item,
 applies its spec (which also heals 50 HP) and answers as for a USE item.
-Map seats aren't known to the server.
+Map seats are known to the server only to answer a request to sit (see
+"Map seats" in `fields.md`).
 
 Oak Barrel (5101007) and Transformation (5111005) and Super
 Transformation (5121003) give the skill level's `morph` (1002, 1000,

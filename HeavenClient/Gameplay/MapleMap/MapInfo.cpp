@@ -71,8 +71,19 @@ namespace ms
 		personal_shop = info["personalShop"].get_bool();
 		recovery = info["recovery"].get_real(1.0);
 
-		for (auto seat : src["seat"])
+		// v83 reads seat i from the node named i (FUN_0052b754), so 2 comes
+		// before 10; the server numbers them the same way.
+		nl::node seat_root = src["seat"];
+
+		for (size_t i = 0; i < seat_root.size(); i++)
+		{
+			nl::node seat = seat_root[std::to_string(i)];
+
+			if (!seat)
+				break;
+
 			seats.push_back(seat);
+		}
 
 		// v83 searches ladders and ropes by number, so 2 comes before 10.
 		std::vector<nl::node> ropes;
@@ -186,13 +197,21 @@ namespace ms
 		return mapborders;
 	}
 
-	Optional<const Seat> MapInfo::findseat(Point<int16_t> position) const
+	int16_t MapInfo::findseat(Point<int16_t> position) const
 	{
-		for (auto &seat : seats)
-			if (seat.inrange(position))
-				return seat;
+		for (size_t i = 0; i < seats.size(); i++)
+			if (seats[i].inrange(position))
+				return static_cast<int16_t>(i);
 
-		return nullptr;
+		return -1;
+	}
+
+	Optional<const Seat> MapInfo::get_seat(int16_t id) const
+	{
+		if (id < 0 || static_cast<size_t>(id) >= seats.size())
+			return nullptr;
+
+		return seats[id];
 	}
 
 	Optional<const Ladder> MapInfo::findladder(Point<int16_t> a, Point<int16_t> b) const
@@ -215,7 +234,7 @@ namespace ms
 	bool Seat::inrange(Point<int16_t> position) const
 	{
 		auto hor = Range<int16_t>::symmetric(position.x(), 10);
-		auto ver = Range<int16_t>::symmetric(position.y(), 10);
+		auto ver = Range<int16_t>::symmetric(position.y(), 30);
 
 		return hor.contains(pos.x()) && ver.contains(pos.y());
 	}

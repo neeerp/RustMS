@@ -37,6 +37,8 @@ namespace ms
 	public:
 		Seat(nl::node source);
 
+		// Whether the seat lies within 10 px across and 30 px up or down of
+		// position (FUN_00536517, FUN_00959797).
 		bool inrange(Point<int16_t> position) const;
 
 		Point<int16_t> getpos() const;
@@ -144,8 +146,10 @@ namespace ms
 
 		Range<int16_t> get_borders() const;
 
-		// Find a seat the player's position
-		Optional<const Seat> findseat(Point<int16_t> position) const;
+		// The first seat in range of position, or -1 (FUN_00536517).
+		int16_t findseat(Point<int16_t> position) const;
+		// The seat with that number, as the server names it.
+		Optional<const Seat> get_seat(int16_t id) const;
 		// The first ladder or rope that the segment from a to b reaches: one
 		// within 10 px of it across and overlapping it down (FUN_00a45b03).
 		Optional<const Ladder> findladder(Point<int16_t> a, Point<int16_t> b) const;
