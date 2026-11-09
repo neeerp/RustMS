@@ -1899,8 +1899,18 @@ impl ClientActor {
                 y,
                 showdown,
             } => {
-                self.mob_killed(mob_id, exp, party_bonus).await?;
-                self.count_quest_kill(mob_id).await?;
+                // Cosmic's giveExpToCharacter: a player dead when it falls
+                // gets neither its EXP nor its quest count, though their
+                // party's split still counts them and the loot still drops.
+                // A last hit sent just before dying lands after the death.
+                if self
+                    .game
+                    .as_ref()
+                    .is_some_and(|game| game.player.stats.hp > 0)
+                {
+                    self.mob_killed(mob_id, exp, party_bonus).await?;
+                    self.count_quest_kill(mob_id).await?;
+                }
                 if looter {
                     self.earn_nx_for_kill();
                     self.drop_loot(mob_id, showdown, object_id, x, y).await?
