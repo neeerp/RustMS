@@ -352,12 +352,10 @@ impl ClientActor {
 
     /// Changing channel, or leaving the Cash Shop: the buffs and cooldowns
     /// go with the session, as a v83 server's buff storage keeps them
-    /// (Cosmic's PlayerBuffStorage). A ride and Homing Beacon's mark end
-    /// first, as they belong to the map.
+    /// (Cosmic's PlayerBuffStorage), a ride among them, as Cosmic keeps
+    /// mounts. Homing Beacon's mark ends first, as its mob belongs to this
+    /// channel's map.
     pub(super) async fn hand_over_buffs(&mut self, session_id: i32) -> Result<(), RuntimeError> {
-        if let Some(skill_id) = self.in_game()?.player.ride_skill() {
-            self.end_buff(skill_id).await?;
-        }
         self.drop_beacon().await?;
         let buffs = std::mem::take(&mut self.in_game_mut()?.player.buffs);
         self.services
@@ -377,8 +375,9 @@ impl ClientActor {
     /// Once in the field, tell the client the buffs and cooldowns the
     /// player brought along; its user starts with none.
     pub(super) async fn show_handed_buffs(&mut self) -> Result<(), RuntimeError> {
-        let buffs = &self.in_game()?.player.buffs;
-        let mut packets = buff::build_buffs_again(buffs, std::time::Instant::now())?;
+        let player = &self.in_game()?.player;
+        let now = std::time::Instant::now();
+        let mut packets = buff::build_buffs_again(&player.buffs, player.ride(), now)?;
         self.send_all(&mut packets).await
     }
 
