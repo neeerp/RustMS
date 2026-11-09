@@ -143,6 +143,9 @@ namespace ms
 		// The first wall an airborne object's next step runs into, if any.
 		std::optional<int16_t> get_wall_crossed(const PhysicsObject &phobj) const;
 
+		// The first ceiling an airborne object's next step rises into, if any.
+		uint16_t get_ceiling_crossed(const PhysicsObject &phobj) const;
+
 		bool has_floor_at(int32_t x, int32_t top, int32_t bottom) const;
 
 		std::unordered_map<uint16_t, Foothold> footholds;

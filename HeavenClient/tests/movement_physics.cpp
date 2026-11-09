@@ -1453,6 +1453,72 @@ void through_a_backward_line()
 	std::filesystem::remove(path);
 }
 
+// A jump into a line drawn right to left stops there and carries on along
+// it; a platform drawn left to right lets it through.
+double highest_under(bool backward)
+{
+	double top = 0.0;
+	auto path = foothold_map({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{1, 1, 0, 0, 200, 0, 0, 0},
+		{1, 2, backward ? 150 : 50, -30, backward ? 50 : 150, -30, 0, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(100.0); player.set_y(0.0);
+		player.onground = true;
+		physics.move_object(player);
+		ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 1);
+
+		for (int tick = 0; tick < 120; tick++)
+		{
+			physics.move_object(player);
+			top = std::min(top, player.crnt_y());
+		}
+
+		require(player.onground, "a jump into a ceiling didn't land again");
+	}
+	std::filesystem::remove(path);
+
+	return top;
+}
+
+void into_a_ceiling()
+{
+	require(highest_under(true) == -30.0, "a jump went through a ceiling");
+	require(highest_under(false) < -30.0, "a platform stopped a jump from below");
+
+	// One nearly upright, as in 102000003 (fh37), stops a jump where it
+	// meets it, not at its y half a pixel on.
+	auto path = foothold_map({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{1, 1, 0, 0, 200, 0, 0, 0},
+		{1, 2, 89, -27, 88, -212, 0, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(86.62); player.set_y(-102.6);
+		player.onground = false;
+		player.vspeed = -0.6;
+		player.hspeed = 1.0;
+
+		for (int tick = 0; tick < 120; tick++)
+		{
+			double y = player.crnt_y();
+			player.walkdir = 1;
+			physics.move_object(player);
+			require(std::abs(player.crnt_y() - y) < 14.0, "a jump into a steep ceiling leapt along it");
+		}
+	}
+	std::filesystem::remove(path);
+}
+
 void drops_from_under_the_map()
 {
 	auto path = foothold_map({
@@ -1964,6 +2030,7 @@ int main()
 		up_a_steep_riser();
 		onto_a_steep_riser();
 		through_a_backward_line();
+		into_a_ceiling();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;
