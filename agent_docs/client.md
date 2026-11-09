@@ -646,6 +646,7 @@ doc named on its row.
 | --- | --- |
 | Login, world/channel select, character list/create/delete, PIC | Implemented |
 | In-map play: movement, jumping, portals, map change, channel change | Implemented |
+| Background music (`Music`) | Implemented. Each track decodes in whole (a town's theme is some 30 MB), and only the last three are kept (`RecentTracks`). Without that limit, a tour of 60 maps grew the client by about 1 GB. v83 streams its one track and keeps none. |
 | Combat: melee/ranged/magic attacks, mob HP/death, mob attacks and skills, drops, pickup | Implemented, with diseases; see `combat.md` |
 | Inventory, equip, item use, scroll, sort/gather | Implemented |
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
