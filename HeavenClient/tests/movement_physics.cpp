@@ -1364,6 +1364,40 @@ void off_a_step()
 	std::filesystem::remove(path);
 }
 
+// A walker carries what is left of its step past a joint on along the next
+// floor by distance, so a riser one pixel wide and 19 high (107000400 fh861)
+// is 19 px of slope, which slides it back down, not one pixel of x.
+void up_a_steep_riser()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{3, 8, 3500, 900, 4000, 900, 0, 0},
+		{1, 1, 2000, 500, 2100, 500, 0, 2},
+		{1, 2, 2100, 500, 2101, 481, 1, 3},
+		{1, 3, 2101, 481, 2200, 473, 2, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(2050); player.set_y(480);
+		for (int tick = 0; tick < 60; ++tick) physics.move_object(player);
+		require(player.onground && player.fhid == 1, "the riser fixture did not find its floor");
+		bool climbed = false;
+		for (int tick = 0; tick < 300; ++tick)
+		{
+			player.walkdir = 1;
+			physics.move_object(player);
+			require(player.onground, "a walk up a steep riser left the ground");
+			require(player.crnt_x() < 2101.0 && player.crnt_y() > 485.0, "a walk went up a steep riser in a step");
+			climbed = climbed || player.fhid == 2;
+		}
+		require(climbed, "a walk did not go on to a steep riser");
+	}
+	std::filesystem::remove(path);
+}
+
 void drops_from_under_the_map()
 {
 	auto path = foothold_map({
@@ -1872,6 +1906,7 @@ int main()
 		off_a_loose_end();
 		off_a_step();
 		jump_after_a_joint_landing();
+		up_a_steep_riser();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;

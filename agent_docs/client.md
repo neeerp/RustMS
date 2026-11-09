@@ -857,6 +857,12 @@ force-and-friction model (`move_normal`).
   jump on the next tick goes along it. A jump just after a landing under a
   joint, as in Ellinia's North Forest (101020000), used to make the position
   NaN (test `jump_after_a_joint_landing`).
+- **Joints.** v83 steps a grounded object a distance along its foothold, and
+  what is left of a step at a joint goes on along the next floor at the same
+  speed along it (0x9b3fd1). `FootholdTree::walk_on` does the same, so a
+  riser one pixel wide and 19 high, as in 107000400 (fh861), is 19 px of
+  steep slope that slides a walker back to its foot, and only a jump gets
+  over it. Before, the x step crossed it in one tick (test `up_a_steep_riser`).
 - **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
   footholds and at most 300 px above the highest. A map with `info/VRLimit`
   pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`,

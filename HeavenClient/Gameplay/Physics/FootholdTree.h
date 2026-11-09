@@ -58,6 +58,10 @@ namespace ms
 		// Keeps a flier within the map's physical space.
 		void limit_flight(PhysicsObject &touse) const;
 
+		// Carries a grounded step past a joint on along the next floor by
+		// distance; returns how much faster or slower it moves in x there.
+		double walk_on(PhysicsObject &touse) const;
+
 		// Updates a PhysicsObject's fhid based on it's position.
 		void update_fh(PhysicsObject &touse) const;
 
