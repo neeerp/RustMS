@@ -1,6 +1,6 @@
 //! Parties: inviting, joining, party HP bars, a mob's HP bar from a
 //! member's hit, sharing a kill's EXP on Snail Hunting Ground I (40000),
-//! and its drops, party chat, and disbanding.
+//! and its drops, a dead member's lost share, party chat, and disbanding.
 
 use integration_harness::hunting::{attack, pickup};
 use integration_harness::login_to_world_session;
@@ -34,6 +34,20 @@ fn invite(name: &str) -> Packet {
 fn accept(party_id: i32) -> Packet {
     let mut p = party_operation(3);
     p.write_int(party_id).unwrap();
+    p
+}
+
+/// TAKE_DAMAGE: mob `mob_id` touched this player for `damage`.
+fn touched(damage: i32, mob_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(-1i8 as u8).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(mob_id).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(0).unwrap();
     p
 }
 
@@ -131,6 +145,28 @@ async fn a_party_shares_hp_bars_exp_and_chat() {
         m.field.removals(loot.object_id),
         [Some(member.character_id)]
     );
+
+    // A member dead when the next snail falls gets nothing, as in Cosmic,
+    // though the split still counts them: the leader's share stays 2.
+    const HP: i32 = 0x400;
+    for _ in 0..30 {
+        for _ in 0..10 {
+            send(&mut member.connection, touched(1, SNAIL)).await;
+        }
+        read_for(&mut member.connection, &mut m, 150).await;
+        if m.stat(HP) == Some(0) {
+            break;
+        }
+    }
+    assert_eq!(m.stat(HP), Some(0));
+    let gains = m.gains.len();
+    let snail = l.field.alive(SNAIL)[0];
+    send(&mut leader.connection, attack(snail, 4)).await;
+    send(&mut leader.connection, attack(snail, 4)).await;
+    until(&mut leader.connection, &mut l, |t| t.gains.len() > 1).await;
+    assert_eq!(l.gains[1], 2);
+    read_for(&mut member.connection, &mut m, 600).await;
+    assert_eq!(m.gains.len(), gains, "{:?}", m.gains);
 
     // Party chat reaches the others, not the speaker.
     send(
