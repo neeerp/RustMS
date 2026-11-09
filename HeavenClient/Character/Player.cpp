@@ -205,6 +205,7 @@ namespace ms
 		attack_course.stop();
 		ladder = nullptr;
 		set_chair(0);
+		map_seat = -1;
 		phobj.wingsfall = 0.0;
 		glide(false, false);
 		nullstate.update_state(*this);
@@ -941,7 +942,10 @@ namespace ms
 			Char::set_state(st);
 
 			if (st != Char::State::SIT)
+			{
 				set_chair(0);
+				map_seat = -1;
+			}
 
 			// Only a swimmer or flier steers up and down; a dive held into a
 			// landing must not pull the next jump down.
@@ -1850,13 +1854,17 @@ namespace ms
 		}
 	}
 
-	void Player::set_seat(Optional<const Seat> seat)
+	void Player::sit_on_seat(int16_t id, Point<int16_t> pos)
 	{
-		if (seat)
-		{
-			set_position(seat->getpos());
-			set_state(Char::State::SIT);
-		}
+		set_position(pos);
+		phobj.hspeed = 0.0;
+		set_state(Char::State::SIT);
+		map_seat = id;
+	}
+
+	bool Player::on_map_seat() const
+	{
+		return map_seat >= 0;
 	}
 
 	void Player::sit_on_chair(int32_t itemid)
@@ -1893,11 +1901,20 @@ namespace ms
 
 	void Player::leave_chair()
 	{
-		if (!chair || leaving_chair)
+		if (leaving_chair)
 			return;
 
-		leaving_chair = true;
-		CancelChairPacket(-1).dispatch();
+		if (chair)
+		{
+			leaving_chair = true;
+			CancelChairPacket(-1).dispatch();
+		}
+		else if (map_seat >= 0)
+		{
+			// Moving or a hit asks to get up from a map seat, behind the
+			// request gate (FUN_0094c856, FUN_009581a9 -> FUN_00a0fbf4).
+			leaving_chair = request(CancelChairPacket(-1), ExclRequest::USE_WAIT);
+		}
 	}
 
 	void Player::stand_up()

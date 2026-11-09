@@ -41,6 +41,7 @@
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../Util/Chalkboard.h"
 #include "../Packets/GameplayPackets.h"
+#include "../Packets/PlayerPackets.h"
 
 #include <nlnx/nx.hpp>
 
@@ -435,10 +436,27 @@ namespace ms
 			otherchar->set_chair(itemid);
 	}
 
+	// v83 FUN_00959797: any answer ends the request. 0 stands the player
+	// up; 1 and a seat seats them there if they still stand by it, or else
+	// asks to stand.
 	void CancelChairHandler::handle(InPacket& recv) const
 	{
+		Player &player = Stage::get().get_player();
+		player.request_answered();
+
 		if (recv.read_byte() == 0)
-			Stage::get().get_player().stand_up();
+		{
+			player.stand_up();
+			return;
+		}
+
+		int16_t id = recv.read_short();
+		Optional<const Seat> seat = Stage::get().get_mapinfo().get_seat(id);
+
+		if (seat && seat->inrange(player.get_position()) && !player.is_sitting())
+			player.sit_on_seat(id, seat->getpos());
+		else
+			player.request(CancelChairPacket(-1), 0);
 	}
 
 	void UpdateCharLookHandler::handle(InPacket& recv) const

@@ -192,6 +192,16 @@ pub fn build_cancel_chair() -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// CANCEL_CHAIR (recv 205) with a seat: the player may sit on the map's
+/// seat `seat` (v83 FUN_00959797 then checks they still stand by it).
+pub fn build_sit_on_seat(seat: i16) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CancelChair as i16)?;
+    packet.write_byte(1)?;
+    packet.write_short(seat)?;
+    Ok(packet)
+}
+
 /// CHALKBOARD (recv 164): the player holds up a chalkboard with `note`, or
 /// puts it away. The player's own client needs it too: it lets them close
 /// the board by clicking it.

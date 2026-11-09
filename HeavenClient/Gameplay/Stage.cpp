@@ -52,6 +52,7 @@
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/MessagingPackets.h"
+#include "../Net/Packets/PlayerPackets.h"
 #include "../Data/SkillData.h"
 
 #include <nlnx/nx.hpp>
@@ -1223,8 +1224,18 @@ namespace ms
 			player.ghost_refuses())
 			return;
 
-		Optional<const Seat> seat = mapinfo.findseat(player.get_position());
-		player.set_seat(seat);
+		// Then the request gate, the alert, and a seat in reach; the server's
+		// CANCEL_CHAIR seats the player.
+		if (!player.can_request(ExclRequest::USE_WAIT) || player.get_look().get_alerted())
+			return;
+
+		if (!player.get_phobj().onground || player.is_climbing())
+			return;
+
+		int16_t seat = mapinfo.findseat(player.get_position());
+
+		if (seat >= 0)
+			player.request(CancelChairPacket(seat), ExclRequest::USE_WAIT);
 	}
 
 	// After the player moves, v83 catches the ladder or rope the arrows ask

@@ -254,8 +254,9 @@ namespace ms
 	// Sitting
 	void PlayerSitState::send_action(Player &player, KeyAction::Id ka, bool down) const
 	{
-		// Getting off a portable chair waits for the server's CANCEL_CHAIR.
-		if (player.get_chair())
+		// Getting off a portable chair or a map seat waits for the server's
+		// CANCEL_CHAIR.
+		if (player.get_chair() || player.on_map_seat())
 		{
 			if (down && (ka == KeyAction::Id::LEFT || ka == KeyAction::Id::RIGHT ||
 						 ka == KeyAction::Id::JUMP || ka == KeyAction::Id::SIT))
