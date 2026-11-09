@@ -1966,10 +1966,14 @@ controller's client plays the cast and the server applies it
 (`game::mob_skill` says what each skill does).
 
 - **The grant:** when a controller's move asks to attack, the server
-  (`MobSet::act`) may also let the mob cast one skill, picked at random
-  from those it can pay for, that are off cooldown (`interval` seconds),
-  whose `hp` limit the mob is at or under, and, for a summon, whose
-  `limit` of live summons isn't reached. A sealed mob casts nothing. The
+  (`MobSet::act`) may also let the mob cast one skill. It picks one of
+  those listed at random and grants it only if the mob can pay for it, it
+  is off cooldown (`interval` seconds), the mob is at or under its `hp`
+  limit, and, for a summon, its `limit` of live summons isn't reached;
+  otherwise the mob attacks, as in Cosmic's MoveLifeHandler. (Picking only
+  among the castable ones would hand a skill with no `interval`, such as
+  Prototype Lord's Confusion 132/5, over on every move, so the mob would
+  never attack.) A sealed mob casts nothing. The
   skill and level end MOVE_MONSTER_RESPONSE; the client keeps a grant until
   another ack grants something else (FUN_0066c23b). An unused grant lapses
   on the server after 10 s.

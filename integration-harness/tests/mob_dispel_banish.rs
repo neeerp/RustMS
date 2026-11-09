@@ -12,7 +12,7 @@ use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_skill, set_job};
 use integration_harness::hunting::{move_mob, use_skill, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{read_for, send, until, warp, Trace};
+use integration_harness::trace::{ask_for_skill, read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::RecvOpcode;
 use packet::{io::write::PktWrite, Packet};
@@ -50,10 +50,7 @@ async fn controlled(c: &mut MapleTestConnection, t: &mut Trace, mob_id: i32) -> 
 /// animation, until it is granted and casts `skill`.
 async fn cast(c: &mut MapleTestConnection, t: &mut Trace, mob: i32, at: (i16, i16), skill: u8) {
     for _ in 0..3 {
-        let granted = t.field.grants.len();
-        send(c, move_mob(mob, at, true, 0, 0)).await;
-        until(c, t, |t| t.field.grants.len() > granted).await;
-        let (_, grant, level) = *t.field.grants.last().unwrap();
+        let (grant, level) = ask_for_skill(c, t, mob, at).await;
         let data = i32::from(grant) | i32::from(level) << 8;
         send(c, move_mob(mob, at, false, 21 << 1, data)).await;
         if grant == skill {

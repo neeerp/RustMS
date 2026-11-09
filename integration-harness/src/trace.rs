@@ -1030,6 +1030,27 @@ pub async fn read_for(c: &mut MapleTestConnection, trace: &mut Trace, ms: u64) {
     }
 }
 
+/// Ask `object_id`, a mob this client controls, at `at`, for a skill to
+/// cast: want to attack until an answer grants one, and return it as
+/// (skill, level). The server picks one of its listed skills at random and
+/// grants it only if the mob may cast it now, so an answer may grant none.
+pub async fn ask_for_skill(
+    c: &mut MapleTestConnection,
+    trace: &mut Trace,
+    object_id: i32,
+    at: (i16, i16),
+) -> (u8, u8) {
+    for _ in 0..60 {
+        let (answers, granted) = (trace.field.move_responses.len(), trace.field.grants.len());
+        send(c, crate::hunting::move_mob(object_id, at, true, 0, 0)).await;
+        until(c, trace, |t| t.field.move_responses.len() > answers).await;
+        if let Some(&(_, skill, level)) = trace.field.grants.get(granted) {
+            return (skill, level);
+        }
+    }
+    panic!("mob {object_id} was granted no skill: {trace:?}");
+}
+
 /// Wait for our own chat line to come back, recording packets on the way.
 /// The field relays it only after earlier work for this client completed.
 /// A field's packets stop at a client that has moved on, so a line said as
