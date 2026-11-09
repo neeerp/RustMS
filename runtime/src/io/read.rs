@@ -1,6 +1,7 @@
 use crate::error::RuntimeError;
 use crypt::MapleAES;
 use packet::{Packet, MAX_PACKET_LENGTH};
+use std::io;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::net::tcp::OwnedReadHalf;
 
@@ -44,11 +45,23 @@ impl PacketReader {
             }
             // read_buf is cancellation safe; it appends bytes to persistent
             // state instead of a temporary header/body buffer.
-            if self.reader.read_buf(&mut self.pending_bytes).await? == 0 {
-                return Err(RuntimeError::ClientDisconnected);
+            match self.reader.read_buf(&mut self.pending_bytes).await {
+                Ok(0) => return Err(RuntimeError::ClientDisconnected),
+                Ok(_) => {}
+                // A client that is killed, or closes with data still unread,
+                // resets the connection. It has still only left.
+                Err(error) if is_reset(&error) => return Err(RuntimeError::ClientDisconnected),
+                Err(error) => return Err(error.into()),
             }
         }
     }
+}
+
+fn is_reset(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
+    )
 }
 
 #[cfg(test)]
@@ -94,5 +107,23 @@ mod tests {
             assert_eq!(reader.read_packet().await.unwrap().bytes, first);
             assert_eq!(reader.read_packet().await.unwrap().bytes, second);
         }
+    }
+
+    #[tokio::test]
+    async fn a_reset_connection_is_a_disconnect() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (client, server) = tokio::join!(
+            TcpStream::connect(listener.local_addr().unwrap()),
+            listener.accept()
+        );
+        let client = client.unwrap();
+        let (read_half, _) = server.unwrap().0.into_split();
+        let mut reader = PacketReader::new(read_half, &[1, 2, 3, 4]);
+        client.set_zero_linger().unwrap();
+        drop(client);
+        assert!(matches!(
+            reader.read_packet().await,
+            Err(RuntimeError::ClientDisconnected)
+        ));
     }
 }
