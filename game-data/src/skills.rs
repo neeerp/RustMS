@@ -312,7 +312,13 @@ impl SkillData {
         }
         Ok(Some(MobSkillLevel {
             mp_cost: int("mpCon")?,
-            interval: int("interval")?,
+            // Confusion level 2 spells it "inteval" (Leviathan, Pink Bean's
+            // Rex, a few event mobs); without it they recast it every move
+            // and never attack.
+            interval: match nx.int_child(node, "interval")? {
+                Some(seconds) => seconds,
+                None => int("inteval")?,
+            },
             duration: int("time")?,
             x: int("x")?,
             y: int("y")?,
@@ -430,6 +436,8 @@ mod tests {
         let heal = data.mob_skill(114, 15).unwrap().unwrap();
         assert_eq!((heal.x, heal.y, heal.hp), (700, 200, 80));
         assert_eq!((heal.lt, heal.rb), ((-400, -350), (400, 250)));
+        let confusion = data.mob_skill(132, 2).unwrap().unwrap();
+        assert_eq!((confusion.interval, confusion.duration), (60, 15));
         let summon = data.mob_skill(200, 1).unwrap().unwrap();
         assert_eq!(summon.summons, [7130200]);
         assert_eq!((summon.limit, summon.summon_effect, summon.hp), (5, 2, 75));
