@@ -303,6 +303,8 @@ namespace ms
 				phobj.hspeed = x - phobj.crnt_x();
 				phobj.limity(fh.ground_below(x));
 				phobj.fhid = landing;
+				// A jump before the next update measures along this floor.
+				phobj.fhslope = fh.slope();
 				phobj.onground = true;
 				phobj.fallstart = 0;
 
@@ -319,6 +321,14 @@ namespace ms
 			bool collision = crnt_y <= ground.first() && next_y >= ground.second();
 
 			if (!phobj.onground && on_joint(get_fh(phobj.fhid), phobj.next_x(), next_y))
+				collision = false;
+
+			// In the air the object may still hold the floor it walked off
+			// when there is none below it. Only a line the step crosses stops
+			// a fall (0x9b34c8), not that floor's line drawn on past its end.
+			const Foothold &held = get_fh(phobj.fhid);
+
+			if (!phobj.onground && (phobj.next_x() < held.l() || phobj.next_x() > held.r()))
 				collision = false;
 
 			if (collision)
@@ -543,7 +553,6 @@ namespace ms
 			return;
 
 		const Foothold &curfh = get_fh(phobj.fhid);
-		bool grounded = phobj.onground;
 		bool checkslope = false;
 
 		double x = phobj.crnt_x();
@@ -560,12 +569,12 @@ namespace ms
 				return fh.id() != 0 && fh.x1() < fh.x2();
 			};
 
-			// It never walks on to one drawn backwards: past the joint it
-			// falls (0x9b3fd1).
+			// It walks on only to one drawn left to right: past a wall or a
+			// backward one dropping away from the joint it falls (0x9b3fd1).
 			if (floor(curfh.next()) ? x > curfh.r() : std::floor(x) > curfh.r())
-				phobj.fhid = backward(get_fh(curfh.next())) ? 0 : curfh.next();
+				phobj.fhid = floor(curfh.next()) ? curfh.next() : 0;
 			else if (floor(curfh.prev()) ? x < curfh.l() : std::ceil(x) < curfh.l())
-				phobj.fhid = backward(get_fh(curfh.prev())) ? 0 : curfh.prev();
+				phobj.fhid = floor(curfh.prev()) ? curfh.prev() : 0;
 
 			if (phobj.fhid == 0)
 				phobj.fhid = get_fhid_below(x, y);
@@ -577,7 +586,8 @@ namespace ms
 		}
 
 		const Foothold &nextfh = get_fh(phobj.fhid);
-		phobj.fhslope = nextfh.slope();
+		// The null foothold's slope is 0 / 0.
+		phobj.fhslope = phobj.fhid ? nextfh.slope() : 0.0;
 
 		double ground = nextfh.ground_below(x);
 
@@ -615,17 +625,13 @@ namespace ms
 		if (phobj.onground)
 			phobj.fhgroup = nextfh.group();
 
-		// A drop keeps to its own flight: one from a mob killed under the map
-		// has no floor below it on the way up to where it lands. Nothing else
-		// in the air is moved either: a step ending on a joint stops a fraction
-		// under both floors, and the next one lands (0x9b34c8).
+		// With no floor below, the object keeps the one it holds and is not
+		// moved. A drop from a mob killed under the map flies up to where it
+		// lands, a step ending on a joint stops a fraction under both floors
+		// and the next one lands (0x9b34c8), and one walking off a loose end
+		// over a gap falls into it (0x9b3fd1).
 		if (phobj.fhid == 0 && phobj.type != PhysicsObject::Type::FIXATED)
-		{
 			phobj.fhid = curfh.id();
-
-			if (grounded)
-				phobj.limitx(curfh.x1());
-		}
 	}
 
 	const Foothold &FootholdTree::get_fh(uint16_t fhid) const

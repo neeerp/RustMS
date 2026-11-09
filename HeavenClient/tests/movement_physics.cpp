@@ -1260,6 +1260,110 @@ void under_a_ledge()
 	std::filesystem::remove(path);
 }
 
+// The top of Victoria Road's Southern Forest dungeon (100040001) has loose
+// platforms with nothing below them. v83 lets a walker off a loose end fall (0x9b3fd1), and
+// only a line the fall crosses stops it (0x9b34c8), not the platform's own
+// drawn on past its end.
+void off_a_loose_end()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 500, -1500, 500, 0, 0},
+		{3, 8, 1500, 500, 2000, 500, 0, 0},
+		{1, 1, 360, 0, 450, 0, 0, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		for (int8_t direction : {1, -1})
+		{
+			ms::PhysicsObject player;
+			player.shoe = true;
+			player.set_x(405); player.set_y(-20);
+			for (int tick = 0; tick < 60; ++tick) physics.move_object(player);
+			require(player.onground && player.fhid == 1, "the loose end fixture did not find its floor");
+			for (int tick = 0; tick < 200; ++tick)
+			{
+				player.walkdir = direction;
+				double x = player.crnt_x();
+				physics.move_object(player);
+				require(std::abs(player.crnt_x() - x) < 12.0, "a walk off a loose end moved the player back");
+				require(std::isfinite(player.fhslope), "a fall with no floor below took the null foothold's slope");
+				bool past = direction > 0 ? player.crnt_x() > 452.0 : player.crnt_x() < 358.0;
+				require(!past || !player.onground, "a walk off a loose end stood on the air past it");
+			}
+			require(player.crnt_y() > 400.0, "a walk off a loose end did not fall");
+		}
+	}
+	std::filesystem::remove(path);
+}
+
+// Ellinia's North Forest (101020000) has a joint at (251, 2119) where a
+// fall's step can end a fraction under both floors; the next step lands
+// (0x9b34c8). A jump on the tick after must go along the floor it landed on.
+void jump_after_a_joint_landing()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 2500, -1500, 2500, 0, 0},
+		{3, 8, 1500, 2500, 2000, 2500, 0, 0},
+		{1, 1, 214, 2126, 251, 2119, 0, 2},
+		{1, 2, 251, 2119, 284, 2121, 1, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(251.7); player.set_y(2119.44);
+		player.onground = false;
+		player.fhid = 1;
+		player.hspeed = 1.0;
+		player.vspeed = 4.264;
+		physics.move_object(player);
+		require(player.onground && player.fhid == 2, "a fall under a joint did not land on the next floor");
+		ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 1);
+		physics.move_object(player);
+		require(std::isfinite(player.crnt_x()) && std::isfinite(player.crnt_y()), "a jump after landing under a joint lost the player's position");
+		require(!player.onground && player.crnt_y() < 2119.0, "a jump after landing under a joint did not take off");
+	}
+	std::filesystem::remove(path);
+}
+
+// Perion (102000000) has a step whose side is drawn as a wall up from the
+// lower floor. v83 walks on only to a foothold drawn left to right
+// (0x9b3fd1): walking off the top, the player falls to the lower floor
+// instead of being put at its foot at once.
+void off_a_step()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{3, 8, 3500, 900, 4000, 900, 0, 0},
+		{1, 1, 2116, 386, 2178, 389, 0, 2},
+		{1, 2, 2178, 389, 2178, 332, 1, 3},
+		{1, 3, 2178, 332, 2240, 333, 2, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(2209); player.set_y(310);
+		for (int tick = 0; tick < 60; ++tick) physics.move_object(player);
+		require(player.onground && player.fhid == 3, "the step fixture did not find its floor");
+		bool fell = false;
+		for (int tick = 0; tick < 70; ++tick)
+		{
+			player.walkdir = -1;
+			double y = player.crnt_y();
+			physics.move_object(player);
+			require(std::abs(player.crnt_y() - y) < 12.0, "a walk off a step dropped the player to its foot");
+			require(player.fhid != 2, "a walk went on to a step's wall");
+			fell = fell || !player.onground;
+		}
+		require(fell && player.onground && player.fhid == 1, "a walk off a step did not fall to the floor below");
+	}
+	std::filesystem::remove(path);
+}
+
 void drops_from_under_the_map()
 {
 	auto path = foothold_map({
@@ -1765,6 +1869,9 @@ int main()
 		hits_at_forks();
 		lava_step();
 		under_a_ledge();
+		off_a_loose_end();
+		off_a_step();
+		jump_after_a_joint_landing();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;
