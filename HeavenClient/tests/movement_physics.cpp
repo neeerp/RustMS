@@ -1214,6 +1214,52 @@ void lava_step()
 
 // The Geist Balrog can die under the lowest floor of the Amorian Challenge's
 // last stage (670010700), with nothing below its drop's start.
+// Orbis Tower's clouds (200080100) hang over their stems: the line under a
+// ledge is drawn right to left. v83 never walks on to such a foothold
+// (0x9b3fd1): one rising from the joint is a wall, one dropping away an edge.
+void under_a_ledge()
+{
+	auto path = foothold_map({
+		{1, 1, -300, 0, 0, 0, 0, 2},
+		{1, 2, 0, 0, -20, -40, 1, 3},
+		{1, 3, -20, -40, -60, -60, 2, 4},
+		{1, 4, -60, -60, 200, -60, 3, 0},
+		{2, 5, -500, 100, 2000, 100, 0, 0},
+		{3, 6, 900, -60, 1060, -60, 0, 7},
+		{3, 7, 1060, -60, 1020, -40, 6, 8},
+		{3, 8, 1020, -40, 1000, 0, 7, 9},
+		{3, 9, 1000, 0, 1300, 0, 8, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		struct Case { double x; int8_t direction; uint16_t start; uint16_t end; double wall; };
+		for (Case c : {Case {-100, 1, 1, 1, 0}, Case {100, -1, 4, 1, -1000}, Case {950, 1, 6, 9, 3000},
+			Case {1100, -1, 9, 9, 1000}})
+		{
+			ms::PhysicsObject player;
+			player.shoe = true;
+			player.set_x(c.x); player.set_y(-80);
+			for (int tick = 0; tick < 100; ++tick) physics.move_object(player);
+			require(player.onground && player.fhid == c.start, "the ledge fixture did not find its floor");
+			for (int tick = 0; tick < 400; ++tick)
+			{
+				player.walkdir = c.direction;
+				double y = player.crnt_y();
+				physics.move_object(player);
+				require(std::abs(player.crnt_y() - y) < 12.0, "a walk past a backward foothold moved the player off its path");
+				require(player.fhid != 2 && player.fhid != 3 && player.fhid != 7 && player.fhid != 8,
+					"a walk went on to a backward foothold");
+				require(c.direction * (player.crnt_x() - c.wall) < 1.0, "a walk went through a backward foothold");
+				if (player.onground && player.fhid == c.end && c.start != c.end)
+					break;
+			}
+			require(player.onground && player.fhid == c.end, "a walk past a backward foothold ended on the wrong floor");
+		}
+	}
+	std::filesystem::remove(path);
+}
+
 void drops_from_under_the_map()
 {
 	auto path = foothold_map({
@@ -1718,6 +1764,7 @@ int main()
 		walls_at_forks();
 		hits_at_forks();
 		lava_step();
+		under_a_ledge();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;

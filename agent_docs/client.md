@@ -839,6 +839,12 @@ force-and-friction model (`move_normal`).
   blocks if it reaches between 1 and 50 px above the feet
   (`FootholdTree::get_wall`). Maps draw walls both top to bottom and bottom
   to top, so `Foothold::is_blocking` sorts the ends first.
+- **Backward footholds.** A foothold drawn right to left, such as the line
+  under an Orbis Tower cloud (200080100), is never walked onto. v83's step
+  along a foothold (0x9b3fd1) takes the next one only if it runs left to
+  right. One that rises from the joint stops the walker there like a wall.
+  From one that drops away, the walker falls (`blocks` and `update_fh` in
+  `FootholdTree.cpp`; test `under_a_ledge`).
 - **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
   footholds and at most 300 px above the highest. A map with `info/VRLimit`
   pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`,
