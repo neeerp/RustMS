@@ -294,10 +294,20 @@ namespace ms
 
 			if (uint16_t landing = phobj.onground ? 0 : get_landing(phobj, start_x, landspeed))
 			{
-				// The step may end past the floor it crossed; the object stops
-				// at that floor's end instead.
+				// v83 puts the object where the step crosses the floor and
+				// walks the rest of the step on along it (0x9b34c8). Here the
+				// rest of the step's x goes along the floor, so on a steep one
+				// it lands near the crossing, not up the line at the step's end.
+				// A wall that stopped the step keeps it there, and a landing
+				// past the floor's end stops at that end.
 				const Foothold &fh = get_fh(landing);
-				double x = std::clamp<double>(phobj.next_x(), fh.l(), fh.r());
+				double hstep = phobj.next_x() - start_x;
+				double before = (crnt_y - fh.y1()) * (fh.x2() - fh.x1()) - (start_x - fh.x1()) * (fh.y2() - fh.y1());
+				double after = (next_y - fh.y1()) * (fh.x2() - fh.x1()) - (phobj.next_x() - fh.x1()) * (fh.y2() - fh.y1());
+				double crossed = before != after ? std::clamp(before / (before - after), 0.0, 1.0) : 1.0;
+				double rest = (1.0 - crossed) * along(fh, hstep, 0.0) * across(fh);
+				double end = phobj.walled ? phobj.next_x() : start_x + hstep * crossed + rest;
+				double x = std::clamp<double>(end, fh.l(), fh.r());
 
 				phobj.land(landspeed * across(fh));
 				phobj.hspeed = x - phobj.crnt_x();

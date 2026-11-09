@@ -1398,6 +1398,36 @@ void up_a_steep_riser()
 	std::filesystem::remove(path);
 }
 
+// v83 lands an object where its step crosses the floor and walks the rest
+// along it (0x9b34c8). A fall into the foot of a riser one pixel wide and
+// 29 high, as in Rien (140000000 fh372), lands at its foot, not 19 px up
+// the line at the step's end.
+void onto_a_steep_riser()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{3, 8, 1500, 900, 2000, 900, 0, 0},
+		{1, 1, 79, -133, 132, -152, 0, 2},
+		{1, 2, 132, -152, 133, -181, 1, 3},
+		{1, 3, 133, -181, 143, -197, 2, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(132.09); player.set_y(-154.68);
+		player.onground = false;
+		player.fhid = 1;
+		player.hspeed = 0.667;
+		player.vspeed = 3.88;
+		physics.move_object(player);
+		require(player.onground, "a fall into a steep riser did not land");
+		require(player.crnt_y() > -158.0, "a fall into a steep riser landed up its line");
+	}
+	std::filesystem::remove(path);
+}
+
 void drops_from_under_the_map()
 {
 	auto path = foothold_map({
@@ -1907,6 +1937,7 @@ int main()
 		off_a_step();
 		jump_after_a_joint_landing();
 		up_a_steep_riser();
+		onto_a_steep_riser();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;
