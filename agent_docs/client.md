@@ -885,7 +885,13 @@ force-and-friction model (`move_normal`).
   down landing is unchanged, but a fall into a steep riser lands near the
   crossing. Before, it landed at the step's end x and took the floor's y
   there, up to 276 px up the line in 610020006 (fh147). A step stopped by a
-  wall still lands at the wall (test `onto_a_steep_riser`).
+  wall still lands at the wall (test `onto_a_steep_riser`). On a floor
+  steeper than it is wide, it lands on the line at the crossing's height,
+  since only the step's whole pixels may cross it. A fall stops on the floor it holds only if the step starts and
+  ends over that floor. `get_fhid_below` truncates x, so a step a fraction
+  past a floor's end can still hold it, and on a nearly upright line, as in
+  610020006 (fh147, fh148), the line's y at the step's own x was up to 272 px
+  up (test `beside_an_upright_line`).
 - **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
   footholds and at most 300 px above the highest. A map with `info/VRLimit`
   pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`,

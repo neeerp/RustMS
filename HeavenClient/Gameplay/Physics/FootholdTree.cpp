@@ -332,7 +332,18 @@ namespace ms
 				double after = (next_y - fh.y1()) * (fh.x2() - fh.x1()) - (phobj.next_x() - fh.x1()) * (fh.y2() - fh.y1());
 				double crossed = before != after ? std::clamp(before / (before - after), 0.0, 1.0) : 1.0;
 				double rest = (1.0 - crossed) * along(fh, hstep, 0.0) * across(fh);
-				double end = phobj.walled ? phobj.next_x() : start_x + hstep * crossed + rest;
+				// If only the step's whole pixels cross a floor steeper than
+				// it is wide, its x may be off the line by a fraction, which
+				// there puts the line's y far up or down it: the object lands
+				// beside the step at its height instead.
+				double met = start_x + hstep * crossed;
+				double dx = fh.x2() - fh.x1();
+				double dy = fh.y2() - fh.y1();
+
+				if (std::abs(dy) > dx)
+					met = fh.x1() + (crnt_y + (next_y - crnt_y) * crossed - fh.y1()) * dx / dy;
+
+				double end = phobj.walled ? phobj.next_x() : met + rest;
 				double x = std::clamp<double>(end, fh.l(), fh.r());
 
 				phobj.land(landspeed * across(fh));
@@ -361,12 +372,15 @@ namespace ms
 
 			// In the air the object may still hold the floor it walked off
 			// when there is none below it. Only a line the step crosses stops
-			// a fall (0x9b34c8), not that floor's line drawn on past its end.
-			// Nor does a line drawn right to left, such as the underside of a
-			// block: v83 meets one only from below, as a ceiling.
+			// a fall (0x9b34c8), not that floor's line drawn on past either
+			// end: a step starting just past a steep one's end would meet it
+			// hundreds of pixels up. Nor does a line drawn right to left, such
+			// as the underside of a block: v83 meets one only from below, as a
+			// ceiling.
 			const Foothold &held = get_fh(phobj.fhid);
+			auto past = [&held](double x) { return x < held.l() || x > held.r(); };
 
-			if (!phobj.onground && (held.x1() >= held.x2() || phobj.next_x() < held.l() || phobj.next_x() > held.r()))
+			if (!phobj.onground && (held.x1() >= held.x2() || past(phobj.crnt_x()) || past(phobj.next_x())))
 				collision = false;
 
 			if (collision)

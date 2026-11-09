@@ -1519,6 +1519,50 @@ void into_a_ceiling()
 	std::filesystem::remove(path);
 }
 
+// Moves from the given state for a second, failing if a tick ever moves it
+// further up or down than a fall could.
+void no_leap(const std::vector<TestFoothold>& footholds, double x, double y, double hspeed, double vspeed, const char* failure)
+{
+	auto path = foothold_map(footholds);
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(x); player.set_y(y);
+		player.onground = false;
+		player.hspeed = hspeed;
+		player.vspeed = vspeed;
+
+		for (int tick = 0; tick < 100; tick++)
+		{
+			double last = player.crnt_y();
+			player.walkdir = -1;
+			physics.move_object(player);
+			require(std::abs(player.crnt_y() - last) < 14.0, failure);
+		}
+	}
+	std::filesystem::remove(path);
+}
+
+// Lines nearly upright, as in 610020006 (fh147, fh148), are floors drawn on
+// far up past their ends. A jump starting just past one's end doesn't meet
+// it hundreds of pixels up, and a step whose whole pixels cross one lands
+// beside it, not at the line's y at the step's own x.
+void beside_an_upright_line()
+{
+	no_leap({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{1, 1, 1000, 0, 1300, 0, 0, 0},
+		{1, 2, 1182, -859, 1184, -289, 0, 0},
+	}, 1185.84, -59.72, -1.0, -2.776, "a jump past the end of an upright line leapt up it");
+	no_leap({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{1, 1, -444, -260, 59, -258, 0, 0},
+		{1, 2, -299, -800, -297, -293, 0, 0},
+	}, -295.42, -332.53, -1.0, -0.984, "a landing on an upright line leapt up it");
+}
+
 void drops_from_under_the_map()
 {
 	auto path = foothold_map({
@@ -2031,6 +2075,7 @@ int main()
 		onto_a_steep_riser();
 		through_a_backward_line();
 		into_a_ceiling();
+		beside_an_upright_line();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;
