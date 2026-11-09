@@ -290,6 +290,32 @@ namespace ms
 			double crnt_y = phobj.crnt_y();
 			double next_y = phobj.next_y();
 
+			// Rising into a line drawn right to left, such as the underside of
+			// a block, stops the object where it meets it, and what is left
+			// of its speed runs along the line (0x9b34c8).
+			if (uint16_t ceiling = !phobj.onground && phobj.type != PhysicsObject::Type::FLYING && phobj.vspeed < 0.0
+					? get_ceiling_crossed(phobj) : 0)
+			{
+				// At the crossing itself: on a steep line, the line's y at
+				// a rounded x would put the object far up or down it.
+				const Foothold &fh = get_fh(ceiling);
+				double dx = fh.x2() - fh.x1();
+				double dy = fh.y2() - fh.y1();
+				double before = (crnt_y - fh.y1()) * dx - (phobj.crnt_x() - fh.x1()) * dy;
+				double after = (next_y - fh.y1()) * dx - (phobj.next_x() - fh.x1()) * dy;
+				double crossed = before != after ? std::clamp(before / (before - after), 0.0, 1.0) : 0.0;
+				double speed = along(fh, phobj.hspeed, phobj.vspeed);
+				double x = phobj.crnt_x() + phobj.hspeed * crossed;
+				double y = crnt_y + phobj.vspeed * crossed;
+
+				phobj.limitx(x);
+				phobj.limity(y);
+				phobj.hspeed = speed * across(fh);
+				phobj.vspeed = speed * dy / std::hypot(dx, dy);
+
+				return;
+			}
+
 			double landspeed = 0.0;
 
 			if (uint16_t landing = phobj.onground ? 0 : get_landing(phobj, start_x, landspeed))
@@ -430,6 +456,64 @@ namespace ms
 		}
 
 		return std::nullopt;
+	}
+
+	// The air step (0x9b34c8) meets a line drawn right to left only from
+	// below, and then only one on the object's layer or the lowest one with
+	// footholds. The first one on the way stops it.
+	uint16_t FootholdTree::get_ceiling_crossed(const PhysicsObject &phobj) const
+	{
+		int32_t xs = static_cast<int32_t>(std::round(phobj.crnt_x()));
+		int32_t ys = static_cast<int32_t>(std::round(phobj.crnt_y()));
+		int32_t xe = static_cast<int32_t>(std::round(phobj.next_x()));
+		int32_t ye = static_cast<int32_t>(std::round(phobj.next_y()));
+		int32_t dx = xe - xs;
+		int32_t dy = ye - ys;
+
+		if (dy >= 0)
+			return 0;
+
+		uint16_t found = 0;
+		double first = 2.0;
+
+		for (int32_t x = std::min(xs, xe); x <= std::max(xs, xe); x++)
+		{
+			auto range = footholdsbyx.equal_range(static_cast<int16_t>(x));
+
+			for (auto iter = range.first; iter != range.second; ++iter)
+			{
+				const Foothold &fh = footholds.at(iter->second);
+
+				if (fh.x1() <= fh.x2())
+					continue;
+
+				if (fh.layer() != phobj.fhlayer && fh.layer() != baselayer)
+					continue;
+
+				int32_t start = side(fh, xs, ys);
+				int32_t end = side(fh, xe, ye);
+
+				if (start > 0 || end < 0 || (start == 0 && end == 0))
+					continue;
+
+				// Which side of the step each end of the line is on.
+				int32_t head = (fh.y1() - ys) * dx - (fh.x1() - xs) * dy;
+				int32_t tail = (fh.y2() - ys) * dx - (fh.x2() - xs) * dy;
+
+				if ((head < 0 && tail < 0) || (head > 0 && tail > 0))
+					continue;
+
+				double crossing = static_cast<double>(-start) / (static_cast<double>(end) - start);
+
+				if (crossing < first)
+				{
+					first = crossing;
+					found = fh.id();
+				}
+			}
+		}
+
+		return found;
 	}
 
 	// CVecCtrl's landing test (0x9b34c8) follows the step in whole pixels, so
@@ -683,7 +767,9 @@ namespace ms
 				phobj.y = ground;
 		}
 
-		phobj.onground = phobj.y == ground && (phobj.onground || !on_joint(nextfh, x, y));
+		// In the air it stands only on a floor: on a line drawn right to left
+		// it has risen into a ceiling, and falls from it.
+		phobj.onground = phobj.y == ground && (phobj.onground || (!on_joint(nextfh, x, y) && !backward(nextfh)));
 
 		if (phobj.onground)
 			phobj.fallstart = 0;

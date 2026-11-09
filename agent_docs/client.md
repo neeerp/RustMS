@@ -755,7 +755,7 @@ force-and-friction model (`move_normal`).
   `FootholdTree::get_wall_crossed` stops anything but a flier at a wall on its
   layer or the lowest one with footholds, even one standing alone. A wall
   faces one way: drawn upward it stops what moves right, drawn downward what
-  moves left. Like v83 the test is in whole pixels. Ceilings aren't tested.
+  moves left. Like v83 the test is in whole pixels. Ceilings are below.
 - **Fly maps.** A map with `info/fly` (and no `info/swim`, which wins) lets
   the player fly whenever they are off a platform (r25 0x9b2ef8, report b108):
   `MapInfo::is_flying` sets `phobj.flymap`, and `Player::is_afloat` puts them
@@ -849,9 +849,21 @@ force-and-friction model (`move_normal`).
   falls to the floor below instead of being put at its foot (test
   `off_a_step`). Nor does a fall land on one. v83's air step (0x9b34c8)
   meets a line drawn right to left only from below, as a ceiling, so a
-  player who jumped up into a block falls back out through its underside
-  instead of standing on it, even when that line is the one held below
-  (test `through_a_backward_line`).
+  player who got into a block falls back out through its underside instead
+  of standing on it, even when that line is the one held below (test
+  `through_a_backward_line`).
+- **Ceilings.** Rising into a line drawn right to left on its layer or the
+  lowest one with footholds, v83's air step (0x9b34c8) stops an object where
+  it meets the line and keeps only the part of its speed that runs along it.
+  `FootholdTree::get_ceiling_crossed` finds the first such line on the step,
+  in whole pixels, and `limit_movement` puts anything but a flier at the
+  exact crossing with its speed projected onto the line, so a jump into a
+  block's underside stops under it and falls back, and one into a nearly
+  upright line, as in 102000003 (fh37), slides up it like a wall. In the air an object stands only on a line
+  drawn left to right. A platform drawn left to right still lets a jump
+  through from below (test `into_a_ceiling`). HeavenClient then moves the
+  object a whole tick's step along the line, where v83 moves it only part
+  of one.
 - **Loose ends.** A walker off a loose end with no floor below, as at the top
   of the Southern Forest dungeon (100040001), falls into the gap. It keeps
   the foothold it held, but neither goes back to that foothold's start nor
