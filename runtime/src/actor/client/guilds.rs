@@ -353,6 +353,26 @@ impl ClientActor {
         .await
     }
 
+    /// After a Name Change, at logout: the other members online get the
+    /// guild again, with the new name in it.
+    pub(super) async fn show_new_name_to_guild(&mut self) -> Result<(), RuntimeError> {
+        let Some(guild_id) = self.in_game()?.player.guild.as_ref().map(|tag| tag.id) else {
+            return Ok(());
+        };
+        let Some(guild) = spawn_db(move || db::guild::load(guild_id)).await? else {
+            return Ok(());
+        };
+        let cid = self.client_id;
+        for member in guild.members.iter().filter(|member| member.id != cid) {
+            self.send_to_directory(DirectoryMessage::GuildInfo {
+                owner: member.id,
+                guild: guild.clone(),
+            })
+            .await?;
+        }
+        Ok(())
+    }
+
     /// The directory, which knows who is online, sends the guild.
     async fn show_guild(&mut self, guild_id: i32) -> Result<(), RuntimeError> {
         let Some(guild) = spawn_db(move || db::guild::load(guild_id)).await? else {

@@ -135,22 +135,35 @@ impl ClientActor {
     }
 
     async fn send_buddies(&mut self, rows: Vec<Buddy>, entering: bool) -> Result<(), RuntimeError> {
-        let buddies = rows
-            .into_iter()
-            .map(|buddy| ListedBuddy {
-                id: buddy.id,
-                name: buddy.name,
-                group: buddy.group,
-                mutual: buddy.mutual,
-                pending: buddy.pending,
-            })
-            .collect();
         self.send_to_directory(DirectoryMessage::BuddyList {
             owner: self.client_id,
-            buddies,
+            buddies: listed(rows),
             entering,
         })
         .await
+    }
+
+    /// After a Name Change, at logout: everyone online whose list holds the
+    /// player gets the whole list again. The client keeps the names of the
+    /// last list it had, and a buddy's login only gives their channel.
+    pub(super) async fn show_new_name_to_buddies(&mut self) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let lists = spawn_db(move || {
+            db::buddy::listed_in(cid)?
+                .into_iter()
+                .map(|owner| Ok((owner, db::buddy::list(owner)?)))
+                .collect::<db::Result<Vec<_>>>()
+        })
+        .await?;
+        for (owner, rows) in lists {
+            self.send_to_directory(DirectoryMessage::BuddyList {
+                owner,
+                buddies: listed(rows),
+                entering: false,
+            })
+            .await?;
+        }
+        Ok(())
     }
 
     async fn announce_channel(
@@ -165,4 +178,16 @@ impl ClientActor {
         self.send_to_directory(DirectoryMessage::Deliver { to, packet })
             .await
     }
+}
+
+fn listed(rows: Vec<Buddy>) -> Vec<ListedBuddy> {
+    rows.into_iter()
+        .map(|buddy| ListedBuddy {
+            id: buddy.id,
+            name: buddy.name,
+            group: buddy.group,
+            mutual: buddy.mutual,
+            pending: buddy.pending,
+        })
+        .collect()
 }

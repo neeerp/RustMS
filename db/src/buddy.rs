@@ -80,6 +80,15 @@ pub fn mutual_ids(cid: i32) -> crate::Result<Vec<i32>> {
         .collect())
 }
 
+/// Characters whose list holds `cid` at all, an unanswered request too.
+pub fn listed_in(cid: i32) -> crate::Result<Vec<i32>> {
+    let mut conn = crate::connection()?;
+    Ok(buddies::table
+        .filter(buddies::buddy_id.eq(cid))
+        .select(buddies::character_id)
+        .load::<i32>(&mut conn)?)
+}
+
 /// Characters whose (accepted) list holds `cid`.
 fn listed_by(conn: &mut PgConnection, cid: i32) -> QueryResult<HashSet<i32>> {
     Ok(buddies::table

@@ -202,6 +202,44 @@ pub async fn rename_character(character_id: i32, name: &str) -> Result<(), Harne
     .await
 }
 
+/// Make the characters `a` and `b` buddies of each other.
+pub async fn befriend(a: i32, b: i32) -> Result<(), HarnessError> {
+    for (owner, buddy) in [(a, b), (b, a)] {
+        change_one_row("befriend", move |conn| {
+            diesel::sql_query(
+                "INSERT INTO buddies (character_id, buddy_id, group_name, pending) \
+                 VALUES ($1, $2, 'Default Group', false)",
+            )
+            .bind::<Integer, _>(owner)
+            .bind::<Integer, _>(buddy)
+            .execute(conn)
+        })
+        .await?;
+    }
+    Ok(())
+}
+
+/// Queue a Name Change from `old` to `new` for `character_id`, as a
+/// bought one would be, to be made at its next logout.
+pub async fn queue_name_change(
+    character_id: i32,
+    old: &str,
+    new: &str,
+) -> Result<(), HarnessError> {
+    let (old, new) = (old.to_string(), new.to_string());
+    change_one_row("queue name change", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO name_changes (character_id, cash_id, price, old_name, new_name) \
+             VALUES ($1, $1, 0, $2, $3)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Text, _>(old)
+        .bind::<Text, _>(new)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Make the logged-out character `character_id` a level `level` `job`
 /// with `mp` MP of `mp`.
 pub async fn set_job(character_id: i32, job: i16, level: i16, mp: i16) -> Result<(), HarnessError> {
