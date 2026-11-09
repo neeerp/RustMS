@@ -66,7 +66,7 @@ beside it.
   (1642) do the checking on both sides (see [Quests](./quests.md)), on the
   first pet out only. The script asks (and if, by the answer, the pet no
   longer leads or the rock or fee are gone, says so and changes nothing), then takes the rock and 10,000 mesos
-  (Cosmic's fee; no v83 source gives one), evolves the pet
+  (the fee the quests' own text names, Say.img 8185/8189 `0/yes/1`), evolves the pet
   (`Effect::EvolvePet`, `net::packet::handle::world::evolve_pet`) and
   completes the quest. The new kind is rolled by the baby's `evol*` weights
   (`rock_evolutions`, `roll_evolution`): the Baby Dragon's four dragons

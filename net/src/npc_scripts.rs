@@ -64,7 +64,8 @@ const PET_SECRET_QUEST: i16 = 4647;
 const HIDDEN_NOTE: i32 = 4031921;
 const PET_SNACK: i32 = 5460000;
 /// Garnox in New Leaf City and Singapore, who evolves pets with the Rock of Evolution
-/// for a fee (Cosmic's 10,000 mesos): the Baby Dragon (quest 8185), the
+/// for a fee (10,000 mesos, as the quests' own text says in Say.img 8185 and
+/// 8189): the Baby Dragon (quest 8185), the
 /// Baby Robo with 50 Cheap Batteries (4659), and a grown pet again (8189).
 const GARNOX: i32 = 9102001;
 const EVOLUTION_FEE: i32 = 10_000;
