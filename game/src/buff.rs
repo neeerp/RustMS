@@ -429,6 +429,11 @@ impl Buffs {
             .any(|&(id, until)| id == skill_id && until > now)
     }
 
+    /// The skills cooling down, each with when it is usable again.
+    pub fn cooldowns(&self) -> &[(i32, Instant)] {
+        &self.cooldowns
+    }
+
     pub fn start_cooldown(&mut self, skill_id: i32, now: Instant, length: Duration) {
         self.cooldowns.retain(|&(id, _)| id != skill_id);
         self.cooldowns.push((skill_id, now + length));

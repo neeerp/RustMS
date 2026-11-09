@@ -95,7 +95,7 @@ change. The client shows nothing. A world stopped without that cleanup
 leaves in-game sessions behind; the restarted world clears them and deletes
 those characters' expireOnLogout items (`drop_stale_logout_items` in
 `runtime/src/world.rs`). Loading a character brings HP and MP down within
-the maximum, since no buff survives a logout or channel change.
+the maximum, since no buff survives a logout.
 
 ## One-of-a-kind items
 

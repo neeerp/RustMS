@@ -85,6 +85,7 @@ pub async fn run_world_server(bind_host: &str) -> Result<(), RuntimeError> {
         directory: directory_tx,
         fields,
         quest_clocks: Default::default(),
+        buffs: Default::default(),
     };
 
     let mut listeners = JoinSet::new();

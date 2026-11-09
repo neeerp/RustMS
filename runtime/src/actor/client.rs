@@ -112,6 +112,8 @@ pub struct WorldServices {
     pub fields: Arc<FieldRegistry>,
     /// The timed quests' clocks of players changing channel.
     pub quest_clocks: Arc<timed_quest::QuestClocks>,
+    /// The buffs and cooldowns of players changing channel.
+    pub buffs: Arc<buff::HandedBuffs>,
 }
 
 /// State that exists only after the client entered the game.
@@ -957,8 +959,10 @@ impl ClientActor {
         // Items that expired meanwhile are gone before the client sees them;
         // it says which once in the game.
         let expired = net::items::expire_items(&mut player, SystemTime::now());
-        // No buff lasts past a logout or a channel change, and gear may have
-        // gone: HP and MP come back within the maximum without them.
+        // Buffs come along from another channel, but none lasts past a
+        // logout, and gear may have gone: HP and MP come back within the
+        // maximum without them.
+        self.take_handed_buffs(&mut player);
         player.fit_hp_mp();
         self.client_id = character_id;
         let quests_ran_out = self.resume_timed_quests(&mut player).await?;
@@ -1032,6 +1036,7 @@ impl ClientActor {
         });
         self.join_current_field(spawn).await?;
         self.show_mount().await?;
+        self.show_handed_buffs().await?;
         self.load_buddies().await?;
         self.load_guild().await?;
         self.load_family().await?;
@@ -1169,7 +1174,6 @@ impl ClientActor {
         let session_id = self.session_id.ok_or(RuntimeError::NotLoggedIn)?;
 
         self.remember_spawn_point();
-        self.cancel_buffs().await?;
         self.close_door().await?;
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
@@ -1180,6 +1184,7 @@ impl ClientActor {
             .await?;
         self.changing_channel = true;
         self.hand_over_quest_clocks(session_id);
+        self.hand_over_buffs(session_id).await?;
 
         let mut redirect = build::world::channel::build_channel_change(channel.host, channel.port)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
@@ -2545,6 +2550,7 @@ mod tests {
             directory,
             fields: FieldRegistry::new(Duration::from_millis(100)),
             quest_clocks: Arc::default(),
+            buffs: Arc::default(),
         };
         let actor = ClientActor::new(stream, addr.ip(), 0, services)
             .await

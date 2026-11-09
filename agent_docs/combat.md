@@ -776,8 +776,14 @@ skill id); when the player has no more than that left it ends instead, as its
 description says ("until 4 seconds before the remaining HP exhausts"). An
 expired buff sends CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
 icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
-and answers with CANCEL_BUFF. Dying and changing channel end every buff;
-cooldowns keep running.
+and answers with CANCEL_BUFF. Dying ends every buff; cooldowns keep running.
+A channel change or a trip to the Cash Shop keeps the buffs and cooldowns:
+the old session hands them over (`HandedBuffs` in `WorldServices`, keyed by
+character and session like the quest clocks), the new one takes them before
+fitting HP and MP, and `build_buffs_again` tells the client each one again
+with the time left (GIVE_BUFF grouped by skill, then energy, dash and
+COOLDOWN). Riding and the Homing Beacon end at the change; a logout ends
+everything.
 
 A skill that reaches the party (`skills::reaches_party`) carries a slot mask
 after the level: 0x80 alone, else bit `1 << (5 - slot)` for each member the

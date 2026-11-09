@@ -15,7 +15,32 @@ use net::packet::handle::world::{
 use net::summons::Support;
 use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tracing::warn;
+
+/// The buffs and cooldowns of players changing channel or leaving the Cash
+/// Shop, by character, for the channel they arrive on. Like the quest
+/// clocks they go with the session, so only the login that carries it on
+/// picks them up; the channels share one clock, so they keep running on
+/// the way.
+#[derive(Default)]
+pub struct HandedBuffs(Mutex<HashMap<i32, (i32, Buffs)>>);
+
+impl HandedBuffs {
+    fn hand_over(&self, character_id: i32, session_id: i32, buffs: Buffs) {
+        let mut waiting = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        waiting.insert(character_id, (session_id, buffs));
+    }
+
+    fn take(&self, character_id: i32, session_id: Option<i32>) -> Option<Buffs> {
+        let mut waiting = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        match waiting.remove(&character_id) {
+            Some((session, buffs)) if Some(session) == session_id => Some(buffs),
+            _ => None,
+        }
+    }
+}
 
 /// What a player is told when their mount tires them off it.
 const MOUNT_TIRED: &str =
@@ -325,8 +350,39 @@ impl ClientActor {
         self.show_buffs(announce).await
     }
 
-    /// End every buff now, e.g. on death. Buffs don't follow the player to
-    /// another channel either.
+    /// Changing channel, or leaving the Cash Shop: the buffs and cooldowns
+    /// go with the session, as a v83 server's buff storage keeps them
+    /// (Cosmic's PlayerBuffStorage). A ride and Homing Beacon's mark end
+    /// first, as they belong to the map.
+    pub(super) async fn hand_over_buffs(&mut self, session_id: i32) -> Result<(), RuntimeError> {
+        if let Some(skill_id) = self.in_game()?.player.ride_skill() {
+            self.end_buff(skill_id).await?;
+        }
+        self.drop_beacon().await?;
+        let buffs = std::mem::take(&mut self.in_game_mut()?.player.buffs);
+        self.services
+            .buffs
+            .hand_over(self.client_id, session_id, buffs);
+        Ok(())
+    }
+
+    /// Entering the game as `player`: the buffs and cooldowns they brought
+    /// from another channel, if any.
+    pub(super) fn take_handed_buffs(&self, player: &mut game::Player) {
+        if let Some(buffs) = self.services.buffs.take(player.id(), self.session_id) {
+            player.buffs = buffs;
+        }
+    }
+
+    /// Once in the field, tell the client the buffs and cooldowns the
+    /// player brought along; its user starts with none.
+    pub(super) async fn show_handed_buffs(&mut self) -> Result<(), RuntimeError> {
+        let buffs = &self.in_game()?.player.buffs;
+        let mut packets = buff::build_buffs_again(buffs, std::time::Instant::now())?;
+        self.send_all(&mut packets).await
+    }
+
+    /// End every buff now, e.g. on death.
     pub(super) async fn cancel_buffs(&mut self) -> Result<(), RuntimeError> {
         self.end_buffs(Buffs::clear).await
     }
