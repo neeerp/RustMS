@@ -410,11 +410,11 @@ namespace ms
 
 		const char *refusal = nullptr;
 
-		// Nor while a dialog is open, nor from a GM's account.
-		if (UI::get().dialog_open())
-			refusal = "Not available";
-		else if (Configuration::get().get_grade().gm())
+		// Nor from a GM's account, nor while a dialog is open.
+		if (Configuration::get().get_grade().gm())
 			refusal = account_grade::NOT_FOR_ADMIN;
+		else if (UI::get().dialog_open())
+			refusal = "Not available";
 		else if (Stage::get().is_player(cid) || !Stage::get().get_character(cid))
 			refusal = "Unable to find the character.";
 

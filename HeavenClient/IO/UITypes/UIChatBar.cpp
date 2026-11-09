@@ -22,6 +22,7 @@
 #include <cstdlib>
 
 #include "UIGroupPicker.h"
+#include "UITradingRoom.h"
 #include "UINotice.h"
 #include "UIWhisperPrompt.h"
 #include "UIStatusBar.h"
@@ -389,6 +390,14 @@ namespace ms
 							else if (parse_find_command(msg, target))
 							{
 								send_whisper(target, "");
+							}
+							// A trade with someone on the map, as from their
+							// character info (FUN_0052fad4). v83's /CashTrade asks
+							// for a cash trade, which RustMS doesn't have.
+							else if (parse_command_argument(msg, "/trade", target)
+								|| parse_command_argument(msg, "/Game Trade", target))
+							{
+								UITradingRoom::request(Stage::get().get_chars().find(target));
 							}
 							else if (PartyCommands::run(msg))
 							{
