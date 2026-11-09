@@ -59,7 +59,11 @@ async fn snail_cards_fill_the_book_and_persist_with_the_cover() {
             pickup(card.object_id, card.x, card.y),
         )
         .await;
-        until(&mut hunter.connection, &mut h, |t| t.cards.len() > kill).await;
+        // The card goes in first; the map hears it taken after (P259).
+        until(&mut hunter.connection, &mut h, |t| {
+            t.cards.len() > kill && !t.field.removals(card.object_id).is_empty()
+        })
+        .await;
         assert_eq!(
             h.field.removals(card.object_id),
             [Some(hunter.character_id)]

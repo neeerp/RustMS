@@ -21,6 +21,8 @@ use tokio::time::Duration;
 
 const LITH_HARBOR: i32 = 104_000_000;
 const RIEN_DOCK: i32 = 140_020_300;
+/// The town Puro's choice names (the dock is "Dangerous Forest").
+const RIEN: i32 = 140_000_000;
 const LITH_TO_RIEN: i32 = 200_090_060;
 const RIEN_TO_LITH: i32 = 200_090_070;
 const ORBIS_FERRY_PLATFORM: i32 = 200_000_161;
@@ -97,13 +99,27 @@ async fn puro_ferries_a_player_to_rien_and_back_on_a_countdown() {
     let mut session = traveller(&config, 1600, LITH_HARBOR).await;
     let m = session.character_name.clone();
     let c = &mut session.connection;
-    for (from, puro, ride, to, meso) in [
-        (LITH_HARBOR, PURO_IN_LITH, LITH_TO_RIEN, RIEN_DOCK, 800),
-        (RIEN_DOCK, PURO_IN_RIEN, RIEN_TO_LITH, LITH_HARBOR, 0),
+    for (from, puro, ride, to, town, meso) in [
+        (
+            LITH_HARBOR,
+            PURO_IN_LITH,
+            LITH_TO_RIEN,
+            RIEN_DOCK,
+            RIEN,
+            800,
+        ),
+        (
+            RIEN_DOCK,
+            PURO_IN_RIEN,
+            RIEN_TO_LITH,
+            LITH_HARBOR,
+            LITH_HARBOR,
+            0,
+        ),
     ] {
         let t = step(c, &format!("{m} talk"), talk(from, puro)).await;
         assert_eq!(t.prompts, [(puro, 4)]);
-        assert!(t.prompt_texts[0].contains(&format!("#m{to}#")));
+        assert!(t.prompt_texts[0].contains(&format!("#m{town}#")));
         let t = step(c, &format!("{m} pick"), answer(4, 1, Some(0))).await;
         assert_eq!(t.prompts, [(puro, 1)]);
         let mut t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;

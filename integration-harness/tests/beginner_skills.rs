@@ -2,7 +2,9 @@
 //! through CLOSE_RANGE_ATTACK, and Recovery and Nimble Feet are buffs from
 //! USE_SKILL. Each spends its MP, and the map sees it used.
 
-use integration_harness::hunting::{attack, cancel_buff, skill_attack, spend_sp, use_skill};
+use integration_harness::hunting::{
+    attack, cancel_buff, magic_attack, skill_attack, spend_sp, use_skill,
+};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{barrier, read_for, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, WorldSession};
@@ -75,7 +77,10 @@ async fn beginner_skills_spend_mp_and_take_effect() {
     // Three Snails at level 1 does exactly 10, for 3 of a new beginner's 5 MP.
     until(&mut a.connection, ta, |t| !t.field.alive(SNAIL).is_empty()).await;
     let target = ta.field.alive(SNAIL)[0];
-    send(&mut a.connection, skill_attack(THREE_SNAILS, target, 11)).await;
+    // v83 casts Three Snails (MAGIC_ATTACK), and a spell past its cap is
+    // refused outright; a physical one could be on a mob iced by Combo
+    // Tempest, which only the field knows (P234).
+    send(&mut a.connection, magic_attack(THREE_SNAILS, target, 11)).await;
     send(&mut a.connection, skill_attack(RECOVERY, target, 1)).await;
     barrier(&mut a.connection, "refused", ta).await;
     // Still the 5 MP from the level-up update.

@@ -43,11 +43,15 @@ async fn snipe_hits_hard_and_cools_down() {
     until(c, &mut h, |t| t.field.alive(SNAIL).len() >= 2).await;
     let snails = h.field.alive(SNAIL);
 
-    // More than 199,999 is refused.
+    // More than 199,999 is refused. A shot past every cap could be on a mob
+    // iced by Combo Tempest, which only the field knows, so it's spent
+    // (and cools down) before the field refuses it (P234).
     send(c, ranged_attack(SNIPE, QUIVER, snails[0], 200_000)).await;
+    until(c, &mut h, |t| t.cooldowns.contains(&(SNIPE, 4))).await;
     read_for(c, &mut h, 400).await;
     assert!(!h.field.killed.contains(&snails[0]));
-    assert!(h.cooldowns.is_empty());
+    until(c, &mut h, |t| t.cooldowns.contains(&(SNIPE, 0))).await;
+    h.cooldowns.clear();
 
     // 199,999 kills, and the client hears of the cooltime.
     send(c, ranged_attack(SNIPE, QUIVER, snails[0], 199_999)).await;
