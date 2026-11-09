@@ -336,9 +336,11 @@ namespace ms
 			// In the air the object may still hold the floor it walked off
 			// when there is none below it. Only a line the step crosses stops
 			// a fall (0x9b34c8), not that floor's line drawn on past its end.
+			// Nor does a line drawn right to left, such as the underside of a
+			// block: v83 meets one only from below, as a ceiling.
 			const Foothold &held = get_fh(phobj.fhid);
 
-			if (!phobj.onground && (phobj.next_x() < held.l() || phobj.next_x() > held.r()))
+			if (!phobj.onground && (held.x1() >= held.x2() || phobj.next_x() < held.l() || phobj.next_x() > held.r()))
 				collision = false;
 
 			if (collision)

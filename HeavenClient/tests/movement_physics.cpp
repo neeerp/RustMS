@@ -1428,6 +1428,31 @@ void onto_a_steep_riser()
 	std::filesystem::remove(path);
 }
 
+void through_a_backward_line()
+{
+	auto path = foothold_map({
+		{3, 7, -2000, 900, -1500, 900, 0, 0},
+		{1, 1, 0, 0, 200, 0, 0, 0},
+		{1, 2, 150, -50, 50, -50, 0, 0},
+	});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(100.0); player.set_y(-60.0);
+		player.onground = false;
+		player.vspeed = 3.0;
+
+		for (int tick = 0; tick < 60 && !player.onground; tick++)
+			physics.move_object(player);
+
+		require(player.onground && player.fhid == 1, "a fall landed on a line drawn right to left");
+		require(player.crnt_y() == 0.0, "a fall through a line drawn right to left missed the floor");
+	}
+	std::filesystem::remove(path);
+}
+
 void drops_from_under_the_map()
 {
 	auto path = foothold_map({
@@ -1938,6 +1963,7 @@ int main()
 		jump_after_a_joint_landing();
 		up_a_steep_riser();
 		onto_a_steep_riser();
+		through_a_backward_line();
 		drops_from_under_the_map();
 		std::cout << "Movement physics passed\n";
 		return 0;
