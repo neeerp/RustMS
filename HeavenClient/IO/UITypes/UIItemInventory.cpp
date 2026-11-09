@@ -994,13 +994,15 @@ namespace ms
 
 		// v83 FUN_00a0977b: a summoning sack (210xxxx) stays shut while
 		// riding or where the map forbids it, and asks first unless it is an
-		// event's.
+		// event's. A GM skips both the map's rule and the question.
 		void use_summon_sack(int16_t slot, int32_t item_id)
 		{
 			if (Stage::get().get_player().ride_refuses())
 				return;
 
-			if (!Stage::get().get_mapinfo().can_summon(item_id))
+			bool gm = Configuration::get().get_grade().gm();
+
+			if (!Stage::get().get_mapinfo().can_summon(item_id, gm))
 			{
 				UI::get().emplace<UIOk>(NOT_HERE, [](bool)
 				{});
@@ -1012,7 +1014,7 @@ namespace ms
 				Stage::get().get_player().request(SummonSackPacket(slot, item_id), ExclRequest::USE_WAIT);
 			};
 
-			if (!field_limit::sack_asks(item_id))
+			if (!field_limit::sack_asks(item_id, gm))
 				open();
 			else
 				UI::get().emplace<UIYesNo>(SUMMON_SACK, [open](bool yes)
